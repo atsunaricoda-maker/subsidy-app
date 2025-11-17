@@ -1498,9 +1498,14 @@ app.get('/client/:id', async (c) => {
         </div>
 
         <!-- 顧客編集モーダル -->
-        <div id="editClientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg p-8 max-w-md w-full">
-                <h3 class="text-xl font-bold mb-4">顧客情報編集</h3>
+        <div id="editClientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeEditModal()">
+            <div class="bg-white rounded-lg p-4 md:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold">顧客情報編集</h3>
+                    <button onclick="closeEditModal()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
                 <form id="editClientForm" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium mb-1">顧客名 *</label>
@@ -1543,11 +1548,11 @@ app.get('/client/:id', async (c) => {
                         <textarea name="notes" id="edit_notes" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
                     </div>
                     <div class="flex gap-2 pt-4">
-                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 text-base">
                             更新
                         </button>
                         <button type="button" onclick="closeEditModal()" 
-                                class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                                class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 text-base">
                             キャンセル
                         </button>
                     </div>
@@ -1807,17 +1812,24 @@ app.get('/client/:id', async (c) => {
                     const formData = new FormData(e.target);
                     const data = Object.fromEntries(formData);
                     
-                    console.log('Updating client:', data);
+                    console.log('=== 更新前の状態 ===');
+                    console.log('現在のステータス:', currentClient.status);
+                    console.log('送信するデータ:', data);
+                    console.log('新しいステータス:', data.status);
                     
                     const response = await axios.put(\`/api/clients/\${CLIENT_ID}\`, data);
                     
-                    console.log('Update response:', response);
+                    console.log('=== 更新レスポンス ===', response.data);
                     
                     closeEditModal();
                     await loadClient();
+                    
+                    console.log('=== 更新後の状態 ===');
+                    console.log('更新後のステータス:', currentClient.status);
+                    
                     showToast('顧客情報を更新しました！');
                 } catch (error) {
-                    console.error('Update error:', error);
+                    console.error('=== 更新エラー ===', error);
                     alert('更新に失敗しました: ' + (error.response?.data?.error || error.message));
                 } finally {
                     // ボタンを元に戻す
