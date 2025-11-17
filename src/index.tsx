@@ -405,26 +405,85 @@ app.get('/api/clients/:id/documents', async (c) => {
   return c.json(result.results)
 })
 
-// 書類アップロード（メタデータのみ - 実際のファイルはR2に保存）
-app.post('/api/clients/:id/documents', async (c) => {
-  const { DB } = c.env
+// 書類アップロード（実際のファイルをR2に保存）
+app.post('/api/clients/:id/documents/upload', async (c) => {
+  const { DB, R2 } = c.env
   const id = c.req.param('id')
-  const data = await c.req.json()
   
-  const result = await DB.prepare(`
-    INSERT INTO documents (client_id, document_type, file_name, file_path, file_size, uploaded_by)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(
-    id,
-    data.document_type,
-    data.file_name,
-    data.file_path,
-    data.file_size || 0,
-    data.uploaded_by
-  ).run()
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    const documentType = formData.get('document_type') as string
+    const uploadedBy = formData.get('uploaded_by') as string
+    
+    if (!file) {
+      return c.json({ error: 'No file provided' }, 400)
+    }
+    
+    if (!documentType) {
+      return c.json({ error: 'No document_type provided' }, 400)
+    }
+    
+    // R2にファイル保存
+    const timestamp = Date.now()
+    const fileName = `${timestamp}-${file.name}`
+    const filePath = `documents/${id}/${fileName}`
+    
+    await R2.put(filePath, file.stream(), {
+      httpMetadata: {
+        contentType: file.type
+      }
+    })
+    
+    // メタデータをD1に保存
+    const result = await DB.prepare(`
+      INSERT INTO documents (client_id, document_type, file_name, file_path, file_size, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      id,
+      documentType,
+      file.name,
+      filePath,
+      file.size,
+      uploadedBy || 'client'
+    ).run()
+    
+    return c.json({ 
+      id: result.meta.last_row_id,
+      file_path: filePath
+    })
+  } catch (error) {
+    console.error('Upload error:', error)
+    return c.json({ error: 'Upload failed' }, 500)
+  }
+})
+
+// ファイルダウンロード
+app.get('/api/documents/:id/download', async (c) => {
+  const { DB, R2 } = c.env
+  const id = c.req.param('id')
   
-  return c.json({ 
-    id: result.meta.last_row_id 
+  // ドキュメント情報取得
+  const doc = await DB.prepare(`
+    SELECT * FROM documents WHERE id = ?
+  `).bind(id).first()
+  
+  if (!doc) {
+    return c.json({ error: 'Document not found' }, 404)
+  }
+  
+  // R2からファイル取得
+  const object = await R2.get(doc.file_path)
+  
+  if (!object) {
+    return c.json({ error: 'File not found in storage' }, 404)
+  }
+  
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': object.httpMetadata?.contentType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${doc.file_name}"`
+    }
   })
 })
 
@@ -571,6 +630,58 @@ app.get('/client/:id', async (c) => {
             </div>
         </div>
 
+        <!-- 顧客編集モーダル -->
+        <div id="editClientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-8 max-w-md w-full">
+                <h3 class="text-xl font-bold mb-4">顧客情報編集</h3>
+                <form id="editClientForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">顧客名 *</label>
+                        <input type="text" name="name" id="edit_name" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">会社名</label>
+                        <input type="text" name="company_name" id="edit_company_name" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">メールアドレス</label>
+                        <input type="email" name="email" id="edit_email" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">電話番号</label>
+                        <input type="tel" name="phone" id="edit_phone" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">ステータス</label>
+                        <select name="status" id="edit_status" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="inquiry">見込み</option>
+                            <option value="consulting">相談中</option>
+                            <option value="preparing">書類準備中</option>
+                            <option value="applying">申請中</option>
+                            <option value="completed">完了</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">担当スタッフ</label>
+                        <input type="text" name="assigned_staff" id="edit_assigned_staff" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">メモ</label>
+                        <textarea name="notes" id="edit_notes" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                    </div>
+                    <div class="flex gap-2 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            更新
+                        </button>
+                        <button type="button" onclick="closeEditModal()" 
+                                class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                            キャンセル
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             const CLIENT_ID = ${id};
@@ -581,19 +692,21 @@ app.get('/client/:id', async (c) => {
                 applying: '申請中',
                 completed: '完了'
             };
+            
+            let currentClient = null;
 
             async function loadClient() {
                 const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                const client = response.data;
+                currentClient = response.data;
                 
                 document.getElementById('clientInfo').innerHTML = \`
-                    <div><strong>会社名:</strong> \${client.company_name || '-'}</div>
-                    <div><strong>メール:</strong> \${client.email || '-'}</div>
-                    <div><strong>電話:</strong> \${client.phone || '-'}</div>
-                    <div><strong>ステータス:</strong> \${STATUS_LABELS[client.status]}</div>
-                    <div><strong>担当:</strong> \${client.assigned_staff || '-'}</div>
-                    <div><strong>メモ:</strong> \${client.notes || '-'}</div>
-                    <div><strong>顧客ポータル:</strong> <a href="/portal/\${client.access_token}" target="_blank" class="text-blue-600 hover:underline">リンク</a></div>
+                    <div><strong>会社名:</strong> \${currentClient.company_name || '-'}</div>
+                    <div><strong>メール:</strong> \${currentClient.email || '-'}</div>
+                    <div><strong>電話:</strong> \${currentClient.phone || '-'}</div>
+                    <div><strong>ステータス:</strong> \${STATUS_LABELS[currentClient.status]}</div>
+                    <div><strong>担当:</strong> \${currentClient.assigned_staff || '-'}</div>
+                    <div><strong>メモ:</strong> \${currentClient.notes || '-'}</div>
+                    <div><strong>顧客ポータル:</strong> <a href="/portal/\${currentClient.access_token}" target="_blank" class="text-blue-600 hover:underline">リンク</a></div>
                 \`;
             }
 
@@ -608,12 +721,49 @@ app.get('/client/:id', async (c) => {
                 }
                 
                 container.innerHTML = docs.map(doc => \`
-                    <div class="border-b py-2 last:border-b-0">
-                        <div class="font-medium text-sm">\${doc.document_type}</div>
-                        <div class="text-xs text-gray-500">\${doc.file_name}</div>
-                        <div class="text-xs text-gray-400">\${new Date(doc.uploaded_at).toLocaleString('ja-JP')}</div>
+                    <div class="border-b py-3 last:border-b-0">
+                        <div class="mb-2">
+                            <div class="font-medium text-sm">\${doc.document_type}</div>
+                            <div class="text-xs text-gray-500">\${doc.file_name}</div>
+                            <div class="text-xs text-gray-400">\${new Date(doc.uploaded_at).toLocaleString('ja-JP')}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs px-2 py-1 rounded-full \${
+                                doc.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                doc.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }">
+                                \${doc.status === 'approved' ? '承認済み' : doc.status === 'rejected' ? '差し戻し' : '確認中'}
+                            </span>
+                            <a href="/api/documents/\${doc.id}/download" 
+                               class="text-blue-600 hover:text-blue-800 text-xs">
+                                <i class="fas fa-download mr-1"></i>DL
+                            </a>
+                            \${doc.status !== 'approved' ? \`
+                                <button onclick="updateDocumentStatus(\${doc.id}, 'approved')" 
+                                        class="text-xs text-green-600 hover:text-green-800">
+                                    <i class="fas fa-check mr-1"></i>承認
+                                </button>
+                            \` : ''}
+                            \${doc.status !== 'rejected' ? \`
+                                <button onclick="updateDocumentStatus(\${doc.id}, 'rejected')" 
+                                        class="text-xs text-red-600 hover:text-red-800">
+                                    <i class="fas fa-times mr-1"></i>差戻し
+                                </button>
+                            \` : ''}
+                        </div>
                     </div>
                 \`).join('');
+            }
+            
+            async function updateDocumentStatus(docId, status) {
+                try {
+                    await axios.put(\`/api/documents/\${docId}/status\`, { status });
+                    loadDocuments();
+                } catch (error) {
+                    alert('ステータス更新に失敗しました');
+                    console.error(error);
+                }
             }
 
             async function loadCommunications() {
@@ -657,9 +807,39 @@ app.get('/client/:id', async (c) => {
             });
 
             function editClient() {
-                // TODO: 編集モーダルを実装
-                alert('編集機能は後で実装します');
+                if (!currentClient) return;
+                
+                // フォームに現在の値を設定
+                document.getElementById('edit_name').value = currentClient.name || '';
+                document.getElementById('edit_company_name').value = currentClient.company_name || '';
+                document.getElementById('edit_email').value = currentClient.email || '';
+                document.getElementById('edit_phone').value = currentClient.phone || '';
+                document.getElementById('edit_status').value = currentClient.status || 'inquiry';
+                document.getElementById('edit_assigned_staff').value = currentClient.assigned_staff || '';
+                document.getElementById('edit_notes').value = currentClient.notes || '';
+                
+                document.getElementById('editClientModal').classList.remove('hidden');
             }
+            
+            function closeEditModal() {
+                document.getElementById('editClientModal').classList.add('hidden');
+            }
+            
+            document.getElementById('editClientForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                
+                try {
+                    await axios.put(\`/api/clients/\${CLIENT_ID}\`, data);
+                    closeEditModal();
+                    loadClient();
+                    alert('更新しました');
+                } catch (error) {
+                    alert('更新に失敗しました');
+                    console.error(error);
+                }
+            });
 
             loadClient();
             loadDocuments();
@@ -733,7 +913,7 @@ app.get('/portal/:token', async (c) => {
                             <div id="checklistItems" class="space-y-2 text-sm"></div>
                         </div>
 
-                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4">
+                        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4 transition-colors">
                             <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
                             <p class="text-sm text-gray-600 mb-4">ここに書類をドラッグ&ドロップ<br>または</p>
                             <input type="file" id="fileInput" class="hidden" multiple>
@@ -833,18 +1013,24 @@ app.get('/portal/:token', async (c) => {
                 container.innerHTML = docs.map(doc => \`
                     <div class="border rounded-lg p-3 mb-2">
                         <div class="flex items-center justify-between">
-                            <div>
+                            <div class="flex-1">
                                 <div class="font-medium text-sm">\${doc.document_type}</div>
                                 <div class="text-xs text-gray-500">\${doc.file_name}</div>
                                 <div class="text-xs text-gray-400">\${new Date(doc.uploaded_at).toLocaleString('ja-JP')}</div>
                             </div>
-                            <span class="text-xs px-2 py-1 rounded-full \${
-                                doc.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                doc.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
-                            }">
-                                \${doc.status === 'approved' ? '承認済み' : doc.status === 'rejected' ? '差し戻し' : '確認中'}
-                            </span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs px-2 py-1 rounded-full \${
+                                    doc.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                    doc.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                }">
+                                    \${doc.status === 'approved' ? '承認済み' : doc.status === 'rejected' ? '差し戻し' : '確認中'}
+                                </span>
+                                <a href="/api/documents/\${doc.id}/download" 
+                                   class="text-green-600 hover:text-green-800">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 \`).join('');
@@ -901,21 +1087,77 @@ app.get('/portal/:token', async (c) => {
                 
                 if (files.length === 0) return;
                 
-                // 実際のファイルアップロードはR2を使う必要があるため、
-                // ここではメタデータのみ登録（簡易版）
-                for (const file of files) {
-                    await axios.post(\`/api/clients/\${CLIENT_ID}/documents\`, {
-                        document_type: documentType,
-                        file_name: file.name,
-                        file_path: \`documents/\${CLIENT_ID}/\${file.name}\`,
-                        file_size: file.size,
-                        uploaded_by: 'client'
-                    });
+                // 実際のファイルアップロード（R2使用）
+                try {
+                    for (const file of files) {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('document_type', documentType);
+                        formData.append('uploaded_by', 'client');
+                        
+                        await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
+                            headers: {
+                                'Content-Type': 'multipart/form-data'
+                            }
+                        });
+                    }
+                    
+                    alert('アップロードしました');
+                    document.getElementById('fileInput').value = '';
+                    loadDocuments();
+                    loadChecklist();
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    alert('アップロードに失敗しました');
+                }
+            });
+
+            // ドラッグ&ドロップ機能
+            const dropZone = document.getElementById('dropZone');
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-green-500', 'bg-green-50');
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-green-500', 'bg-green-50');
+            });
+            
+            dropZone.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-green-500', 'bg-green-50');
+                
+                const documentType = document.getElementById('documentType').value;
+                if (!documentType) {
+                    alert('書類の種類を選択してください');
+                    return;
                 }
                 
-                alert('アップロードしました');
-                loadDocuments();
-                loadChecklist();
+                const files = e.dataTransfer.files;
+                if (files.length === 0) return;
+                
+                try {
+                    for (const file of files) {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('document_type', documentType);
+                        formData.append('uploaded_by', 'client');
+                        
+                        await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
+                            headers: {
+                                'Content-Type': 'multipart/form-data'
+                            }
+                        });
+                    }
+                    
+                    alert('アップロードしました');
+                    loadDocuments();
+                    loadChecklist();
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    alert('アップロードに失敗しました');
+                }
             });
 
             loadStatus();
