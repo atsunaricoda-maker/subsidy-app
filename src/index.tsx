@@ -12,6 +12,110 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/api/*', cors())
 
 // ===============================
+// 認証機能
+// ===============================
+
+// ログインページ
+app.get('/login', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ログイン - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div class="min-h-screen flex items-center justify-center">
+            <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+                <div class="text-center mb-8">
+                    <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">助成金申請管理システム</h1>
+                    <p class="text-sm text-gray-600 mt-2">管理者ログイン</p>
+                </div>
+                
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">ユーザー名</label>
+                        <input type="text" name="username" required 
+                               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">パスワード</label>
+                        <input type="password" name="password" required 
+                               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" 
+                            class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                        ログイン
+                    </button>
+                </form>
+                
+                <div class="mt-6 p-4 bg-blue-50 rounded-lg text-sm">
+                    <p class="font-medium text-blue-800 mb-2">デモ用ログイン情報：</p>
+                    <p class="text-blue-700">ユーザー名: <code class="bg-white px-2 py-1 rounded">admin</code></p>
+                    <p class="text-blue-700">パスワード: <code class="bg-white px-2 py-1 rounded">admin123</code></p>
+                </div>
+                
+                <div id="errorMessage" class="hidden mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm"></div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                
+                try {
+                    const response = await axios.post('/api/auth/login', data);
+                    localStorage.setItem('admin_token', response.data.token);
+                    localStorage.setItem('admin_name', response.data.name);
+                    window.location.href = '/';
+                } catch (error) {
+                    const errorDiv = document.getElementById('errorMessage');
+                    errorDiv.textContent = 'ログインに失敗しました。ユーザー名またはパスワードが正しくありません。';
+                    errorDiv.classList.remove('hidden');
+                }
+            });
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// ログインAPI
+app.post('/api/auth/login', async (c) => {
+  const { DB } = c.env
+  const { username, password } = await c.req.json()
+  
+  const user = await DB.prepare(`
+    SELECT * FROM admin_users WHERE username = ? AND password_hash = ?
+  `).bind(username, password).first()
+  
+  if (!user) {
+    return c.json({ error: 'Invalid credentials' }, 401)
+  }
+  
+  // 簡易的なトークン生成（本番環境ではJWTなどを使用）
+  const token = btoa(`${user.id}:${Date.now()}`)
+  
+  return c.json({
+    token,
+    name: user.name,
+    username: user.username
+  })
+})
+
+// ログアウトAPI
+app.post('/api/auth/logout', (c) => {
+  return c.json({ success: true })
+})
+
+// ===============================
 // 管理者画面
 // ===============================
 
@@ -37,9 +141,15 @@ app.get('/', (c) => {
                             <i class="fas fa-file-invoice-dollar mr-2"></i>
                             助成金申請管理システム
                         </h1>
-                        <div class="text-sm">
-                            <i class="fas fa-user-shield mr-1"></i>
-                            管理者モード
+                        <div class="flex items-center gap-4 text-sm">
+                            <span id="adminName">
+                                <i class="fas fa-user-shield mr-1"></i>
+                                管理者モード
+                            </span>
+                            <button onclick="logout()" class="hover:underline">
+                                <i class="fas fa-sign-out-alt mr-1"></i>
+                                ログアウト
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -152,6 +262,39 @@ app.get('/', (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+            // 認証チェック
+            function checkAuth() {
+                const token = localStorage.getItem('admin_token');
+                const adminName = localStorage.getItem('admin_name');
+                
+                if (!token) {
+                    window.location.href = '/login';
+                    return false;
+                }
+                
+                if (adminName) {
+                    document.getElementById('adminName').innerHTML = \`
+                        <i class="fas fa-user-shield mr-1"></i>
+                        \${adminName}
+                    \`;
+                }
+                
+                return true;
+            }
+            
+            function logout() {
+                if (confirm('ログアウトしますか？')) {
+                    localStorage.removeItem('admin_token');
+                    localStorage.removeItem('admin_name');
+                    window.location.href = '/login';
+                }
+            }
+            
+            // 認証確認
+            if (!checkAuth()) {
+                // リダイレクト処理は checkAuth 内で実行
+            }
+        
             const STATUS_LABELS = {
                 inquiry: '見込み',
                 consulting: '相談中',
@@ -588,6 +731,10 @@ app.get('/client/:id', async (c) => {
                             </a>
                             <h1 class="text-2xl font-bold">${client.name} の詳細</h1>
                         </div>
+                        <button onclick="logout()" class="text-sm hover:underline">
+                            <i class="fas fa-sign-out-alt mr-1"></i>
+                            ログアウト
+                        </button>
                     </div>
                 </div>
             </header>
@@ -684,6 +831,29 @@ app.get('/client/:id', async (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+            // 認証チェック
+            function checkAuth() {
+                const token = localStorage.getItem('admin_token');
+                if (!token) {
+                    window.location.href = '/login';
+                    return false;
+                }
+                return true;
+            }
+            
+            function logout() {
+                if (confirm('ログアウトしますか？')) {
+                    localStorage.removeItem('admin_token');
+                    localStorage.removeItem('admin_name');
+                    window.location.href = '/login';
+                }
+            }
+            
+            // 認証確認
+            if (!checkAuth()) {
+                // リダイレクト処理は checkAuth 内で実行
+            }
+        
             const CLIENT_ID = ${id};
             const STATUS_LABELS = {
                 inquiry: '見込み',
