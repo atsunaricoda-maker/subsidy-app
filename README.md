@@ -52,6 +52,8 @@
 
 ## 🌐 公開URL
 
+- **本番環境**: https://subsidy-manager.pages.dev
+- **最新デプロイ**: https://c61c2777.subsidy-manager.pages.dev
 - **開発環境**: https://3000-iwrkztrt62csfqxhcj1f7-2e77fc33.sandbox.novita.ai
 
 ### アクセス方法
