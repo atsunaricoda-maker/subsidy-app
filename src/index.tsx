@@ -1876,24 +1876,27 @@ app.get('/portal/:token', async (c) => {
                             <div id="checklistItems" class="space-y-2 text-sm"></div>
                         </div>
 
-                        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-8 text-center mb-4 transition-colors">
-                            <i class="fas fa-cloud-upload-alt text-3xl md:text-4xl text-gray-400 mb-2"></i>
-                            <p class="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">
-                                <span class="hidden sm:inline">ここに書類をドラッグ&ドロップ<br>または</span>
-                                <span class="sm:hidden">タップしてファイルを選択</span>
-                            </p>
-                            <input type="file" id="fileInput" class="hidden" multiple>
-                            <button onclick="document.getElementById('fileInput').click()" 
-                                    class="bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-green-700 text-sm md:text-base w-full sm:w-auto">
-                                <i class="fas fa-file mr-2"></i>ファイルを選択
-                            </button>
-                        </div>
-
                         <div class="mb-4">
-                            <label class="block text-sm font-medium mb-1">書類の種類</label>
-                            <select id="documentType" class="w-full px-4 py-3 border rounded-lg text-base">
+                            <label class="block text-sm font-medium mb-2">1. まず書類の種類を選択してください *</label>
+                            <select id="documentType" class="w-full px-4 py-3 border rounded-lg text-base border-green-500">
                                 <option value="">選択してください</option>
                             </select>
+                        </div>
+
+                        <div id="uploadSection" class="hidden">
+                            <label class="block text-sm font-medium mb-2">2. ファイルをアップロード</label>
+                            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-8 text-center mb-4 transition-colors">
+                                <i class="fas fa-cloud-upload-alt text-3xl md:text-4xl text-gray-400 mb-2"></i>
+                                <p class="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">
+                                    <span class="hidden sm:inline">ここに書類をドラッグ&ドロップ<br>または</span>
+                                    <span class="sm:hidden">タップしてファイルを選択</span>
+                                </p>
+                                <input type="file" id="fileInput" class="hidden" multiple>
+                                <button onclick="document.getElementById('fileInput').click()" 
+                                        class="bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-green-700 text-sm md:text-base w-full sm:w-auto">
+                                    <i class="fas fa-file mr-2"></i>ファイルを選択
+                                </button>
+                            </div>
                         </div>
 
                         <h3 class="font-medium mb-2">アップロード済み書類</h3>
@@ -2044,39 +2047,61 @@ app.get('/portal/:token', async (c) => {
                 loadCommunications();
             });
 
+            // 書類の種類選択時の処理
+            document.getElementById('documentType').addEventListener('change', (e) => {
+                const uploadSection = document.getElementById('uploadSection');
+                if (e.target.value) {
+                    uploadSection.classList.remove('hidden');
+                } else {
+                    uploadSection.classList.add('hidden');
+                }
+            });
+
             document.getElementById('fileInput').addEventListener('change', async (e) => {
                 const files = e.target.files;
                 const documentType = document.getElementById('documentType').value;
                 
                 if (!documentType) {
-                    alert('書類の種類を選択してください');
+                    showMessage('error', '書類の種類を選択してください');
                     return;
                 }
                 
                 if (files.length === 0) return;
                 
+                // アップロード開始を表示
+                showMessage('info', 'アップロード中...');
+                
                 // 実際のファイルアップロード（R2使用）
                 try {
+                    let successCount = 0;
                     for (const file of files) {
                         const formData = new FormData();
                         formData.append('file', file);
                         formData.append('document_type', documentType);
                         formData.append('uploaded_by', 'client');
                         
-                        await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
+                        const response = await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
                             headers: {
                                 'Content-Type': 'multipart/form-data'
                             }
                         });
+                        
+                        if (response.status === 200 && response.data) {
+                            successCount++;
+                        }
                     }
                     
-                    alert('アップロードしました');
+                    showMessage('success', \`\${successCount}件の書類をアップロードしました！\`);
                     document.getElementById('fileInput').value = '';
-                    loadDocuments();
-                    loadChecklist();
+                    await loadDocuments();
+                    await loadChecklist();
                 } catch (error) {
                     console.error('Upload error:', error);
-                    alert('アップロードに失敗しました');
+                    if (error.response) {
+                        showMessage('error', \`アップロードエラー: \${error.response.data.error || '不明なエラー'}\`);
+                    } else {
+                        showMessage('error', 'ネットワークエラーが発生しました。もう一度お試しください。');
+                    }
                 }
             });
 
@@ -2098,35 +2123,84 @@ app.get('/portal/:token', async (c) => {
                 
                 const documentType = document.getElementById('documentType').value;
                 if (!documentType) {
-                    alert('書類の種類を選択してください');
+                    showMessage('error', '書類の種類を選択してください');
                     return;
                 }
                 
                 const files = e.dataTransfer.files;
                 if (files.length === 0) return;
                 
+                // アップロード開始を表示
+                showMessage('info', 'アップロード中...');
+                
                 try {
+                    let successCount = 0;
                     for (const file of files) {
                         const formData = new FormData();
                         formData.append('file', file);
                         formData.append('document_type', documentType);
                         formData.append('uploaded_by', 'client');
                         
-                        await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
+                        const response = await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
                             headers: {
                                 'Content-Type': 'multipart/form-data'
                             }
                         });
+                        
+                        if (response.status === 200 && response.data) {
+                            successCount++;
+                        }
                     }
                     
-                    alert('アップロードしました');
-                    loadDocuments();
-                    loadChecklist();
+                    showMessage('success', \`\${successCount}件の書類をアップロードしました！\`);
+                    await loadDocuments();
+                    await loadChecklist();
                 } catch (error) {
                     console.error('Upload error:', error);
-                    alert('アップロードに失敗しました');
+                    if (error.response) {
+                        showMessage('error', \`アップロードエラー: \${error.response.data.error || '不明なエラー'}\`);
+                    } else {
+                        showMessage('error', 'ネットワークエラーが発生しました。もう一度お試しください。');
+                    }
                 }
             });
+
+            // メッセージ表示関数
+            function showMessage(type, message) {
+                const colors = {
+                    success: 'bg-green-600',
+                    error: 'bg-red-600',
+                    info: 'bg-blue-600'
+                };
+                const icons = {
+                    success: 'fa-check-circle',
+                    error: 'fa-exclamation-circle',
+                    info: 'fa-info-circle'
+                };
+                
+                // 既存のメッセージを削除
+                const existing = document.getElementById('uploadMessage');
+                if (existing) existing.remove();
+                
+                const toast = document.createElement('div');
+                toast.id = 'uploadMessage';
+                toast.className = \`fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-auto \${colors[type]} text-white px-4 md:px-6 py-3 rounded-lg shadow-lg z-50\`;
+                toast.innerHTML = \`
+                    <div class="flex items-center gap-2">
+                        <i class="fas \${icons[type]}"></i>
+                        <span class="text-sm md:text-base">\${message}</span>
+                    </div>
+                \`;
+                document.body.appendChild(toast);
+                
+                if (type !== 'info') {
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        toast.style.transition = 'opacity 0.3s';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 3000);
+                }
+            }
 
             loadStatus();
             loadChecklist();
