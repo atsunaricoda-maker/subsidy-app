@@ -1607,38 +1607,45 @@ app.get('/client/:id', async (c) => {
             }
 
             async function loadClient() {
-                const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                currentClient = response.data;
-                
-                const subsidyType = subsidyTypes.find(s => s.id === currentClient.subsidy_type_id);
-                const portalUrl = \`\${window.location.origin}/portal/\${currentClient.access_token}\`;
-                
-                document.getElementById('clientInfo').innerHTML = \`
-                    <div><strong>会社名:</strong> \${currentClient.company_name || '-'}</div>
-                    <div><strong>メール:</strong> \${currentClient.email || '-'}</div>
-                    <div><strong>電話:</strong> \${currentClient.phone || '-'}</div>
-                    <div><strong>申請助成金:</strong> \${subsidyType ? subsidyType.name : '-'}</div>
-                    <div><strong>ステータス:</strong> \${STATUS_LABELS[currentClient.status]}</div>
-                    <div><strong>担当:</strong> \${currentClient.assigned_staff || '-'}</div>
-                    <div><strong>メモ:</strong> \${currentClient.notes || '-'}</div>
-                    <div class="mt-3 pt-3 border-t">
-                        <strong class="block mb-2">顧客ポータルURL:</strong>
-                        <div class="flex gap-2">
-                            <input type="text" 
-                                   value="\${portalUrl}" 
-                                   readonly 
-                                   class="flex-1 px-3 py-2 border rounded-lg bg-gray-50 text-sm">
-                            <button onclick="copyPortalUrl('\${portalUrl}', '\${currentClient.name}')" 
-                                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 whitespace-nowrap">
-                                <i class="fas fa-copy mr-1"></i>コピー
-                            </button>
+                try {
+                    console.log('Loading client...');
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
+                    currentClient = response.data;
+                    console.log('Client loaded:', currentClient);
+                    
+                    const subsidyType = subsidyTypes.find(s => s.id === currentClient.subsidy_type_id);
+                    const portalUrl = \`\${window.location.origin}/portal/\${currentClient.access_token}\`;
+                    
+                    document.getElementById('clientInfo').innerHTML = \`
+                        <div><strong>会社名:</strong> \${currentClient.company_name || '-'}</div>
+                        <div><strong>メール:</strong> \${currentClient.email || '-'}</div>
+                        <div><strong>電話:</strong> \${currentClient.phone || '-'}</div>
+                        <div><strong>申請助成金:</strong> \${subsidyType ? subsidyType.name : '-'}</div>
+                        <div><strong>ステータス:</strong> \${STATUS_LABELS[currentClient.status]}</div>
+                        <div><strong>担当:</strong> \${currentClient.assigned_staff || '-'}</div>
+                        <div><strong>メモ:</strong> \${currentClient.notes || '-'}</div>
+                        <div class="mt-3 pt-3 border-t">
+                            <strong class="block mb-2">顧客ポータルURL:</strong>
+                            <div class="flex gap-2">
+                                <input type="text" 
+                                       value="\${portalUrl}" 
+                                       readonly 
+                                       class="flex-1 px-3 py-2 border rounded-lg bg-gray-50 text-sm">
+                                <button onclick="copyPortalUrl('\${portalUrl}', '\${currentClient.name}')" 
+                                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 whitespace-nowrap">
+                                    <i class="fas fa-copy mr-1"></i>コピー
+                                </button>
+                            </div>
+                            <a href="/portal/\${currentClient.access_token}" target="_blank" 
+                               class="text-blue-600 hover:underline text-sm mt-1 inline-block">
+                                <i class="fas fa-external-link-alt mr-1"></i>ポータルを開く
+                            </a>
                         </div>
-                        <a href="/portal/\${currentClient.access_token}" target="_blank" 
-                           class="text-blue-600 hover:underline text-sm mt-1 inline-block">
-                            <i class="fas fa-external-link-alt mr-1"></i>ポータルを開く
-                        </a>
-                    </div>
-                \`;
+                    \`;
+                } catch (error) {
+                    console.error('Error loading client:', error);
+                    document.getElementById('clientInfo').innerHTML = '<div class="text-red-600">顧客情報の読み込みに失敗しました</div>';
+                }
             }
             
             // ポータルURLコピー機能
@@ -1788,17 +1795,34 @@ app.get('/client/:id', async (c) => {
             
             document.getElementById('editClientForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const formData = new FormData(e.target);
-                const data = Object.fromEntries(formData);
+                
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
                 
                 try {
-                    await axios.put(\`/api/clients/\${CLIENT_ID}\`, data);
+                    // ローディング表示
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>更新中...';
+                    
+                    const formData = new FormData(e.target);
+                    const data = Object.fromEntries(formData);
+                    
+                    console.log('Updating client:', data);
+                    
+                    const response = await axios.put(\`/api/clients/\${CLIENT_ID}\`, data);
+                    
+                    console.log('Update response:', response);
+                    
                     closeEditModal();
-                    loadClient();
-                    alert('更新しました');
+                    await loadClient();
+                    showToast('顧客情報を更新しました！');
                 } catch (error) {
-                    alert('更新に失敗しました');
-                    console.error(error);
+                    console.error('Update error:', error);
+                    alert('更新に失敗しました: ' + (error.response?.data?.error || error.message));
+                } finally {
+                    // ボタンを元に戻す
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
                 }
             });
 
