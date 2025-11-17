@@ -437,6 +437,7 @@ app.get('/', (c) => {
 
                 container.innerHTML = clients.map(client => {
                     const subsidyType = subsidyTypes.find(s => s.id === client.subsidy_type_id);
+                    const portalUrl = \`\${window.location.origin}/portal/\${client.access_token}\`;
                     return \`
                     <div class="border-b last:border-b-0 py-4 hover:bg-gray-50">
                         <div class="flex items-start justify-between">
@@ -460,15 +461,48 @@ app.get('/', (c) => {
                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
                                     <i class="fas fa-eye mr-1"></i>詳細
                                 </a>
+                                <button onclick="copyPortalUrl('\${portalUrl}', '\${client.name}')"
+                                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm">
+                                    <i class="fas fa-copy mr-1"></i>URL
+                                </button>
                                 <a href="/portal/\${client.access_token}" target="_blank"
                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-                                    <i class="fas fa-external-link-alt mr-1"></i>顧客ポータル
+                                    <i class="fas fa-external-link-alt mr-1"></i>ポータル
                                 </a>
                             </div>
                         </div>
                     </div>
                 \`;
                 }).join('');
+            }
+            
+            // ポータルURLコピー機能
+            function copyPortalUrl(url, clientName) {
+                navigator.clipboard.writeText(url).then(() => {
+                    showToast(\`\${clientName}様のポータルURLをコピーしました！\`);
+                }).catch(err => {
+                    console.error('コピーに失敗しました:', err);
+                    alert('URLのコピーに失敗しました。手動でコピーしてください: ' + url);
+                });
+            }
+            
+            // トースト通知表示
+            function showToast(message) {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in';
+                toast.innerHTML = \`
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-check-circle"></i>
+                        <span>\${message}</span>
+                    </div>
+                \`;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.3s';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
             }
 
             // フィルター・検索
@@ -1532,6 +1566,7 @@ app.get('/client/:id', async (c) => {
                 currentClient = response.data;
                 
                 const subsidyType = subsidyTypes.find(s => s.id === currentClient.subsidy_type_id);
+                const portalUrl = \`\${window.location.origin}/portal/\${currentClient.access_token}\`;
                 
                 document.getElementById('clientInfo').innerHTML = \`
                     <div><strong>会社名:</strong> \${currentClient.company_name || '-'}</div>
@@ -1541,8 +1576,53 @@ app.get('/client/:id', async (c) => {
                     <div><strong>ステータス:</strong> \${STATUS_LABELS[currentClient.status]}</div>
                     <div><strong>担当:</strong> \${currentClient.assigned_staff || '-'}</div>
                     <div><strong>メモ:</strong> \${currentClient.notes || '-'}</div>
-                    <div><strong>顧客ポータル:</strong> <a href="/portal/\${currentClient.access_token}" target="_blank" class="text-blue-600 hover:underline">リンク</a></div>
+                    <div class="mt-3 pt-3 border-t">
+                        <strong class="block mb-2">顧客ポータルURL:</strong>
+                        <div class="flex gap-2">
+                            <input type="text" 
+                                   value="\${portalUrl}" 
+                                   readonly 
+                                   class="flex-1 px-3 py-2 border rounded-lg bg-gray-50 text-sm">
+                            <button onclick="copyPortalUrl('\${portalUrl}', '\${currentClient.name}')" 
+                                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 whitespace-nowrap">
+                                <i class="fas fa-copy mr-1"></i>コピー
+                            </button>
+                        </div>
+                        <a href="/portal/\${currentClient.access_token}" target="_blank" 
+                           class="text-blue-600 hover:underline text-sm mt-1 inline-block">
+                            <i class="fas fa-external-link-alt mr-1"></i>ポータルを開く
+                        </a>
+                    </div>
                 \`;
+            }
+            
+            // ポータルURLコピー機能
+            function copyPortalUrl(url, clientName) {
+                navigator.clipboard.writeText(url).then(() => {
+                    showToast(\`\${clientName}様のポータルURLをコピーしました！\`);
+                }).catch(err => {
+                    console.error('コピーに失敗しました:', err);
+                    alert('URLのコピーに失敗しました。手動でコピーしてください: ' + url);
+                });
+            }
+            
+            // トースト通知表示
+            function showToast(message) {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                toast.innerHTML = \`
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-check-circle"></i>
+                        <span>\${message}</span>
+                    </div>
+                \`;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.3s';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
             }
 
             async function loadDocuments() {
