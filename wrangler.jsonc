@@ -5,18 +5,19 @@
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
-  ],
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "subsidy-manager-production",
-      "database_id": "local-db-for-development"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "R2",
-      "bucket_name": "subsidy-manager-documents"
-    }
   ]
+  // D1とR2は後で手動で設定します
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "subsidy-manager-production",
+  //     "database_id": "YOUR_DATABASE_ID_HERE"
+  //   }
+  // ],
+  // "r2_buckets": [
+  //   {
+  //     "binding": "R2",
+  //     "bucket_name": "subsidy-manager-documents"
+  //   }
+  // ]
 }
