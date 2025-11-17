@@ -261,6 +261,12 @@ app.get('/', (c) => {
                         <input type="tel" name="phone" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
+                        <label class="block text-sm font-medium mb-1">申請する助成金 *</label>
+                        <select name="subsidy_type_id" id="newClientSubsidyType" required class="w-full px-3 py-2 border rounded-lg">
+                            <option value="">選択してください</option>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium mb-1">担当スタッフ</label>
                         <input type="text" name="assigned_staff" class="w-full px-3 py-2 border rounded-lg">
                     </div>
@@ -335,6 +341,7 @@ app.get('/', (c) => {
             };
 
             let allClients = [];
+            let subsidyTypes = [];
 
             // データ読み込み
             async function loadData() {
@@ -348,6 +355,21 @@ app.get('/', (c) => {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
                         '<div class="text-center py-8 text-red-500">データの読み込みに失敗しました</div>';
+                }
+            }
+            
+            // 助成金種別読み込み
+            async function loadSubsidyTypes() {
+                try {
+                    const response = await axios.get('/api/subsidy-types');
+                    subsidyTypes = response.data;
+                    
+                    // 新規登録フォームのセレクトボックスに追加
+                    const select = document.getElementById('newClientSubsidyType');
+                    select.innerHTML = '<option value="">選択してください</option>' +
+                        subsidyTypes.map(type => \`<option value="\${type.id}">\${type.name}（\${type.category}）</option>\`).join('');
+                } catch (error) {
+                    console.error('Error loading subsidy types:', error);
                 }
             }
             
@@ -407,7 +429,9 @@ app.get('/', (c) => {
                     return;
                 }
 
-                container.innerHTML = clients.map(client => \`
+                container.innerHTML = clients.map(client => {
+                    const subsidyType = subsidyTypes.find(s => s.id === client.subsidy_type_id);
+                    return \`
                     <div class="border-b last:border-b-0 py-4 hover:bg-gray-50">
                         <div class="flex items-start justify-between">
                             <div class="flex-1">
@@ -416,6 +440,7 @@ app.get('/', (c) => {
                                     <span class="px-3 py-1 rounded-full text-xs font-medium \${STATUS_COLORS[client.status]}">
                                         \${STATUS_LABELS[client.status]}
                                     </span>
+                                    \${subsidyType ? \`<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${subsidyType.name}</span>\` : ''}
                                 </div>
                                 <div class="text-sm text-gray-600 space-y-1">
                                     \${client.company_name ? \`<div><i class="fas fa-building w-4"></i> \${client.company_name}</div>\` : ''}
@@ -436,7 +461,8 @@ app.get('/', (c) => {
                             </div>
                         </div>
                     </div>
-                \`).join('');
+                \`;
+                }).join('');
             }
 
             // フィルター・検索
@@ -489,6 +515,7 @@ app.get('/', (c) => {
             });
 
             // 初期読み込み
+            loadSubsidyTypes();
             loadData();
         </script>
     </body>
@@ -570,8 +597,8 @@ app.post('/api/clients', async (c) => {
   const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
   
   const result = await DB.prepare(`
-    INSERT INTO clients (name, company_name, email, phone, access_token, assigned_staff, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (name, company_name, email, phone, access_token, assigned_staff, notes, subsidy_type_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
     data.company_name || null,
@@ -579,7 +606,8 @@ app.post('/api/clients', async (c) => {
     data.phone || null,
     token,
     data.assigned_staff || null,
-    data.notes || null
+    data.notes || null,
+    data.subsidy_type_id || null
   ).run()
   
   return c.json({ 
@@ -597,7 +625,7 @@ app.put('/api/clients/:id', async (c) => {
   await DB.prepare(`
     UPDATE clients 
     SET name = ?, company_name = ?, email = ?, phone = ?, 
-        status = ?, assigned_staff = ?, notes = ?,
+        status = ?, assigned_staff = ?, notes = ?, subsidy_type_id = ?,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).bind(
@@ -608,6 +636,7 @@ app.put('/api/clients/:id', async (c) => {
     data.status,
     data.assigned_staff || null,
     data.notes || null,
+    data.subsidy_type_id || null,
     id
   ).run()
   
@@ -766,6 +795,7 @@ app.post('/api/clients/:id/communications', async (c) => {
 // API: 必要書類チェックリスト
 // ===============================
 
+// 旧チェックリスト（互換性のため残す）
 app.get('/api/document-checklist', async (c) => {
   const { DB } = c.env
   
@@ -774,6 +804,113 @@ app.get('/api/document-checklist', async (c) => {
   `).all()
   
   return c.json(result.results)
+})
+
+// 顧客の助成金種別に基づくチェックリスト
+app.get('/api/clients/:id/document-checklist', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  // 顧客の助成金種別を取得
+  const client = await DB.prepare(`
+    SELECT subsidy_type_id FROM clients WHERE id = ?
+  `).bind(id).first()
+  
+  if (!client || !client.subsidy_type_id) {
+    // 助成金種別が設定されていない場合は旧チェックリストを返す
+    const result = await DB.prepare(`
+      SELECT * FROM document_checklist ORDER BY display_order
+    `).all()
+    return c.json(result.results)
+  }
+  
+  // 助成金種別の必要書類を取得
+  const result = await DB.prepare(`
+    SELECT * FROM subsidy_type_documents 
+    WHERE subsidy_type_id = ? 
+    ORDER BY display_order
+  `).bind(client.subsidy_type_id).all()
+  
+  return c.json(result.results)
+})
+
+// ===============================
+// API: 助成金種別管理
+// ===============================
+
+// 助成金種別一覧取得
+app.get('/api/subsidy-types', async (c) => {
+  const { DB } = c.env
+  
+  const result = await DB.prepare(`
+    SELECT * FROM subsidy_types ORDER BY category, name
+  `).all()
+  
+  return c.json(result.results)
+})
+
+// 助成金種別の必要書類取得
+app.get('/api/subsidy-types/:id/documents', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const result = await DB.prepare(`
+    SELECT * FROM subsidy_type_documents 
+    WHERE subsidy_type_id = ? 
+    ORDER BY display_order
+  `).bind(id).all()
+  
+  return c.json(result.results)
+})
+
+// 助成金種別新規作成
+app.post('/api/subsidy-types', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  const result = await DB.prepare(`
+    INSERT INTO subsidy_types (name, description, category)
+    VALUES (?, ?, ?)
+  `).bind(
+    data.name,
+    data.description || null,
+    data.category || null
+  ).run()
+  
+  return c.json({ id: result.meta.last_row_id })
+})
+
+// 助成金種別に必要書類追加
+app.post('/api/subsidy-types/:id/documents', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  const result = await DB.prepare(`
+    INSERT INTO subsidy_type_documents 
+    (subsidy_type_id, document_type, description, is_required, display_order)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(
+    id,
+    data.document_type,
+    data.description || null,
+    data.is_required !== undefined ? data.is_required : 1,
+    data.display_order || 0
+  ).run()
+  
+  return c.json({ id: result.meta.last_row_id })
+})
+
+// 助成金種別の必要書類削除
+app.delete('/api/subsidy-types/:subsidyId/documents/:docId', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('docId')
+  
+  await DB.prepare(`
+    DELETE FROM subsidy_type_documents WHERE id = ?
+  `).bind(docId).run()
+  
+  return c.json({ success: true })
 })
 
 // ===============================
@@ -881,6 +1018,12 @@ app.get('/client/:id', async (c) => {
                         <input type="tel" name="phone" id="edit_phone" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
+                        <label class="block text-sm font-medium mb-1">申請する助成金</label>
+                        <select name="subsidy_type_id" id="edit_subsidy_type_id" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="">選択してください</option>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium mb-1">ステータス</label>
                         <select name="status" id="edit_status" class="w-full px-3 py-2 border rounded-lg">
                             <option value="inquiry">見込み</option>
@@ -946,15 +1089,33 @@ app.get('/client/:id', async (c) => {
             };
             
             let currentClient = null;
+            let subsidyTypes = [];
+
+            async function loadSubsidyTypes() {
+                try {
+                    const response = await axios.get('/api/subsidy-types');
+                    subsidyTypes = response.data;
+                    
+                    // 編集フォームのセレクトボックスに追加
+                    const select = document.getElementById('edit_subsidy_type_id');
+                    select.innerHTML = '<option value="">選択してください</option>' +
+                        subsidyTypes.map(type => \`<option value="\${type.id}">\${type.name}（\${type.category}）</option>\`).join('');
+                } catch (error) {
+                    console.error('Error loading subsidy types:', error);
+                }
+            }
 
             async function loadClient() {
                 const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
                 currentClient = response.data;
                 
+                const subsidyType = subsidyTypes.find(s => s.id === currentClient.subsidy_type_id);
+                
                 document.getElementById('clientInfo').innerHTML = \`
                     <div><strong>会社名:</strong> \${currentClient.company_name || '-'}</div>
                     <div><strong>メール:</strong> \${currentClient.email || '-'}</div>
                     <div><strong>電話:</strong> \${currentClient.phone || '-'}</div>
+                    <div><strong>申請助成金:</strong> \${subsidyType ? subsidyType.name : '-'}</div>
                     <div><strong>ステータス:</strong> \${STATUS_LABELS[currentClient.status]}</div>
                     <div><strong>担当:</strong> \${currentClient.assigned_staff || '-'}</div>
                     <div><strong>メモ:</strong> \${currentClient.notes || '-'}</div>
@@ -1066,6 +1227,7 @@ app.get('/client/:id', async (c) => {
                 document.getElementById('edit_company_name').value = currentClient.company_name || '';
                 document.getElementById('edit_email').value = currentClient.email || '';
                 document.getElementById('edit_phone').value = currentClient.phone || '';
+                document.getElementById('edit_subsidy_type_id').value = currentClient.subsidy_type_id || '';
                 document.getElementById('edit_status').value = currentClient.status || 'inquiry';
                 document.getElementById('edit_assigned_staff').value = currentClient.assigned_staff || '';
                 document.getElementById('edit_notes').value = currentClient.notes || '';
@@ -1093,9 +1255,11 @@ app.get('/client/:id', async (c) => {
                 }
             });
 
-            loadClient();
-            loadDocuments();
-            loadCommunications();
+            loadSubsidyTypes().then(() => {
+                loadClient();
+                loadDocuments();
+                loadCommunications();
+            });
         </script>
     </body>
     </html>
@@ -1230,7 +1394,8 @@ app.get('/portal/:token', async (c) => {
             }
 
             async function loadChecklist() {
-                const response = await axios.get('/api/document-checklist');
+                // 顧客の助成金種別に基づくチェックリストを取得
+                const response = await axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`);
                 const items = response.data;
                 
                 const docsResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/documents\`);
@@ -1242,7 +1407,7 @@ app.get('/portal/:token', async (c) => {
                         <i class="fas fa-\${uploadedTypes.has(item.document_type) ? 'check-circle text-green-500' : 'circle text-gray-300'}"></i>
                         <div>
                             <div class="font-medium">\${item.document_type}</div>
-                            <div class="text-xs text-gray-500">\${item.description}</div>
+                            <div class="text-xs text-gray-500">\${item.description || ''}</div>
                         </div>
                     </div>
                 \`).join('');
