@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "subsidy-manager",
+  "name": "subsidy-app",
   "compatibility_date": "2025-11-17",
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
@@ -10,14 +10,14 @@
   // "d1_databases": [
   //   {
   //     "binding": "DB",
-  //     "database_name": "subsidy-manager-production",
+  //     "database_name": "subsidy-app-production",
   //     "database_id": "YOUR_DATABASE_ID_HERE"
   //   }
   // ],
   // "r2_buckets": [
   //   {
   //     "binding": "R2",
-  //     "bucket_name": "subsidy-manager-documents"
+  //     "bucket_name": "subsidy-app-documents"
   //   }
   // ]
 }
