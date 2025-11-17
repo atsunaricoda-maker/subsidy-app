@@ -196,10 +196,16 @@ app.get('/', (c) => {
                             <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索" 
                                    class="px-4 py-2 border rounded-lg w-64">
                         </div>
-                        <button onclick="openNewClientModal()" 
-                                class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                            <i class="fas fa-plus mr-2"></i>新規顧客登録
-                        </button>
+                        <div class="flex gap-2">
+                            <a href="/subsidy-types" 
+                               class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+                                <i class="fas fa-file-contract mr-2"></i>助成金種別管理
+                            </a>
+                            <button onclick="openNewClientModal()" 
+                                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                                <i class="fas fa-plus mr-2"></i>新規顧客登録
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -911,6 +917,422 @@ app.delete('/api/subsidy-types/:subsidyId/documents/:docId', async (c) => {
   `).bind(docId).run()
   
   return c.json({ success: true })
+})
+
+// ===============================
+// 助成金種別管理画面
+// ===============================
+
+app.get('/subsidy-types', async (c) => {
+  const { DB } = c.env
+  
+  const subsidyTypes = await DB.prepare(`
+    SELECT * FROM subsidy_types ORDER BY category, name
+  `).all()
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>助成金種別管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div class="min-h-screen">
+            <header class="bg-blue-600 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <a href="/" class="text-sm hover:underline mb-2 block">
+                                <i class="fas fa-arrow-left mr-1"></i>トップに戻る
+                            </a>
+                            <h1 class="text-2xl font-bold">
+                                <i class="fas fa-file-contract mr-2"></i>
+                                助成金種別管理
+                            </h1>
+                        </div>
+                        <button onclick="logout()" class="text-sm hover:underline">
+                            <i class="fas fa-sign-out-alt mr-1"></i>
+                            ログアウト
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="container mx-auto px-4 py-8">
+                <!-- 新規作成ボタン -->
+                <div class="mb-6">
+                    <button onclick="openNewSubsidyModal()" 
+                            class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-plus mr-2"></i>新しい助成金種別を追加
+                    </button>
+                </div>
+
+                <!-- 助成金種別一覧 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="subsidyTypesList">
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                        <div>読み込み中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新規助成金作成モーダル -->
+        <div id="newSubsidyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4 my-8">
+                <h3 class="text-xl font-bold mb-4">新しい助成金種別を作成</h3>
+                <form id="newSubsidyForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">助成金名 *</label>
+                        <input type="text" name="name" required 
+                               placeholder="例：事業再構築補助金"
+                               class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">カテゴリ</label>
+                        <select name="category" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="IT系">IT系</option>
+                            <option value="雇用系">雇用系</option>
+                            <option value="設備投資系">設備投資系</option>
+                            <option value="一般">一般</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">説明</label>
+                        <textarea name="description" rows="2" 
+                                  placeholder="この助成金の概要説明"
+                                  class="w-full px-3 py-2 border rounded-lg"></textarea>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-2">
+                            必要書類 *
+                            <span class="text-xs text-gray-500 ml-2">（最低1つは必要です）</span>
+                        </label>
+                        <div id="documentsList" class="space-y-3 mb-3">
+                            <!-- 書類入力フィールドがここに追加されます -->
+                        </div>
+                        <button type="button" onclick="addDocumentField()" 
+                                class="text-blue-600 hover:text-blue-700 text-sm">
+                            <i class="fas fa-plus-circle mr-1"></i>書類を追加
+                        </button>
+                    </div>
+                    
+                    <div class="flex gap-2 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            作成
+                        </button>
+                        <button type="button" onclick="closeNewSubsidyModal()" 
+                                class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                            キャンセル
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 助成金詳細・編集モーダル -->
+        <div id="editSubsidyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4 my-8">
+                <h3 class="text-xl font-bold mb-4">助成金種別の詳細・編集</h3>
+                <div id="editSubsidyContent">
+                    <!-- 内容が動的に挿入されます -->
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            // 認証チェック
+            function checkAuth() {
+                const token = localStorage.getItem('admin_token');
+                if (!token) {
+                    window.location.href = '/login';
+                    return false;
+                }
+                return true;
+            }
+            
+            function logout() {
+                if (confirm('ログアウトしますか？')) {
+                    localStorage.removeItem('admin_token');
+                    localStorage.removeItem('admin_name');
+                    window.location.href = '/login';
+                }
+            }
+            
+            if (!checkAuth()) {}
+
+            let subsidyTypes = [];
+            let documentFieldCount = 0;
+
+            // 助成金種別一覧読み込み
+            async function loadSubsidyTypes() {
+                try {
+                    const response = await axios.get('/api/subsidy-types');
+                    subsidyTypes = response.data;
+                    renderSubsidyTypes();
+                } catch (error) {
+                    console.error('Error loading subsidy types:', error);
+                }
+            }
+
+            // 助成金種別表示
+            function renderSubsidyTypes() {
+                const container = document.getElementById('subsidyTypesList');
+                
+                if (subsidyTypes.length === 0) {
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">まだ助成金種別が登録されていません</div>';
+                    return;
+                }
+
+                container.innerHTML = subsidyTypes.map(subsidy => \`
+                    <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <h3 class="text-lg font-bold">\${subsidy.name}</h3>
+                                    <span class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
+                                        \${subsidy.category}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600">\${subsidy.description || '説明なし'}</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="viewSubsidyDetail(\${subsidy.id})" 
+                                    class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-eye mr-1"></i>詳細・編集
+                            </button>
+                        </div>
+                    </div>
+                \`).join('');
+            }
+
+            // 新規作成モーダル開く
+            function openNewSubsidyModal() {
+                document.getElementById('newSubsidyModal').classList.remove('hidden');
+                document.getElementById('documentsList').innerHTML = '';
+                documentFieldCount = 0;
+                // 最初の書類フィールドを追加
+                addDocumentField();
+            }
+
+            function closeNewSubsidyModal() {
+                document.getElementById('newSubsidyModal').classList.add('hidden');
+                document.getElementById('newSubsidyForm').reset();
+            }
+
+            // 書類フィールド追加
+            function addDocumentField() {
+                documentFieldCount++;
+                const container = document.getElementById('documentsList');
+                const fieldHtml = \`
+                    <div class="border rounded-lg p-3 bg-gray-50" data-doc-id="\${documentFieldCount}">
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" 
+                                   name="doc_type_\${documentFieldCount}" 
+                                   placeholder="書類名（例：登記簿謄本）"
+                                   required
+                                   class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                            <button type="button" onclick="removeDocumentField(\${documentFieldCount})" 
+                                    class="text-red-600 hover:text-red-700 px-2">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <input type="text" 
+                               name="doc_desc_\${documentFieldCount}" 
+                               placeholder="説明（例：3ヶ月以内に発行されたもの）"
+                               class="w-full px-3 py-2 border rounded-lg text-sm">
+                    </div>
+                \`;
+                container.insertAdjacentHTML('beforeend', fieldHtml);
+            }
+
+            function removeDocumentField(id) {
+                const field = document.querySelector(\`[data-doc-id="\${id}"]\`);
+                if (field) {
+                    field.remove();
+                }
+            }
+
+            // 新規助成金作成
+            document.getElementById('newSubsidyForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                
+                // 基本情報
+                const subsidyData = {
+                    name: formData.get('name'),
+                    category: formData.get('category'),
+                    description: formData.get('description')
+                };
+                
+                // 書類リスト収集
+                const documents = [];
+                for (let i = 1; i <= documentFieldCount; i++) {
+                    const docType = formData.get(\`doc_type_\${i}\`);
+                    const docDesc = formData.get(\`doc_desc_\${i}\`);
+                    if (docType) {
+                        documents.push({
+                            document_type: docType,
+                            description: docDesc || '',
+                            display_order: documents.length + 1
+                        });
+                    }
+                }
+                
+                if (documents.length === 0) {
+                    alert('最低1つは書類を追加してください');
+                    return;
+                }
+                
+                try {
+                    // 助成金種別作成
+                    const subsidyResponse = await axios.post('/api/subsidy-types', subsidyData);
+                    const subsidyId = subsidyResponse.data.id;
+                    
+                    // 書類を追加
+                    for (const doc of documents) {
+                        await axios.post(\`/api/subsidy-types/\${subsidyId}/documents\`, doc);
+                    }
+                    
+                    alert('助成金種別を作成しました');
+                    closeNewSubsidyModal();
+                    loadSubsidyTypes();
+                } catch (error) {
+                    alert('作成に失敗しました');
+                    console.error(error);
+                }
+            });
+
+            // 助成金詳細表示
+            async function viewSubsidyDetail(id) {
+                try {
+                    const [subsidyResponse, docsResponse] = await Promise.all([
+                        axios.get(\`/api/subsidy-types\`),
+                        axios.get(\`/api/subsidy-types/\${id}/documents\`)
+                    ]);
+                    
+                    const subsidy = subsidyResponse.data.find(s => s.id === id);
+                    const documents = docsResponse.data;
+                    
+                    const content = \`
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">助成金名</label>
+                                <div class="text-lg font-bold">\${subsidy.name}</div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">カテゴリ</label>
+                                <span class="px-3 py-1 rounded bg-blue-100 text-blue-800 text-sm">
+                                    \${subsidy.category}
+                                </span>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">説明</label>
+                                <p class="text-gray-700">\${subsidy.description || '説明なし'}</p>
+                            </div>
+                            
+                            <hr class="my-4">
+                            
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <label class="block text-sm font-medium">必要書類一覧</label>
+                                    <button onclick="addNewDocument(\${id})" 
+                                            class="text-blue-600 hover:text-blue-700 text-sm">
+                                        <i class="fas fa-plus-circle mr-1"></i>書類を追加
+                                    </button>
+                                </div>
+                                <div id="documentDetailList" class="space-y-2">
+                                    \${documents.map((doc, index) => \`
+                                        <div class="border rounded-lg p-3 bg-gray-50 flex items-start justify-between">
+                                            <div class="flex-1">
+                                                <div class="font-medium text-sm">\${index + 1}. \${doc.document_type}</div>
+                                                <div class="text-xs text-gray-500">\${doc.description || '説明なし'}</div>
+                                            </div>
+                                            <button onclick="deleteDocument(\${id}, \${doc.id})" 
+                                                    class="text-red-600 hover:text-red-700 text-sm ml-2">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    \`).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="flex gap-2 pt-4">
+                                <button onclick="closeEditSubsidyModal()" 
+                                        class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                                    閉じる
+                                </button>
+                            </div>
+                        </div>
+                    \`;
+                    
+                    document.getElementById('editSubsidyContent').innerHTML = content;
+                    document.getElementById('editSubsidyModal').classList.remove('hidden');
+                    
+                } catch (error) {
+                    alert('詳細の読み込みに失敗しました');
+                    console.error(error);
+                }
+            }
+
+            function closeEditSubsidyModal() {
+                document.getElementById('editSubsidyModal').classList.add('hidden');
+            }
+
+            // 書類追加
+            async function addNewDocument(subsidyId) {
+                const docType = prompt('書類名を入力してください\\n例：登記簿謄本');
+                if (!docType) return;
+                
+                const docDesc = prompt('説明を入力してください（任意）\\n例：3ヶ月以内に発行されたもの');
+                
+                try {
+                    await axios.post(\`/api/subsidy-types/\${subsidyId}/documents\`, {
+                        document_type: docType,
+                        description: docDesc || '',
+                        display_order: 999
+                    });
+                    
+                    // 再表示
+                    viewSubsidyDetail(subsidyId);
+                } catch (error) {
+                    alert('追加に失敗しました');
+                    console.error(error);
+                }
+            }
+
+            // 書類削除
+            async function deleteDocument(subsidyId, docId) {
+                if (!confirm('この書類を削除しますか？')) return;
+                
+                try {
+                    await axios.delete(\`/api/subsidy-types/\${subsidyId}/documents/\${docId}\`);
+                    
+                    // 再表示
+                    viewSubsidyDetail(subsidyId);
+                    loadSubsidyTypes();
+                } catch (error) {
+                    alert('削除に失敗しました');
+                    console.error(error);
+                }
+            }
+
+            // 初期読み込み
+            loadSubsidyTypes();
+        </script>
+    </body>
+    </html>
+  `)
 })
 
 // ===============================
