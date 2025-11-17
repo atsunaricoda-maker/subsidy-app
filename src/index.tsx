@@ -203,6 +203,27 @@ app.get('/', (c) => {
                     </div>
                 </div>
 
+                <!-- 統計・レポート -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 class="text-xl font-bold mb-4">
+                        <i class="fas fa-chart-bar mr-2"></i>統計情報
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="border rounded-lg p-4">
+                            <div class="text-sm text-gray-500 mb-1">総顧客数</div>
+                            <div class="text-2xl font-bold" id="stat-total">-</div>
+                        </div>
+                        <div class="border rounded-lg p-4">
+                            <div class="text-sm text-gray-500 mb-1">今月の新規顧客</div>
+                            <div class="text-2xl font-bold text-blue-600" id="stat-new-month">-</div>
+                        </div>
+                        <div class="border rounded-lg p-4">
+                            <div class="text-sm text-gray-500 mb-1">今月の完了件数</div>
+                            <div class="text-2xl font-bold text-green-600" id="stat-completed-month">-</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 顧客一覧 -->
                 <div class="bg-white rounded-lg shadow">
                     <div class="p-6">
@@ -321,12 +342,38 @@ app.get('/', (c) => {
                     const response = await axios.get('/api/clients');
                     allClients = response.data;
                     updateStatusCards();
+                    updateStatistics();
                     renderClients(allClients);
                 } catch (error) {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
                         '<div class="text-center py-8 text-red-500">データの読み込みに失敗しました</div>';
                 }
+            }
+            
+            // 統計情報更新
+            function updateStatistics() {
+                const now = new Date();
+                const thisMonth = \`\${now.getFullYear()}-\${String(now.getMonth() + 1).padStart(2, '0')}\`;
+                
+                // 総顧客数
+                const total = allClients.length;
+                document.getElementById('stat-total').textContent = total;
+                
+                // 今月の新規顧客
+                const newThisMonth = allClients.filter(c => {
+                    const created = c.created_at.substring(0, 7);
+                    return created === thisMonth;
+                }).length;
+                document.getElementById('stat-new-month').textContent = newThisMonth;
+                
+                // 今月の完了件数
+                const completedThisMonth = allClients.filter(c => {
+                    if (c.status !== 'completed') return false;
+                    const updated = c.updated_at.substring(0, 7);
+                    return updated === thisMonth;
+                }).length;
+                document.getElementById('stat-completed-month').textContent = completedThisMonth;
             }
 
             // ステータスカード更新
@@ -461,6 +508,41 @@ app.get('/api/clients', async (c) => {
   `).all()
   
   return c.json(result.results)
+})
+
+// 統計情報取得
+app.get('/api/stats', async (c) => {
+  const { DB } = c.env
+  
+  // 総顧客数
+  const totalResult = await DB.prepare(`
+    SELECT COUNT(*) as count FROM clients
+  `).first()
+  
+  // ステータス別集計
+  const statusResult = await DB.prepare(`
+    SELECT status, COUNT(*) as count FROM clients GROUP BY status
+  `).all()
+  
+  // 今月の新規顧客
+  const thisMonth = new Date().toISOString().substring(0, 7)
+  const newThisMonthResult = await DB.prepare(`
+    SELECT COUNT(*) as count FROM clients 
+    WHERE strftime('%Y-%m', created_at) = ?
+  `).bind(thisMonth).first()
+  
+  // 今月の完了件数
+  const completedThisMonthResult = await DB.prepare(`
+    SELECT COUNT(*) as count FROM clients 
+    WHERE status = 'completed' AND strftime('%Y-%m', updated_at) = ?
+  `).bind(thisMonth).first()
+  
+  return c.json({
+    total: totalResult.count,
+    byStatus: statusResult.results,
+    newThisMonth: newThisMonthResult.count,
+    completedThisMonth: completedThisMonthResult.count
+  })
 })
 
 // 顧客詳細取得
