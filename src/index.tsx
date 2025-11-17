@@ -137,18 +137,20 @@ app.get('/', (c) => {
             <header class="bg-blue-600 text-white shadow-lg">
                 <div class="container mx-auto px-4 py-4">
                     <div class="flex items-center justify-between">
-                        <h1 class="text-2xl font-bold">
-                            <i class="fas fa-file-invoice-dollar mr-2"></i>
-                            助成金申請管理システム
+                        <h1 class="text-lg md:text-2xl font-bold">
+                            <i class="fas fa-file-invoice-dollar mr-1 md:mr-2"></i>
+                            <span class="hidden sm:inline">助成金申請管理システム</span>
+                            <span class="sm:hidden">助成金管理</span>
                         </h1>
-                        <div class="flex items-center gap-4 text-sm">
-                            <span id="adminName">
+                        <div class="flex items-center gap-2 md:gap-4 text-xs md:text-sm">
+                            <span id="adminName" class="hidden sm:inline">
                                 <i class="fas fa-user-shield mr-1"></i>
                                 管理者モード
                             </span>
                             <button onclick="logout()" class="hover:underline">
                                 <i class="fas fa-sign-out-alt mr-1"></i>
-                                ログアウト
+                                <span class="hidden sm:inline">ログアウト</span>
+                                <span class="sm:hidden">終了</span>
                             </button>
                         </div>
                     </div>
@@ -183,9 +185,10 @@ app.get('/', (c) => {
 
                 <!-- フィルターと新規登録 -->
                 <div class="bg-white rounded-lg shadow p-4 mb-6">
-                    <div class="flex items-center justify-between">
-                        <div class="flex gap-2">
-                            <select id="filterStatus" class="px-4 py-2 border rounded-lg">
+                    <div class="space-y-3">
+                        <!-- 検索・フィルター -->
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <select id="filterStatus" class="px-4 py-3 border rounded-lg text-base">
                                 <option value="">全ステータス</option>
                                 <option value="inquiry">見込み</option>
                                 <option value="consulting">相談中</option>
@@ -194,16 +197,21 @@ app.get('/', (c) => {
                                 <option value="completed">完了</option>
                             </select>
                             <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索" 
-                                   class="px-4 py-2 border rounded-lg w-64">
+                                   class="flex-1 px-4 py-3 border rounded-lg text-base">
                         </div>
-                        <div class="flex gap-2">
+                        <!-- アクションボタン -->
+                        <div class="grid grid-cols-2 gap-2">
                             <a href="/subsidy-types" 
-                               class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
-                                <i class="fas fa-file-contract mr-2"></i>助成金種別管理
+                               class="bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 text-center text-sm md:text-base">
+                                <i class="fas fa-file-contract mr-1"></i>
+                                <span class="hidden sm:inline">助成金種別管理</span>
+                                <span class="sm:hidden">助成金管理</span>
                             </a>
                             <button onclick="openNewClientModal()" 
-                                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                                <i class="fas fa-plus mr-2"></i>新規顧客登録
+                                    class="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 text-sm md:text-base">
+                                <i class="fas fa-plus mr-1"></i>
+                                <span class="hidden sm:inline">新規顧客登録</span>
+                                <span class="sm:hidden">新規登録</span>
                             </button>
                         </div>
                     </div>
@@ -246,8 +254,8 @@ app.get('/', (c) => {
         </div>
 
         <!-- 新規顧客登録モーダル -->
-        <div id="newClientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg p-8 max-w-md w-full">
+        <div id="newClientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-lg p-4 md:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
                 <h3 class="text-xl font-bold mb-4">新規顧客登録</h3>
                 <form id="newClientForm" class="space-y-4">
                     <div>
@@ -281,11 +289,11 @@ app.get('/', (c) => {
                         <textarea name="notes" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
                     </div>
                     <div class="flex gap-2 pt-4">
-                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 text-base">
                             登録
                         </button>
                         <button type="button" onclick="closeNewClientModal()" 
-                                class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                                class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 text-base">
                             キャンセル
                         </button>
                     </div>
@@ -440,7 +448,8 @@ app.get('/', (c) => {
                     const portalUrl = \`\${window.location.origin}/portal/\${client.access_token}\`;
                     return \`
                     <div class="border-b last:border-b-0 py-4 hover:bg-gray-50">
-                        <div class="flex items-start justify-between">
+                        <!-- PC版表示 -->
+                        <div class="hidden md:flex items-start justify-between">
                             <div class="flex-1">
                                 <div class="flex items-center gap-3 mb-2">
                                     <h3 class="text-lg font-bold">\${client.name}</h3>
@@ -471,6 +480,42 @@ app.get('/', (c) => {
                                 </a>
                             </div>
                         </div>
+                        
+                        <!-- スマホ版表示（カード形式） -->
+                        <div class="md:hidden space-y-3">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <h3 class="text-base font-bold mb-1">\${client.name}</h3>
+                                    \${client.company_name ? \`<div class="text-sm text-gray-600">\${client.company_name}</div>\` : ''}
+                                </div>
+                                <span class="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap \${STATUS_COLORS[client.status]}">
+                                    \${STATUS_LABELS[client.status]}
+                                </span>
+                            </div>
+                            \${subsidyType ? \`<div class="inline-block px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${subsidyType.name}</div>\` : ''}
+                            <div class="text-sm text-gray-600 space-y-1">
+                                \${client.email ? \`<div><i class="fas fa-envelope w-4"></i> \${client.email}</div>\` : ''}
+                                \${client.phone ? \`<div><i class="fas fa-phone w-4"></i> \${client.phone}</div>\` : ''}
+                                \${client.assigned_staff ? \`<div><i class="fas fa-user w-4"></i> 担当: \${client.assigned_staff}</div>\` : ''}
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <a href="/client/\${client.id}" 
+                                   class="bg-blue-600 text-white px-3 py-3 rounded-lg hover:bg-blue-700 text-sm text-center">
+                                    <i class="fas fa-eye block mb-1"></i>
+                                    <span class="text-xs">詳細</span>
+                                </a>
+                                <button onclick="copyPortalUrl('\${portalUrl}', '\${client.name}')"
+                                        class="bg-purple-600 text-white px-3 py-3 rounded-lg hover:bg-purple-700 text-sm">
+                                    <i class="fas fa-copy block mb-1"></i>
+                                    <span class="text-xs">URL</span>
+                                </button>
+                                <a href="/portal/\${client.access_token}" target="_blank"
+                                   class="bg-green-600 text-white px-3 py-3 rounded-lg hover:bg-green-700 text-sm text-center">
+                                    <i class="fas fa-external-link-alt block mb-1"></i>
+                                    <span class="text-xs">ポータル</span>
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 \`;
                 }).join('');
@@ -489,11 +534,11 @@ app.get('/', (c) => {
             // トースト通知表示
             function showToast(message) {
                 const toast = document.createElement('div');
-                toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in';
+                toast.className = 'fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-auto bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in';
                 toast.innerHTML = \`
                     <div class="flex items-center gap-2">
                         <i class="fas fa-check-circle"></i>
-                        <span>\${message}</span>
+                        <span class="text-sm md:text-base">\${message}</span>
                     </div>
                 \`;
                 document.body.appendChild(toast);
@@ -1797,12 +1842,12 @@ app.get('/portal/:token', async (c) => {
     <body class="bg-gray-50">
         <div class="min-h-screen">
             <header class="bg-green-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <h1 class="text-2xl font-bold">
-                        <i class="fas fa-user-circle mr-2"></i>
-                        ${client.name} 様 専用ポータル
+                <div class="container mx-auto px-4 py-3 md:py-4">
+                    <h1 class="text-lg md:text-2xl font-bold">
+                        <i class="fas fa-user-circle mr-1 md:mr-2"></i>
+                        ${client.name} 様
                     </h1>
-                    <p class="text-sm mt-1">助成金申請に必要な書類をアップロードしたり、担当者とやり取りができます</p>
+                    <p class="text-xs md:text-sm mt-1">助成金申請の書類提出とやり取り</p>
                 </div>
             </header>
 
@@ -1819,7 +1864,7 @@ app.get('/portal/:token', async (c) => {
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">
                     <!-- 書類アップロード -->
                     <div class="bg-white rounded-lg shadow p-6">
                         <h2 class="text-lg font-bold mb-4">
@@ -1831,19 +1876,22 @@ app.get('/portal/:token', async (c) => {
                             <div id="checklistItems" class="space-y-2 text-sm"></div>
                         </div>
 
-                        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4 transition-colors">
-                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
-                            <p class="text-sm text-gray-600 mb-4">ここに書類をドラッグ&ドロップ<br>または</p>
+                        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-8 text-center mb-4 transition-colors">
+                            <i class="fas fa-cloud-upload-alt text-3xl md:text-4xl text-gray-400 mb-2"></i>
+                            <p class="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">
+                                <span class="hidden sm:inline">ここに書類をドラッグ&ドロップ<br>または</span>
+                                <span class="sm:hidden">タップしてファイルを選択</span>
+                            </p>
                             <input type="file" id="fileInput" class="hidden" multiple>
                             <button onclick="document.getElementById('fileInput').click()" 
-                                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
-                                ファイルを選択
+                                    class="bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-green-700 text-sm md:text-base w-full sm:w-auto">
+                                <i class="fas fa-file mr-2"></i>ファイルを選択
                             </button>
                         </div>
 
                         <div class="mb-4">
                             <label class="block text-sm font-medium mb-1">書類の種類</label>
-                            <select id="documentType" class="w-full px-3 py-2 border rounded-lg">
+                            <select id="documentType" class="w-full px-4 py-3 border rounded-lg text-base">
                                 <option value="">選択してください</option>
                             </select>
                         </div>
@@ -1863,10 +1911,11 @@ app.get('/portal/:token', async (c) => {
                         <form id="clientMessageForm" class="flex gap-2">
                             <input type="text" id="clientMessageInput" 
                                    placeholder="メッセージを入力..." 
-                                   class="flex-1 px-4 py-2 border rounded-lg" required>
+                                   class="flex-1 px-4 py-3 border rounded-lg text-base" required>
                             <button type="submit" 
-                                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
-                                送信
+                                    class="bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-green-700 whitespace-nowrap">
+                                <i class="fas fa-paper-plane mr-1"></i>
+                                <span class="hidden sm:inline">送信</span>
                             </button>
                         </form>
                     </div>
