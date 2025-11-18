@@ -20,6 +20,13 @@
   - 各助成金の必要書類追加・削除
   - フレキシブルな書類リスト管理
   - 新しい助成金制度にも即座に対応可能
+- **従業員管理**: 
+  - 専用管理画面（`/admin/users`）
+  - 従業員アカウントの一覧表示
+  - 新規従業員の追加（ユーザー名、パスワード、表示名）
+  - 既存従業員の編集（パスワード変更含む）
+  - 従業員の削除（メイン管理者は削除不可）
+  - 管理者権限の一元管理
 - **進捗管理**: 5段階のステータス管理（見込み → 相談中 → 書類準備中 → 申請中 → 完了）
 - **ダッシュボード**: ステータス別の集計表示（リアルタイム更新）
 - **統計・レポート**: 
@@ -223,6 +230,7 @@ npm run db:console:local
 - `/login` - ログインページ
 - `/` - トップページ（顧客一覧・ダッシュボード）※要認証
 - `/subsidy-types` - 助成金種別管理 ※要認証
+- `/admin/users` - 従業員管理 ※要認証
 - `/client/:id` - 顧客詳細ページ ※要認証
 
 ### 顧客ポータル
@@ -256,6 +264,12 @@ npm run db:console:local
 - `POST /api/subsidy-types` - 助成金種別新規作成
 - `POST /api/subsidy-types/:id/documents` - 必要書類追加
 - `DELETE /api/subsidy-types/:subsidyId/documents/:docId` - 必要書類削除
+
+#### 従業員管理API
+- `GET /api/admin/users` - 従業員一覧取得
+- `POST /api/admin/users` - 従業員追加
+- `PUT /api/admin/users/:id` - 従業員情報更新
+- `DELETE /api/admin/users/:id` - 従業員削除（メイン管理者は削除不可）
 
 #### その他API
 - `GET /api/document-checklist` - 必要書類一覧取得（旧形式）
