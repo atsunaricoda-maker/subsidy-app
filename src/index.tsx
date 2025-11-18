@@ -641,6 +641,12 @@ app.get('/', (c) => {
                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
                                     <i class="fas fa-external-link-alt mr-1"></i>ポータル
                                 </a>
+                                \${localStorage.getItem('admin_role') === 'admin' ? \`
+                                <button onclick="deleteClient(\${client.id}, '\${client.name}')"
+                                        class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm">
+                                    <i class="fas fa-trash mr-1"></i>削除
+                                </button>
+                                \` : ''}
                             </div>
                         </div>
                         
@@ -661,7 +667,7 @@ app.get('/', (c) => {
                                 \${client.phone ? \`<div><i class="fas fa-phone w-4"></i> \${client.phone}</div>\` : ''}
                                 \${client.assigned_staff ? \`<div><i class="fas fa-user w-4"></i> 担当: \${client.assigned_staff}</div>\` : ''}
                             </div>
-                            <div class="grid grid-cols-3 gap-2">
+                            <div class="grid \${localStorage.getItem('admin_role') === 'admin' ? 'grid-cols-4' : 'grid-cols-3'} gap-2">
                                 <a href="/client/\${client.id}" 
                                    class="bg-blue-600 text-white px-3 py-3 rounded-lg hover:bg-blue-700 text-sm text-center">
                                     <i class="fas fa-eye block mb-1"></i>
@@ -677,6 +683,13 @@ app.get('/', (c) => {
                                     <i class="fas fa-external-link-alt block mb-1"></i>
                                     <span class="text-xs">ポータル</span>
                                 </a>
+                                \${localStorage.getItem('admin_role') === 'admin' ? \`
+                                <button onclick="deleteClient(\${client.id}, '\${client.name}')"
+                                        class="bg-red-600 text-white px-3 py-3 rounded-lg hover:bg-red-700 text-sm">
+                                    <i class="fas fa-trash block mb-1"></i>
+                                    <span class="text-xs">削除</span>
+                                </button>
+                                \` : ''}
                             </div>
                         </div>
                     </div>
@@ -692,6 +705,22 @@ app.get('/', (c) => {
                     console.error('コピーに失敗しました:', err);
                     alert('URLのコピーに失敗しました。手動でコピーしてください: ' + url);
                 });
+            }
+            
+            // 顧客削除
+            async function deleteClient(clientId, clientName) {
+                if (!confirm(\`\${clientName}様の情報を削除してもよろしいですか？\n\nこの操作は取り消せません。\n関連する書類やコミュニケーション履歴もすべて削除されます。\`)) {
+                    return;
+                }
+                
+                try {
+                    await axios.delete(\`/api/clients/\${clientId}\`);
+                    showToast(\`\${clientName}様の情報を削除しました\`);
+                    loadData(); // リロード
+                } catch (error) {
+                    alert('削除に失敗しました: ' + (error.response?.data?.error || error.message));
+                    console.error('Delete error:', error);
+                }
             }
             
             // トースト通知表示
@@ -890,6 +919,12 @@ app.put('/api/clients/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  
+  // completedステータスへの変更はadminのみ許可
+  if (data.status === 'completed' && user && user.role !== 'admin') {
+    return c.json({ error: 'プロジェクトの完了処理は管理者のみ実行できます' }, 403)
+  }
   
   await DB.prepare(`
     UPDATE clients 
@@ -911,6 +946,28 @@ app.put('/api/clients/:id', async (c) => {
   ).run()
   
   return c.json({ success: true })
+})
+
+// 顧客削除（adminのみ）
+app.delete('/api/clients/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  
+  // adminのみ削除可能
+  if (!user || user.role !== 'admin') {
+    return c.json({ error: '顧客の削除は管理者のみ実行できます' }, 403)
+  }
+  
+  // 関連データも削除される（ON DELETE CASCADE）
+  await DB.prepare(`
+    DELETE FROM clients WHERE id = ?
+  `).bind(id).run()
+  
+  return c.json({ 
+    success: true,
+    message: '顧客を削除しました'
+  })
 })
 
 // ===============================
@@ -1654,6 +1711,9 @@ app.get('/client/:id', async (c) => {
                             <button onclick="editClient()" class="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                                 <i class="fas fa-edit mr-2"></i>編集
                             </button>
+                            <button onclick="deleteCurrentClient()" id="deleteClientBtn" class="hidden mt-2 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
+                                <i class="fas fa-trash mr-2"></i>削除
+                            </button>
                         </div>
 
                         <!-- 書類一覧 -->
@@ -1853,9 +1913,32 @@ app.get('/client/:id', async (c) => {
                             </a>
                         </div>
                     \`;
+                    
+                    // adminのみ削除ボタン表示
+                    if (localStorage.getItem('admin_role') === 'admin') {
+                        document.getElementById('deleteClientBtn').classList.remove('hidden');
+                    }
                 } catch (error) {
                     console.error('Error loading client:', error);
                     document.getElementById('clientInfo').innerHTML = '<div class="text-red-600">顧客情報の読み込みに失敗しました</div>';
+                }
+            }
+            
+            // 顧客削除
+            async function deleteCurrentClient() {
+                if (!currentClient) return;
+                
+                if (!confirm(\`\${currentClient.name}様の情報を削除してもよろしいですか？\n\nこの操作は取り消せません。\n関連する書類やコミュニケーション履歴もすべて削除されます。\`)) {
+                    return;
+                }
+                
+                try {
+                    await axios.delete(\`/api/clients/\${CLIENT_ID}\`);
+                    alert(\`\${currentClient.name}様の情報を削除しました\`);
+                    window.location.href = '/'; // トップページに戻る
+                } catch (error) {
+                    alert('削除に失敗しました: ' + (error.response?.data?.error || error.message));
+                    console.error('Delete error:', error);
                 }
             }
             
@@ -1997,6 +2080,20 @@ app.get('/client/:id', async (c) => {
                 document.getElementById('edit_status').value = currentClient.status || 'inquiry';
                 document.getElementById('editClientAssignedTo').value = currentClient.assigned_to || '';
                 document.getElementById('edit_notes').value = currentClient.notes || '';
+                
+                // 非adminは完了ステータスを選択できない
+                const statusSelect = document.getElementById('edit_status');
+                const completedOption = statusSelect.querySelector('option[value="completed"]');
+                if (localStorage.getItem('admin_role') !== 'admin' && completedOption) {
+                    completedOption.disabled = true;
+                    completedOption.textContent = '完了（管理者のみ）';
+                    
+                    // もし現在completedなら警告
+                    if (currentClient.status === 'completed') {
+                        statusSelect.disabled = true;
+                        statusSelect.title = 'このプロジェクトは完了済みです。変更する場合は管理者に連絡してください。';
+                    }
+                }
                 
                 document.getElementById('editClientModal').classList.remove('hidden');
             }
