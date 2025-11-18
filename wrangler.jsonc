@@ -9,7 +9,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "subsidy-app-production",
+      "database_name": "subsidy-manager-production",
       "database_id": "9cc67ea6-387e-40f3-b7f9-cc376a26bea2"
     }
   ],
