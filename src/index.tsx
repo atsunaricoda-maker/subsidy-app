@@ -74,6 +74,8 @@ app.get('/login', (c) => {
                     const response = await axios.post('/api/auth/login', data);
                     localStorage.setItem('admin_token', response.data.token);
                     localStorage.setItem('admin_name', response.data.name);
+                    localStorage.setItem('admin_username', response.data.username);
+                    localStorage.setItem('admin_role', response.data.role);
                     window.location.href = '/';
                 } catch (error) {
                     const errorDiv = document.getElementById('errorMessage');
@@ -106,7 +108,8 @@ app.post('/api/auth/login', async (c) => {
   return c.json({
     token,
     name: user.name,
-    username: user.username
+    username: user.username,
+    role: user.role || 'staff'
   })
 })
 
@@ -114,6 +117,20 @@ app.post('/api/auth/login', async (c) => {
 app.post('/api/auth/logout', (c) => {
   return c.json({ success: true })
 })
+
+// ユーザー情報取得ヘルパー関数
+async function getCurrentUser(c: any) {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader) return null
+  
+  try {
+    // Authorization: Bearer username:role の形式
+    const [username, role] = authHeader.replace('Bearer ', '').split(':')
+    return { username, role: role || 'staff' }
+  } catch {
+    return null
+  }
+}
 
 // ===============================
 // 従業員管理API
@@ -387,8 +404,10 @@ app.get('/', (c) => {
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">担当スタッフ</label>
-                        <input type="text" name="assigned_staff" class="w-full px-3 py-2 border rounded-lg">
+                        <label class="block text-sm font-medium mb-1">担当者</label>
+                        <select name="assigned_to" id="newClientAssignedTo" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="">未割り当て</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">メモ</label>
@@ -462,6 +481,10 @@ app.get('/', (c) => {
 
             let allClients = [];
             let subsidyTypes = [];
+            let allUsers = [];
+
+            // Axios設定：認証ヘッダーを自動付与
+            axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
 
             // データ読み込み
             async function loadData() {
@@ -490,6 +513,24 @@ app.get('/', (c) => {
                         subsidyTypes.map(type => \`<option value="\${type.id}">\${type.name}（\${type.category}）</option>\`).join('');
                 } catch (error) {
                     console.error('Error loading subsidy types:', error);
+                }
+            }
+            
+            // 従業員一覧読み込み
+            async function loadUsers() {
+                try {
+                    const response = await axios.get('/api/admin/users');
+                    allUsers = response.data;
+                    
+                    // 新規登録・編集フォームのセレクトボックスに追加
+                    const select = document.getElementById('newClientAssignedTo');
+                    const editSelect = document.getElementById('editClientAssignedTo');
+                    const options = '<option value="">未割り当て</option>' +
+                        allUsers.map(user => \`<option value="\${user.username}">\${user.name}</option>\`).join('');
+                    if (select) select.innerHTML = options;
+                    if (editSelect) editSelect.innerHTML = options;
+                } catch (error) {
+                    console.error('Error loading users:', error);
                 }
             }
             
@@ -707,6 +748,7 @@ app.get('/', (c) => {
 
             // 初期読み込み
             loadSubsidyTypes();
+            loadUsers();
             loadData();
         </script>
     </body>
@@ -721,9 +763,22 @@ app.get('/', (c) => {
 // 顧客一覧取得
 app.get('/api/clients', async (c) => {
   const { DB } = c.env
-  const result = await DB.prepare(`
-    SELECT * FROM clients ORDER BY created_at DESC
-  `).all()
+  const user = await getCurrentUser(c)
+  
+  let query = `SELECT * FROM clients`
+  let params = []
+  
+  // adminロール以外は自分が担当の案件のみ表示
+  if (user && user.role !== 'admin') {
+    query += ` WHERE assigned_to = ?`
+    params.push(user.username)
+  }
+  
+  query += ` ORDER BY created_at DESC`
+  
+  const result = params.length > 0 
+    ? await DB.prepare(query).bind(...params).all()
+    : await DB.prepare(query).all()
   
   return c.json(result.results)
 })
@@ -767,6 +822,7 @@ app.get('/api/stats', async (c) => {
 app.get('/api/clients/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
   
   const client = await DB.prepare(`
     SELECT * FROM clients WHERE id = ?
@@ -774,6 +830,11 @@ app.get('/api/clients/:id', async (c) => {
   
   if (!client) {
     return c.json({ error: 'Client not found' }, 404)
+  }
+  
+  // adminロール以外は自分が担当の案件のみアクセス可能
+  if (user && user.role !== 'admin' && client.assigned_to !== user.username) {
+    return c.json({ error: 'Access denied' }, 403)
   }
   
   return c.json(client)
@@ -788,8 +849,8 @@ app.post('/api/clients', async (c) => {
   const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
   
   const result = await DB.prepare(`
-    INSERT INTO clients (name, company_name, email, phone, access_token, assigned_staff, notes, subsidy_type_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (name, company_name, email, phone, access_token, assigned_staff, assigned_to, notes, subsidy_type_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
     data.company_name || null,
@@ -797,6 +858,7 @@ app.post('/api/clients', async (c) => {
     data.phone || null,
     token,
     data.assigned_staff || null,
+    data.assigned_to || null,
     data.notes || null,
     data.subsidy_type_id || null
   ).run()
@@ -816,7 +878,7 @@ app.put('/api/clients/:id', async (c) => {
   await DB.prepare(`
     UPDATE clients 
     SET name = ?, company_name = ?, email = ?, phone = ?, 
-        status = ?, assigned_staff = ?, notes = ?, subsidy_type_id = ?,
+        status = ?, assigned_staff = ?, assigned_to = ?, notes = ?, subsidy_type_id = ?,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).bind(
@@ -826,6 +888,7 @@ app.put('/api/clients/:id', async (c) => {
     data.phone || null,
     data.status,
     data.assigned_staff || null,
+    data.assigned_to || null,
     data.notes || null,
     data.subsidy_type_id || null,
     id
@@ -1873,11 +1936,12 @@ app.get('/client/:id', async (c) => {
             document.getElementById('messageForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const message = document.getElementById('messageInput').value;
+                const adminName = localStorage.getItem('admin_name') || 'スタッフ';
                 
                 await axios.post(\`/api/clients/\${CLIENT_ID}/communications\`, {
                     message,
                     sender_type: 'staff',
-                    sender_name: 'スタッフ'
+                    sender_name: adminName
                 });
                 
                 document.getElementById('messageInput').value = '';
