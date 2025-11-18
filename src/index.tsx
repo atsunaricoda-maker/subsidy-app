@@ -317,15 +317,15 @@ app.get('/', (c) => {
                                    class="flex-1 px-4 py-3 border rounded-lg text-base">
                         </div>
                         <!-- アクションボタン -->
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div id="actionButtons" class="grid grid-cols-2 md:grid-cols-3 gap-2">
                             <a href="/subsidy-types" 
                                class="bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 text-center text-sm md:text-base">
                                 <i class="fas fa-file-contract mr-1"></i>
                                 <span class="hidden sm:inline">助成金種別管理</span>
                                 <span class="sm:hidden">助成金管理</span>
                             </a>
-                            <a href="/admin/users" 
-                               class="bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 text-center text-sm md:text-base">
+                            <a href="/admin/users" id="employeeManagementBtn"
+                               class="hidden bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 text-center text-sm md:text-base">
                                 <i class="fas fa-users-cog mr-1"></i>
                                 <span class="hidden sm:inline">従業員管理</span>
                                 <span class="sm:hidden">従業員</span>
@@ -459,6 +459,22 @@ app.get('/', (c) => {
             // 認証確認
             if (!checkAuth()) {
                 // リダイレクト処理は checkAuth 内で実行
+            }
+            
+            // adminロールのみ従業員管理ボタン表示
+            const adminRole = localStorage.getItem('admin_role');
+            if (adminRole === 'admin') {
+                const employeeBtn = document.getElementById('employeeManagementBtn');
+                if (employeeBtn) {
+                    employeeBtn.classList.remove('hidden');
+                }
+            } else {
+                // staffの場合はボタンを2列にする
+                const actionButtons = document.getElementById('actionButtons');
+                if (actionButtons) {
+                    actionButtons.classList.remove('md:grid-cols-3');
+                    actionButtons.classList.add('md:grid-cols-2');
+                }
             }
         
             const STATUS_LABELS = {
@@ -1709,8 +1725,10 @@ app.get('/client/:id', async (c) => {
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">担当スタッフ</label>
-                        <input type="text" name="assigned_staff" id="edit_assigned_staff" class="w-full px-3 py-2 border rounded-lg">
+                        <label class="block text-sm font-medium mb-1">担当者</label>
+                        <select name="assigned_to" id="editClientAssignedTo" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="">未割り当て</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">メモ</label>
@@ -1753,6 +1771,9 @@ app.get('/client/:id', async (c) => {
             if (!checkAuth()) {
                 // リダイレクト処理は checkAuth 内で実行
             }
+            
+            // Axios設定：認証ヘッダーを自動付与
+            axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
         
             const CLIENT_ID = ${id};
             const STATUS_LABELS = {
@@ -1765,6 +1786,7 @@ app.get('/client/:id', async (c) => {
             
             let currentClient = null;
             let subsidyTypes = [];
+            let allUsers = [];
 
             async function loadSubsidyTypes() {
                 try {
@@ -1779,6 +1801,20 @@ app.get('/client/:id', async (c) => {
                     console.error('Error loading subsidy types:', error);
                 }
             }
+            
+            async function loadUsers() {
+                try {
+                    const response = await axios.get('/api/admin/users');
+                    allUsers = response.data;
+                    
+                    // 編集フォームのセレクトボックスに追加
+                    const select = document.getElementById('editClientAssignedTo');
+                    select.innerHTML = '<option value="">未割り当て</option>' +
+                        allUsers.map(user => \`<option value="\${user.username}">\${user.name}</option>\`).join('');
+                } catch (error) {
+                    console.error('Error loading users:', error);
+                }
+            }
 
             async function loadClient() {
                 try {
@@ -1788,6 +1824,7 @@ app.get('/client/:id', async (c) => {
                     console.log('Client loaded:', currentClient);
                     
                     const subsidyType = subsidyTypes.find(s => s.id === currentClient.subsidy_type_id);
+                    const assignedUser = allUsers.find(u => u.username === currentClient.assigned_to);
                     const portalUrl = \`\${window.location.origin}/portal/\${currentClient.access_token}\`;
                     
                     document.getElementById('clientInfo').innerHTML = \`
@@ -1796,7 +1833,7 @@ app.get('/client/:id', async (c) => {
                         <div><strong>電話:</strong> \${currentClient.phone || '-'}</div>
                         <div><strong>申請助成金:</strong> \${subsidyType ? subsidyType.name : '-'}</div>
                         <div><strong>ステータス:</strong> \${STATUS_LABELS[currentClient.status]}</div>
-                        <div><strong>担当:</strong> \${currentClient.assigned_staff || '-'}</div>
+                        <div><strong>担当者:</strong> \${assignedUser ? assignedUser.name : '未割り当て'}</div>
                         <div><strong>メモ:</strong> \${currentClient.notes || '-'}</div>
                         <div class="mt-3 pt-3 border-t">
                             <strong class="block mb-2">顧客ポータルURL:</strong>
@@ -1958,7 +1995,7 @@ app.get('/client/:id', async (c) => {
                 document.getElementById('edit_phone').value = currentClient.phone || '';
                 document.getElementById('edit_subsidy_type_id').value = currentClient.subsidy_type_id || '';
                 document.getElementById('edit_status').value = currentClient.status || 'inquiry';
-                document.getElementById('edit_assigned_staff').value = currentClient.assigned_staff || '';
+                document.getElementById('editClientAssignedTo').value = currentClient.assigned_to || '';
                 document.getElementById('edit_notes').value = currentClient.notes || '';
                 
                 document.getElementById('editClientModal').classList.remove('hidden');
@@ -2008,7 +2045,7 @@ app.get('/client/:id', async (c) => {
                 }
             });
 
-            loadSubsidyTypes().then(() => {
+            Promise.all([loadSubsidyTypes(), loadUsers()]).then(() => {
                 loadClient();
                 loadDocuments();
                 loadCommunications();
