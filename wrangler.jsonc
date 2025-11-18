@@ -5,19 +5,18 @@
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "subsidy-app-production",
+      "database_id": "9cc67ea6-387e-40f3-b7f9-cc376a26bea2"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "subsidy-app-documents"
+    }
   ]
-  // D1とR2は後で手動で設定します
-  // "d1_databases": [
-  //   {
-  //     "binding": "DB",
-  //     "database_name": "subsidy-app-production",
-  //     "database_id": "YOUR_DATABASE_ID_HERE"
-  //   }
-  // ],
-  // "r2_buckets": [
-  //   {
-  //     "binding": "R2",
-  //     "bucket_name": "subsidy-app-documents"
-  //   }
-  // ]
 }
