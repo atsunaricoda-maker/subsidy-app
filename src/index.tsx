@@ -4331,88 +4331,84 @@ app.get('/portal/:token', async (c) => {
             // テンプレートモーダル
             let currentTemplateQuestionId = null;
             
-            // キーワードベースのテンプレート辞書
-            const templateKeywords = {
-                // ビジョン・将来
-                'ビジョン': [
-                    '〇〇分野でのリーディングカンパニーを目指し、業界の発展と地域社会への貢献を両立させていきます。5年後には売上△億円、従業員□名の体制を構築する計画です。',
-                    '既存事業の強化に加え、新規事業領域への積極的な展開を図ります。従業員が創造的な業務に集中できる環境を整備し、イノベーションを継続的に生み出す企業を目指します。',
-                    'デジタル技術を活用した業務効率化と新サービス開発により、顧客満足度の向上と持続的な成長を実現します。',
+            // 質問キーに基づくテンプレート辞書（各質問専用）
+            const questionTemplates = {
+                // ===== IT導入補助金 =====
+                'company_overview': [
+                    '当社は【業種】を営む企業で、創業【年数】目になります。主に【製品・サービス名】を提供しており、【地域・顧客層】のお客様を中心に事業を展開しております。',
+                    '弊社は【商品・サービス】の製造・販売を主な事業としております。【技術・特徴】を強みとし、創業以来お客様との信頼関係を大切にしてまいりました。',
+                    '【業種】として【年数】年の実績があります。【主力事業】を中心に、地域密着型の経営を続けてまいりました。',
                 ],
-                '将来': [
-                    '3年後には現在の売上高を〇％増加させ、新規顧客を△社獲得することを目標としています。',
-                    '将来的には〇〇市場への参入を視野に入れ、事業領域の拡大を図っていきます。',
+                'employee_count': ['10', '25', '50', '100'],
+                'annual_revenue': ['5000', '10000', '30000', '50000'],
+                'current_issues': [
+                    '現在、受発注業務が手作業のため、FAXや電話での注文対応に多くの時間を要しています。転記ミスや確認漏れが頻発し、顧客からのクレームにつながるケースもあります。',
+                    '在庫管理が属人的で、Excelで管理しているため在庫の過不足が発生しがちです。棚卸しにも多大な時間がかかり、業務効率が悪い状態です。',
+                    '顧客情報が各営業担当者の手元で管理されており、情報共有ができていません。担当者不在時の対応が困難で、顧客満足度の低下を招いています。',
+                    '経理業務が紙ベースで、請求書作成や入金確認に多くの時間を費やしています。月末月初は残業が常態化しています。',
+                    '生産現場の進捗管理ができておらず、納期遅延が発生しています。工程間の情報連携が不十分で、手待ち時間が多く発生しています。',
                 ],
-                // 事業内容
-                '事業内容': [
-                    '当社は〇〇業界において、△△サービスを提供しております。主な顧客層は□□で、創業以来○年間にわたり事業を展開してまいりました。',
-                    '弊社は〇〇の製造・販売を主な事業としております。年間売上高は約○○万円、従業員数は△名の中小企業です。',
-                    '〇〇に特化した専門サービスを提供しており、地域の□□業者様を中心にお取引いただいております。',
+                'issue_impact': [
+                    '月に約20時間の残業が発生しており、年間で約50万円の人件費増となっています。また、ミスによる再作業やクレーム対応で本来の業務に集中できない状況です。',
+                    '在庫過多による保管コスト年間約100万円、欠品による機会損失が年間約200万円と試算しています。',
+                    '顧客対応の遅れにより、年間5件程度の失注が発生していると推測されます。既存顧客の離反も懸念されます。',
+                    '経理担当者の月末残業が平均40時間を超えており、負担が大きい状態です。',
                 ],
-                '会社': [
-                    '設立〇年目の企業で、主に△△事業を展開しています。従業員は□名、年商は約○○万円です。',
-                    '〇〇県に本社を構え、地域密着型の事業を展開しております。',
+                'target_it_tool': ['受発注システム', '会計・財務システム', '顧客管理(CRM)', '在庫管理システム', 'テレワーク関連'],
+                'expected_effect': [
+                    '受発注業務の自動化により、月20時間の残業削減と転記ミスゼロを目指します。年間50万円以上のコスト削減効果を見込んでいます。',
+                    'システム導入により在庫の適正化を図り、保管コスト30%削減、欠品率50%減を目標としています。',
+                    '顧客情報の一元管理により、対応スピードを50%向上させ、顧客満足度の改善と売上10%増を目指します。',
+                    '経理業務のデジタル化により、処理時間を60%短縮し、月末の残業を解消することを目標としています。',
                 ],
-                // 課題・問題
-                '課題': [
-                    '現在、〇〇の面で課題を抱えており、具体的には△△という問題が生じています。この課題を解決することで、□□の改善が見込まれます。',
-                    '業務効率化が課題となっており、特に〇〇の工程において多くの時間と人手を要している状況です。',
-                    '人手不足により〇〇業務に支障が出ており、従業員の残業時間増加や品質低下が懸念されています。',
+                'implementation_schedule': [
+                    '来年3月までに本稼働させたいと考えています。',
+                    '補助金交付決定後、3ヶ月以内での導入完了を希望します。',
+                    '繁忙期を避け、閑散期での段階的な導入を希望します。',
                 ],
-                '問題': [
-                    '〇〇の老朽化が進んでおり、メンテナンスコストの増大と生産性低下が問題となっています。',
-                    '手作業に頼っている△△業務でミスが発生しやすく、品質管理の面で課題があります。',
+                'future_vision': [
+                    '3年後には売上を現在の1.5倍に、5年後には2倍に成長させることを目標としています。そのために業務効率化を進め、従業員がより付加価値の高い業務に集中できる環境を整えます。',
+                    'デジタル化を推進し、生産性を30%向上させます。浮いた時間とリソースで新規顧客開拓に注力し、20社の新規取引先獲得を目指します。',
+                    '業務効率化で余力を生み出し、新たな事業領域への参入を計画しています。既存の強みを活かしながら、事業の多角化を図ります。',
                 ],
-                // 導入・計画
-                '導入': [
-                    '本事業では〇〇システムの導入を予定しております。これにより、△△の効率化・□□の向上を目指します。',
-                    '〇〇機器を導入し、生産性を△％向上させることを目標としています。',
-                    '最新の〇〇ソフトウェアを導入し、業務のデジタル化を推進します。',
+                // ===== ものづくり補助金 =====
+                'company_strength': [
+                    '当社の強みは【分野】における【年数】年の経験と実績です。特に【技術・ノウハウ】については、地域でもトップクラスの品質を誇っております。',
+                    '独自開発の【技術名】により、競合他社では対応が難しい【製品・加工】が可能です。',
+                    '大手メーカーとの長年の取引実績があり、品質管理体制と納期遵守率の高さが評価されています。',
                 ],
-                '計画': [
-                    '第1段階として〇〇を導入し、その後△△の整備を進める計画です。全体の導入期間は□ヶ月を予定しています。',
-                    '〇年〇月から導入を開始し、△月までに本格稼働を目指します。',
+                'innovation_content': [
+                    '本事業では、AI/IoTを活用した検査システムの導入により、これまで熟練者の経験に頼っていた品質検査を自動化・高精度化します。',
+                    '新たに【設備・技術】を導入し、従来は対応できなかった【製品・加工】の製造を可能にします。これにより新規市場への参入が実現します。',
+                    '最新の生産設備を導入し、生産性を大幅に向上させるとともに、品質のばらつきを低減します。',
                 ],
-                'IT': [
-                    '業務管理システムの導入により、受発注から在庫管理までを一元化し、業務効率の大幅な改善を図ります。',
-                    'クラウドベースの〇〇システムを導入し、テレワーク環境の整備と情報共有の効率化を実現します。',
-                    'RPA（業務自動化ツール）を導入し、定型的な事務作業を自動化することで、年間〇時間の工数削減を見込んでいます。',
+                'technical_challenge': [
+                    '【工程】における【課題】の検出・制御が技術的課題です。解決策として、AI画像認識技術を導入し、リアルタイムでの自動判定を実現します。',
+                    '現状、手作業で行っている工程でミスが発生しています。新たに自動化設備を導入することで、この課題を克服します。',
                 ],
-                // 効果・成果
-                '効果': [
-                    '本事業の実施により、〇〇の効率が約△％向上し、年間□□万円のコスト削減が見込まれます。',
-                    '導入後は〇〇時間の業務時間短縮が期待でき、従業員の負担軽減にもつながります。',
-                    '品質の安定化により不良率が△％低下し、顧客満足度の向上が期待できます。',
+                'equipment_detail': [
+                    '【メーカー名】製 【機械・システム名】 Model【型番】 処理能力：【仕様】 精度：【仕様】',
+                    '【システム名】一式 ・【機器1】：【仕様】 ・【機器2】：【仕様】',
                 ],
-                '期待': [
-                    '生産性が〇％向上し、年間△時間の労働時間削減が期待できます。',
-                    '業務のデジタル化により、ペーパーレス化と情報共有の迅速化が実現します。',
+                'investment_amount': ['1500', '3500', '5000', '8000'],
+                'productivity_improvement': [
+                    '付加価値額を年間1,000万円増加させ、従業員一人当たりの付加価値額を15%向上させます。',
+                    '生産性を3年間で10%向上させ、事業計画期間内に給与を3%引き上げます。',
                 ],
-                // 金額・費用
-                '金額': [
-                    '総事業費は〇〇万円を予定しており、内訳はシステム導入費△万円、設備費□万円です。',
-                    '投資金額は〇〇万円で、△年での投資回収を見込んでいます。',
+                'market_expansion': [
+                    '品質保証体制の強化により、医療機器/航空宇宙/自動車市場への参入を目指します。',
+                    '新技術を活かし、新規分野の顧客を開拓します。展示会出展や営業活動により、10社の新規顧客獲得を目標としています。',
                 ],
-                '売上': [
-                    '直近の売上高は〇〇万円、経常利益は△万円です。',
-                    '過去3年間の売上推移は、〇年度：△万円、□年度：○万円、直近：△万円となっております。',
-                ],
-                // 従業員
-                '従業員': [
-                    '正社員〇名、パート・アルバイト△名の計□名で運営しております。',
-                    '従業員数は〇名で、うち製造部門△名、営業部門□名、管理部門○名という構成です。',
-                ],
-                // スケジュール
-                'スケジュール': [
-                    '〇月：要件定義・選定、△月：導入・設定、□月：テスト運用、○月：本格稼働を予定しています。',
-                    '導入期間は約〇ヶ月を想定しており、段階的に運用を開始する計画です。',
-                ],
-                // デフォルト
-                'default': [
-                    '具体的な内容は〇〇となります。詳細については別途ご説明いたします。',
-                    '〇〇について、△△の観点から□□と考えております。',
-                    '現状は〇〇ですが、本事業により△△への改善を目指します。',
-                ]
+            };
+            
+            // キーワードベースのフォールバック
+            const keywordTemplates = {
+                'ビジョン': ['将来的には業界のリーディングカンパニーを目指し、地域社会への貢献を両立させていきます。'],
+                '将来': ['3年後には現在の売上高を増加させ、新規顧客を獲得することを目標としています。'],
+                '事業内容': ['当社は【業種】において、【サービス】を提供しております。創業以来【年数】年にわたり事業を展開してまいりました。'],
+                '課題': ['現在、【課題内容】の面で課題を抱えており、業務効率化が必要な状況です。'],
+                '効果': ['本事業の実施により、業務効率が向上し、コスト削減が見込まれます。'],
+                'default': ['具体的な内容についてご記入ください。']
             };
             
             function openTemplateModal(questionId) {
@@ -4421,31 +4417,71 @@ app.get('/portal/:token', async (c) => {
                 
                 document.getElementById('templateQuestionText').textContent = question.question_text;
                 
-                // 質問内容とカテゴリからテンプレートを選定
-                let templates = [];
-                const searchText = question.question_text + ' ' + (question.category || '');
+                // まずquestion_keyで直接マッチを試みる
+                let templates = questionTemplates[question.question_key] || [];
                 
-                // マッチするキーワードを探す
-                for (const [keyword, temps] of Object.entries(templateKeywords)) {
-                    if (keyword !== 'default' && searchText.includes(keyword)) {
-                        templates = templates.concat(temps);
+                // マッチしない場合はキーワードベースで検索
+                if (templates.length === 0) {
+                    const searchText = question.question_text + ' ' + (question.category || '');
+                    for (const [keyword, temps] of Object.entries(keywordTemplates)) {
+                        if (keyword !== 'default' && searchText.includes(keyword)) {
+                            templates = templates.concat(temps);
+                        }
                     }
                 }
                 
-                // マッチしない場合はデフォルト
+                // それでもマッチしない場合はデフォルト
                 if (templates.length === 0) {
-                    templates = templateKeywords['default'];
+                    templates = keywordTemplates['default'];
                 }
                 
-                // 重複を除去して最大5件に制限
-                templates = [...new Set(templates)].slice(0, 5);
+                // 重複を除去
+                templates = [...new Set(templates)];
                 
                 document.getElementById('templateList').innerHTML = templates.map((template, i) => \`
                     <button onclick="applyTemplate(\${i})" 
                             class="w-full text-left p-3 border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors">
-                        <div class="text-sm text-gray-700">\${template}</div>
+                        <div class="text-sm text-gray-700 whitespace-pre-wrap">\${template}</div>
                     </button>
                 \`).join('');
+                
+                // グローバルに保存
+                window.currentTemplates = templates;
+                
+                document.getElementById('templateModal').classList.remove('hidden');
+            }
+            
+            function openTemplateModal(questionId) {
+                currentTemplateQuestionId = questionId;
+                const question = hearingQuestions.find(q => q.id === questionId);
+                
+                document.getElementById('templateQuestionText').textContent = question.question_text;
+                
+                // 質問キーで直接テンプレートを取得
+                let templates = questionTemplates[question.question_key] || [];
+                
+                // テンプレートがない場合はデフォルト
+                if (templates.length === 0) {
+                    templates = questionTemplates['default'] || [];
+                }
+                
+                // example_answerがあれば先頭に追加
+                if (question.example_answer && templates.indexOf(question.example_answer) === -1) {
+                    templates = [question.example_answer].concat(templates);
+                }
+                
+                // 最大5件に制限
+                templates = templates.slice(0, 5);
+                
+                if (templates.length === 0) {
+                    document.getElementById('templateList').innerHTML = '<div class="text-center text-gray-500 py-4">この質問用のテンプレートはありません</div>';
+                } else {
+                    document.getElementById('templateList').innerHTML = templates.map(function(template, i) {
+                        return '<button onclick="applyTemplate(' + i + ')" class="w-full text-left p-3 border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors">' +
+                            '<div class="text-sm text-gray-700">' + template + '</div>' +
+                        '</button>';
+                    }).join('');
+                }
                 
                 // グローバルに保存
                 window.currentTemplates = templates;
@@ -4460,9 +4496,9 @@ app.get('/portal/:token', async (c) => {
             function applyTemplate(index) {
                 if (currentTemplateQuestionId && window.currentTemplates) {
                     const template = window.currentTemplates[index];
-                    const textarea = document.getElementById(\`answer-\${currentTemplateQuestionId}\`);
-                    if (textarea) {
-                        textarea.value = template;
+                    const input = document.getElementById('answer-' + currentTemplateQuestionId);
+                    if (input) {
+                        input.value = template;
                         updateHearingAnswer(currentTemplateQuestionId, template);
                     }
                     closeTemplateModal();
