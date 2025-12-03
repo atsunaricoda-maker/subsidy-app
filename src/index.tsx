@@ -2838,6 +2838,11 @@ app.get('/client/:id', async (c) => {
                                 <button onclick="viewDocument(\${doc.id})" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm">
                                     <i class="fas fa-eye mr-1"></i>詳細・編集
                                 </button>
+                                <button onclick="deleteGeneratedDocument(\${doc.id}, '\${doc.document_title.replace(/'/g, "\\\\'")}')}" 
+                                        class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-sm"
+                                        title="削除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
                         </div>
                     \`).join('');
@@ -2968,6 +2973,21 @@ app.get('/client/:id', async (c) => {
             
             let currentViewingDocId = null;
             
+            async function deleteGeneratedDocument(docId, docTitle) {
+                if (!confirm(\`「\${docTitle}」を削除しますか？\\n\\nこの操作は取り消せません。\`)) {
+                    return;
+                }
+                
+                try {
+                    await axios.delete(\`/api/generated-documents/\${docId}\`);
+                    showMessage('success', '文書を削除しました');
+                    loadGeneratedDocuments();
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    showMessage('error', '削除に失敗しました');
+                }
+            }
+            
             async function viewDocument(docId) {
                 currentViewingDocId = docId;
                 try {
@@ -3003,6 +3023,10 @@ app.get('/client/:id', async (c) => {
                                 </button>
                                 <button onclick="exportDocument(\${doc.id})" class="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700">
                                     <i class="fas fa-download mr-1"></i>エクスポート
+                                </button>
+                                <button onclick="deleteGeneratedDocumentFromDetail(\${doc.id}, '\${doc.document_title.replace(/'/g, "\\\\'")}')}" 
+                                        class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">
+                                    <i class="fas fa-trash mr-1"></i>削除
                                 </button>
                             </div>
                         </div>
@@ -3192,6 +3216,23 @@ app.get('/client/:id', async (c) => {
             // セクション別採択事例比較
             function compareWithSuccessCase(sectionId) {
                 alert(\`セクション「\${sectionId}」の採択事例比較機能は、今後のアップデートで追加予定です。\n\n現在は「採択事例と比較」ボタンで全体比較をご利用ください。\`);
+            }
+            
+            // 詳細画面から文書削除
+            async function deleteGeneratedDocumentFromDetail(docId, docTitle) {
+                if (!confirm(\`「\${docTitle}」を削除しますか？\\n\\nこの操作は取り消せません。\`)) {
+                    return;
+                }
+                
+                try {
+                    await axios.delete(\`/api/generated-documents/\${docId}\`);
+                    showMessage('success', '文書を削除しました');
+                    closeDocumentDetailModal();
+                    loadGeneratedDocuments();
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    showMessage('error', '削除に失敗しました');
+                }
             }
             
             // 文書エクスポート（フェーズ4）
@@ -6737,6 +6778,24 @@ app.put('/api/generated-documents/:id/sections/:sectionId', async (c) => {
     SET sections_content = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).bind(JSON.stringify(sectionsContent), docId).run()
+  
+  return c.json({ success: true })
+})
+
+// 文書削除
+app.delete('/api/generated-documents/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  // 編集履歴も削除
+  await DB.prepare(`
+    DELETE FROM document_section_edits WHERE document_id = ?
+  `).bind(id).run()
+  
+  // 文書を削除
+  await DB.prepare(`
+    DELETE FROM generated_documents WHERE id = ?
+  `).bind(id).run()
   
   return c.json({ success: true })
 })
