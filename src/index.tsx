@@ -8550,30 +8550,10 @@ ${(subsidies.results || []).map((s: any) => `
   申請期間: ${s.application_start_date || '?'} 〜 ${s.application_end_date || '?'}
 `).join('')}
 
-各補助金について詳細に分析し、以下のJSON形式で回答してください：
-{
-  "company_summary": "企業の特徴を100文字程度で要約",
-  "recommendations": [
-    {
-      "subsidy_name": "補助金名",
-      "match_score": 0-100,
-      "adoption_probability": 0-100,
-      "rank": 1-n（お勧め順位）,
-      "compatibility": {
-        "eligibility": { "met": true/false, "detail": "詳細説明" },
-        "business_fit": { "score": 0-100, "detail": "詳細説明" },
-        "timing": { "status": "申請可能" | "申請期間外" | "間もなく締切", "deadline_days": 残り日数 }
-      },
-      "reasons": ["推奨理由1", "推奨理由2"],
-      "concerns": ["懸念点1", "懸念点2"],
-      "preparation_steps": ["準備ステップ1", "準備ステップ2"],
-      "estimated_amount": "想定される補助金額（万円）",
-      "application_complexity": "簡単" | "普通" | "複雑"
-    }
-  ],
-  "overall_strategy": "この企業に対する補助金活用の総合戦略（200文字以内）",
-  "priority_actions": ["優先して行うべきアクション1", "アクション2", "アクション3"]
-}`
+企業に最も適した補助金を上位3件選び、以下のJSON形式のみで回答してください。
+必ずJSONのみを出力してください。説明文や前置きは一切不要です。recommendationsは必ず3件以下にしてください。
+
+{"company_summary":"企業の特徴（50字以内）","recommendations":[{"subsidy_name":"補助金名","match_score":50,"rank":1,"reasons":["理由1"],"concerns":["懸念点1"],"estimated_amount":"100万円"}],"overall_strategy":"補助金活用戦略（50字以内）","priority_actions":["アクション1","アクション2"]}`
 
   try {
     const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
@@ -8586,10 +8566,24 @@ ${(subsidies.results || []).map((s: any) => `
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
       jsonStr = jsonStr.substring(startIdx, endIdx + 1)
     }
+    // 制御文字と問題のある文字を除去
     jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, ' ')
+    // 改行を削除してJSONを整形
+    jsonStr = jsonStr.replace(/\n/g, ' ').replace(/\r/g, ' ')
+    // 複数スペースを1つに
+    jsonStr = jsonStr.replace(/\s+/g, ' ')
     
-    if (jsonStr) {
-      const result = JSON.parse(jsonStr)
+    let result = null
+    try {
+      result = JSON.parse(jsonStr)
+    } catch (parseError) {
+      console.error('JSON parse error, trying to fix:', parseError)
+      // 一般的なJSON修正を試みる
+      jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
+      result = JSON.parse(jsonStr)
+    }
+    
+    if (result) {
       
       // 各補助金のスコアをDBに保存
       for (const rec of (result.recommendations || [])) {
@@ -8602,10 +8596,10 @@ ${(subsidies.results || []).map((s: any) => `
           `).bind(
             clientId,
             subsidy.id,
-            rec.match_score,
-            rec.adoption_probability,
+            rec.match_score || 50,
+            rec.adoption_probability || rec.match_score || 50,
             rec.reasons?.join(', ') || '',
-            JSON.stringify(rec.compatibility)
+            JSON.stringify(rec.compatibility || {})
           ).run()
         }
       }
