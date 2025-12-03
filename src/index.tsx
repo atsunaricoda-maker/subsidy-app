@@ -2164,16 +2164,24 @@ app.get('/client/:id', async (c) => {
             // AIレスポンスを読みやすく整形する関数
             function formatAIResponse(text) {
                 if (!text) return '';
-                const backtick = String.fromCharCode(96);
-                const backtickRegex = new RegExp(backtick + '([^' + backtick + ']+)' + backtick, 'g');
-                return text
-                    .replace(/\*\*([^*]+)\*\*/g, '$1')
-                    .replace(/\*([^*]+)\*/g, '$1')
-                    .replace(/^#{1,6}\s+/gm, '')
-                    .replace(/^[\-\*]\s+/gm, '・')
-                    .replace(backtickRegex, '$1')
-                    .replace(/\n{3,}/g, '\n\n')
-                    .trim();
+                // マークダウン記法を除去してプレーンテキストに変換
+                var result = text;
+                // 太字 **text** を除去
+                result = result.split('**').join('');
+                // 見出し # を除去（行頭の#と空白を削除）
+                result = result.replace(/^#+\\s*/gm, '');
+                // 箇条書き - や * を日本語の・に変換
+                result = result.replace(/^[\\-\\*]\\s+/gm, '・');
+                // バッククォートを除去
+                var bt = String.fromCharCode(96);
+                while (result.indexOf(bt) !== -1) {
+                    result = result.replace(bt, '');
+                }
+                // 連続する改行を整理
+                while (result.indexOf('\\n\\n\\n') !== -1) {
+                    result = result.replace('\\n\\n\\n', '\\n\\n');
+                }
+                return result.trim();
             }
             
             // ポータルURLコピー機能
@@ -3509,21 +3517,23 @@ app.get('/portal/:token', async (c) => {
             // AIレスポンスを読みやすく整形する関数
             function formatAIResponse(text) {
                 if (!text) return '';
-                const backtick = String.fromCharCode(96);
-                const backtickRegex = new RegExp(backtick + '([^' + backtick + ']+)' + backtick, 'g');
-                return text
-                    // マークダウンの太字を除去
-                    .replace(/\*\*([^*]+)\*\*/g, '$1')
-                    .replace(/\*([^*]+)\*/g, '$1')
-                    // マークダウンの見出しを除去
-                    .replace(/^#{1,6}\s+/gm, '')
-                    // マークダウンの箇条書きを日本語の箇条書きに変換
-                    .replace(/^[\-\*]\s+/gm, '・')
-                    // バッククォートを除去
-                    .replace(backtickRegex, '$1')
-                    // 連続する改行を1つに
-                    .replace(/\n{3,}/g, '\n\n')
-                    .trim();
+                var result = text;
+                // 太字 **text** を除去
+                result = result.split('**').join('');
+                // 見出し # を除去
+                result = result.replace(/^#+\\s*/gm, '');
+                // 箇条書きを日本語の・に変換
+                result = result.replace(/^[\\-\\*]\\s+/gm, '・');
+                // バッククォートを除去
+                var bt = String.fromCharCode(96);
+                while (result.indexOf(bt) !== -1) {
+                    result = result.replace(bt, '');
+                }
+                // 連続する改行を整理
+                while (result.indexOf('\\n\\n\\n') !== -1) {
+                    result = result.replace('\\n\\n\\n', '\\n\\n');
+                }
+                return result.trim();
             }
             
             const CLIENT_ID = ${client.id};
