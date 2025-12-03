@@ -7405,26 +7405,83 @@ app.get('/api/hearing-questions/:subsidyTypeId', async (c) => {
   const { DB } = c.env
   const subsidyTypeId = c.req.param('subsidyTypeId')
   
-  // まず補助金固有の質問があるかチェック
-  const specificQuestions = await DB.prepare(`
-    SELECT * FROM hearing_questions 
-    WHERE subsidy_type_id = ?
-    ORDER BY display_order ASC
-  `).bind(subsidyTypeId).all()
-  
-  // 補助金固有の質問がある場合はそれを返す
-  if (specificQuestions.results && specificQuestions.results.length > 0) {
-    return c.json(specificQuestions.results)
-  }
-  
-  // 補助金固有の質問がない場合は共通質問（subsidy_type_id = 0）を返す
+  // 共通質問を取得（subsidy_type_id = 0）
   const commonQuestions = await DB.prepare(`
     SELECT * FROM hearing_questions 
     WHERE subsidy_type_id = 0
     ORDER BY display_order ASC
   `).all()
   
-  return c.json(commonQuestions.results)
+  // 補助金固有の質問を取得
+  const specificQuestions = await DB.prepare(`
+    SELECT * FROM hearing_questions 
+    WHERE subsidy_type_id = ?
+    ORDER BY display_order ASC
+  `).bind(subsidyTypeId).all()
+  
+  const commonQs = commonQuestions.results || []
+  const specificQs = specificQuestions.results || []
+  
+  // 固有質問がない場合は共通質問のみ返す
+  if (specificQs.length === 0) {
+    return c.json(commonQs)
+  }
+  
+  // 質問テキストの正規化関数（重複検出用）
+  // 質問の核心部分を抽出して比較
+  const normalizeText = (text: string) => {
+    let normalized = text
+      .replace(/導入後|実現後/g, '効果')
+      .replace(/御社|貴社/g, '会社')
+      .replace(/[？?！!、。・\s]/g, '')
+      .toLowerCase()
+    return normalized
+  }
+  
+  // キーワードベースの重複チェック（同じカテゴリの類似質問を検出）
+  const getKeywords = (text: string): string[] => {
+    const keywords: string[] = []
+    if (/事業内容/.test(text)) keywords.push('事業内容')
+    if (/従業員/.test(text)) keywords.push('従業員')
+    if (/年商|売上/.test(text)) keywords.push('売上')
+    if (/創業|設立/.test(text)) keywords.push('設立年')
+    if (/課題|困っている/.test(text)) keywords.push('課題')
+    if (/影響/.test(text)) keywords.push('影響')
+    if (/効果|期待/.test(text) && /どのような/.test(text)) keywords.push('期待効果')
+    if (/予算/.test(text)) keywords.push('予算')
+    if (/ビジョン|5年後|3年後/.test(text)) keywords.push('ビジョン')
+    return keywords
+  }
+  
+  // 固有質問で既にカバーされているキーワードを収集
+  const coveredKeywords = new Set<string>()
+  specificQs.forEach(q => {
+    getKeywords(q.question_text).forEach(k => coveredKeywords.add(k))
+  })
+  
+  // 固有質問の正規化されたテキストセットを作成
+  const specificTextSet = new Set(specificQs.map(q => normalizeText(q.question_text)))
+  
+  // 共通質問から重複を除外（テキスト一致 OR キーワード重複）
+  const filteredCommonQs = commonQs.filter(q => {
+    // 正規化テキストで完全一致する場合は除外
+    if (specificTextSet.has(normalizeText(q.question_text))) return false
+    // キーワードが既にカバーされている場合も除外
+    const qKeywords = getKeywords(q.question_text)
+    if (qKeywords.some(k => coveredKeywords.has(k))) return false
+    return true
+  })
+  
+  // 固有質問をベースにして、共通質問の固有に無いものを追加
+  const mergedQuestions = [
+    ...specificQs,  // 固有質問を優先
+    ...filteredCommonQs  // 共通質問で重複していないもの
+  ]
+  
+  // display_orderでソート
+  mergedQuestions.sort((a, b) => a.display_order - b.display_order)
+  
+  return c.json(mergedQuestions)
 })
 
 // 顧客のヒアリング回答取得
