@@ -1916,10 +1916,18 @@ app.get('/client/:id', async (c) => {
                             </button>
                         </div>
 
-                        <!-- 書類一覧 -->
+                        <!-- 書類進捗 -->
                         <div class="bg-white rounded-lg shadow p-6">
-                            <h2 class="text-lg font-bold mb-4">書類一覧</h2>
-                            <div id="documentsList"></div>
+                            <h2 class="text-lg font-bold mb-2">
+                                <i class="fas fa-folder-open mr-2 text-blue-600"></i>必要書類
+                            </h2>
+                            <div id="documentProgress" class="mb-3"></div>
+                            <div id="documentChecklist" class="space-y-2 mb-4"></div>
+                            
+                            <h3 class="text-sm font-bold text-gray-700 mb-2 pt-3 border-t">
+                                <i class="fas fa-file-upload mr-1"></i>アップロード済み
+                            </h3>
+                            <div id="documentsList" class="max-h-48 overflow-y-auto"></div>
                         </div>
                     </div>
 
@@ -2379,30 +2387,81 @@ app.get('/client/:id', async (c) => {
             }
 
             async function loadDocuments() {
-                const response = await axios.get(\`/api/clients/\${CLIENT_ID}/documents\`);
-                const docs = response.data;
+                // 必要書類チェックリストと既にアップロードされた書類を取得
+                const [checklistRes, docsRes] = await Promise.all([
+                    axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`),
+                    axios.get(\`/api/clients/\${CLIENT_ID}/documents\`)
+                ]);
                 
+                const checklist = checklistRes.data;
+                const docs = docsRes.data;
+                const uploadedTypes = new Set(docs.map(d => d.document_type));
+                
+                // 必須書類のカウント
+                const requiredDocs = checklist.filter(item => item.is_required);
+                const uploadedRequired = requiredDocs.filter(item => uploadedTypes.has(item.document_type)).length;
+                const totalRequired = requiredDocs.length;
+                const progressPercent = totalRequired > 0 ? Math.round((uploadedRequired / totalRequired) * 100) : 0;
+                
+                // 進捗表示
+                const progressContainer = document.getElementById('documentProgress');
+                progressContainer.innerHTML = \`
+                    <div class="flex items-center justify-between text-sm mb-1">
+                        <span class="text-gray-600">必須書類の提出状況</span>
+                        <span class="font-bold \${progressPercent === 100 ? 'text-green-600' : 'text-blue-600'}">\${uploadedRequired}/\${totalRequired}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="h-2 rounded-full transition-all \${progressPercent === 100 ? 'bg-green-500' : 'bg-blue-500'}" style="width: \${progressPercent}%"></div>
+                    </div>
+                \`;
+                
+                // チェックリスト表示（未提出の書類を強調）
+                const checklistContainer = document.getElementById('documentChecklist');
+                const pendingDocs = checklist.filter(item => !uploadedTypes.has(item.document_type));
+                
+                if (pendingDocs.length === 0) {
+                    checklistContainer.innerHTML = \`
+                        <div class="text-center py-3 bg-green-50 rounded-lg">
+                            <i class="fas fa-check-circle text-green-500 text-xl mb-1"></i>
+                            <p class="text-sm text-green-700 font-medium">全ての書類が提出済みです</p>
+                        </div>
+                    \`;
+                } else {
+                    checklistContainer.innerHTML = \`
+                        <div class="text-xs text-gray-500 mb-2">未提出の書類:</div>
+                        \${pendingDocs.map(item => \`
+                            <div class="flex items-center gap-2 p-2 bg-gray-50 rounded border \${item.is_required ? 'border-red-200' : 'border-gray-200'}">
+                                <i class="fas fa-circle text-xs \${item.is_required ? 'text-red-400' : 'text-gray-300'}"></i>
+                                <span class="text-sm flex-1">\${item.document_type}</span>
+                                \${item.is_required ? '<span class="text-xs text-red-500 font-medium">必須</span>' : '<span class="text-xs text-gray-400">任意</span>'}
+                            </div>
+                        \`).join('')}
+                    \`;
+                }
+                
+                // アップロード済み書類一覧
                 const container = document.getElementById('documentsList');
                 if (docs.length === 0) {
-                    container.innerHTML = '<div class="text-sm text-gray-500">まだ書類がありません</div>';
+                    container.innerHTML = '<div class="text-sm text-gray-500 py-2">まだ書類がありません</div>';
                     return;
                 }
                 
                 container.innerHTML = docs.map(doc => \`
-                    <div class="border-b py-3 last:border-b-0">
-                        <div class="mb-2">
-                            <div class="font-medium text-sm">\${doc.document_type}</div>
-                            <div class="text-xs text-gray-500">\${doc.file_name}</div>
-                            <div class="text-xs text-gray-400">\${new Date(doc.uploaded_at).toLocaleString('ja-JP')}</div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs px-2 py-1 rounded-full \${
+                    <div class="border-b py-2 last:border-b-0">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium text-sm truncate">\${doc.document_type}</div>
+                                <div class="text-xs text-gray-500 truncate">\${doc.file_name}</div>
+                            </div>
+                            <span class="flex-shrink-0 text-xs px-2 py-0.5 rounded-full \${
                                 doc.status === 'approved' ? 'bg-green-100 text-green-800' :
                                 doc.status === 'rejected' ? 'bg-red-100 text-red-800' :
                                 'bg-yellow-100 text-yellow-800'
                             }">
-                                \${doc.status === 'approved' ? '承認済み' : doc.status === 'rejected' ? '差し戻し' : '確認中'}
+                                \${doc.status === 'approved' ? '✓' : doc.status === 'rejected' ? '✗' : '...'}
                             </span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-1">
                             <a href="/api/documents/\${doc.id}/download" 
                                class="text-blue-600 hover:text-blue-800 text-xs">
                                 <i class="fas fa-download mr-1"></i>DL
@@ -2416,7 +2475,7 @@ app.get('/client/:id', async (c) => {
                             \${doc.status !== 'rejected' ? \`
                                 <button onclick="updateDocumentStatus(\${doc.id}, 'rejected')" 
                                         class="text-xs text-red-600 hover:text-red-800">
-                                    <i class="fas fa-times mr-1"></i>差戻し
+                                    <i class="fas fa-times mr-1"></i>差戻
                                 </button>
                             \` : ''}
                         </div>
