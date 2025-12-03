@@ -421,9 +421,19 @@ app.get('/', (c) => {
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">申請する助成金 *</label>
-                        <select name="subsidy_type_id" id="newClientSubsidyType" required class="w-full px-3 py-2 border rounded-lg">
-                            <option value="">選択してください</option>
-                        </select>
+                        <div class="relative">
+                            <input type="text" id="subsidySearchInput" 
+                                   placeholder="🔍 補助金名で検索..." 
+                                   class="w-full px-3 py-2 border rounded-lg mb-1"
+                                   oninput="filterSubsidyOptions()">
+                            <select name="subsidy_type_id" id="newClientSubsidyType" required 
+                                    class="w-full px-3 py-2 border rounded-lg" size="6">
+                                <option value="">選択してください</option>
+                            </select>
+                            <div id="selectedSubsidyName" class="text-xs text-green-600 mt-1 hidden">
+                                <i class="fas fa-check-circle mr-1"></i><span></span>
+                            </div>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">担当者</label>
@@ -614,13 +624,64 @@ app.get('/', (c) => {
                     const response = await axios.get('/api/subsidy-types');
                     subsidyTypes = response.data;
                     
-                    // 新規登録フォームのセレクトボックスに追加
-                    const select = document.getElementById('newClientSubsidyType');
-                    select.innerHTML = '<option value="">選択してください</option>' +
-                        subsidyTypes.map(type => \`<option value="\${type.id}">\${type.name}（\${type.category}）</option>\`).join('');
+                    renderSubsidyOptions();
                 } catch (error) {
                     console.error('Error loading subsidy types:', error);
                 }
+            }
+            
+            // 補助金オプションをカテゴリ別にレンダリング
+            function renderSubsidyOptions(filter = '') {
+                const select = document.getElementById('newClientSubsidyType');
+                if (!select) return;
+                
+                // カテゴリでグループ化
+                const grouped = {};
+                subsidyTypes.forEach(type => {
+                    const cat = type.category || 'その他';
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(type);
+                });
+                
+                // フィルタリング
+                const filterLower = filter.toLowerCase();
+                let html = '<option value="">選択してください</option>';
+                
+                Object.entries(grouped).forEach(([category, types]) => {
+                    const filteredTypes = types.filter(t => 
+                        !filter || 
+                        t.name.toLowerCase().includes(filterLower) || 
+                        category.toLowerCase().includes(filterLower)
+                    );
+                    
+                    if (filteredTypes.length > 0) {
+                        html += \`<optgroup label="📁 \${category}">\`;
+                        filteredTypes.forEach(type => {
+                            html += \`<option value="\${type.id}">\${type.name}</option>\`;
+                        });
+                        html += '</optgroup>';
+                    }
+                });
+                
+                select.innerHTML = html;
+                
+                // 選択時に表示を更新
+                select.onchange = function() {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const display = document.getElementById('selectedSubsidyName');
+                    if (this.value && selectedOption) {
+                        display.classList.remove('hidden');
+                        display.querySelector('span').textContent = selectedOption.text;
+                    } else {
+                        display.classList.add('hidden');
+                    }
+                };
+            }
+            
+            // 補助金検索フィルター
+            function filterSubsidyOptions() {
+                const input = document.getElementById('subsidySearchInput');
+                renderSubsidyOptions(input.value);
             }
             
             // 従業員一覧読み込み
@@ -2162,9 +2223,15 @@ app.get('/client/:id', async (c) => {
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">申請する助成金</label>
-                        <select name="subsidy_type_id" id="edit_subsidy_type_id" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="">選択してください</option>
-                        </select>
+                        <div class="relative">
+                            <input type="text" id="editSubsidySearchInput" 
+                                   placeholder="🔍 補助金名で検索..." 
+                                   class="w-full px-3 py-2 border rounded-lg mb-1"
+                                   oninput="filterEditSubsidyOptions()">
+                            <select name="subsidy_type_id" id="edit_subsidy_type_id" class="w-full px-3 py-2 border rounded-lg" size="5">
+                                <option value="">選択してください</option>
+                            </select>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">ステータス</label>
@@ -2245,13 +2312,55 @@ app.get('/client/:id', async (c) => {
                     const response = await axios.get('/api/subsidy-types');
                     subsidyTypes = response.data;
                     
-                    // 編集フォームのセレクトボックスに追加
-                    const select = document.getElementById('edit_subsidy_type_id');
-                    select.innerHTML = '<option value="">選択してください</option>' +
-                        subsidyTypes.map(type => \`<option value="\${type.id}">\${type.name}（\${type.category}）</option>\`).join('');
+                    renderEditSubsidyOptions();
                 } catch (error) {
                     console.error('Error loading subsidy types:', error);
                 }
+            }
+            
+            // 編集フォーム用：補助金オプションをカテゴリ別にレンダリング
+            function renderEditSubsidyOptions(filter = '') {
+                const select = document.getElementById('edit_subsidy_type_id');
+                if (!select) return;
+                
+                // カテゴリでグループ化
+                const grouped = {};
+                subsidyTypes.forEach(type => {
+                    const cat = type.category || 'その他';
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(type);
+                });
+                
+                // フィルタリング
+                const filterLower = filter.toLowerCase();
+                let html = '<option value="">選択してください</option>';
+                
+                Object.entries(grouped).forEach(([category, types]) => {
+                    const filteredTypes = types.filter(t => 
+                        !filter || 
+                        t.name.toLowerCase().includes(filterLower) || 
+                        category.toLowerCase().includes(filterLower)
+                    );
+                    
+                    if (filteredTypes.length > 0) {
+                        html += \`<optgroup label="📁 \${category}">\`;
+                        filteredTypes.forEach(type => {
+                            html += \`<option value="\${type.id}">\${type.name}</option>\`;
+                        });
+                        html += '</optgroup>';
+                    }
+                });
+                
+                select.innerHTML = html;
+            }
+            
+            // 編集フォーム用：補助金検索フィルター
+            function filterEditSubsidyOptions() {
+                const input = document.getElementById('editSubsidySearchInput');
+                const currentValue = document.getElementById('edit_subsidy_type_id').value;
+                renderEditSubsidyOptions(input.value);
+                // 現在の値を維持
+                document.getElementById('edit_subsidy_type_id').value = currentValue;
             }
             
             async function loadUsers() {
