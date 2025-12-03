@@ -7459,34 +7459,59 @@ app.get('/admin/backup', (c) => {
 // AI機能 API
 // ===============================
 
-// Gemini API呼び出しヘルパー
-async function callGeminiAPI(prompt: string, apiKey: string): Promise<string> {
+// Gemini API呼び出しヘルパー（リトライ機能付き）
+async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3): Promise<string> {
   if (!apiKey) {
     // デモモード：APIキーがない場合はダミーレスポンス
     return `【デモモード】\n\nAPIキーが設定されていないため、実際のAI生成は行われません。\n\n本番環境では、以下のプロンプトに基づいてAIが文章を生成します：\n\n${prompt.substring(0, 200)}...`
   }
   
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096,
-        }
-      })
-    }
-  )
+  let lastError: Error | null = null
   
-  if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`)
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // レート制限対策：リトライ時は待機
+      if (attempt > 0) {
+        const waitTime = Math.min(1000 * Math.pow(2, attempt), 10000) // 2秒, 4秒, 最大10秒
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 4096,
+            }
+          })
+        }
+      )
+      
+      // 429（レート制限）または5xx（サーバーエラー）の場合はリトライ
+      if (response.status === 429 || response.status >= 500) {
+        lastError = new Error(`Gemini API error: ${response.status}`)
+        console.error(`Gemini API attempt ${attempt + 1}/${maxRetries} failed: ${response.status}`)
+        continue
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      
+    } catch (error) {
+      lastError = error as Error
+      console.error(`Gemini API attempt ${attempt + 1}/${maxRetries} error:`, error)
+    }
   }
   
-  const data = await response.json()
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  throw lastError || new Error('Gemini API failed after retries')
 }
 
 // ===============================
@@ -8624,14 +8649,67 @@ ${(successCases.results || []).slice(0, 3).map((c: any, i: number) => `
     }, 500)
   } catch (error: any) {
     console.error('Predict adoption error:', error?.message || error)
+    
+    // エラー時でもできる限り有用な情報を返す
+    const dataCompleteness = Math.round(answeredQuestions / totalQuestions * 100)
+    const hasProfile = !!(profile?.industry || profile?.employee_count)
+    
+    // 簡易的な評価を生成
+    let estimatedProbability = 30 // ベース
+    let assessment = 'D'
+    
+    if (dataCompleteness >= 80) {
+      estimatedProbability += 30
+      assessment = 'B'
+    } else if (dataCompleteness >= 50) {
+      estimatedProbability += 15
+      assessment = 'C'
+    }
+    
+    if (hasProfile) {
+      estimatedProbability += 10
+    }
+    
+    if (generatedDocs?.count > 0) {
+      estimatedProbability += 10
+    }
+    
     return c.json({ 
-      error: 'AI分析に失敗しました',
-      details: error?.message || 'Unknown error',
+      success: true,
+      error: 'AI分析が一時的に利用できません。簡易評価を表示しています。',
       prediction: {
-        adoption_probability: 50,
+        adoption_probability: Math.min(estimatedProbability, 70),
         confidence_level: 'low',
-        overall_assessment: 'C',
-        improvement_suggestions: [{ priority: 'high', suggestion: 'ヒアリング情報を充実させてください', expected_impact: '予測精度の向上' }]
+        overall_assessment: assessment,
+        score_breakdown: {
+          eligibility: { score: hasProfile ? 50 : 20, comment: hasProfile ? '基本情報が登録されています' : '企業情報が不足しています' },
+          business_plan: { score: dataCompleteness >= 50 ? 50 : 20, comment: `ヒアリング回答率: ${dataCompleteness}%` },
+          innovation: { score: 30, comment: 'AI分析が必要です' },
+          feasibility: { score: 30, comment: 'AI分析が必要です' },
+          expected_effect: { score: 30, comment: 'AI分析が必要です' }
+        },
+        strengths: dataCompleteness >= 50 ? ['ヒアリング情報が一定量入力されています'] : ['現時点では特定できません'],
+        weaknesses: [
+          ...(hasProfile ? [] : ['企業プロファイルが未入力です']),
+          ...(dataCompleteness < 50 ? ['ヒアリング情報が不足しています'] : []),
+          ...(generatedDocs?.count === 0 ? ['申請書類が未作成です'] : [])
+        ],
+        improvement_suggestions: [
+          ...(hasProfile ? [] : [{ priority: 'high', suggestion: '企業プロファイルを入力してください', expected_impact: '申請資格の確認が可能になります' }]),
+          ...(dataCompleteness < 80 ? [{ priority: 'high', suggestion: 'ヒアリング質問に回答してください', expected_impact: '採択率予測の精度が向上します' }] : []),
+          { priority: 'medium', suggestion: '後ほど再度AI分析を実行してください', expected_impact: 'より詳細な分析結果を取得できます' }
+        ],
+        similar_success_rate: 'AI分析が必要です',
+        key_success_factors: ['ヒアリング情報の充実', '企業情報の詳細入力', '申請書類の準備'],
+        risk_factors: ['情報不足による低評価', 'AI分析未完了'],
+        recommended_actions: ['ヒアリング質問への回答を完了させる', '企業プロファイルを入力する', '後ほど再度分析を実行する']
+      },
+      metadata: {
+        client_id: clientId,
+        subsidy_name: client.subsidy_name,
+        analyzed_at: new Date().toISOString(),
+        data_completeness: dataCompleteness,
+        is_fallback: true
       }
     })
   }
@@ -8796,17 +8874,38 @@ ${(subsidies.results || []).map((s: any) => `
         partial: true
       }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Comprehensive matching error:', error)
-    // エラー時もフォールバックデータを返す
+    
+    // エラー時でもできる限り有用なフォールバックを返す
+    const subsidyList = (subsidies.results || []).slice(0, 3)
+    
     return c.json({
-      success: false,
-      error: 'AI分析に失敗しました。しばらくしてから再度お試しください。',
+      success: true,
+      error: 'AI分析が一時的に利用できません。基本的な補助金情報を表示しています。',
       analysis: {
-        company_summary: '分析を実行できませんでした',
-        recommendations: [],
-        overall_strategy: 'エラーが発生しました。再度お試しください。',
-        priority_actions: ['再度分析を実行する']
+        company_summary: client.company_name ? `${client.company_name}様の補助金候補` : '補助金候補一覧',
+        recommendations: subsidyList.map((s: any, i: number) => ({
+          subsidy_name: s.name,
+          match_score: 50,
+          rank: i + 1,
+          reasons: [`${s.category}カテゴリの補助金です`, s.description ? s.description.substring(0, 50) + '...' : '詳細は公募要領をご確認ください'],
+          concerns: ['詳細な適合性分析にはAI分析が必要です'],
+          estimated_amount: s.max_amount ? `最大${(s.max_amount / 10000).toLocaleString()}万円` : '要確認'
+        })),
+        overall_strategy: 'AI分析が一時的に利用できないため、基本的な補助金情報を表示しています。後ほど再度「総合分析」を実行してください。',
+        priority_actions: [
+          'ヒアリング質問への回答を完了させる',
+          '企業プロファイルを充実させる', 
+          '後ほど再度総合分析を実行する'
+        ]
+      },
+      metadata: {
+        client_id: clientId,
+        analyzed_at: new Date().toISOString(),
+        subsidies_analyzed: subsidies.results?.length || 0,
+        is_fallback: true,
+        error_type: error?.message?.includes('429') ? 'rate_limit' : 'unknown'
       }
     })
   }
