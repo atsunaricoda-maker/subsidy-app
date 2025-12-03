@@ -1431,6 +1431,55 @@ app.delete('/api/subsidy-types/:subsidyId/documents/:docId', async (c) => {
   return c.json({ success: true })
 })
 
+// 助成金種別削除（関連データも削除）
+app.delete('/api/subsidy-types/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  // id = 0 は共通質問用なので削除不可
+  if (id === '0') {
+    return c.json({ error: '共通質問用のレコードは削除できません' }, 400)
+  }
+  
+  try {
+    // この補助金種別を使用している顧客数をチェック
+    const clientsUsingThisType = await DB.prepare(`
+      SELECT COUNT(*) as count FROM clients WHERE subsidy_type_id = ?
+    `).bind(id).first()
+    
+    // 関連データを削除
+    // 1. 必要書類
+    await DB.prepare(`DELETE FROM subsidy_type_documents WHERE subsidy_type_id = ?`).bind(id).run()
+    
+    // 2. ヒアリング質問
+    await DB.prepare(`DELETE FROM hearing_questions WHERE subsidy_type_id = ?`).bind(id).run()
+    
+    // 3. 補助金ガイドライン
+    await DB.prepare(`DELETE FROM subsidy_guidelines WHERE subsidy_type_id = ?`).bind(id).run()
+    
+    // 4. マッチングスコア（この補助金種別に関連するもの）
+    await DB.prepare(`DELETE FROM subsidy_match_scores WHERE subsidy_type_id = ?`).bind(id).run()
+    
+    // 5. 補助金監視URL
+    await DB.prepare(`DELETE FROM subsidy_watch_urls WHERE subsidy_type_id = ?`).bind(id).run()
+    
+    // 6. 顧客の補助金種別をNULLに更新（削除ではなく解除）
+    await DB.prepare(`UPDATE clients SET subsidy_type_id = NULL WHERE subsidy_type_id = ?`).bind(id).run()
+    
+    // 最後に補助金種別自体を削除
+    await DB.prepare(`DELETE FROM subsidy_types WHERE id = ?`).bind(id).run()
+    
+    return c.json({ 
+      success: true, 
+      message: '助成金種別を削除しました',
+      affected_clients: clientsUsingThisType?.count || 0
+    })
+  } catch (error) {
+    console.error('Error deleting subsidy type:', error)
+    return c.json({ error: '削除に失敗しました', details: String(error) }, 500)
+  }
+})
+
 // ===============================
 // 助成金種別管理画面
 // ===============================
@@ -1668,6 +1717,11 @@ app.get('/subsidy-types', async (c) => {
                                                     class="flex-1 bg-gray-600 text-white px-3 py-2 rounded hover:bg-gray-700 text-sm">
                                                 <i class="fas fa-eye mr-1"></i>詳細・編集
                                             </button>
+                                            <button onclick="deleteSubsidyType(\${subsidy.id}, '\${subsidy.name.replace(/'/g, "\\\\'")})" 
+                                                    class="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 text-sm"
+                                                    title="この補助金種別を削除">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 \`).join('')}
@@ -1830,10 +1884,16 @@ app.get('/subsidy-types', async (c) => {
                                 </div>
                             </div>
                             
+                            <hr class="my-4">
+                            
                             <div class="flex gap-2 pt-4">
                                 <button onclick="closeEditSubsidyModal()" 
                                         class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
                                     閉じる
+                                </button>
+                                <button onclick="deleteSubsidyType(\${subsidy.id}, '\${subsidy.name.replace(/'/g, "\\\\'")}'); closeEditSubsidyModal();" 
+                                        class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+                                    <i class="fas fa-trash mr-2"></i>この補助金種別を削除
                                 </button>
                             </div>
                         </div>
@@ -1886,6 +1946,39 @@ app.get('/subsidy-types', async (c) => {
                     loadSubsidyTypes();
                 } catch (error) {
                     alert('削除に失敗しました');
+                    console.error(error);
+                }
+            }
+
+            // 補助金種別削除
+            async function deleteSubsidyType(id, name) {
+                const confirmMessage = \`「\${name}」を削除しますか？\n\n⚠️ 警告: この操作は取り消せません。\n\n削除されるデータ:\n- この補助金種別の必要書類\n- この補助金種別用のヒアリング質問\n- 補助金ガイドライン\n- マッチングスコア\n\n※ この補助金種別を使用している顧客は、補助金種別が未設定になります。\`;
+                
+                if (!confirm(confirmMessage)) return;
+                
+                // 二重確認
+                const finalConfirm = prompt(\`本当に削除する場合は「\${name}」と入力してください:\`);
+                if (finalConfirm !== name) {
+                    alert('入力が一致しないため、削除をキャンセルしました');
+                    return;
+                }
+                
+                try {
+                    const response = await axios.delete(\`/api/subsidy-types/\${id}\`);
+                    
+                    if (response.data.affected_clients > 0) {
+                        alert(\`「\${name}」を削除しました。\n\${response.data.affected_clients}件の顧客の補助金種別が未設定になりました。\`);
+                    } else {
+                        alert(\`「\${name}」を削除しました。\`);
+                    }
+                    
+                    loadSubsidyTypes();
+                } catch (error) {
+                    if (error.response?.data?.error) {
+                        alert(\`削除に失敗しました: \${error.response.data.error}\`);
+                    } else {
+                        alert('削除に失敗しました');
+                    }
                     console.error(error);
                 }
             }
