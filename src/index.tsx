@@ -3336,7 +3336,7 @@ app.get('/portal/:token', async (c) => {
                 <div class="lg:grid lg:grid-cols-12 lg:gap-6">
                     
                     <!-- 左カラム: ステータス + ヒアリング質問 -->
-                    <div class="lg:col-span-7 xl:col-span-8 space-y-4 lg:space-y-6">
+                    <div class="lg:col-span-8 space-y-4 lg:space-y-6">
                         <!-- 現在のステータス (コンパクト) -->
                         <div class="bg-white rounded-lg shadow p-4">
                             <div class="flex items-center justify-between">
@@ -3364,13 +3364,13 @@ app.get('/portal/:token', async (c) => {
                                     <i class="fas fa-clipboard-list mr-2 text-indigo-600"></i>ヒアリング質問
                                 </h2>
                                 <div class="flex gap-2">
+                                    <button onclick="openDocumentAnalyzeModal()" 
+                                            class="bg-orange-500 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-orange-600">
+                                        <i class="fas fa-file-alt mr-1"></i>書類から抽出
+                                    </button>
                                     <button onclick="saveAllHearingAnswers()" 
                                             class="bg-indigo-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-indigo-700">
                                         <i class="fas fa-save mr-1"></i>保存
-                                    </button>
-                                    <button onclick="autoFillWithAI()" 
-                                            class="bg-purple-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-purple-700">
-                                        <i class="fas fa-magic mr-1"></i>AI回答
                                     </button>
                                 </div>
                             </div>
@@ -3383,7 +3383,7 @@ app.get('/portal/:token', async (c) => {
                             </div>
                             
                             <!-- 質問一覧 (スクロール可能) -->
-                            <div id="hearingQuestionsList" class="space-y-4 max-h-[60vh] lg:max-h-[65vh] overflow-y-auto pr-2">
+                            <div id="hearingQuestionsList" class="space-y-4 max-h-[60vh] lg:max-h-[70vh] overflow-y-auto pr-2">
                                 <div class="text-center py-8 text-gray-500">
                                     <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                     <p>ヒアリング質問を読み込み中...</p>
@@ -3392,33 +3392,9 @@ app.get('/portal/:token', async (c) => {
                         </div>
                     </div>
 
-                    <!-- 右カラム: AIアシスタント + 書類 + やり取り -->
-                    <div class="lg:col-span-5 xl:col-span-4 mt-4 lg:mt-0">
+                    <!-- 右カラム: 書類 + やり取り -->
+                    <div class="lg:col-span-4 mt-4 lg:mt-0">
                         <div class="lg:sticky lg:top-4 space-y-4">
-                            <!-- AIアシスタント（質問・相談用） -->
-                            <div class="bg-white rounded-lg shadow p-4">
-                                <h2 class="text-base font-bold mb-3">
-                                    <i class="fas fa-robot mr-2 text-purple-600"></i>AIアシスタント
-                                </h2>
-                                
-                                <div id="portalAiChat" class="border rounded-lg mb-3 h-48 lg:h-40 overflow-y-auto p-3 bg-gray-50 text-sm">
-                                    <div class="text-center text-gray-500 py-4">
-                                        <i class="fas fa-robot text-3xl mb-2 text-purple-400"></i>
-                                        <p class="text-sm">補助金申請のお手伝いをします</p>
-                                    </div>
-                                </div>
-                                
-                                <form id="portalAiChatForm" class="flex gap-2">
-                                    <input type="text" id="portalAiChatInput" 
-                                           placeholder="AIに質問..." 
-                                           class="flex-1 px-3 py-2 border rounded-lg text-sm" required>
-                                    <button type="submit" 
-                                            class="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700">
-                                        <i class="fas fa-paper-plane"></i>
-                                    </button>
-                                </form>
-                            </div>
-
                             <!-- タブで切り替え: 書類 / やり取り -->
                             <div class="bg-white rounded-lg shadow">
                                 <div class="flex border-b">
@@ -3483,12 +3459,147 @@ app.get('/portal/:token', async (c) => {
                 </div>
             </div>
 
-            <!-- モバイル用フローティングボタン（スクロールで隠れた時用） -->
-            <div class="lg:hidden fixed bottom-4 right-4 z-40">
-                <button onclick="document.getElementById('portalAiChatInput').focus(); document.getElementById('portalAiChat').scrollIntoView({behavior: 'smooth'})" 
-                        class="bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700">
+            <!-- AIアシスタント フローティングボタン -->
+            <div class="fixed bottom-4 right-4 z-40">
+                <button onclick="openAiModal()" 
+                        class="bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 flex items-center gap-2">
                     <i class="fas fa-robot text-xl"></i>
+                    <span class="hidden sm:inline text-sm font-medium">AIに相談</span>
                 </button>
+            </div>
+
+            <!-- AIアシスタント モーダル -->
+            <div id="aiModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-end sm:items-center justify-center">
+                <div class="bg-white w-full sm:w-[500px] sm:max-w-lg sm:rounded-lg sm:m-4 rounded-t-2xl max-h-[85vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b bg-purple-600 text-white sm:rounded-t-lg rounded-t-2xl">
+                        <h3 class="font-bold"><i class="fas fa-robot mr-2"></i>AIアシスタント</h3>
+                        <button onclick="closeAiModal()" class="text-white hover:text-purple-200">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="portalAiChat" class="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-[300px]">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-robot text-4xl mb-3 text-purple-400"></i>
+                            <p class="font-medium">補助金申請のお手伝いをします</p>
+                            <p class="text-sm mt-2">質問への回答方法や、書類の書き方など<br>なんでもお気軽にご相談ください</p>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border-t bg-white sm:rounded-b-lg">
+                        <form id="portalAiChatForm" class="flex gap-2">
+                            <input type="text" id="portalAiChatInput" 
+                                   placeholder="質問を入力してください..." 
+                                   class="flex-1 px-4 py-3 border rounded-lg text-base" required>
+                            <button type="submit" 
+                                    class="bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI提案モーダル（質問個別） -->
+            <div id="aiSuggestModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white w-full max-w-lg rounded-lg max-h-[80vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b">
+                        <h3 class="font-bold text-purple-600"><i class="fas fa-magic mr-2"></i>AI回答提案</h3>
+                        <button onclick="closeAiSuggestModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-4 border-b bg-gray-50">
+                        <div class="text-sm text-gray-600 mb-1">質問:</div>
+                        <div id="suggestQuestionText" class="font-medium"></div>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <div id="suggestContent" class="text-center py-8 text-gray-500">
+                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                            <p>AIが回答を考えています...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="suggestActions" class="p-4 border-t bg-gray-50 hidden">
+                        <div class="flex gap-2">
+                            <button onclick="applySuggestion()" class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                                <i class="fas fa-check mr-1"></i>この回答を使う
+                            </button>
+                            <button onclick="regenerateSuggestion()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+                                <i class="fas fa-redo"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 書類解析モーダル -->
+            <div id="docAnalyzeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white w-full max-w-2xl rounded-lg max-h-[85vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b">
+                        <h3 class="font-bold text-orange-600"><i class="fas fa-file-alt mr-2"></i>書類からAI抽出</h3>
+                        <button onclick="closeDocAnalyzeModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-4 border-b">
+                        <p class="text-sm text-gray-600 mb-3">アップロード済みの書類から、AIがヒアリング質問の回答に使える情報を抽出します。</p>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium mb-2">解析する書類を選択:</label>
+                            <select id="analyzeDocSelect" class="w-full px-3 py-2 border rounded-lg">
+                                <option value="">書類を選択してください</option>
+                            </select>
+                        </div>
+                        
+                        <button onclick="analyzeDocument()" id="analyzeBtn"
+                                class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600">
+                            <i class="fas fa-search mr-1"></i>AIで解析開始
+                        </button>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <div id="analyzeResult" class="text-center py-8 text-gray-400">
+                            <i class="fas fa-file-invoice text-4xl mb-3"></i>
+                            <p>書類を選択して解析を開始してください</p>
+                        </div>
+                    </div>
+                    
+                    <div id="analyzeActions" class="p-4 border-t bg-gray-50 hidden">
+                        <div class="flex gap-2">
+                            <button onclick="applyAllExtracted()" class="flex-1 bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600">
+                                <i class="fas fa-check-double mr-1"></i>すべて自動入力
+                            </button>
+                            <button onclick="closeDocAnalyzeModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+                                閉じる
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- テンプレート選択モーダル -->
+            <div id="templateModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white w-full max-w-lg rounded-lg max-h-[70vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b">
+                        <h3 class="font-bold text-blue-600"><i class="fas fa-list-alt mr-2"></i>テンプレートから選択</h3>
+                        <button onclick="closeTemplateModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-4 border-b bg-gray-50">
+                        <div class="text-sm text-gray-600 mb-1">質問:</div>
+                        <div id="templateQuestionText" class="font-medium"></div>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <div id="templateList" class="space-y-2"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -3927,6 +4038,20 @@ app.get('/portal/:token', async (c) => {
                 const currentAnswer = hearingAnswers[question.id] || '';
                 const inputType = question.input_type || 'textarea';
                 
+                // 入力ボタン群
+                const actionButtons = \`
+                    <div class="flex gap-1 mt-2">
+                        <button onclick="openAiSuggestModal(\${question.id})" 
+                                class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200">
+                            <i class="fas fa-magic mr-1"></i>AI提案
+                        </button>
+                        <button onclick="openTemplateModal(\${question.id})" 
+                                class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                            <i class="fas fa-list-alt mr-1"></i>テンプレ
+                        </button>
+                    </div>
+                \`;
+                
                 if (inputType === 'select' && question.options) {
                     const options = JSON.parse(question.options);
                     return \`
@@ -3945,10 +4070,11 @@ app.get('/portal/:token', async (c) => {
                     \`;
                 } else {
                     return \`
-                        <textarea onchange="updateHearingAnswer(\${question.id}, this.value)"
+                        <textarea id="answer-\${question.id}" onchange="updateHearingAnswer(\${question.id}, this.value)"
                                   placeholder="回答を入力してください..."
                                   rows="3"
                                   class="w-full px-4 py-3 border rounded-lg text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none">\${currentAnswer}</textarea>
+                        \${actionButtons}
                     \`;
                 }
             }
@@ -4113,6 +4239,293 @@ app.get('/portal/:token', async (c) => {
                 input.focus();
             });
 
+            // ===============================
+            // モーダル関連
+            // ===============================
+            
+            // AIアシスタントモーダル
+            function openAiModal() {
+                document.getElementById('aiModal').classList.remove('hidden');
+                document.getElementById('portalAiChatInput').focus();
+            }
+            
+            function closeAiModal() {
+                document.getElementById('aiModal').classList.add('hidden');
+            }
+            
+            // AI提案モーダル
+            let currentSuggestQuestionId = null;
+            let currentSuggestion = '';
+            
+            function openAiSuggestModal(questionId) {
+                currentSuggestQuestionId = questionId;
+                const question = hearingQuestions.find(q => q.id === questionId);
+                
+                document.getElementById('suggestQuestionText').textContent = question.question_text;
+                document.getElementById('suggestContent').innerHTML = \`
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>AIが回答を考えています...</p>
+                    </div>
+                \`;
+                document.getElementById('suggestActions').classList.add('hidden');
+                document.getElementById('aiSuggestModal').classList.remove('hidden');
+                
+                generateSuggestion(questionId);
+            }
+            
+            function closeAiSuggestModal() {
+                document.getElementById('aiSuggestModal').classList.add('hidden');
+            }
+            
+            async function generateSuggestion(questionId) {
+                const question = hearingQuestions.find(q => q.id === questionId);
+                
+                try {
+                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/ai-suggest\`, {
+                        question_id: questionId,
+                        question_text: question.question_text
+                    });
+                    
+                    currentSuggestion = formatAIResponse(response.data.suggestion);
+                    
+                    document.getElementById('suggestContent').innerHTML = \`
+                        <div class="bg-purple-50 rounded-lg p-4 border border-purple-100">
+                            <div class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">\${currentSuggestion}</div>
+                        </div>
+                    \`;
+                    document.getElementById('suggestActions').classList.remove('hidden');
+                } catch (error) {
+                    document.getElementById('suggestContent').innerHTML = \`
+                        <div class="text-center py-8 text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>提案の取得に失敗しました</p>
+                        </div>
+                    \`;
+                }
+            }
+            
+            function regenerateSuggestion() {
+                document.getElementById('suggestContent').innerHTML = \`
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>別の回答を考えています...</p>
+                    </div>
+                \`;
+                document.getElementById('suggestActions').classList.add('hidden');
+                generateSuggestion(currentSuggestQuestionId);
+            }
+            
+            function applySuggestion() {
+                if (currentSuggestQuestionId && currentSuggestion) {
+                    const textarea = document.getElementById(\`answer-\${currentSuggestQuestionId}\`);
+                    if (textarea) {
+                        textarea.value = currentSuggestion;
+                        updateHearingAnswer(currentSuggestQuestionId, currentSuggestion);
+                    }
+                    closeAiSuggestModal();
+                    showMessage('success', '回答を入力しました');
+                }
+            }
+            
+            // テンプレートモーダル
+            let currentTemplateQuestionId = null;
+            
+            const answerTemplates = {
+                '事業内容': [
+                    '当社は〇〇業界において、△△サービスを提供しております。主な顧客層は□□で、創業以来○年間にわたり事業を展開してまいりました。',
+                    '弊社は〇〇の製造・販売を主な事業としております。年間売上高は約○○万円、従業員数は△名の企業です。',
+                ],
+                '課題': [
+                    '現在、〇〇の面で課題を抱えており、具体的には△△という問題が生じています。この課題を解決することで、□□の改善が見込まれます。',
+                    '業務効率化が課題となっており、特に〇〇の工程において多くの時間と人手を要している状況です。',
+                ],
+                '導入予定': [
+                    '本事業では〇〇システムの導入を予定しております。これにより、△△の効率化・□□の向上を目指します。',
+                    '〇〇機器を導入し、生産性を△％向上させることを目標としています。',
+                ],
+                '効果': [
+                    '本事業の実施により、〇〇の効率が約△％向上し、年間□□万円のコスト削減が見込まれます。',
+                    '導入後は〇〇時間の業務時間短縮が期待でき、従業員の負担軽減にもつながります。',
+                ],
+                'default': [
+                    '具体的な内容は〇〇です。',
+                    '詳細については△△となります。',
+                ]
+            };
+            
+            function openTemplateModal(questionId) {
+                currentTemplateQuestionId = questionId;
+                const question = hearingQuestions.find(q => q.id === questionId);
+                
+                document.getElementById('templateQuestionText').textContent = question.question_text;
+                
+                // 質問内容からテンプレートカテゴリを推測
+                let templates = answerTemplates['default'];
+                for (const [key, value] of Object.entries(answerTemplates)) {
+                    if (question.question_text.includes(key) || (question.category && question.category.includes(key))) {
+                        templates = value;
+                        break;
+                    }
+                }
+                
+                document.getElementById('templateList').innerHTML = templates.map((template, i) => \`
+                    <button onclick="applyTemplate(\${i})" 
+                            class="w-full text-left p-3 border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                        <div class="text-sm text-gray-700">\${template}</div>
+                    </button>
+                \`).join('');
+                
+                // グローバルに保存
+                window.currentTemplates = templates;
+                
+                document.getElementById('templateModal').classList.remove('hidden');
+            }
+            
+            function closeTemplateModal() {
+                document.getElementById('templateModal').classList.add('hidden');
+            }
+            
+            function applyTemplate(index) {
+                if (currentTemplateQuestionId && window.currentTemplates) {
+                    const template = window.currentTemplates[index];
+                    const textarea = document.getElementById(\`answer-\${currentTemplateQuestionId}\`);
+                    if (textarea) {
+                        textarea.value = template;
+                        updateHearingAnswer(currentTemplateQuestionId, template);
+                    }
+                    closeTemplateModal();
+                    showMessage('success', 'テンプレートを適用しました');
+                }
+            }
+            
+            // 書類解析モーダル
+            let extractedData = {};
+            
+            function openDocumentAnalyzeModal() {
+                // アップロード済み書類をセレクトに追加
+                axios.get(\`/api/clients/\${CLIENT_ID}/documents\`).then(response => {
+                    const docs = response.data;
+                    const select = document.getElementById('analyzeDocSelect');
+                    select.innerHTML = '<option value="">書類を選択してください</option>' +
+                        docs.map(doc => \`<option value="\${doc.id}">\${doc.document_type} - \${doc.file_name}</option>\`).join('');
+                });
+                
+                document.getElementById('analyzeResult').innerHTML = \`
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fas fa-file-invoice text-4xl mb-3"></i>
+                        <p>書類を選択して解析を開始してください</p>
+                    </div>
+                \`;
+                document.getElementById('analyzeActions').classList.add('hidden');
+                document.getElementById('docAnalyzeModal').classList.remove('hidden');
+            }
+            
+            function closeDocAnalyzeModal() {
+                document.getElementById('docAnalyzeModal').classList.add('hidden');
+            }
+            
+            async function analyzeDocument() {
+                const docId = document.getElementById('analyzeDocSelect').value;
+                if (!docId) {
+                    showMessage('error', '書類を選択してください');
+                    return;
+                }
+                
+                const btn = document.getElementById('analyzeBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>解析中...';
+                
+                document.getElementById('analyzeResult').innerHTML = \`
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>AIが書類を解析中です...</p>
+                        <p class="text-sm text-gray-400 mt-2">しばらくお待ちください</p>
+                    </div>
+                \`;
+                
+                try {
+                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/analyze-document\`, {
+                        document_id: docId
+                    });
+                    
+                    extractedData = response.data.extracted || {};
+                    
+                    if (Object.keys(extractedData).length === 0) {
+                        document.getElementById('analyzeResult').innerHTML = \`
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-info-circle text-2xl mb-2"></i>
+                                <p>この書類から抽出できる情報が見つかりませんでした</p>
+                            </div>
+                        \`;
+                    } else {
+                        document.getElementById('analyzeResult').innerHTML = \`
+                            <div class="space-y-3">
+                                <div class="text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                                    以下の情報を抽出しました:
+                                </div>
+                                \${Object.entries(extractedData).map(([questionId, value]) => {
+                                    const question = hearingQuestions.find(q => q.id === parseInt(questionId));
+                                    return \`
+                                        <div class="border rounded-lg p-3 bg-orange-50">
+                                            <div class="text-xs text-gray-500 mb-1">\${question ? question.question_text : '質問ID: ' + questionId}</div>
+                                            <div class="text-sm text-gray-700">\${value}</div>
+                                            <button onclick="applyExtracted(\${questionId})" 
+                                                    class="mt-2 text-xs px-2 py-1 bg-orange-500 text-white rounded hover:bg-orange-600">
+                                                <i class="fas fa-check mr-1"></i>この回答を使う
+                                            </button>
+                                        </div>
+                                    \`;
+                                }).join('')}
+                            </div>
+                        \`;
+                        document.getElementById('analyzeActions').classList.remove('hidden');
+                    }
+                } catch (error) {
+                    document.getElementById('analyzeResult').innerHTML = \`
+                        <div class="text-center py-8 text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>書類の解析に失敗しました</p>
+                            <p class="text-sm mt-1">\${error.response?.data?.error || 'エラーが発生しました'}</p>
+                        </div>
+                    \`;
+                }
+                
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search mr-1"></i>AIで解析開始';
+            }
+            
+            function applyExtracted(questionId) {
+                if (extractedData[questionId]) {
+                    const textarea = document.getElementById(\`answer-\${questionId}\`);
+                    if (textarea) {
+                        textarea.value = extractedData[questionId];
+                        updateHearingAnswer(questionId, extractedData[questionId]);
+                        showMessage('success', '回答を入力しました');
+                    }
+                }
+            }
+            
+            function applyAllExtracted() {
+                let count = 0;
+                for (const [questionId, value] of Object.entries(extractedData)) {
+                    const textarea = document.getElementById(\`answer-\${questionId}\`);
+                    if (textarea) {
+                        textarea.value = value;
+                        updateHearingAnswer(parseInt(questionId), value);
+                        count++;
+                    }
+                }
+                closeDocAnalyzeModal();
+                showMessage('success', \`\${count}件の回答を自動入力しました\`);
+                renderQuestions();
+            }
+
+            // ===============================
+            // 初期化
+            // ===============================
+            
             loadStatus();
             loadHearingQuestions();
             loadChecklist();
@@ -6075,6 +6488,122 @@ ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? '
     return c.json({ response: aiResponse })
   } catch (error) {
     return c.json({ error: 'AI応答の生成に失敗しました', response: '申し訳ありません。一時的にAI機能が利用できません。しばらくしてからお試しください。' })
+  }
+})
+
+// AI回答提案API
+app.post('/api/clients/:clientId/ai-suggest', async (c) => {
+  const { DB, GEMINI_API_KEY } = c.env
+  const clientId = c.req.param('clientId')
+  const data = await c.req.json()
+  
+  // 顧客情報と既存回答を取得
+  const client = await DB.prepare(`
+    SELECT c.*, st.name as subsidy_name
+    FROM clients c
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    WHERE c.id = ?
+  `).bind(clientId).first()
+  
+  const answers = await DB.prepare(`
+    SELECT hq.question_text, ha.answer_text
+    FROM hearing_answers ha
+    JOIN hearing_questions hq ON ha.question_id = hq.id
+    WHERE ha.client_id = ?
+  `).bind(clientId).all()
+  
+  const prompt = `あなたは補助金申請の回答作成を支援するアシスタントです。
+
+【重要なルール】
+- マークダウン記法は使わないでください
+- 自然な日本語の文章で回答してください
+- 補助金申請に適した具体的で説得力のある文章を書いてください
+- 200〜300字程度で簡潔に回答してください
+
+【顧客情報】
+会社名: ${client?.company_name || '未設定'}
+申請予定の補助金: ${client?.subsidy_name || '未設定'}
+
+【既存の回答】
+${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text || '未回答'}`).join('\n')}
+
+以下の質問に対する回答例を作成してください。〇〇や△△などの箇所は、ユーザーが後で具体的な内容に置き換えられるようにしてください。
+
+質問: ${data.question_text}`
+
+  try {
+    const suggestion = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    return c.json({ suggestion })
+  } catch (error) {
+    return c.json({ error: '提案の生成に失敗しました' }, 500)
+  }
+})
+
+// 書類解析API
+app.post('/api/clients/:clientId/analyze-document', async (c) => {
+  const { DB, GEMINI_API_KEY, R2 } = c.env
+  const clientId = c.req.param('clientId')
+  const data = await c.req.json()
+  
+  // 書類情報を取得
+  const doc = await DB.prepare(`
+    SELECT * FROM documents WHERE id = ? AND client_id = ?
+  `).bind(data.document_id, clientId).first()
+  
+  if (!doc) {
+    return c.json({ error: '書類が見つかりません' }, 404)
+  }
+  
+  // ヒアリング質問を取得
+  const client = await DB.prepare(`
+    SELECT subsidy_type_id FROM clients WHERE id = ?
+  `).bind(clientId).first()
+  
+  const questions = await DB.prepare(`
+    SELECT id, question_text, category FROM hearing_questions
+    WHERE subsidy_type_id = ?
+    ORDER BY display_order
+  `).bind(client?.subsidy_type_id).all()
+  
+  // 書類の種類に基づいてプロンプトを構築
+  const prompt = `あなたは補助金申請書類の解析を行うアシスタントです。
+
+【書類情報】
+書類の種類: ${doc.document_type}
+ファイル名: ${doc.file_name}
+
+【ヒアリング質問一覧】
+${(questions.results || []).map((q: any, i: number) => `${i+1}. [ID:${q.id}] ${q.question_text}`).join('\n')}
+
+この書類の種類「${doc.document_type}」から推測して、上記のヒアリング質問に対して回答できそうな情報を推測して生成してください。
+
+必ず以下のJSON形式で回答してください:
+{
+  "質問ID": "推測される回答内容",
+  "質問ID": "推測される回答内容"
+}
+
+例: 決算書なら売上高や従業員数、事業計画書なら事業内容や投資計画など、書類の種類から推測できる情報を回答してください。
+推測できない項目は含めないでください。
+回答は具体的な数値や内容ではなく、「〇〇円」「△△名」のようなプレースホルダーを使用してください。`
+
+  try {
+    const aiResponse = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    
+    // JSONを抽出
+    let extracted = {}
+    try {
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        extracted = JSON.parse(jsonMatch[0])
+      }
+    } catch (e) {
+      // JSONパースエラーの場合は空のオブジェクトを返す
+    }
+    
+    return c.json({ extracted, raw_response: aiResponse })
+  } catch (error) {
+    return c.json({ error: '書類の解析に失敗しました' }, 500)
   }
 })
 
