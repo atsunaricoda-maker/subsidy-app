@@ -3315,160 +3315,188 @@ app.get('/portal/:token', async (c) => {
                 </div>
             </header>
 
-            <div class="container mx-auto px-4 py-8">
-                <!-- 現在のステータス -->
-                <div class="bg-white rounded-lg shadow p-6 mb-6">
-                    <h2 class="text-lg font-bold mb-3">現在の進捗状況</h2>
-                    <div class="flex items-center gap-4">
-                        <div class="text-3xl" id="statusIcon"></div>
-                        <div>
-                            <div class="text-2xl font-bold" id="statusText"></div>
-                            <div class="text-sm text-gray-600" id="statusDescription"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ヒアリング質問セクション -->
-                <div class="bg-white rounded-lg shadow p-6 mb-6">
-                    <h2 class="text-lg font-bold mb-4">
-                        <i class="fas fa-clipboard-list mr-2 text-indigo-600"></i>ヒアリング質問
-                    </h2>
-                    <p class="text-sm text-gray-600 mb-4">
-                        補助金申請に必要な情報をお聞かせください。回答いただいた内容は申請書類の作成に活用されます。
-                    </p>
+            <div class="container mx-auto px-4 py-4 lg:py-6">
+                <!-- PC: 2カラムレイアウト / モバイル: 縦並び -->
+                <div class="lg:grid lg:grid-cols-12 lg:gap-6">
                     
-                    <!-- 回答進捗 -->
-                    <div class="mb-6 bg-indigo-50 rounded-lg p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm font-medium text-indigo-800">回答進捗</span>
-                            <span id="hearingProgress" class="text-sm text-indigo-600">0 / 0 問</span>
-                        </div>
-                        <div class="w-full bg-indigo-200 rounded-full h-2">
-                            <div id="hearingProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all" style="width: 0%"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- カテゴリ別タブ -->
-                    <div class="mb-4 border-b">
-                        <div id="hearingCategoryTabs" class="flex overflow-x-auto gap-1">
-                            <div class="text-gray-500 text-sm py-2">読み込み中...</div>
-                        </div>
-                    </div>
-                    
-                    <!-- 質問一覧 -->
-                    <div id="hearingQuestionsList" class="space-y-6">
-                        <div class="text-center py-8 text-gray-500">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>ヒアリング質問を読み込み中...</p>
-                        </div>
-                    </div>
-                    
-                    <!-- 一括保存ボタン -->
-                    <div class="mt-6 pt-4 border-t flex flex-col sm:flex-row gap-3">
-                        <button onclick="saveAllHearingAnswers()" 
-                                class="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700">
-                            <i class="fas fa-save mr-2"></i>回答を保存
-                        </button>
-                        <button onclick="autoFillWithAI()" 
-                                class="flex-1 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700">
-                            <i class="fas fa-magic mr-2"></i>AIに相談して回答
-                        </button>
-                    </div>
-                </div>
-
-                <!-- AIアシスタント（質問・相談用） -->
-                <div class="bg-white rounded-lg shadow p-6 mb-6">
-                    <h2 class="text-lg font-bold mb-4">
-                        <i class="fas fa-robot mr-2 text-purple-600"></i>AIアシスタント
-                    </h2>
-                    <p class="text-sm text-gray-600 mb-4">
-                        補助金申請について分からないことがあれば、AIに質問できます。ヒアリング質問への回答の参考にもなります。
-                    </p>
-                    
-                    <div id="portalAiChat" class="border rounded-lg mb-4 h-64 overflow-y-auto p-4 bg-gray-50">
-                        <div class="text-center text-gray-500 py-8">
-                            <i class="fas fa-robot text-4xl mb-2 text-purple-400"></i>
-                            <p>こんにちは！補助金申請のお手伝いをします。</p>
-                            <p class="text-sm mt-2">ご質問やお困りのことがあればお聞かせください。</p>
-                        </div>
-                    </div>
-                    
-                    <form id="portalAiChatForm" class="flex gap-2">
-                        <input type="text" id="portalAiChatInput" 
-                               placeholder="AIに質問する..." 
-                               class="flex-1 px-4 py-3 border rounded-lg text-base" required>
-                        <button type="submit" 
-                                class="bg-purple-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-purple-700 whitespace-nowrap">
-                            <i class="fas fa-paper-plane mr-1"></i>
-                            <span class="hidden sm:inline">送信</span>
-                        </button>
-                    </form>
-                </div>
-
-                <div class="space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">
-                    <!-- 書類アップロード -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-bold mb-4">
-                            <i class="fas fa-upload mr-2"></i>書類アップロード
-                        </h2>
-                        
-                        <div class="mb-4">
-                            <h3 class="font-medium mb-2">必要書類チェックリスト</h3>
-                            <div id="checklistItems" class="space-y-2 text-sm"></div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">1. まず書類の種類を選択してください *</label>
-                            <select id="documentType" class="w-full px-4 py-3 border rounded-lg text-base border-green-500">
-                                <option value="">選択してください</option>
-                            </select>
-                        </div>
-
-                        <div id="uploadSection" class="hidden">
-                            <label class="block text-sm font-medium mb-2">2. ファイルをアップロード</label>
-                            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-8 text-center mb-4 transition-colors">
-                                <i class="fas fa-cloud-upload-alt text-3xl md:text-4xl text-gray-400 mb-2"></i>
-                                <p class="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">
-                                    <span class="hidden sm:inline">ここに書類をドラッグ&ドロップ<br>または</span>
-                                    <span class="sm:hidden">タップしてファイルを選択</span>
-                                </p>
-                                <input type="file" id="fileInput" class="hidden" multiple>
-                                <button onclick="document.getElementById('fileInput').click()" 
-                                        class="bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-green-700 text-sm md:text-base w-full sm:w-auto">
-                                    <i class="fas fa-file mr-2"></i>ファイルを選択
-                                </button>
+                    <!-- 左カラム: ステータス + ヒアリング質問 -->
+                    <div class="lg:col-span-7 xl:col-span-8 space-y-4 lg:space-y-6">
+                        <!-- 現在のステータス (コンパクト) -->
+                        <div class="bg-white rounded-lg shadow p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="text-2xl" id="statusIcon"></div>
+                                    <div>
+                                        <div class="text-lg font-bold" id="statusText"></div>
+                                        <div class="text-xs text-gray-600" id="statusDescription"></div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xs text-gray-500">回答進捗</div>
+                                    <div id="hearingProgress" class="text-sm font-medium text-indigo-600">0 / 0 問</div>
+                                </div>
+                            </div>
+                            <div class="mt-3 w-full bg-indigo-200 rounded-full h-2">
+                                <div id="hearingProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all" style="width: 0%"></div>
                             </div>
                         </div>
 
-                        <h3 class="font-medium mb-2">アップロード済み書類</h3>
-                        <div id="uploadedDocuments"></div>
+                        <!-- ヒアリング質問セクション -->
+                        <div class="bg-white rounded-lg shadow p-4 lg:p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-lg font-bold">
+                                    <i class="fas fa-clipboard-list mr-2 text-indigo-600"></i>ヒアリング質問
+                                </h2>
+                                <div class="flex gap-2">
+                                    <button onclick="saveAllHearingAnswers()" 
+                                            class="bg-indigo-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-indigo-700">
+                                        <i class="fas fa-save mr-1"></i>保存
+                                    </button>
+                                    <button onclick="autoFillWithAI()" 
+                                            class="bg-purple-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-purple-700">
+                                        <i class="fas fa-magic mr-1"></i>AI回答
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- カテゴリ別タブ -->
+                            <div class="mb-4 border-b">
+                                <div id="hearingCategoryTabs" class="flex overflow-x-auto gap-1">
+                                    <div class="text-gray-500 text-sm py-2">読み込み中...</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 質問一覧 (スクロール可能) -->
+                            <div id="hearingQuestionsList" class="space-y-4 max-h-[60vh] lg:max-h-[65vh] overflow-y-auto pr-2">
+                                <div class="text-center py-8 text-gray-500">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>ヒアリング質問を読み込み中...</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- やり取り -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-bold mb-4">
-                            <i class="fas fa-comments mr-2"></i>担当者とのやり取り
-                        </h2>
-                        
-                        <div id="clientCommunications" class="space-y-3 mb-4 max-h-96 overflow-y-auto"></div>
-                        
-                        <form id="clientMessageForm" class="flex gap-2">
-                            <input type="text" id="clientMessageInput" 
-                                   placeholder="メッセージを入力..." 
-                                   class="flex-1 px-4 py-3 border rounded-lg text-base" required>
-                            <button type="submit" 
-                                    class="bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-green-700 whitespace-nowrap">
-                                <i class="fas fa-paper-plane mr-1"></i>
-                                <span class="hidden sm:inline">送信</span>
-                            </button>
-                        </form>
+                    <!-- 右カラム: AIアシスタント + 書類 + やり取り -->
+                    <div class="lg:col-span-5 xl:col-span-4 mt-4 lg:mt-0">
+                        <div class="lg:sticky lg:top-4 space-y-4">
+                            <!-- AIアシスタント（質問・相談用） -->
+                            <div class="bg-white rounded-lg shadow p-4">
+                                <h2 class="text-base font-bold mb-3">
+                                    <i class="fas fa-robot mr-2 text-purple-600"></i>AIアシスタント
+                                </h2>
+                                
+                                <div id="portalAiChat" class="border rounded-lg mb-3 h-48 lg:h-40 overflow-y-auto p-3 bg-gray-50 text-sm">
+                                    <div class="text-center text-gray-500 py-4">
+                                        <i class="fas fa-robot text-3xl mb-2 text-purple-400"></i>
+                                        <p class="text-sm">補助金申請のお手伝いをします</p>
+                                    </div>
+                                </div>
+                                
+                                <form id="portalAiChatForm" class="flex gap-2">
+                                    <input type="text" id="portalAiChatInput" 
+                                           placeholder="AIに質問..." 
+                                           class="flex-1 px-3 py-2 border rounded-lg text-sm" required>
+                                    <button type="submit" 
+                                            class="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- タブで切り替え: 書類 / やり取り -->
+                            <div class="bg-white rounded-lg shadow">
+                                <div class="flex border-b">
+                                    <button onclick="switchPortalTab('documents')" id="tabDocuments"
+                                            class="flex-1 px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600">
+                                        <i class="fas fa-upload mr-1"></i>書類
+                                    </button>
+                                    <button onclick="switchPortalTab('communications')" id="tabCommunications"
+                                            class="flex-1 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                                        <i class="fas fa-comments mr-1"></i>やり取り
+                                    </button>
+                                </div>
+                                
+                                <!-- 書類アップロードタブ -->
+                                <div id="panelDocuments" class="p-4">
+                                    <div class="mb-3">
+                                        <h3 class="text-sm font-medium mb-2">必要書類</h3>
+                                        <div id="checklistItems" class="space-y-1 text-xs max-h-24 overflow-y-auto"></div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <select id="documentType" class="w-full px-3 py-2 border rounded-lg text-sm border-green-500">
+                                            <option value="">書類の種類を選択</option>
+                                        </select>
+                                    </div>
+
+                                    <div id="uploadSection" class="hidden mb-3">
+                                        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center transition-colors">
+                                            <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-1"></i>
+                                            <p class="text-xs text-gray-600 mb-2">ドラッグ&ドロップ または</p>
+                                            <input type="file" id="fileInput" class="hidden" multiple>
+                                            <button onclick="document.getElementById('fileInput').click()" 
+                                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                                <i class="fas fa-file mr-1"></i>選択
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 class="text-sm font-medium mb-2">アップロード済み</h3>
+                                        <div id="uploadedDocuments" class="max-h-32 overflow-y-auto text-sm"></div>
+                                    </div>
+                                </div>
+
+                                <!-- やり取りタブ -->
+                                <div id="panelCommunications" class="p-4 hidden">
+                                    <div id="clientCommunications" class="space-y-2 mb-3 max-h-48 overflow-y-auto text-sm"></div>
+                                    
+                                    <form id="clientMessageForm" class="flex gap-2">
+                                        <input type="text" id="clientMessageInput" 
+                                               placeholder="メッセージを入力..." 
+                                               class="flex-1 px-3 py-2 border rounded-lg text-sm" required>
+                                        <button type="submit" 
+                                                class="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- モバイル用フローティングボタン（スクロールで隠れた時用） -->
+            <div class="lg:hidden fixed bottom-4 right-4 z-40">
+                <button onclick="document.getElementById('portalAiChatInput').focus(); document.getElementById('portalAiChat').scrollIntoView({behavior: 'smooth'})" 
+                        class="bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700">
+                    <i class="fas fa-robot text-xl"></i>
+                </button>
             </div>
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+            // タブ切り替え関数
+            function switchPortalTab(tab) {
+                const tabDocs = document.getElementById('tabDocuments');
+                const tabComms = document.getElementById('tabCommunications');
+                const panelDocs = document.getElementById('panelDocuments');
+                const panelComms = document.getElementById('panelCommunications');
+                
+                if (tab === 'documents') {
+                    tabDocs.className = 'flex-1 px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600';
+                    tabComms.className = 'flex-1 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+                    panelDocs.classList.remove('hidden');
+                    panelComms.classList.add('hidden');
+                } else {
+                    tabDocs.className = 'flex-1 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+                    tabComms.className = 'flex-1 px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600';
+                    panelDocs.classList.add('hidden');
+                    panelComms.classList.remove('hidden');
+                }
+            }
             const CLIENT_ID = ${client.id};
             const STATUS_INFO = {
                 inquiry: { icon: '🔍', text: '見込み', desc: 'まずはお話を聞かせてください' },
@@ -3498,17 +3526,14 @@ app.get('/portal/:token', async (c) => {
                 const uploadedTypes = new Set(uploadedDocs.map(d => d.document_type));
                 
                 document.getElementById('checklistItems').innerHTML = items.map(item => \`
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-\${uploadedTypes.has(item.document_type) ? 'check-circle text-green-500' : 'circle text-gray-300'}"></i>
-                        <div>
-                            <div class="font-medium">\${item.document_type}</div>
-                            <div class="text-xs text-gray-500">\${item.description || ''}</div>
-                        </div>
+                    <div class="flex items-center gap-1.5 py-0.5">
+                        <i class="fas fa-\${uploadedTypes.has(item.document_type) ? 'check-circle text-green-500' : 'circle text-gray-300'} text-xs"></i>
+                        <span class="\${uploadedTypes.has(item.document_type) ? 'text-green-700' : 'text-gray-600'}">\${item.document_type}</span>
                     </div>
                 \`).join('');
 
                 const select = document.getElementById('documentType');
-                select.innerHTML = '<option value="">選択してください</option>' + 
+                select.innerHTML = '<option value="">書類の種類を選択</option>' + 
                     items.map(item => \`<option value="\${item.document_type}">\${item.document_type}</option>\`).join('');
             }
 
@@ -3523,26 +3548,22 @@ app.get('/portal/:token', async (c) => {
                 }
                 
                 container.innerHTML = docs.map(doc => \`
-                    <div class="border rounded-lg p-3 mb-2">
-                        <div class="flex items-center justify-between">
-                            <div class="flex-1">
-                                <div class="font-medium text-sm">\${doc.document_type}</div>
-                                <div class="text-xs text-gray-500">\${doc.file_name}</div>
-                                <div class="text-xs text-gray-400">\${new Date(doc.uploaded_at).toLocaleString('ja-JP')}</div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs px-2 py-1 rounded-full \${
-                                    doc.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                    doc.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                }">
-                                    \${doc.status === 'approved' ? '承認済み' : doc.status === 'rejected' ? '差し戻し' : '確認中'}
-                                </span>
-                                <a href="/api/documents/\${doc.id}/download" 
-                                   class="text-green-600 hover:text-green-800">
-                                    <i class="fas fa-download"></i>
-                                </a>
-                            </div>
+                    <div class="border rounded p-2 mb-1.5 flex items-center justify-between">
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-xs truncate">\${doc.document_type}</div>
+                            <div class="text-xs text-gray-400 truncate">\${doc.file_name}</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 ml-2">
+                            <span class="text-xs px-1.5 py-0.5 rounded \${
+                                doc.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                doc.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
+                            }">
+                                \${doc.status === 'approved' ? '✓' : doc.status === 'rejected' ? '✗' : '...'}
+                            </span>
+                            <a href="/api/documents/\${doc.id}/download" class="text-green-600 hover:text-green-800 text-xs">
+                                <i class="fas fa-download"></i>
+                            </a>
                         </div>
                     </div>
                 \`).join('');
@@ -3562,10 +3583,9 @@ app.get('/portal/:token', async (c) => {
                     const isClient = comm.sender_type === 'client';
                     return \`
                         <div class="flex \${isClient ? 'justify-end' : 'justify-start'}">
-                            <div class="max-w-xs \${isClient ? 'bg-green-100' : 'bg-gray-100'} rounded-lg p-3">
-                                <div class="font-medium text-sm mb-1">\${comm.sender_name}</div>
-                                <div class="text-sm">\${comm.message}</div>
-                                <div class="text-xs text-gray-500 mt-1">\${new Date(comm.created_at).toLocaleString('ja-JP')}</div>
+                            <div class="max-w-[85%] \${isClient ? 'bg-green-100' : 'bg-gray-100'} rounded-lg px-2.5 py-1.5">
+                                <div class="text-xs">\${comm.message}</div>
+                                <div class="text-xs text-gray-400 mt-0.5">\${comm.sender_name} · \${new Date(comm.created_at).toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'})}</div>
                             </div>
                         </div>
                     \`;
