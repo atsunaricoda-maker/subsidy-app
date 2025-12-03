@@ -373,6 +373,16 @@ app.get('/', (c) => {
                     </div>
                 </div>
 
+                <!-- 申請期限アラート -->
+                <div id="deadlineAlertSection" class="bg-white rounded-lg shadow p-6 mb-6 hidden">
+                    <h2 class="text-xl font-bold mb-4 text-red-600">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>申請期限が近い案件
+                    </h2>
+                    <div id="deadlineAlertList" class="space-y-3">
+                        <!-- 期限が近い案件がここに表示される -->
+                    </div>
+                </div>
+
                 <!-- 顧客一覧 -->
                 <div class="bg-white rounded-lg shadow">
                     <div class="p-6">
@@ -526,11 +536,76 @@ app.get('/', (c) => {
                     updateStatusCards();
                     updateStatistics();
                     renderClients(allClients);
+                    renderDeadlineAlerts(allClients);
                 } catch (error) {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
                         '<div class="text-center py-8 text-red-500">データの読み込みに失敗しました</div>';
                 }
+            }
+            
+            // 申請期限アラート表示
+            function renderDeadlineAlerts(clients) {
+                const section = document.getElementById('deadlineAlertSection');
+                const container = document.getElementById('deadlineAlertList');
+                
+                // 期限が14日以内の案件を抽出（完了・却下以外）
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const urgentClients = clients.filter(client => {
+                    if (!client.application_end_date) return false;
+                    if (client.status === 'completed' || client.status === 'rejected') return false;
+                    
+                    const deadline = new Date(client.application_end_date);
+                    const diffDays = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    return diffDays >= 0 && diffDays <= 14;
+                }).sort((a, b) => {
+                    return new Date(a.application_end_date).getTime() - new Date(b.application_end_date).getTime();
+                });
+                
+                if (urgentClients.length === 0) {
+                    section.classList.add('hidden');
+                    return;
+                }
+                
+                section.classList.remove('hidden');
+                
+                container.innerHTML = urgentClients.map(client => {
+                    const subsidyType = subsidyTypes.find(s => s.id === client.subsidy_type_id);
+                    const deadline = new Date(client.application_end_date);
+                    const diffDays = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    let urgencyClass = '';
+                    let urgencyText = '';
+                    if (diffDays <= 3) {
+                        urgencyClass = 'border-l-4 border-l-red-600 bg-red-50';
+                        urgencyText = \`<span class="bg-red-600 text-white px-2 py-1 rounded text-xs font-bold animate-pulse">あと\${diffDays}日!</span>\`;
+                    } else if (diffDays <= 7) {
+                        urgencyClass = 'border-l-4 border-l-orange-500 bg-orange-50';
+                        urgencyText = \`<span class="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold">あと\${diffDays}日</span>\`;
+                    } else {
+                        urgencyClass = 'border-l-4 border-l-yellow-500 bg-yellow-50';
+                        urgencyText = \`<span class="bg-yellow-500 text-white px-2 py-1 rounded text-xs font-bold">あと\${diffDays}日</span>\`;
+                    }
+                    
+                    return \`
+                        <div class="p-3 rounded \${urgencyClass} flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                \${urgencyText}
+                                <div>
+                                    <div class="font-bold">\${client.name}</div>
+                                    <div class="text-sm text-gray-600">
+                                        \${subsidyType?.name || '補助金未設定'} | 期限: \${client.application_end_date}
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="/client/\${client.id}" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                                詳細
+                            </a>
+                        </div>
+                    \`;
+                }).join('');
             }
             
             // 助成金種別読み込み
@@ -622,26 +697,51 @@ app.get('/', (c) => {
                     return;
                 }
 
+                // 申請期限の残り日数を計算する関数
+                function getDeadlineInfo(endDate) {
+                    if (!endDate) return null;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const deadline = new Date(endDate);
+                    const diffTime = deadline.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays < 0) {
+                        return { text: '期限切れ', class: 'bg-gray-400 text-white', urgent: false };
+                    } else if (diffDays <= 7) {
+                        return { text: \`残り\${diffDays}日\`, class: 'bg-red-600 text-white animate-pulse', urgent: true };
+                    } else if (diffDays <= 14) {
+                        return { text: \`残り\${diffDays}日\`, class: 'bg-orange-500 text-white', urgent: true };
+                    } else if (diffDays <= 30) {
+                        return { text: \`残り\${diffDays}日\`, class: 'bg-yellow-500 text-white', urgent: false };
+                    } else {
+                        return { text: \`残り\${diffDays}日\`, class: 'bg-green-500 text-white', urgent: false };
+                    }
+                }
+                
                 container.innerHTML = clients.map(client => {
                     const subsidyType = subsidyTypes.find(s => s.id === client.subsidy_type_id);
                     const portalUrl = \`\${window.location.origin}/portal/\${client.access_token}\`;
+                    const deadlineInfo = getDeadlineInfo(client.application_end_date);
                     return \`
-                    <div class="border-b last:border-b-0 py-4 hover:bg-gray-50">
+                    <div class="border-b last:border-b-0 py-4 hover:bg-gray-50 \${deadlineInfo?.urgent ? 'border-l-4 border-l-red-500 pl-3' : ''}">
                         <!-- PC版表示 -->
                         <div class="hidden md:flex items-start justify-between">
                             <div class="flex-1">
-                                <div class="flex items-center gap-3 mb-2">
+                                <div class="flex items-center gap-3 mb-2 flex-wrap">
                                     <h3 class="text-lg font-bold">\${client.name}</h3>
                                     <span class="px-3 py-1 rounded-full text-xs font-medium \${STATUS_COLORS[client.status]}">
                                         \${STATUS_LABELS[client.status]}
                                     </span>
                                     \${subsidyType ? \`<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${subsidyType.name}</span>\` : ''}
+                                    \${deadlineInfo ? \`<span class="px-2 py-1 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
                                 </div>
                                 <div class="text-sm text-gray-600 space-y-1">
                                     \${client.company_name ? \`<div><i class="fas fa-building w-4"></i> \${client.company_name}</div>\` : ''}
                                     \${client.email ? \`<div><i class="fas fa-envelope w-4"></i> \${client.email}</div>\` : ''}
                                     \${client.phone ? \`<div><i class="fas fa-phone w-4"></i> \${client.phone}</div>\` : ''}
                                     \${client.assigned_staff ? \`<div><i class="fas fa-user w-4"></i> 担当: \${client.assigned_staff}</div>\` : ''}
+                                    \${client.application_end_date ? \`<div><i class="fas fa-calendar-alt w-4"></i> 申請期限: \${client.application_end_date}\${client.subsidy_rate ? \` | 補助率: \${client.subsidy_rate}\` : ''}\${client.max_amount ? \` | 上限: \${(client.max_amount / 10000).toLocaleString()}万円\` : ''}</div>\` : ''}
                                 </div>
                             </div>
                             <div class="flex gap-2">
@@ -673,15 +773,19 @@ app.get('/', (c) => {
                                     <h3 class="text-base font-bold mb-1">\${client.name}</h3>
                                     \${client.company_name ? \`<div class="text-sm text-gray-600">\${client.company_name}</div>\` : ''}
                                 </div>
-                                <span class="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap \${STATUS_COLORS[client.status]}">
-                                    \${STATUS_LABELS[client.status]}
-                                </span>
+                                <div class="flex flex-col items-end gap-1">
+                                    <span class="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap \${STATUS_COLORS[client.status]}">
+                                        \${STATUS_LABELS[client.status]}
+                                    </span>
+                                    \${deadlineInfo ? \`<span class="px-2 py-1 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
+                                </div>
                             </div>
                             \${subsidyType ? \`<div class="inline-block px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${subsidyType.name}</div>\` : ''}
                             <div class="text-sm text-gray-600 space-y-1">
                                 \${client.email ? \`<div><i class="fas fa-envelope w-4"></i> \${client.email}</div>\` : ''}
                                 \${client.phone ? \`<div><i class="fas fa-phone w-4"></i> \${client.phone}</div>\` : ''}
                                 \${client.assigned_staff ? \`<div><i class="fas fa-user w-4"></i> 担当: \${client.assigned_staff}</div>\` : ''}
+                                \${client.application_end_date ? \`<div><i class="fas fa-calendar-alt w-4"></i> 期限: \${client.application_end_date}</div>\` : ''}
                             </div>
                             <div class="grid \${localStorage.getItem('admin_role') === 'admin' ? 'grid-cols-4' : 'grid-cols-3'} gap-2">
                                 <a href="/client/\${client.id}" 
@@ -826,16 +930,25 @@ app.get('/api/clients', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   
-  let query = `SELECT * FROM clients`
-  let params = []
+  // 補助金の公募要領情報もJOINして取得
+  let query = `
+    SELECT c.*, 
+           sg.application_end_date,
+           sg.max_amount,
+           sg.subsidy_rate,
+           sg.fiscal_year
+    FROM clients c
+    LEFT JOIN subsidy_guidelines sg ON c.subsidy_type_id = sg.subsidy_type_id AND sg.status = 'active'
+  `
+  let params: string[] = []
   
   // adminロール以外は自分が担当の案件のみ表示
   if (user && user.role !== 'admin') {
-    query += ` WHERE assigned_to = ?`
+    query += ` WHERE c.assigned_to = ?`
     params.push(user.username)
   }
   
-  query += ` ORDER BY created_at DESC`
+  query += ` ORDER BY c.created_at DESC`
   
   const result = params.length > 0 
     ? await DB.prepare(query).bind(...params).all()
@@ -6674,6 +6787,13 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
     return c.json({ error: 'テンプレートが見つかりません' }, 404)
   }
   
+  // 公募要領情報取得
+  const guidelines = await DB.prepare(`
+    SELECT * FROM subsidy_guidelines 
+    WHERE subsidy_type_id = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(client.subsidy_type_id).first()
+  
   // ヒアリング回答取得
   const answers = await DB.prepare(`
     SELECT hq.question_key, hq.question_text, hq.category, ha.answer_text
@@ -6694,6 +6814,22 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
   const sections = JSON.parse(template.sections)
   const generatedSections: Record<string, string> = {}
   
+  // 補助金情報を整形
+  const g = guidelines as any
+  const guidelinesInfo = guidelines ? `
+【補助金制度情報】
+- 補助金名: ${client.subsidy_name}
+- 年度・公募回: ${g?.fiscal_year || ''}年度 ${g?.version || ''}
+- 補助率: ${g?.subsidy_rate || '未設定'}
+- 補助上限額: ${g?.max_amount ? `${(g.max_amount / 10000).toLocaleString()}万円` : '未設定'}
+- 補助下限額: ${g?.min_amount ? `${(g.min_amount / 10000).toLocaleString()}万円` : '未設定'}
+- 対象経費: ${g?.target_expenses || '未設定'}
+- 対象者要件: ${g?.eligibility_requirements || '未設定'}
+- 申請期限: ${g?.application_end_date || '未設定'}` : `
+【補助金制度情報】
+- 補助金名: ${client.subsidy_name}
+- その他詳細情報: 未登録`
+  
   // 各セクションをAIで生成
   for (const section of sections) {
     const sectionPrompt = `${template.ai_prompt_base}
@@ -6702,6 +6838,7 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
 - 会社名: ${client.company_name || '未設定'}
 - 顧客名: ${client.name}
 - 申請補助金: ${client.subsidy_name}
+${guidelinesInfo}
 
 【ヒアリング回答】
 ${(answers.results || []).map((a: any) => `【${a.category}】${a.question_text}\n回答: ${a.answer_text || '未回答'}`).join('\n\n')}
@@ -6721,6 +6858,7 @@ ${(successCases.results || []).map((c: any, i: number) => `事例${i+1}: ${c.suc
 - 箇条書きが必要な場合は「・」や「（1）」「①」などの記号を使用してください
 - 改行と段落で構造化してください
 - 具体的な数値を含めてください
+- 補助率や補助上限額などの補助金制度情報を適切に文書に反映してください
 - 審査員が納得できる論理的な説明を心がけてください
 - 文字数は${section.max_chars}文字以内に収めてください
 - 自然な日本語のビジネス文書として出力してください`
