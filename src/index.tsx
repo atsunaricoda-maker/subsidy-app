@@ -5187,6 +5187,254 @@ app.post('/api/subsidy-check-updates', async (c) => {
   })
 })
 
+// AI による公募要領情報の自動抽出
+app.post('/api/subsidy-guidelines/:subsidyTypeId/ai-extract', async (c) => {
+  const { DB, GEMINI_API_KEY } = c.env
+  const subsidyTypeId = c.req.param('subsidyTypeId')
+  const { url } = await c.req.json()
+  
+  if (!url) {
+    return c.json({ error: 'URLが指定されていません' }, 400)
+  }
+  
+  try {
+    // URLからコンテンツを取得
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ja,en;q=0.9'
+      }
+    })
+    
+    if (!response.ok) {
+      return c.json({ error: `URLの取得に失敗しました: HTTP ${response.status}` }, 400)
+    }
+    
+    const html = await response.text()
+    
+    // HTMLからテキストを抽出（簡易的なパース）
+    const textContent = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 15000) // トークン制限のため
+    
+    // 補助金情報を取得
+    const subsidyType = await DB.prepare(`
+      SELECT * FROM subsidy_types WHERE id = ?
+    `).bind(subsidyTypeId).first()
+    
+    // 現在の公募要領情報を取得
+    const currentGuideline = await DB.prepare(`
+      SELECT * FROM subsidy_guidelines 
+      WHERE subsidy_type_id = ? AND status = 'active'
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(subsidyTypeId).first()
+    
+    // AIプロンプト作成
+    const prompt = `あなたは補助金・助成金の専門家です。以下のウェブページの内容から、補助金の公募要領情報を抽出してください。
+
+【補助金名】
+${subsidyType?.name || '不明'}
+
+【ウェブページの内容】
+${textContent}
+
+【抽出してほしい情報】
+以下の情報をJSON形式で出力してください。情報が見つからない場合はnullを入れてください。
+
+{
+  "fiscal_year": "年度（例: 2025年度、令和7年度）",
+  "version": "公募回・バージョン（例: 第1次公募、通年公募、第18次）",
+  "application_start_date": "申請開始日（YYYY-MM-DD形式）",
+  "application_end_date": "申請締切日（YYYY-MM-DD形式）",
+  "max_amount": "補助上限額（円単位の数値のみ、例: 4500000）",
+  "min_amount": "補助下限額（円単位の数値のみ）",
+  "subsidy_rate": "補助率（例: 1/2、2/3、1/2〜2/3）",
+  "eligibility_requirements": "対象者・要件（100文字以内で要約）",
+  "target_expenses": "対象経費（100文字以内で要約）",
+  "changes_detected": "前回からの主な変更点（あれば記載、なければnull）",
+  "confidence": "抽出の確信度（high/medium/low）",
+  "notes": "その他重要な情報や注意点"
+}
+
+重要：
+- 金額は必ず円単位の数値のみで出力（万円の場合は10000を掛けて変換）
+- 日付は必ずYYYY-MM-DD形式
+- 情報が明確に読み取れない場合はnullを設定
+- JSONのみを出力し、他の説明は不要`
+
+    // Gemini APIを呼び出し
+    if (!GEMINI_API_KEY) {
+      return c.json({ 
+        error: 'API key not configured',
+        demo: true,
+        extracted: {
+          fiscal_year: "2025年度",
+          version: "デモ用サンプル",
+          application_end_date: "2025-12-31",
+          max_amount: 5000000,
+          subsidy_rate: "1/2",
+          confidence: "low",
+          notes: "これはデモ用のサンプルデータです"
+        }
+      })
+    }
+    
+    const aiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 2048,
+          }
+        })
+      }
+    )
+    
+    if (!aiResponse.ok) {
+      throw new Error(`Gemini API error: ${aiResponse.status}`)
+    }
+    
+    const aiData = await aiResponse.json()
+    const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONを抽出
+    let extracted = null
+    try {
+      // JSONブロックを探す
+      const jsonMatch = aiText.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        extracted = JSON.parse(jsonMatch[0])
+      }
+    } catch (e) {
+      console.error('JSON parse error:', e)
+    }
+    
+    if (!extracted) {
+      return c.json({ error: 'AIからの応答を解析できませんでした', raw: aiText }, 500)
+    }
+    
+    // 現在のデータと比較して差分を検出
+    const changes = []
+    if (currentGuideline) {
+      if (extracted.fiscal_year && extracted.fiscal_year !== currentGuideline.fiscal_year) {
+        changes.push({ field: '年度', old: currentGuideline.fiscal_year, new: extracted.fiscal_year })
+      }
+      if (extracted.version && extracted.version !== currentGuideline.version) {
+        changes.push({ field: '公募回', old: currentGuideline.version, new: extracted.version })
+      }
+      if (extracted.application_end_date && extracted.application_end_date !== currentGuideline.application_end_date) {
+        changes.push({ field: '申請締切', old: currentGuideline.application_end_date, new: extracted.application_end_date })
+      }
+      if (extracted.max_amount && extracted.max_amount !== currentGuideline.max_amount) {
+        changes.push({ field: '上限額', old: currentGuideline.max_amount, new: extracted.max_amount })
+      }
+      if (extracted.subsidy_rate && extracted.subsidy_rate !== currentGuideline.subsidy_rate) {
+        changes.push({ field: '補助率', old: currentGuideline.subsidy_rate, new: extracted.subsidy_rate })
+      }
+    }
+    
+    return c.json({
+      success: true,
+      subsidy_type: subsidyType,
+      current_guideline: currentGuideline,
+      extracted,
+      changes,
+      has_changes: changes.length > 0 || !currentGuideline,
+      source_url: url
+    })
+    
+  } catch (error) {
+    console.error('AI extraction error:', error)
+    return c.json({ error: `抽出中にエラーが発生しました: ${error.message}` }, 500)
+  }
+})
+
+// AI抽出結果で公募要領を更新
+app.post('/api/subsidy-guidelines/:subsidyTypeId/ai-update', async (c) => {
+  const { DB } = c.env
+  const subsidyTypeId = c.req.param('subsidyTypeId')
+  const data = await c.req.json()
+  
+  try {
+    // 既存のactiveな公募要領を取得
+    const existing = await DB.prepare(`
+      SELECT id FROM subsidy_guidelines 
+      WHERE subsidy_type_id = ? AND status = 'active'
+      AND fiscal_year = ? AND version = ?
+    `).bind(subsidyTypeId, data.fiscal_year, data.version || null).first()
+    
+    if (existing) {
+      // 既存レコードを更新
+      await DB.prepare(`
+        UPDATE subsidy_guidelines SET
+          application_start_date = ?,
+          application_end_date = ?,
+          max_amount = ?,
+          min_amount = ?,
+          subsidy_rate = ?,
+          eligibility_requirements = ?,
+          target_expenses = ?,
+          source_url = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        data.application_start_date || null,
+        data.application_end_date || null,
+        data.max_amount || null,
+        data.min_amount || null,
+        data.subsidy_rate || null,
+        data.eligibility_requirements || null,
+        data.target_expenses || null,
+        data.source_url || null,
+        existing.id
+      ).run()
+      
+      return c.json({ success: true, action: 'updated', id: existing.id })
+    } else {
+      // 新規作成
+      const result = await DB.prepare(`
+        INSERT INTO subsidy_guidelines (
+          subsidy_type_id, fiscal_year, version,
+          application_start_date, application_end_date,
+          max_amount, min_amount, subsidy_rate,
+          eligibility_requirements, target_expenses,
+          status, source_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+      `).bind(
+        subsidyTypeId,
+        data.fiscal_year || null,
+        data.version || null,
+        data.application_start_date || null,
+        data.application_end_date || null,
+        data.max_amount || null,
+        data.min_amount || null,
+        data.subsidy_rate || null,
+        data.eligibility_requirements || null,
+        data.target_expenses || null,
+        data.source_url || null
+      ).run()
+      
+      return c.json({ success: true, action: 'created', id: result.meta.last_row_id })
+    }
+  } catch (error) {
+    console.error('AI update error:', error)
+    return c.json({ error: `更新に失敗しました: ${error.message}` }, 500)
+  }
+})
+
 // 更新ログ一覧取得
 app.get('/api/subsidy-update-logs', async (c) => {
   const { DB } = c.env
@@ -5499,6 +5747,31 @@ app.get('/admin/guidelines', (c) => {
 
                 <!-- 公募要領詳細タブ -->
                 <div id="content-guidelines" class="hidden space-y-6">
+                    <!-- AI自動更新セクション -->
+                    <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-robot text-white"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-purple-900">AI自動更新</h3>
+                                    <p class="text-sm text-purple-700">公式サイトからAIが最新情報を自動抽出します</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <select id="aiExtractSubsidy" class="px-3 py-2 border border-purple-300 rounded-lg text-sm bg-white">
+                                    <option value="">補助金を選択</option>
+                                </select>
+                                <button onclick="openAiExtractModal()" 
+                                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2">
+                                    <i class="fas fa-magic"></i>
+                                    <span>AIで情報取得</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="flex flex-wrap justify-between items-center gap-4">
                         <div>
                             <h2 class="text-lg font-bold">公募要領詳細</h2>
@@ -5693,6 +5966,130 @@ app.get('/admin/guidelines', (c) => {
             </div>
         </div>
 
+        <!-- AI抽出モーダル -->
+        <div id="aiExtractModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-lg p-6 max-w-2xl w-full my-8">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                        <i class="fas fa-robot text-white"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold">AI自動情報取得</h3>
+                        <p class="text-sm text-gray-500">公式サイトから公募要領情報を自動抽出</p>
+                    </div>
+                </div>
+                <form id="aiExtractForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">補助金種別 *</label>
+                        <select name="subsidy_type_id" id="aiExtractSubsidyType" required class="w-full px-3 py-2 border rounded-lg">
+                            <option value="">選択してください</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">公式サイトURL *</label>
+                        <input type="url" name="url" id="aiExtractUrl" required class="w-full px-3 py-2 border rounded-lg" placeholder="https://...">
+                        <p class="text-xs text-gray-500 mt-1">公募要領の情報が掲載されているページのURLを入力してください</p>
+                    </div>
+                    <div id="aiExtractStatus" class="hidden">
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-spinner fa-spin text-purple-600 text-xl"></i>
+                                <div>
+                                    <div class="font-medium text-purple-900">AIが解析中...</div>
+                                    <div class="text-sm text-purple-700">公式サイトから情報を抽出しています</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pt-4">
+                        <button type="submit" id="aiExtractSubmitBtn" class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                            <i class="fas fa-magic mr-2"></i>AIで情報を抽出
+                        </button>
+                        <button type="button" onclick="closeAiExtractModal()" class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- AI抽出結果モーダル -->
+        <div id="aiResultModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-lg p-6 max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                            <i class="fas fa-check text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold">AI抽出結果</h3>
+                            <p class="text-sm text-gray-500" id="aiResultSubsidyName">-</p>
+                        </div>
+                    </div>
+                    <button onclick="closeAiResultModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- 変更点サマリー -->
+                <div id="aiResultChanges" class="mb-6"></div>
+                
+                <!-- 抽出データ比較 -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <h4 class="font-bold mb-3">抽出された情報</h4>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-500">年度:</span>
+                            <span class="ml-2 font-medium" id="aiResult_fiscal_year">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">公募回:</span>
+                            <span class="ml-2 font-medium" id="aiResult_version">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">申請開始:</span>
+                            <span class="ml-2 font-medium" id="aiResult_start_date">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">申請締切:</span>
+                            <span class="ml-2 font-medium" id="aiResult_end_date">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">上限額:</span>
+                            <span class="ml-2 font-medium" id="aiResult_max_amount">-</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">補助率:</span>
+                            <span class="ml-2 font-medium" id="aiResult_subsidy_rate">-</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-sm">
+                        <div class="text-gray-500">対象者・要件:</div>
+                        <div class="mt-1" id="aiResult_eligibility">-</div>
+                    </div>
+                    <div class="mt-3 text-sm">
+                        <div class="text-gray-500">対象経費:</div>
+                        <div class="mt-1" id="aiResult_expenses">-</div>
+                    </div>
+                    <div class="mt-3 text-sm flex items-center gap-2">
+                        <span class="text-gray-500">確信度:</span>
+                        <span id="aiResult_confidence" class="px-2 py-0.5 rounded text-xs">-</span>
+                    </div>
+                    <div id="aiResult_notes" class="mt-3 text-sm text-gray-600 hidden">
+                        <div class="text-gray-500">注意点:</div>
+                        <div class="mt-1 italic"></div>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button onclick="applyAiResult()" class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-bold">
+                        <i class="fas fa-check mr-2"></i>この内容で更新する
+                    </button>
+                    <button onclick="closeAiResultModal()" class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400">
+                        キャンセル
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             // 認証チェック
@@ -5738,6 +6135,166 @@ app.get('/admin/guidelines', (c) => {
                     subsidyTypes.map(s => \`<option value="\${s.id}">\${s.name}</option>\`).join('');
                 document.getElementById('addUrlSubsidyType').innerHTML = options;
                 document.getElementById('addGuidelineSubsidyType').innerHTML = options;
+                document.getElementById('aiExtractSubsidy').innerHTML = '<option value="">補助金を選択</option>' + 
+                    subsidyTypes.map(s => \`<option value="\${s.id}" data-url="\${s.source_url || ''}">\${s.name}</option>\`).join('');
+                document.getElementById('aiExtractSubsidyType').innerHTML = options;
+            }
+            
+            // AI抽出モーダル
+            let currentAiResult = null;
+            
+            function openAiExtractModal() {
+                const selectedSubsidy = document.getElementById('aiExtractSubsidy').value;
+                if (selectedSubsidy) {
+                    document.getElementById('aiExtractSubsidyType').value = selectedSubsidy;
+                    // 補助金の公式URLがあれば自動入力
+                    const subsidy = subsidyTypes.find(s => s.id == selectedSubsidy);
+                    const guideline = allGuidelines.find(g => g.subsidy_type_id == selectedSubsidy && g.status === 'active');
+                    if (guideline?.source_url) {
+                        document.getElementById('aiExtractUrl').value = guideline.source_url;
+                    }
+                }
+                document.getElementById('aiExtractModal').classList.remove('hidden');
+            }
+            
+            function closeAiExtractModal() {
+                document.getElementById('aiExtractModal').classList.add('hidden');
+                document.getElementById('aiExtractForm').reset();
+                document.getElementById('aiExtractStatus').classList.add('hidden');
+            }
+            
+            document.getElementById('aiExtractForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const subsidyTypeId = document.getElementById('aiExtractSubsidyType').value;
+                const url = document.getElementById('aiExtractUrl').value;
+                
+                if (!subsidyTypeId || !url) {
+                    showToast('補助金とURLを入力してください', 'error');
+                    return;
+                }
+                
+                // ローディング表示
+                document.getElementById('aiExtractStatus').classList.remove('hidden');
+                document.getElementById('aiExtractSubmitBtn').disabled = true;
+                
+                try {
+                    const response = await axios.post(\`/api/subsidy-guidelines/\${subsidyTypeId}/ai-extract\`, { url });
+                    const result = response.data;
+                    
+                    if (result.error) {
+                        showToast(result.error, 'error');
+                        return;
+                    }
+                    
+                    // 結果を保存
+                    currentAiResult = {
+                        subsidyTypeId,
+                        ...result.extracted,
+                        source_url: url
+                    };
+                    
+                    // 結果モーダルを表示
+                    closeAiExtractModal();
+                    showAiResultModal(result);
+                    
+                } catch (error) {
+                    showToast('AI抽出に失敗しました: ' + (error.response?.data?.error || error.message), 'error');
+                } finally {
+                    document.getElementById('aiExtractStatus').classList.add('hidden');
+                    document.getElementById('aiExtractSubmitBtn').disabled = false;
+                }
+            });
+            
+            function showAiResultModal(result) {
+                const subsidy = subsidyTypes.find(s => s.id == result.subsidy_type?.id);
+                document.getElementById('aiResultSubsidyName').textContent = subsidy?.name || result.subsidy_type?.name || '不明';
+                
+                // 変更点表示
+                const changesDiv = document.getElementById('aiResultChanges');
+                if (result.changes && result.changes.length > 0) {
+                    changesDiv.innerHTML = \`
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <h4 class="font-bold text-yellow-800 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>変更が検出されました</h4>
+                            <div class="space-y-2">
+                                \${result.changes.map(c => \`
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <span class="text-gray-600">\${c.field}:</span>
+                                        <span class="line-through text-red-600">\${c.old || '-'}</span>
+                                        <i class="fas fa-arrow-right text-gray-400"></i>
+                                        <span class="text-green-600 font-bold">\${c.new}</span>
+                                    </div>
+                                \`).join('')}
+                            </div>
+                        </div>
+                    \`;
+                } else if (!result.current_guideline) {
+                    changesDiv.innerHTML = \`
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-bold text-blue-800"><i class="fas fa-plus-circle mr-2"></i>新規登録</h4>
+                            <p class="text-sm text-blue-700">この補助金の公募要領情報が新規登録されます</p>
+                        </div>
+                    \`;
+                } else {
+                    changesDiv.innerHTML = \`
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h4 class="font-bold text-green-800"><i class="fas fa-check-circle mr-2"></i>変更なし</h4>
+                            <p class="text-sm text-green-700">現在の情報と同じ内容です</p>
+                        </div>
+                    \`;
+                }
+                
+                // 抽出データ表示
+                const ext = result.extracted;
+                document.getElementById('aiResult_fiscal_year').textContent = ext.fiscal_year || '-';
+                document.getElementById('aiResult_version').textContent = ext.version || '-';
+                document.getElementById('aiResult_start_date').textContent = ext.application_start_date || '-';
+                document.getElementById('aiResult_end_date').textContent = ext.application_end_date || '-';
+                document.getElementById('aiResult_max_amount').textContent = ext.max_amount ? (ext.max_amount / 10000).toLocaleString() + '万円' : '-';
+                document.getElementById('aiResult_subsidy_rate').textContent = ext.subsidy_rate || '-';
+                document.getElementById('aiResult_eligibility').textContent = ext.eligibility_requirements || '-';
+                document.getElementById('aiResult_expenses').textContent = ext.target_expenses || '-';
+                
+                // 確信度
+                const confEl = document.getElementById('aiResult_confidence');
+                const confColors = { high: 'bg-green-100 text-green-800', medium: 'bg-yellow-100 text-yellow-800', low: 'bg-red-100 text-red-800' };
+                const confLabels = { high: '高', medium: '中', low: '低' };
+                confEl.className = \`px-2 py-0.5 rounded text-xs \${confColors[ext.confidence] || 'bg-gray-100 text-gray-800'}\`;
+                confEl.textContent = confLabels[ext.confidence] || ext.confidence || '-';
+                
+                // 注意点
+                const notesDiv = document.getElementById('aiResult_notes');
+                if (ext.notes) {
+                    notesDiv.classList.remove('hidden');
+                    notesDiv.querySelector('div:last-child').textContent = ext.notes;
+                } else {
+                    notesDiv.classList.add('hidden');
+                }
+                
+                document.getElementById('aiResultModal').classList.remove('hidden');
+            }
+            
+            function closeAiResultModal() {
+                document.getElementById('aiResultModal').classList.add('hidden');
+                currentAiResult = null;
+            }
+            
+            async function applyAiResult() {
+                if (!currentAiResult) {
+                    showToast('適用するデータがありません', 'error');
+                    return;
+                }
+                
+                try {
+                    const response = await axios.post(\`/api/subsidy-guidelines/\${currentAiResult.subsidyTypeId}/ai-update\`, currentAiResult);
+                    
+                    if (response.data.success) {
+                        showToast(\`公募要領を\${response.data.action === 'created' ? '新規登録' : '更新'}しました\`);
+                        closeAiResultModal();
+                        loadGuidelines();
+                    }
+                } catch (error) {
+                    showToast('更新に失敗しました: ' + (error.response?.data?.error || error.message), 'error');
+                }
             }
 
             // 監視URL一覧
