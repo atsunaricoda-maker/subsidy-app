@@ -4588,13 +4588,25 @@ app.get('/portal/:token', async (c) => {
                         document_id: docId
                     });
                     
-                    extractedData = response.data.extracted || {};
+                    const rawExtracted = response.data.extracted || {};
+                    
+                    // 空の値をフィルター
+                    extractedData = {};
+                    Object.entries(rawExtracted).forEach(([key, value]) => {
+                        if (value && String(value).trim()) {
+                            extractedData[key] = value;
+                        }
+                    });
+                    
+                    const analysisMethod = response.data.analysis_method;
+                    const isInferred = analysisMethod === 'text' && response.data.raw_response?.includes('推測');
                     
                     if (Object.keys(extractedData).length === 0) {
                         document.getElementById('analyzeResult').innerHTML = \`
                             <div class="text-center py-8 text-gray-500">
                                 <i class="fas fa-info-circle text-2xl mb-2"></i>
                                 <p>この書類から抽出できる情報が見つかりませんでした</p>
+                                <p class="text-sm mt-2">ヒント: 会社概要、決算書、見積書などビジネス関連の書類をアップロードしてください</p>
                             </div>
                         \`;
                     } else {
@@ -4603,15 +4615,20 @@ app.get('/portal/:token', async (c) => {
                                 <div class="text-sm font-medium text-gray-700 mb-2">
                                     <i class="fas fa-check-circle text-green-500 mr-1"></i>
                                     以下の情報を抽出しました:
+                                    \${isInferred ? '<span class="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">※書類種別からの推測を含む</span>' : ''}
                                 </div>
                                 \${Object.entries(extractedData).map(([questionId, value]) => {
                                     const question = hearingQuestions.find(q => q.id === parseInt(questionId));
+                                    const isGuess = String(value).includes('推測');
                                     return \`
-                                        <div class="border rounded-lg p-3 bg-orange-50">
-                                            <div class="text-xs text-gray-500 mb-1">\${question ? question.question_text : '質問ID: ' + questionId}</div>
+                                        <div class="border rounded-lg p-3 \${isGuess ? 'bg-yellow-50 border-yellow-200' : 'bg-orange-50'}">
+                                            <div class="text-xs text-gray-500 mb-1">
+                                                \${question ? question.question_text : '質問ID: ' + questionId}
+                                                \${isGuess ? '<span class="ml-1 text-yellow-600">(推測)</span>' : ''}
+                                            </div>
                                             <div class="text-sm text-gray-700">\${value}</div>
                                             <button onclick="applyExtracted(\${questionId})" 
-                                                    class="mt-2 text-xs px-2 py-1 bg-orange-500 text-white rounded hover:bg-orange-600">
+                                                    class="mt-2 text-xs px-2 py-1 \${isGuess ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-orange-500 hover:bg-orange-600'} text-white rounded">
                                                 <i class="fas fa-check mr-1"></i>この回答を使う
                                             </button>
                                         </div>
@@ -6443,6 +6460,22 @@ app.get('/admin/backup', (c) => {
 // AI機能 API
 // ===============================
 
+// 書類タイプから含まれる情報のヒントを返す
+function getDocumentTypeHint(documentType: string): string {
+  const hints: Record<string, string> = {
+    '登記簿謄本': '- 会社名（商号）\n- 本店所在地\n- 設立年月日\n- 資本金\n- 代表者名\n- 事業目的',
+    '決算書': '- 売上高（年商）\n- 営業利益\n- 従業員数\n- 資産・負債の状況\n- 事業年度',
+    '経営計画書': '- 事業内容\n- 経営方針\n- 売上目標\n- 事業課題\n- 将来ビジョン\n- 投資計画',
+    '事業計画書': '- 事業概要\n- ターゲット市場\n- 競合分析\n- 収益計画\n- 実施スケジュール',
+    '見積書': '- 導入予定のツール・システム名\n- 費用（税込/税抜）\n- ベンダー名\n- 導入スケジュール',
+    'ITツール見積書': '- ITツール名\n- 導入費用\n- 月額費用\n- ベンダー名\n- 機能概要',
+    'IT導入計画書': '- 導入予定のITツール\n- 導入目的\n- 期待される効果\n- 導入スケジュール\n- 担当者',
+    '会社案内': '- 会社名\n- 事業内容\n- 設立年\n- 従業員数\n- 主要取引先\n- 沿革',
+    '確定申告書': '- 売上高\n- 所得金額\n- 従業員数\n- 事業内容'
+  }
+  return hints[documentType] || '- 会社に関する基本情報\n- 事業内容\n- 数値データ（売上、従業員数等）'
+}
+
 // Gemini API呼び出しヘルパー
 async function callGeminiAPI(prompt: string, apiKey: string): Promise<string> {
   if (!apiKey) {
@@ -6708,7 +6741,7 @@ app.post('/api/clients/:clientId/analyze-document', async (c) => {
   const data = await c.req.json()
   
   // 書類情報を取得
-  const doc = await DB.prepare(`
+  const doc: any = await DB.prepare(`
     SELECT * FROM documents WHERE id = ? AND client_id = ?
   `).bind(data.document_id, clientId).first()
   
@@ -6717,7 +6750,7 @@ app.post('/api/clients/:clientId/analyze-document', async (c) => {
   }
   
   // ヒアリング質問を取得
-  const client = await DB.prepare(`
+  const client: any = await DB.prepare(`
     SELECT subsidy_type_id FROM clients WHERE id = ?
   `).bind(clientId).first()
   
@@ -6727,45 +6760,170 @@ app.post('/api/clients/:clientId/analyze-document', async (c) => {
     ORDER BY display_order
   `).bind(client?.subsidy_type_id).all()
   
-  // 書類の種類に基づいてプロンプトを構築
-  const prompt = `あなたは補助金申請書類の解析を行うアシスタントです。
+  // R2から書類の内容を取得
+  let documentContent = ''
+  let isImageFile = false
+  let imageBase64 = ''
+  
+  try {
+    const object = await R2.get(doc.file_path)
+    if (object) {
+      const fileName = doc.file_name?.toLowerCase() || ''
+      const contentType = object.httpMetadata?.contentType || ''
+      
+      // 画像ファイルの場合
+      if (contentType.startsWith('image/') || fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+        isImageFile = true
+        const arrayBuffer = await object.arrayBuffer()
+        const uint8Array = new Uint8Array(arrayBuffer)
+        // Base64エンコード
+        let binary = ''
+        for (let i = 0; i < uint8Array.length; i++) {
+          binary += String.fromCharCode(uint8Array[i])
+        }
+        imageBase64 = btoa(binary)
+      }
+      // PDFファイルの場合 - 画像として処理を試みる（最初のページ）
+      else if (contentType === 'application/pdf' || fileName.endsWith('.pdf')) {
+        // PDFは画像として処理できないため、書類種別から推測
+        documentContent = `[PDFファイル: ${doc.file_name}]
+この書類は「${doc.document_type}」として登録されています。
+PDFの内容を直接読み取ることはできませんが、書類の種類から以下の情報が含まれている可能性があります:
+
+【${doc.document_type}に通常含まれる情報】
+${getDocumentTypeHint(doc.document_type)}
+
+上記を参考に、このような書類に記載されている一般的な情報をヒアリング質問の回答として推測してください。
+ただし、推測であることを明記し、「〇〇（推測）」のように記載してください。`
+      }
+      // テキストファイルの場合
+      else if (contentType.startsWith('text/') || fileName.match(/\.(txt|csv|md)$/i)) {
+        documentContent = await object.text()
+      }
+      // その他（Word, Excel等）
+      else {
+        documentContent = `[ファイル: ${doc.file_name}]\n※このファイル形式の内容は直接読み取れないため、書類の種類「${doc.document_type}」に基づいて推測してください。`
+      }
+    }
+  } catch (e) {
+    console.error('File read error:', e)
+    documentContent = `[ファイル読み取りエラー]\n書類の種類「${doc.document_type}」に基づいて推測してください。`
+  }
+  
+  // プロンプトを構築
+  const questionList = (questions.results || []).map((q: any, i: number) => 
+    `${i+1}. [ID:${q.id}] ${q.question_text}`
+  ).join('\n')
+  
+  const basePrompt = `あなたは補助金申請書類の解析を行う専門家です。
+アップロードされた書類の内容を分析し、ヒアリング質問への回答に使える情報を抽出してください。
 
 【書類情報】
 書類の種類: ${doc.document_type}
 ファイル名: ${doc.file_name}
 
 【ヒアリング質問一覧】
-${(questions.results || []).map((q: any, i: number) => `${i+1}. [ID:${q.id}] ${q.question_text}`).join('\n')}
+${questionList}
 
-この書類の種類「${doc.document_type}」から推測して、上記のヒアリング質問に対して回答できそうな情報を推測して生成してください。
+【重要な指示】
+1. 書類から読み取れる具体的な情報（会社名、数値、事業内容など）を抽出してください
+2. 推測ではなく、書類に実際に記載されている情報を優先してください
+3. 書類に記載がない項目は含めないでください
+4. 数値は単位も含めて正確に抽出してください
 
-必ず以下のJSON形式で回答してください:
+必ず以下のJSON形式のみで回答してください（説明文は不要）:
 {
-  "質問ID": "推測される回答内容",
-  "質問ID": "推測される回答内容"
-}
-
-例: 決算書なら売上高や従業員数、事業計画書なら事業内容や投資計画など、書類の種類から推測できる情報を回答してください。
-推測できない項目は含めないでください。
-回答は具体的な数値や内容ではなく、「〇〇円」「△△名」のようなプレースホルダーを使用してください。`
+  "質問ID": "書類から抽出した回答内容",
+  "質問ID": "書類から抽出した回答内容"
+}`
 
   try {
-    const aiResponse = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    let aiResponse: string
     
-    // JSONを抽出
-    let extracted = {}
-    try {
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        extracted = JSON.parse(jsonMatch[0])
+    if (isImageFile && imageBase64) {
+      // 画像ファイルの場合はGemini Vision APIを使用
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: basePrompt + '\n\n【画像分析の追加指示】\n画像内のテキスト、数値、表、図表などを全て読み取ってください。\n会社名、事業内容、売上、従業員数、課題、計画などの情報があれば抽出してください。\n画像が申請書類、名刺、決算書、パンフレット等の場合は特に詳細に分析してください。\n\n以下の画像を分析してください。' },
+                {
+                  inline_data: {
+                    mime_type: doc.file_name?.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
+                    data: imageBase64
+                  }
+                }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 4096
+            }
+          })
+        }
+      )
+      
+      const result: any = await response.json()
+      
+      // エラーチェック
+      if (result.error) {
+        console.error('Gemini Vision API error:', result.error)
+        throw new Error(result.error.message || 'Vision API error')
       }
-    } catch (e) {
-      // JSONパースエラーの場合は空のオブジェクトを返す
+      
+      aiResponse = result.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      
+      // レスポンスが空の場合のログ
+      if (!aiResponse) {
+        console.log('Empty vision response. Full result:', JSON.stringify(result))
+      }
+    } else {
+      // テキストベースの場合
+      const textPrompt = documentContent 
+        ? `${basePrompt}\n\n【書類の内容】\n${documentContent.substring(0, 10000)}`
+        : basePrompt
+      
+      aiResponse = await callGeminiAPI(textPrompt, GEMINI_API_KEY)
     }
     
-    return c.json({ extracted, raw_response: aiResponse })
-  } catch (error) {
-    return c.json({ error: '書類の解析に失敗しました' }, 500)
+    // JSONを抽出（クリーニング処理）
+    let extracted: Record<string, string> = {}
+    try {
+      // マークダウンのコードブロックを除去
+      let cleanedResponse = aiResponse
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim()
+      
+      // 最初の { から最後の } までを抽出
+      const firstBrace = cleanedResponse.indexOf('{')
+      const lastBrace = cleanedResponse.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1)
+      }
+      
+      // 制御文字を除去
+      cleanedResponse = cleanedResponse.replace(/[\x00-\x1F\x7F]/g, ' ')
+      
+      extracted = JSON.parse(cleanedResponse)
+    } catch (e) {
+      console.error('JSON parse error:', e, 'Response:', aiResponse)
+    }
+    
+    return c.json({ 
+      extracted, 
+      raw_response: aiResponse,
+      document_type: doc.document_type,
+      file_name: doc.file_name,
+      analysis_method: isImageFile ? 'vision' : 'text'
+    })
+  } catch (error: any) {
+    console.error('Document analysis error:', error)
+    return c.json({ error: '書類の解析に失敗しました: ' + (error.message || '') }, 500)
   }
 })
 
