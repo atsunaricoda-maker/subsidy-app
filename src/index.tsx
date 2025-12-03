@@ -2161,6 +2161,21 @@ app.get('/client/:id', async (c) => {
                 }
             }
             
+            // AIレスポンスを読みやすく整形する関数
+            function formatAIResponse(text) {
+                if (!text) return '';
+                const backtick = String.fromCharCode(96);
+                const backtickRegex = new RegExp(backtick + '([^' + backtick + ']+)' + backtick, 'g');
+                return text
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/\*([^*]+)\*/g, '$1')
+                    .replace(/^#{1,6}\s+/gm, '')
+                    .replace(/^[\-\*]\s+/gm, '・')
+                    .replace(backtickRegex, '$1')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+            }
+            
             // ポータルURLコピー機能
             function copyPortalUrl(url, clientName) {
                 navigator.clipboard.writeText(url).then(() => {
@@ -2442,19 +2457,15 @@ app.get('/client/:id', async (c) => {
                 // ユーザーメッセージを即座に表示
                 const container = document.getElementById('aiChatContainer');
                 container.innerHTML += \`
-                    <div class="flex justify-end mb-3">
-                        <div class="max-w-[80%] bg-blue-100 rounded-lg p-3">
-                            <div class="flex items-center gap-2 mb-1">
-                                <i class="fas fa-user text-sm text-blue-600"></i>
-                                <span class="text-xs font-medium">あなた</span>
-                            </div>
-                            <div class="text-sm">\${message}</div>
+                    <div class="flex justify-end mb-2">
+                        <div class="max-w-[85%] bg-blue-100 rounded-lg px-3 py-2">
+                            <div class="text-sm text-gray-700">\${message}</div>
                         </div>
                     </div>
-                    <div class="flex justify-start mb-3" id="aiTyping">
-                        <div class="max-w-[80%] bg-purple-100 rounded-lg p-3">
-                            <i class="fas fa-spinner fa-spin text-purple-600"></i>
-                            <span class="text-sm ml-2">考え中...</span>
+                    <div class="flex justify-start mb-2" id="aiTyping">
+                        <div class="bg-purple-50 rounded-lg px-3 py-2 border border-purple-100">
+                            <i class="fas fa-circle-notch fa-spin text-purple-400 text-xs"></i>
+                            <span class="text-xs text-purple-400 ml-1">回答中...</span>
                         </div>
                     </div>
                 \`;
@@ -2468,14 +2479,11 @@ app.get('/client/:id', async (c) => {
                     
                     document.getElementById('aiTyping').remove();
                     
+                    const formattedResponse = formatAIResponse(response.data.response);
                     container.innerHTML += \`
-                        <div class="flex justify-start mb-3">
-                            <div class="max-w-[80%] bg-purple-100 rounded-lg p-3">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <i class="fas fa-robot text-sm text-purple-600"></i>
-                                    <span class="text-xs font-medium">AIアシスタント</span>
-                                </div>
-                                <div class="text-sm whitespace-pre-wrap">\${response.data.response}</div>
+                        <div class="flex justify-start mb-2">
+                            <div class="max-w-[85%] bg-purple-50 rounded-lg p-3 border border-purple-100">
+                                <div class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">\${formattedResponse}</div>
                             </div>
                         </div>
                     \`;
@@ -3497,6 +3505,27 @@ app.get('/portal/:token', async (c) => {
                     panelComms.classList.remove('hidden');
                 }
             }
+            
+            // AIレスポンスを読みやすく整形する関数
+            function formatAIResponse(text) {
+                if (!text) return '';
+                const backtick = String.fromCharCode(96);
+                const backtickRegex = new RegExp(backtick + '([^' + backtick + ']+)' + backtick, 'g');
+                return text
+                    // マークダウンの太字を除去
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/\*([^*]+)\*/g, '$1')
+                    // マークダウンの見出しを除去
+                    .replace(/^#{1,6}\s+/gm, '')
+                    // マークダウンの箇条書きを日本語の箇条書きに変換
+                    .replace(/^[\-\*]\s+/gm, '・')
+                    // バッククォートを除去
+                    .replace(backtickRegex, '$1')
+                    // 連続する改行を1つに
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+            }
+            
             const CLIENT_ID = ${client.id};
             const STATUS_INFO = {
                 inquiry: { icon: '🔍', text: '見込み', desc: 'まずはお話を聞かせてください' },
@@ -4034,19 +4063,15 @@ app.get('/portal/:token', async (c) => {
                 // ユーザーメッセージを即座に表示
                 const container = document.getElementById('portalAiChat');
                 container.innerHTML += \`
-                    <div class="flex justify-end mb-3">
-                        <div class="max-w-[80%] bg-green-100 rounded-lg p-3">
-                            <div class="flex items-center gap-2 mb-1">
-                                <i class="fas fa-user text-sm text-green-600"></i>
-                                <span class="text-xs font-medium">あなた</span>
-                            </div>
-                            <div class="text-sm">\${message}</div>
+                    <div class="flex justify-end mb-2">
+                        <div class="max-w-[85%] bg-green-100 rounded-lg px-3 py-2">
+                            <div class="text-sm text-gray-700">\${message}</div>
                         </div>
                     </div>
-                    <div class="flex justify-start mb-3" id="portalAiTyping">
-                        <div class="max-w-[80%] bg-purple-100 rounded-lg p-3">
-                            <i class="fas fa-spinner fa-spin text-purple-600"></i>
-                            <span class="text-sm ml-2">考え中...</span>
+                    <div class="flex justify-start mb-2" id="portalAiTyping">
+                        <div class="bg-purple-50 rounded-lg px-3 py-2 border border-purple-100">
+                            <i class="fas fa-circle-notch fa-spin text-purple-400 text-xs"></i>
+                            <span class="text-xs text-purple-400 ml-1">回答中...</span>
                         </div>
                     </div>
                 \`;
@@ -4060,14 +4085,11 @@ app.get('/portal/:token', async (c) => {
                     
                     document.getElementById('portalAiTyping').remove();
                     
+                    const formattedResponse = formatAIResponse(response.data.response);
                     container.innerHTML += \`
                         <div class="flex justify-start mb-3">
-                            <div class="max-w-[80%] bg-purple-100 rounded-lg p-3">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <i class="fas fa-robot text-sm text-purple-600"></i>
-                                    <span class="text-xs font-medium">AIアシスタント</span>
-                                </div>
-                                <div class="text-sm whitespace-pre-wrap">\${response.data.response}</div>
+                            <div class="max-w-[85%] bg-purple-50 rounded-lg p-3 border border-purple-100">
+                                <div class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">\${formattedResponse}</div>
                             </div>
                         </div>
                     \`;
@@ -6007,13 +6029,19 @@ app.post('/api/clients/:clientId/ai-chat', async (c) => {
   `).bind(clientId).all()
   
   // プロンプト構築
-  const systemPrompt = `あなたは補助金申請を支援するAIアシスタントです。
-親切で分かりやすい言葉で、申請者の情報を引き出すお手伝いをしてください。
+  const systemPrompt = `あなたは補助金申請を支援する親切なアドバイザーです。
+
+【重要な回答ルール】
+- マークダウン記法（**太字**、# 見出し、- 箇条書き）は使わないでください
+- 自然な日本語の文章で回答してください
+- 箇条書きが必要な場合は「・」や「1. 2. 3.」を使ってください
+- 堅すぎず、親しみやすい口調で話してください
+- 回答は簡潔に、要点を絞ってください（長くなりすぎないように）
 
 【顧客情報】
-- 顧客名: ${client?.name || '未設定'}
-- 会社名: ${client?.company_name || '未設定'}
-- 申請予定の補助金: ${client?.subsidy_name || '未設定'}
+顧客名: ${client?.name || '未設定'}
+会社名: ${client?.company_name || '未設定'}
+申請予定の補助金: ${client?.subsidy_name || '未設定'}
 
 【これまでのヒアリング回答】
 ${(answers.results || []).map((a: any) => `Q: ${a.question_text}\nA: ${a.answer_text || '未回答'}`).join('\n\n')}
@@ -6021,8 +6049,7 @@ ${(answers.results || []).map((a: any) => `Q: ${a.question_text}\nA: ${a.answer_
 【直近の会話履歴】
 ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`).join('\n')}
 
-以下のユーザーメッセージに対して、補助金申請に役立つ回答をしてください。
-必要に応じて追加の質問をして、申請に必要な情報を収集してください。`
+上記を踏まえて、ユーザーの質問に分かりやすく回答してください。`
 
   const prompt = `${systemPrompt}\n\nユーザー: ${data.message}`
   
