@@ -4331,26 +4331,87 @@ app.get('/portal/:token', async (c) => {
             // テンプレートモーダル
             let currentTemplateQuestionId = null;
             
-            const answerTemplates = {
+            // キーワードベースのテンプレート辞書
+            const templateKeywords = {
+                // ビジョン・将来
+                'ビジョン': [
+                    '〇〇分野でのリーディングカンパニーを目指し、業界の発展と地域社会への貢献を両立させていきます。5年後には売上△億円、従業員□名の体制を構築する計画です。',
+                    '既存事業の強化に加え、新規事業領域への積極的な展開を図ります。従業員が創造的な業務に集中できる環境を整備し、イノベーションを継続的に生み出す企業を目指します。',
+                    'デジタル技術を活用した業務効率化と新サービス開発により、顧客満足度の向上と持続的な成長を実現します。',
+                ],
+                '将来': [
+                    '3年後には現在の売上高を〇％増加させ、新規顧客を△社獲得することを目標としています。',
+                    '将来的には〇〇市場への参入を視野に入れ、事業領域の拡大を図っていきます。',
+                ],
+                // 事業内容
                 '事業内容': [
                     '当社は〇〇業界において、△△サービスを提供しております。主な顧客層は□□で、創業以来○年間にわたり事業を展開してまいりました。',
-                    '弊社は〇〇の製造・販売を主な事業としております。年間売上高は約○○万円、従業員数は△名の企業です。',
+                    '弊社は〇〇の製造・販売を主な事業としております。年間売上高は約○○万円、従業員数は△名の中小企業です。',
+                    '〇〇に特化した専門サービスを提供しており、地域の□□業者様を中心にお取引いただいております。',
                 ],
+                '会社': [
+                    '設立〇年目の企業で、主に△△事業を展開しています。従業員は□名、年商は約○○万円です。',
+                    '〇〇県に本社を構え、地域密着型の事業を展開しております。',
+                ],
+                // 課題・問題
                 '課題': [
                     '現在、〇〇の面で課題を抱えており、具体的には△△という問題が生じています。この課題を解決することで、□□の改善が見込まれます。',
                     '業務効率化が課題となっており、特に〇〇の工程において多くの時間と人手を要している状況です。',
+                    '人手不足により〇〇業務に支障が出ており、従業員の残業時間増加や品質低下が懸念されています。',
                 ],
-                '導入予定': [
+                '問題': [
+                    '〇〇の老朽化が進んでおり、メンテナンスコストの増大と生産性低下が問題となっています。',
+                    '手作業に頼っている△△業務でミスが発生しやすく、品質管理の面で課題があります。',
+                ],
+                // 導入・計画
+                '導入': [
                     '本事業では〇〇システムの導入を予定しております。これにより、△△の効率化・□□の向上を目指します。',
                     '〇〇機器を導入し、生産性を△％向上させることを目標としています。',
+                    '最新の〇〇ソフトウェアを導入し、業務のデジタル化を推進します。',
                 ],
+                '計画': [
+                    '第1段階として〇〇を導入し、その後△△の整備を進める計画です。全体の導入期間は□ヶ月を予定しています。',
+                    '〇年〇月から導入を開始し、△月までに本格稼働を目指します。',
+                ],
+                'IT': [
+                    '業務管理システムの導入により、受発注から在庫管理までを一元化し、業務効率の大幅な改善を図ります。',
+                    'クラウドベースの〇〇システムを導入し、テレワーク環境の整備と情報共有の効率化を実現します。',
+                    'RPA（業務自動化ツール）を導入し、定型的な事務作業を自動化することで、年間〇時間の工数削減を見込んでいます。',
+                ],
+                // 効果・成果
                 '効果': [
                     '本事業の実施により、〇〇の効率が約△％向上し、年間□□万円のコスト削減が見込まれます。',
                     '導入後は〇〇時間の業務時間短縮が期待でき、従業員の負担軽減にもつながります。',
+                    '品質の安定化により不良率が△％低下し、顧客満足度の向上が期待できます。',
                 ],
+                '期待': [
+                    '生産性が〇％向上し、年間△時間の労働時間削減が期待できます。',
+                    '業務のデジタル化により、ペーパーレス化と情報共有の迅速化が実現します。',
+                ],
+                // 金額・費用
+                '金額': [
+                    '総事業費は〇〇万円を予定しており、内訳はシステム導入費△万円、設備費□万円です。',
+                    '投資金額は〇〇万円で、△年での投資回収を見込んでいます。',
+                ],
+                '売上': [
+                    '直近の売上高は〇〇万円、経常利益は△万円です。',
+                    '過去3年間の売上推移は、〇年度：△万円、□年度：○万円、直近：△万円となっております。',
+                ],
+                // 従業員
+                '従業員': [
+                    '正社員〇名、パート・アルバイト△名の計□名で運営しております。',
+                    '従業員数は〇名で、うち製造部門△名、営業部門□名、管理部門○名という構成です。',
+                ],
+                // スケジュール
+                'スケジュール': [
+                    '〇月：要件定義・選定、△月：導入・設定、□月：テスト運用、○月：本格稼働を予定しています。',
+                    '導入期間は約〇ヶ月を想定しており、段階的に運用を開始する計画です。',
+                ],
+                // デフォルト
                 'default': [
-                    '具体的な内容は〇〇です。',
-                    '詳細については△△となります。',
+                    '具体的な内容は〇〇となります。詳細については別途ご説明いたします。',
+                    '〇〇について、△△の観点から□□と考えております。',
+                    '現状は〇〇ですが、本事業により△△への改善を目指します。',
                 ]
             };
             
@@ -4360,14 +4421,24 @@ app.get('/portal/:token', async (c) => {
                 
                 document.getElementById('templateQuestionText').textContent = question.question_text;
                 
-                // 質問内容からテンプレートカテゴリを推測
-                let templates = answerTemplates['default'];
-                for (const [key, value] of Object.entries(answerTemplates)) {
-                    if (question.question_text.includes(key) || (question.category && question.category.includes(key))) {
-                        templates = value;
-                        break;
+                // 質問内容とカテゴリからテンプレートを選定
+                let templates = [];
+                const searchText = question.question_text + ' ' + (question.category || '');
+                
+                // マッチするキーワードを探す
+                for (const [keyword, temps] of Object.entries(templateKeywords)) {
+                    if (keyword !== 'default' && searchText.includes(keyword)) {
+                        templates = templates.concat(temps);
                     }
                 }
+                
+                // マッチしない場合はデフォルト
+                if (templates.length === 0) {
+                    templates = templateKeywords['default'];
+                }
+                
+                // 重複を除去して最大5件に制限
+                templates = [...new Set(templates)].slice(0, 5);
                 
                 document.getElementById('templateList').innerHTML = templates.map((template, i) => \`
                     <button onclick="applyTemplate(\${i})" 
@@ -6368,19 +6439,43 @@ app.get('/api/clients/:clientId/hearing-answers', async (c) => {
   return c.json(result.results)
 })
 
-// ヒアリング回答保存
+// ヒアリング回答保存（複数対応）
 app.post('/api/clients/:clientId/hearing-answers', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
   
-  // 既存の回答を確認
+  // 複数回答の一括保存
+  if (data.answers && Array.isArray(data.answers)) {
+    let savedCount = 0
+    for (const answer of data.answers) {
+      const existing = await DB.prepare(`
+        SELECT id FROM hearing_answers WHERE client_id = ? AND question_id = ?
+      `).bind(clientId, answer.question_id).first()
+      
+      if (existing) {
+        await DB.prepare(`
+          UPDATE hearing_answers 
+          SET answer_text = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(answer.answer_text, existing.id).run()
+      } else {
+        await DB.prepare(`
+          INSERT INTO hearing_answers (client_id, question_id, answer_text)
+          VALUES (?, ?, ?)
+        `).bind(clientId, answer.question_id, answer.answer_text).run()
+      }
+      savedCount++
+    }
+    return c.json({ saved: savedCount })
+  }
+  
+  // 単一回答の保存（後方互換性）
   const existing = await DB.prepare(`
     SELECT id FROM hearing_answers WHERE client_id = ? AND question_id = ?
   `).bind(clientId, data.question_id).first()
   
   if (existing) {
-    // 更新
     await DB.prepare(`
       UPDATE hearing_answers 
       SET answer_text = ?, updated_at = CURRENT_TIMESTAMP
@@ -6388,7 +6483,6 @@ app.post('/api/clients/:clientId/hearing-answers', async (c) => {
     `).bind(data.answer_text, existing.id).run()
     return c.json({ id: existing.id, updated: true })
   } else {
-    // 新規作成
     const result = await DB.prepare(`
       INSERT INTO hearing_answers (client_id, question_id, answer_text)
       VALUES (?, ?, ?)
