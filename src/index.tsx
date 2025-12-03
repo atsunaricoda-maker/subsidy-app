@@ -7624,50 +7624,137 @@ app.post('/api/clients/:clientId/hearing-answers', async (c) => {
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
   
+  // question_keyとclient_profilesフィールドのマッピング
+  const profileFieldMapping: Record<string, string> = {
+    'employee_count': 'employee_count',
+    'common_employee_count': 'employee_count',
+    'annual_revenue': 'annual_revenue',
+    'common_annual_revenue': 'annual_revenue',
+    'establishment_year': 'establishment_year',
+    'common_establishment_year': 'establishment_year',
+    'company_overview': 'industry',  // 事業内容から業種を推定
+    'common_company_overview': 'industry',
+    'common_business_area': 'region',
+    'current_issues': 'business_challenges',
+    'common_current_issues': 'business_challenges',
+    'common_what_to_achieve': 'investment_plans',
+    'target_it_tool': 'investment_plans',
+  }
+  
+  // プロファイル更新用データを収集
+  const profileUpdates: Record<string, string> = {}
+  
+  // 回答を保存し、プロファイル更新データを収集する関数
+  const saveAnswerAndCollectProfile = async (questionId: number, answerText: string) => {
+    // 質問のquestion_keyを取得
+    const question = await DB.prepare(`
+      SELECT question_key FROM hearing_questions WHERE id = ?
+    `).bind(questionId).first() as { question_key: string } | null
+    
+    if (question && profileFieldMapping[question.question_key] && answerText) {
+      const field = profileFieldMapping[question.question_key]
+      profileUpdates[field] = answerText
+    }
+    
+    // 回答を保存
+    const existing = await DB.prepare(`
+      SELECT id FROM hearing_answers WHERE client_id = ? AND question_id = ?
+    `).bind(clientId, questionId).first()
+    
+    if (existing) {
+      await DB.prepare(`
+        UPDATE hearing_answers 
+        SET answer_text = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(answerText, (existing as any).id).run()
+    } else {
+      await DB.prepare(`
+        INSERT INTO hearing_answers (client_id, question_id, answer_text)
+        VALUES (?, ?, ?)
+      `).bind(clientId, questionId, answerText).run()
+    }
+  }
+  
   // 複数回答の一括保存
   if (data.answers && Array.isArray(data.answers)) {
-    let savedCount = 0
     for (const answer of data.answers) {
-      const existing = await DB.prepare(`
-        SELECT id FROM hearing_answers WHERE client_id = ? AND question_id = ?
-      `).bind(clientId, answer.question_id).first()
-      
-      if (existing) {
-        await DB.prepare(`
-          UPDATE hearing_answers 
-          SET answer_text = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `).bind(answer.answer_text, existing.id).run()
-      } else {
-        await DB.prepare(`
-          INSERT INTO hearing_answers (client_id, question_id, answer_text)
-          VALUES (?, ?, ?)
-        `).bind(clientId, answer.question_id, answer.answer_text).run()
-      }
-      savedCount++
+      await saveAnswerAndCollectProfile(answer.question_id, answer.answer_text)
     }
-    return c.json({ saved: savedCount })
-  }
-  
-  // 単一回答の保存（後方互換性）
-  const existing = await DB.prepare(`
-    SELECT id FROM hearing_answers WHERE client_id = ? AND question_id = ?
-  `).bind(clientId, data.question_id).first()
-  
-  if (existing) {
-    await DB.prepare(`
-      UPDATE hearing_answers 
-      SET answer_text = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(data.answer_text, existing.id).run()
-    return c.json({ id: existing.id, updated: true })
   } else {
-    const result = await DB.prepare(`
-      INSERT INTO hearing_answers (client_id, question_id, answer_text)
-      VALUES (?, ?, ?)
-    `).bind(clientId, data.question_id, data.answer_text).run()
-    return c.json({ id: result.meta.last_row_id, created: true })
+    // 単一回答の保存（後方互換性）
+    await saveAnswerAndCollectProfile(data.question_id, data.answer_text)
   }
+  
+  // client_profilesを自動更新
+  if (Object.keys(profileUpdates).length > 0) {
+    const existingProfile = await DB.prepare(`
+      SELECT id FROM client_profiles WHERE client_id = ?
+    `).bind(clientId).first()
+    
+    if (existingProfile) {
+      // 既存プロファイルを更新（null以外のフィールドのみ）
+      const updates: string[] = []
+      const values: any[] = []
+      
+      for (const [field, value] of Object.entries(profileUpdates)) {
+        if (field === 'employee_count' || field === 'annual_revenue') {
+          // 数値フィールド
+          const numValue = parseInt(value.replace(/[^0-9]/g, ''))
+          if (!isNaN(numValue)) {
+            updates.push(`${field} = ?`)
+            values.push(numValue)
+          }
+        } else if (field === 'establishment_year') {
+          // 年のフィールド
+          const yearMatch = value.match(/(\d{4})/)
+          if (yearMatch) {
+            updates.push(`${field} = ?`)
+            values.push(parseInt(yearMatch[1]))
+          }
+        } else {
+          updates.push(`${field} = ?`)
+          values.push(value)
+        }
+      }
+      
+      if (updates.length > 0) {
+        updates.push('updated_at = CURRENT_TIMESTAMP')
+        values.push(clientId)
+        await DB.prepare(`
+          UPDATE client_profiles SET ${updates.join(', ')} WHERE client_id = ?
+        `).bind(...values).run()
+      }
+    } else {
+      // 新規プロファイル作成
+      const fields = ['client_id']
+      const placeholders = ['?']
+      const values: any[] = [clientId]
+      
+      for (const [field, value] of Object.entries(profileUpdates)) {
+        fields.push(field)
+        placeholders.push('?')
+        
+        if (field === 'employee_count' || field === 'annual_revenue') {
+          const numValue = parseInt(value.replace(/[^0-9]/g, ''))
+          values.push(isNaN(numValue) ? null : numValue)
+        } else if (field === 'establishment_year') {
+          const yearMatch = value.match(/(\d{4})/)
+          values.push(yearMatch ? parseInt(yearMatch[1]) : null)
+        } else {
+          values.push(value)
+        }
+      }
+      
+      await DB.prepare(`
+        INSERT INTO client_profiles (${fields.join(', ')}) VALUES (${placeholders.join(', ')})
+      `).bind(...values).run()
+    }
+  }
+  
+  return c.json({ 
+    saved: data.answers ? data.answers.length : 1,
+    profile_updated: Object.keys(profileUpdates).length > 0
+  })
 })
 
 // ===============================
