@@ -2550,7 +2550,12 @@ app.get('/client/:id', async (c) => {
                                     <div class="flex items-start gap-2">
                                         <i class="fas \${answersMap[q.id] ? 'fa-check-circle text-green-500' : 'fa-circle text-gray-300'} mt-1"></i>
                                         <div class="flex-1">
-                                            <div class="text-sm font-medium">\${q.question_text}</div>
+                                            <div class="text-sm font-medium">
+                                                \${q.question_text}
+                                                \${q.is_required ? 
+                                                    '<span class="ml-1 px-1.5 py-0.5 text-xs bg-red-100 text-red-600 rounded">必須</span>' : 
+                                                    '<span class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 rounded">任意</span>'}
+                                            </div>
                                             \${answersMap[q.id] ? \`<div class="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">\${answersMap[q.id]}</div>\` : ''}
                                         </div>
                                     </div>
@@ -3348,8 +3353,8 @@ app.get('/portal/:token', async (c) => {
                                     </div>
                                 </div>
                                 <div class="text-right">
-                                    <div class="text-xs text-gray-500">回答進捗</div>
-                                    <div id="hearingProgress" class="text-sm font-medium text-indigo-600">0 / 0 問</div>
+                                    <div class="text-xs text-gray-500">回答進捗（必須質問基準）</div>
+                                    <div id="hearingProgress" class="text-sm font-medium text-indigo-600">必須: 0/0問</div>
                                 </div>
                             </div>
                             <div class="mt-3 w-full bg-indigo-200 rounded-full h-2">
@@ -4025,7 +4030,12 @@ app.get('/portal/:token', async (c) => {
                                 \${hearingAnswers[q.id] ? '<i class="fas fa-check"></i>' : (index + 1)}
                             </span>
                             <div class="flex-1">
-                                <div class="font-medium text-gray-800 mb-1">\${q.question_text}</div>
+                                <div class="font-medium text-gray-800 mb-1">
+                                    \${q.question_text}
+                                    \${q.is_required ? 
+                                        '<span class="ml-2 px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded">必須</span>' : 
+                                        '<span class="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded">任意</span>'}
+                                </div>
                                 \${q.description ? \`<div class="text-sm text-gray-500">\${q.description}</div>\` : ''}
                             </div>
                         </div>
@@ -4088,12 +4098,34 @@ app.get('/portal/:token', async (c) => {
             }
             
             function updateProgress() {
-                const total = hearingQuestions.length;
-                const answered = hearingQuestions.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
-                const percent = total > 0 ? Math.round((answered / total) * 100) : 0;
+                // 必須質問の進捗
+                const requiredQuestions = hearingQuestions.filter(q => q.is_required);
+                const requiredAnswered = requiredQuestions.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
+                const requiredTotal = requiredQuestions.length;
+                const requiredPercent = requiredTotal > 0 ? Math.round((requiredAnswered / requiredTotal) * 100) : 0;
                 
-                document.getElementById('hearingProgress').textContent = \`\${answered} / \${total} 問\`;
-                document.getElementById('hearingProgressBar').style.width = \`\${percent}%\`;
+                // 任意質問の進捗
+                const optionalQuestions = hearingQuestions.filter(q => !q.is_required);
+                const optionalAnswered = optionalQuestions.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
+                const optionalTotal = optionalQuestions.length;
+                
+                // 表示更新
+                let progressText = \`必須: \${requiredAnswered}/\${requiredTotal}問\`;
+                if (optionalTotal > 0) {
+                    progressText += \` ｜ 任意: \${optionalAnswered}/\${optionalTotal}問\`;
+                }
+                document.getElementById('hearingProgress').textContent = progressText;
+                document.getElementById('hearingProgressBar').style.width = \`\${requiredPercent}%\`;
+                
+                // 必須完了でバーの色を変更
+                const progressBar = document.getElementById('hearingProgressBar');
+                if (requiredPercent === 100) {
+                    progressBar.classList.remove('bg-indigo-600');
+                    progressBar.classList.add('bg-green-500');
+                } else {
+                    progressBar.classList.remove('bg-green-500');
+                    progressBar.classList.add('bg-indigo-600');
+                }
             }
             
             async function saveAllHearingAnswers() {
