@@ -1358,11 +1358,17 @@ app.get('/api/clients/:id/document-checklist', async (c) => {
 // 助成金種別一覧取得
 app.get('/api/subsidy-types', async (c) => {
   const { DB } = c.env
+  const includeHidden = c.req.query('include_hidden') === 'true'
   
   // id = 0 は共通質問用の内部レコードなので除外
-  const result = await DB.prepare(`
-    SELECT * FROM subsidy_types WHERE id > 0 ORDER BY category, name
-  `).all()
+  // 社労士管轄は一旦非表示（include_hidden=trueで表示可能）
+  let query = `SELECT * FROM subsidy_types WHERE id > 0`
+  if (!includeHidden) {
+    query += ` AND (category IS NULL OR category != '社労士管轄')`
+  }
+  query += ` ORDER BY category, name`
+  
+  const result = await DB.prepare(query).all()
   
   return c.json(result.results)
 })
@@ -1633,10 +1639,10 @@ app.get('/subsidy-types', async (c) => {
             let subsidyTypes = [];
             let documentFieldCount = 0;
 
-            // 助成金種別一覧読み込み
+            // 助成金種別一覧読み込み（管理画面では非表示含む全て表示）
             async function loadSubsidyTypes() {
                 try {
-                    const response = await axios.get('/api/subsidy-types');
+                    const response = await axios.get('/api/subsidy-types?include_hidden=true');
                     subsidyTypes = response.data;
                     renderSubsidyTypes();
                 } catch (error) {
@@ -1689,18 +1695,23 @@ app.get('/subsidy-types', async (c) => {
                 // カテゴリの表示順序
                 const categoryOrder = ['行政書士管轄', '社労士管轄', 'その他'];
                 
+                // 非表示カテゴリ（顧客向けには表示しない）
+                const hiddenCategories = ['社労士管轄'];
+                
                 let html = '';
                 categoryOrder.forEach(category => {
                     if (!grouped[category]) return;
                     
                     const colors = CATEGORY_COLORS[category] || CATEGORY_COLORS['その他'];
                     const items = grouped[category];
+                    const isHidden = hiddenCategories.includes(category);
                     
                     html += \`
-                        <div class="mb-8">
+                        <div class="mb-8 \${isHidden ? 'opacity-60' : ''}">
                             <div class="\${colors.header} text-white px-4 py-3 rounded-t-lg flex items-center gap-2">
                                 <i class="fas \${colors.icon}"></i>
                                 <h2 class="text-lg font-bold">\${category}</h2>
+                                \${isHidden ? '<span class="bg-yellow-400 text-yellow-900 px-2 py-1 rounded text-xs font-bold"><i class="fas fa-eye-slash mr-1"></i>非表示中</span>' : ''}
                                 <span class="ml-auto bg-white/20 px-2 py-1 rounded text-sm">\${items.length}件</span>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 \${colors.bg} rounded-b-lg border-2 \${colors.border} border-t-0">
