@@ -8781,7 +8781,7 @@ ${(subsidies.results || []).map((s: any) => `
 企業に最も適した補助金を上位3件選び、以下のJSON形式のみで回答してください。
 必ずJSONのみを出力してください。説明文や前置きは一切不要です。recommendationsは必ず3件以下にしてください。
 
-{"company_summary":"企業の特徴（50字以内）","recommendations":[{"subsidy_name":"補助金名","match_score":50,"rank":1,"reasons":["理由1"],"concerns":["懸念点1"],"estimated_amount":"100万円"}],"overall_strategy":"補助金活用戦略（50字以内）","priority_actions":["アクション1","アクション2"]}`
+{"company_summary":"企業の特徴（50字以内）","recommendations":[{"subsidy_name":"補助金名","match_score":50,"adoption_probability":50,"application_complexity":"普通","rank":1,"reasons":["理由1"],"concerns":["懸念点1"],"estimated_amount":"100万円","compatibility":{"eligibility":{"met":true,"detail":"申請資格あり"},"timing":{"status":"申請可能"}}}],"overall_strategy":"補助金活用戦略（50字以内）","priority_actions":["アクション1","アクション2"]}`
 
   try {
     const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
@@ -8888,10 +8888,13 @@ ${(subsidies.results || []).map((s: any) => `
         recommendations: subsidyList.map((s: any, i: number) => ({
           subsidy_name: s.name,
           match_score: 50,
+          adoption_probability: 50,
+          application_complexity: '普通',
           rank: i + 1,
           reasons: [`${s.category}カテゴリの補助金です`, s.description ? s.description.substring(0, 50) + '...' : '詳細は公募要領をご確認ください'],
           concerns: ['詳細な適合性分析にはAI分析が必要です'],
-          estimated_amount: s.max_amount ? `最大${(s.max_amount / 10000).toLocaleString()}万円` : '要確認'
+          estimated_amount: s.max_amount ? `最大${(s.max_amount / 10000).toLocaleString()}万円` : '要確認',
+          compatibility: { eligibility: { met: true, detail: '要確認' }, timing: { status: '要確認' } }
         })),
         overall_strategy: 'AI分析が一時的に利用できないため、基本的な補助金情報を表示しています。後ほど再度「総合分析」を実行してください。',
         priority_actions: [
