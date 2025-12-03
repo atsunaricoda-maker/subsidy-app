@@ -6349,13 +6349,26 @@ app.get('/api/hearing-questions/:subsidyTypeId', async (c) => {
   const { DB } = c.env
   const subsidyTypeId = c.req.param('subsidyTypeId')
   
-  const result = await DB.prepare(`
+  // まず補助金固有の質問があるかチェック
+  const specificQuestions = await DB.prepare(`
     SELECT * FROM hearing_questions 
     WHERE subsidy_type_id = ?
-    ORDER BY display_order
+    ORDER BY display_order ASC
   `).bind(subsidyTypeId).all()
   
-  return c.json(result.results)
+  // 補助金固有の質問がある場合はそれを返す
+  if (specificQuestions.results && specificQuestions.results.length > 0) {
+    return c.json(specificQuestions.results)
+  }
+  
+  // 補助金固有の質問がない場合は共通質問（subsidy_type_id = 0）を返す
+  const commonQuestions = await DB.prepare(`
+    SELECT * FROM hearing_questions 
+    WHERE subsidy_type_id = 0
+    ORDER BY display_order ASC
+  `).all()
+  
+  return c.json(commonQuestions.results)
 })
 
 // 顧客のヒアリング回答取得
