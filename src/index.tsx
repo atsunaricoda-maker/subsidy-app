@@ -2838,9 +2838,10 @@ app.get('/client/:id', async (c) => {
                                 <button onclick="viewDocument(\${doc.id})" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm">
                                     <i class="fas fa-eye mr-1"></i>詳細・編集
                                 </button>
-                                <button onclick="deleteGeneratedDocument(\${doc.id}, '\${doc.document_title.replace(/'/g, "\\\\'")}')}" 
+                                <button onclick="deleteGeneratedDocument(\${doc.id})" 
                                         class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-sm"
-                                        title="削除">
+                                        title="削除"
+                                        data-title="\${doc.document_title}">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -2973,8 +2974,8 @@ app.get('/client/:id', async (c) => {
             
             let currentViewingDocId = null;
             
-            async function deleteGeneratedDocument(docId, docTitle) {
-                if (!confirm(\`「\${docTitle}」を削除しますか？\\n\\nこの操作は取り消せません。\`)) {
+            async function deleteGeneratedDocument(docId) {
+                if (!confirm('この文書を削除しますか？\\n\\nこの操作は取り消せません。')) {
                     return;
                 }
                 
@@ -3024,7 +3025,7 @@ app.get('/client/:id', async (c) => {
                                 <button onclick="exportDocument(\${doc.id})" class="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700">
                                     <i class="fas fa-download mr-1"></i>エクスポート
                                 </button>
-                                <button onclick="deleteGeneratedDocumentFromDetail(\${doc.id}, '\${doc.document_title.replace(/'/g, "\\\\'")}')}" 
+                                <button onclick="deleteGeneratedDocumentFromDetail(\${doc.id})" 
                                         class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">
                                     <i class="fas fa-trash mr-1"></i>削除
                                 </button>
@@ -3219,8 +3220,8 @@ app.get('/client/:id', async (c) => {
             }
             
             // 詳細画面から文書削除
-            async function deleteGeneratedDocumentFromDetail(docId, docTitle) {
-                if (!confirm(\`「\${docTitle}」を削除しますか？\\n\\nこの操作は取り消せません。\`)) {
+            async function deleteGeneratedDocumentFromDetail(docId) {
+                if (!confirm('この文書を削除しますか？\\n\\nこの操作は取り消せません。')) {
                     return;
                 }
                 
