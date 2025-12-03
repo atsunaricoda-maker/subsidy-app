@@ -1185,8 +1185,9 @@ app.get('/api/clients/:id/document-checklist', async (c) => {
 app.get('/api/subsidy-types', async (c) => {
   const { DB } = c.env
   
+  // id = 0 は共通質問用の内部レコードなので除外
   const result = await DB.prepare(`
-    SELECT * FROM subsidy_types ORDER BY category, name
+    SELECT * FROM subsidy_types WHERE id > 0 ORDER BY category, name
   `).all()
   
   return c.json(result.results)
@@ -1263,8 +1264,9 @@ app.delete('/api/subsidy-types/:subsidyId/documents/:docId', async (c) => {
 app.get('/subsidy-types', async (c) => {
   const { DB } = c.env
   
+  // id = 0 は共通質問用の内部レコードなので除外
   const subsidyTypes = await DB.prepare(`
-    SELECT * FROM subsidy_types ORDER BY category, name
+    SELECT * FROM subsidy_types WHERE id > 0 ORDER BY category, name
   `).all()
   
   return c.html(`
