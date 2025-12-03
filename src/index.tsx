@@ -1423,8 +1423,8 @@ app.get('/subsidy-types', async (c) => {
                     </button>
                 </div>
 
-                <!-- 助成金種別一覧 -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="subsidyTypesList">
+                <!-- 助成金種別一覧（カテゴリ別） -->
+                <div id="subsidyTypesList">
                     <div class="text-center py-8 text-gray-500">
                         <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
                         <div>読み込み中...</div>
@@ -1445,12 +1445,10 @@ app.get('/subsidy-types', async (c) => {
                                class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">カテゴリ</label>
+                        <label class="block text-sm font-medium mb-1">カテゴリ（管轄）</label>
                         <select name="category" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="IT系">IT系</option>
-                            <option value="雇用系">雇用系</option>
-                            <option value="設備投資系">設備投資系</option>
-                            <option value="一般">一般</option>
+                            <option value="行政書士管轄">行政書士管轄（補助金）</option>
+                            <option value="社労士管轄">社労士管轄（助成金）</option>
                             <option value="その他">その他</option>
                         </select>
                     </div>
@@ -1536,6 +1534,31 @@ app.get('/subsidy-types', async (c) => {
                 }
             }
 
+            // カテゴリの色設定
+            const CATEGORY_COLORS = {
+                '行政書士管轄': { 
+                    bg: 'bg-emerald-50', 
+                    border: 'border-emerald-500', 
+                    badge: 'bg-emerald-100 text-emerald-800',
+                    header: 'bg-emerald-600',
+                    icon: 'fa-file-signature'
+                },
+                '社労士管轄': { 
+                    bg: 'bg-blue-50', 
+                    border: 'border-blue-500', 
+                    badge: 'bg-blue-100 text-blue-800',
+                    header: 'bg-blue-600',
+                    icon: 'fa-users'
+                },
+                'その他': { 
+                    bg: 'bg-gray-50', 
+                    border: 'border-gray-400', 
+                    badge: 'bg-gray-100 text-gray-800',
+                    header: 'bg-gray-600',
+                    icon: 'fa-folder'
+                }
+            };
+            
             // 助成金種別表示
             function renderSubsidyTypes() {
                 const container = document.getElementById('subsidyTypesList');
@@ -1545,27 +1568,54 @@ app.get('/subsidy-types', async (c) => {
                     return;
                 }
 
-                container.innerHTML = subsidyTypes.map(subsidy => \`
-                    <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-                        <div class="flex items-start justify-between mb-3">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <h3 class="text-lg font-bold">\${subsidy.name}</h3>
-                                    <span class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
-                                        \${subsidy.category}
-                                    </span>
-                                </div>
-                                <p class="text-sm text-gray-600">\${subsidy.description || '説明なし'}</p>
+                // カテゴリ別にグループ化
+                const grouped = {};
+                subsidyTypes.forEach(subsidy => {
+                    const cat = subsidy.category || 'その他';
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(subsidy);
+                });
+                
+                // カテゴリの表示順序
+                const categoryOrder = ['行政書士管轄', '社労士管轄', 'その他'];
+                
+                let html = '';
+                categoryOrder.forEach(category => {
+                    if (!grouped[category]) return;
+                    
+                    const colors = CATEGORY_COLORS[category] || CATEGORY_COLORS['その他'];
+                    const items = grouped[category];
+                    
+                    html += \`
+                        <div class="mb-8">
+                            <div class="\${colors.header} text-white px-4 py-3 rounded-t-lg flex items-center gap-2">
+                                <i class="fas \${colors.icon}"></i>
+                                <h2 class="text-lg font-bold">\${category}</h2>
+                                <span class="ml-auto bg-white/20 px-2 py-1 rounded text-sm">\${items.length}件</span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 \${colors.bg} rounded-b-lg border-2 \${colors.border} border-t-0">
+                                \${items.map(subsidy => \`
+                                    <div class="bg-white rounded-lg shadow p-4 hover:shadow-lg transition border-l-4 \${colors.border}">
+                                        <div class="flex items-start justify-between mb-2">
+                                            <div class="flex-1">
+                                                <h3 class="font-bold text-gray-800">\${subsidy.name}</h3>
+                                                <p class="text-sm text-gray-600 mt-1">\${subsidy.description || '説明なし'}</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-2 mt-3">
+                                            <button onclick="viewSubsidyDetail(\${subsidy.id})" 
+                                                    class="flex-1 bg-gray-600 text-white px-3 py-2 rounded hover:bg-gray-700 text-sm">
+                                                <i class="fas fa-eye mr-1"></i>詳細・編集
+                                            </button>
+                                        </div>
+                                    </div>
+                                \`).join('')}
                             </div>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="viewSubsidyDetail(\${subsidy.id})" 
-                                    class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                                <i class="fas fa-eye mr-1"></i>詳細・編集
-                            </button>
-                        </div>
-                    </div>
-                \`).join('');
+                    \`;
+                });
+                
+                container.innerHTML = html;
             }
 
             // 新規作成モーダル開く
