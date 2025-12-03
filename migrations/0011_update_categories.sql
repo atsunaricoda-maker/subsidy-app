@@ -1,16 +1,16 @@
 -- =====================================================
--- カテゴリを「行政書士」「社労士」に更新
+-- カテゴリを「行政書士管轄」「社労士管轄」に更新
 -- =====================================================
 
 -- 行政書士管轄の補助金
-UPDATE subsidy_types SET category = '行政書士' WHERE name IN (
+UPDATE subsidy_types SET category = '行政書士管轄' WHERE name IN (
   'IT導入補助金', 
   'ものづくり補助金', 
   '小規模事業者持続化補助金'
 );
 
 -- 社労士管轄の助成金
-UPDATE subsidy_types SET category = '社労士' WHERE name IN (
+UPDATE subsidy_types SET category = '社労士管轄' WHERE name IN (
   'キャリアアップ助成金', 
   '雇用調整助成金', 
   '両立支援等助成金', 
