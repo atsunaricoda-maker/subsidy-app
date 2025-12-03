@@ -6869,9 +6869,15 @@ ${(successCases.results || []).map((c: any, i: number) => `事例${i+1}: ${c.suc
 文字数上限: ${section.max_chars}文字
 
 上記の情報を基に、このセクションの内容を生成してください。
+
+【重要な出力ルール】
+- マークダウン記法（太字、見出し、箇条書き記号、コードブロック等）は絶対に使用しないでください
+- 箇条書きが必要な場合は「・」や「（1）」「①」などの記号を使用してください
+- 改行と段落で構造化してください
 - 具体的な数値を含めてください
 - 審査員が納得できる論理的な説明を心がけてください
-- 文字数は${section.max_chars}文字以内に収めてください`
+- 文字数は${section.max_chars}文字以内に収めてください
+- 自然な日本語のビジネス文書として出力してください`
 
     try {
       const content = await callGeminiAPI(sectionPrompt, GEMINI_API_KEY)
@@ -7018,7 +7024,13 @@ ${(answers.results || []).map((a: any) => `【${a.category}】${a.question_text}
 
 ${data.additional_instructions ? `【追加指示】\n${data.additional_instructions}\n` : ''}
 
-上記の情報を基に、このセクションの内容を再生成してください。`
+上記の情報を基に、このセクションの内容を再生成してください。
+
+【重要な出力ルール】
+- マークダウン記法（太字、見出し、箇条書き記号、コードブロック等）は絶対に使用しないでください
+- 箇条書きが必要な場合は「・」や「（1）」「①」などの記号を使用してください
+- 改行と段落で構造化してください
+- 自然な日本語のビジネス文書として出力してください`
 
   try {
     const content = await callGeminiAPI(prompt, GEMINI_API_KEY)
@@ -7617,9 +7629,50 @@ ${(subsidies.results || []).map((s: any) => `
       })
     }
     
-    return c.json({ error: 'AI分析の解析に失敗しました' }, 500)
+    // JSON解析失敗時のフォールバック
+    return c.json({
+      success: true,
+      analysis: {
+        company_summary: '企業情報を分析中です。詳細な分析にはヒアリング情報の充実が必要です。',
+        recommendations: (subsidies.results || []).slice(0, 5).map((s: any, i: number) => ({
+          subsidy_name: s.name,
+          match_score: 50,
+          adoption_probability: 50,
+          rank: i + 1,
+          compatibility: {
+            eligibility: { met: true, detail: '詳細確認が必要です' },
+            business_fit: { score: 50, detail: 'ヒアリング情報をもとに再分析してください' },
+            timing: { status: '要確認', deadline_days: null }
+          },
+          reasons: ['基本的な要件は満たしている可能性があります'],
+          concerns: ['詳細情報が不足しているため正確な判定ができません'],
+          preparation_steps: ['ヒアリング質問に回答してください', '企業プロファイルを充実させてください'],
+          estimated_amount: '要算出',
+          application_complexity: '普通'
+        })),
+        overall_strategy: 'まずはヒアリング質問への回答を完了させ、企業プロファイルを充実させてください。その後、再度分析を実行することでより精度の高い結果が得られます。',
+        priority_actions: ['ヒアリング質問に回答する', '企業プロファイルを更新する', '再度総合分析を実行する']
+      },
+      metadata: {
+        client_id: clientId,
+        analyzed_at: new Date().toISOString(),
+        subsidies_analyzed: subsidies.results?.length || 0,
+        partial: true
+      }
+    })
   } catch (error) {
-    return c.json({ error: 'AI分析に失敗しました' }, 500)
+    console.error('Comprehensive matching error:', error)
+    // エラー時もフォールバックデータを返す
+    return c.json({
+      success: false,
+      error: 'AI分析に失敗しました。しばらくしてから再度お試しください。',
+      analysis: {
+        company_summary: '分析を実行できませんでした',
+        recommendations: [],
+        overall_strategy: 'エラーが発生しました。再度お試しください。',
+        priority_actions: ['再度分析を実行する']
+      }
+    })
   }
 })
 
