@@ -5358,6 +5358,29 @@ app.put('/api/subsidy-guidelines/:id', async (c) => {
   return c.json({ success: true })
 })
 
+// 公募要領削除API
+app.delete('/api/subsidy-guidelines/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  await DB.prepare(`DELETE FROM subsidy_guidelines WHERE id = ?`).bind(id).run()
+  
+  return c.json({ success: true })
+})
+
+// 公募要領ステータス切り替えAPI
+app.patch('/api/subsidy-guidelines/:id/status', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const { status } = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE subsidy_guidelines SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).bind(status, id).run()
+  
+  return c.json({ success: true })
+})
+
 // ===============================
 // 公募要領管理画面
 // ===============================
@@ -5476,14 +5499,24 @@ app.get('/admin/guidelines', (c) => {
 
                 <!-- 公募要領詳細タブ -->
                 <div id="content-guidelines" class="hidden space-y-6">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-lg font-bold">公募要領詳細</h2>
-                        <button onclick="openAddGuidelineModal()" 
-                                class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
-                            <i class="fas fa-plus mr-2"></i>新規追加
-                        </button>
+                    <div class="flex flex-wrap justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold">公募要領詳細</h2>
+                            <p class="text-sm text-gray-500">補助金・助成金ごとに公募情報を管理します</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="guidelinesFilter" onchange="filterGuidelines()" class="px-3 py-2 border rounded-lg text-sm">
+                                <option value="all">すべて表示</option>
+                                <option value="active">有効のみ</option>
+                                <option value="inactive">終了のみ</option>
+                            </select>
+                            <button onclick="openAddGuidelineModal()" 
+                                    class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                                <i class="fas fa-plus mr-2"></i>新規追加
+                            </button>
+                        </div>
                     </div>
-                    <div id="guidelinesList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="guidelinesList" class="space-y-8">
                         <div class="text-center py-8 text-gray-500">読み込み中...</div>
                     </div>
                 </div>
@@ -5545,9 +5578,13 @@ app.get('/admin/guidelines', (c) => {
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1">年度</label>
-                            <input type="text" name="fiscal_year" class="w-full px-3 py-2 border rounded-lg" placeholder="令和6年度">
+                            <label class="block text-sm font-medium mb-1">年度 *</label>
+                            <input type="text" name="fiscal_year" required class="w-full px-3 py-2 border rounded-lg" placeholder="2025年度">
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">公募回・バージョン</label>
+                        <input type="text" name="version" class="w-full px-3 py-2 border rounded-lg" placeholder="第1次公募、通年公募 など">
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -5570,7 +5607,7 @@ app.get('/admin/guidelines', (c) => {
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1">補助率</label>
-                            <input type="text" name="subsidy_rate" class="w-full px-3 py-2 border rounded-lg" placeholder="1/2">
+                            <input type="text" name="subsidy_rate" class="w-full px-3 py-2 border rounded-lg" placeholder="1/2〜2/3">
                         </div>
                     </div>
                     <div>
@@ -5584,6 +5621,73 @@ app.get('/admin/guidelines', (c) => {
                     <div class="flex gap-2 pt-4">
                         <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700">追加</button>
                         <button type="button" onclick="closeAddGuidelineModal()" class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 公募要領編集モーダル -->
+        <div id="editGuidelineModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-lg p-6 max-w-2xl w-full my-8">
+                <h3 class="text-xl font-bold mb-4">公募要領詳細編集</h3>
+                <form id="editGuidelineForm" class="space-y-4">
+                    <input type="hidden" name="id" id="editGuidelineId">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">補助金種別</label>
+                            <input type="text" id="editGuidelineSubsidyName" disabled class="w-full px-3 py-2 border rounded-lg bg-gray-100">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">年度 *</label>
+                            <input type="text" name="fiscal_year" id="editGuidelineFiscalYear" required class="w-full px-3 py-2 border rounded-lg" placeholder="2025年度">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">公募回・バージョン</label>
+                        <input type="text" name="version" id="editGuidelineVersion" class="w-full px-3 py-2 border rounded-lg" placeholder="第1次公募、通年公募 など">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">申請開始日</label>
+                            <input type="date" name="application_start_date" id="editGuidelineStartDate" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">申請締切日</label>
+                            <input type="date" name="application_end_date" id="editGuidelineEndDate" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">上限額（万円）</label>
+                            <input type="number" name="max_amount" id="editGuidelineMaxAmount" class="w-full px-3 py-2 border rounded-lg" placeholder="450">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">下限額（万円）</label>
+                            <input type="number" name="min_amount" id="editGuidelineMinAmount" class="w-full px-3 py-2 border rounded-lg" placeholder="5">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">補助率</label>
+                            <input type="text" name="subsidy_rate" id="editGuidelineSubsidyRate" class="w-full px-3 py-2 border rounded-lg" placeholder="1/2〜2/3">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">公式サイトURL</label>
+                        <input type="url" name="source_url" id="editGuidelineSourceUrl" class="w-full px-3 py-2 border rounded-lg" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">公募要領PDF URL</label>
+                        <input type="url" name="pdf_url" id="editGuidelinePdfUrl" class="w-full px-3 py-2 border rounded-lg" placeholder="https://...pdf">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">ステータス</label>
+                        <select name="status" id="editGuidelineStatus" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="active">有効（公募中）</option>
+                            <option value="inactive">終了</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">更新</button>
+                        <button type="button" onclick="closeEditGuidelineModal()" class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">キャンセル</button>
                     </div>
                 </form>
             </div>
@@ -5710,32 +5814,187 @@ app.get('/admin/guidelines', (c) => {
                 \`).join('');
             }
 
+            // 公募要領データを保持
+            let allGuidelines = [];
+            
             // 公募要領一覧
             async function loadGuidelines() {
                 const response = await axios.get('/api/subsidy-guidelines');
-                const guidelines = response.data;
+                allGuidelines = response.data;
+                renderGuidelines();
+            }
+            
+            function filterGuidelines() {
+                renderGuidelines();
+            }
+            
+            function renderGuidelines() {
+                const filter = document.getElementById('guidelinesFilter').value;
+                let guidelines = allGuidelines;
+                
+                if (filter === 'active') {
+                    guidelines = guidelines.filter(g => g.status === 'active');
+                } else if (filter === 'inactive') {
+                    guidelines = guidelines.filter(g => g.status !== 'active');
+                }
                 
                 const container = document.getElementById('guidelinesList');
                 if (guidelines.length === 0) {
-                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">公募要領詳細がありません</div>';
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-folder-open text-4xl mb-2"></i><div>公募要領がありません</div></div>';
                     return;
                 }
                 
-                container.innerHTML = guidelines.map(g => \`
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <div class="flex items-start justify-between mb-2">
-                            <span class="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">\${g.subsidy_name}</span>
-                            <span class="px-2 py-1 \${g.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'} rounded text-xs">\${g.status === 'active' ? '有効' : g.status}</span>
+                // 補助金種別ごとにグループ化
+                const grouped = {};
+                const subsidyInfo = {};
+                guidelines.forEach(g => {
+                    const key = g.subsidy_type_id;
+                    if (!grouped[key]) {
+                        grouped[key] = [];
+                        // 補助金情報を取得
+                        const subsidy = subsidyTypes.find(s => s.id == key);
+                        subsidyInfo[key] = subsidy || { name: g.subsidy_name, category: '不明' };
+                    }
+                    grouped[key].push(g);
+                });
+                
+                // カテゴリ色の定義
+                const getCategoryColor = (category) => {
+                    if (category === '行政書士管轄') return { bg: 'bg-emerald-50', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-800', icon: 'fas fa-stamp' };
+                    if (category === '社労士管轄') return { bg: 'bg-blue-50', border: 'border-blue-500', badge: 'bg-blue-100 text-blue-800', icon: 'fas fa-user-tie' };
+                    return { bg: 'bg-gray-50', border: 'border-gray-500', badge: 'bg-gray-100 text-gray-800', icon: 'fas fa-folder' };
+                };
+                
+                // 申請期限の残日数計算
+                const getDaysRemaining = (endDate) => {
+                    if (!endDate) return null;
+                    const today = new Date();
+                    const end = new Date(endDate);
+                    const diff = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+                    return diff;
+                };
+                
+                const getDeadlineStatus = (days) => {
+                    if (days === null) return { class: '', text: '' };
+                    if (days < 0) return { class: 'text-gray-500', text: '終了' };
+                    if (days <= 7) return { class: 'text-red-600 font-bold', text: \`残り\${days}日\` };
+                    if (days <= 14) return { class: 'text-orange-600 font-bold', text: \`残り\${days}日\` };
+                    if (days <= 30) return { class: 'text-yellow-600', text: \`残り\${days}日\` };
+                    return { class: 'text-green-600', text: \`残り\${days}日\` };
+                };
+                
+                let html = '';
+                
+                // カテゴリでソート（行政書士管轄 → 社労士管轄 → その他）
+                const categoryOrder = ['行政書士管轄', '社労士管轄'];
+                const sortedKeys = Object.keys(grouped).sort((a, b) => {
+                    const catA = subsidyInfo[a]?.category || '';
+                    const catB = subsidyInfo[b]?.category || '';
+                    const orderA = categoryOrder.indexOf(catA);
+                    const orderB = categoryOrder.indexOf(catB);
+                    if (orderA !== orderB) return (orderA === -1 ? 999 : orderA) - (orderB === -1 ? 999 : orderB);
+                    return (subsidyInfo[a]?.name || '').localeCompare(subsidyInfo[b]?.name || '');
+                });
+                
+                sortedKeys.forEach(subsidyTypeId => {
+                    const items = grouped[subsidyTypeId];
+                    const info = subsidyInfo[subsidyTypeId];
+                    const colors = getCategoryColor(info.category);
+                    
+                    html += \`
+                        <div class="bg-white rounded-lg shadow overflow-hidden">
+                            <div class="\${colors.bg} border-l-4 \${colors.border} px-4 py-3">
+                                <div class="flex items-center justify-between flex-wrap gap-2">
+                                    <div class="flex items-center gap-3">
+                                        <i class="\${colors.icon} text-gray-600"></i>
+                                        <div>
+                                            <h3 class="font-bold text-gray-900">\${info.name}</h3>
+                                            <span class="\${colors.badge} text-xs px-2 py-0.5 rounded">\${info.category || '一般'}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm text-gray-500">\${items.length}件の公募情報</span>
+                                        <button onclick="openAddGuidelineModalFor(\${subsidyTypeId})" class="text-indigo-600 hover:text-indigo-800 text-sm">
+                                            <i class="fas fa-plus-circle mr-1"></i>追加
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="divide-y">
+                    \`;
+                    
+                    items.forEach(g => {
+                        const days = getDaysRemaining(g.application_end_date);
+                        const deadlineStatus = getDeadlineStatus(days);
+                        
+                        html += \`
+                            <div class="p-4 hover:bg-gray-50 transition-colors">
+                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                    <div class="flex-1 min-w-[200px]">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="font-bold">\${g.fiscal_year || '-'}</span>
+                                            \${g.version ? \`<span class="text-gray-500">\${g.version}</span>\` : ''}
+                                            <span class="px-2 py-0.5 rounded text-xs \${g.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}">\${g.status === 'active' ? '公募中' : '終了'}</span>
+                                        </div>
+                                        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 text-sm">
+                                            <div>
+                                                <span class="text-gray-500">補助率:</span>
+                                                <span class="ml-1 font-medium">\${g.subsidy_rate || '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-gray-500">上限額:</span>
+                                                <span class="ml-1 font-medium">\${g.max_amount ? (g.max_amount / 10000).toLocaleString() + '万円' : '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-gray-500">申請期限:</span>
+                                                <span class="ml-1 \${deadlineStatus.class}">\${g.application_end_date || '-'} \${deadlineStatus.text}</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-gray-500">開始:</span>
+                                                <span class="ml-1">\${g.application_start_date || '-'}</span>
+                                            </div>
+                                        </div>
+                                        \${g.source_url ? \`
+                                            <div class="mt-2">
+                                                <a href="\${g.source_url}" target="_blank" class="text-blue-600 hover:underline text-sm">
+                                                    <i class="fas fa-external-link-alt mr-1"></i>公式サイト
+                                                </a>
+                                                \${g.pdf_url ? \`
+                                                    <a href="\${g.pdf_url}" target="_blank" class="text-blue-600 hover:underline text-sm ml-4">
+                                                        <i class="fas fa-file-pdf mr-1"></i>公募要領PDF
+                                                    </a>
+                                                \` : ''}
+                                            </div>
+                                        \` : ''}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="toggleGuidelineStatus(\${g.id}, '\${g.status}')" 
+                                                class="px-3 py-1 rounded text-sm \${g.status === 'active' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}"
+                                                title="\${g.status === 'active' ? '終了にする' : '有効にする'}">
+                                            <i class="fas fa-\${g.status === 'active' ? 'pause' : 'play'} mr-1"></i>
+                                            \${g.status === 'active' ? '終了' : '有効化'}
+                                        </button>
+                                        <button onclick='openEditGuidelineModal(\${JSON.stringify(g).replace(/'/g, "&#39;")})' 
+                                                class="px-3 py-1 bg-blue-100 text-blue-600 rounded text-sm hover:bg-blue-200">
+                                            <i class="fas fa-edit mr-1"></i>編集
+                                        </button>
+                                        <button onclick="deleteGuideline(\${g.id})" 
+                                                class="px-3 py-1 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200">
+                                            <i class="fas fa-trash mr-1"></i>削除
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                    });
+                    
+                    html += \`
+                            </div>
                         </div>
-                        <h3 class="font-bold mb-2">\${g.fiscal_year || ''} \${g.version || ''}</h3>
-                        <div class="text-sm text-gray-600 space-y-1">
-                            \${g.application_end_date ? \`<div><i class="fas fa-calendar mr-1"></i>締切: \${g.application_end_date}</div>\` : ''}
-                            \${g.max_amount ? \`<div><i class="fas fa-yen-sign mr-1"></i>上限: \${(g.max_amount / 10000).toLocaleString()}万円</div>\` : ''}
-                            \${g.subsidy_rate ? \`<div><i class="fas fa-percent mr-1"></i>補助率: \${g.subsidy_rate}</div>\` : ''}
-                        </div>
-                        \${g.source_url ? \`<a href="\${g.source_url}" target="_blank" class="text-blue-600 hover:underline text-sm mt-2 block"><i class="fas fa-external-link-alt mr-1"></i>公式サイト</a>\` : ''}
-                    </div>
-                \`).join('');
+                    \`;
+                });
+                
+                container.innerHTML = html;
             }
 
             // 通知
@@ -5852,6 +6111,10 @@ app.get('/admin/guidelines', (c) => {
             function openAddGuidelineModal() {
                 document.getElementById('addGuidelineModal').classList.remove('hidden');
             }
+            function openAddGuidelineModalFor(subsidyTypeId) {
+                document.getElementById('addGuidelineSubsidyType').value = subsidyTypeId;
+                document.getElementById('addGuidelineModal').classList.remove('hidden');
+            }
             function closeAddGuidelineModal() {
                 document.getElementById('addGuidelineModal').classList.add('hidden');
                 document.getElementById('addGuidelineForm').reset();
@@ -5875,6 +6138,77 @@ app.get('/admin/guidelines', (c) => {
                     showToast('追加に失敗しました', 'error');
                 }
             });
+            
+            // 公募要領編集
+            function openEditGuidelineModal(g) {
+                document.getElementById('editGuidelineId').value = g.id;
+                document.getElementById('editGuidelineSubsidyName').value = g.subsidy_name || '-';
+                document.getElementById('editGuidelineFiscalYear').value = g.fiscal_year || '';
+                document.getElementById('editGuidelineVersion').value = g.version || '';
+                document.getElementById('editGuidelineStartDate').value = g.application_start_date || '';
+                document.getElementById('editGuidelineEndDate').value = g.application_end_date || '';
+                document.getElementById('editGuidelineMaxAmount').value = g.max_amount ? g.max_amount / 10000 : '';
+                document.getElementById('editGuidelineMinAmount').value = g.min_amount ? g.min_amount / 10000 : '';
+                document.getElementById('editGuidelineSubsidyRate').value = g.subsidy_rate || '';
+                document.getElementById('editGuidelineSourceUrl').value = g.source_url || '';
+                document.getElementById('editGuidelinePdfUrl').value = g.pdf_url || '';
+                document.getElementById('editGuidelineStatus').value = g.status || 'active';
+                document.getElementById('editGuidelineModal').classList.remove('hidden');
+            }
+            function closeEditGuidelineModal() {
+                document.getElementById('editGuidelineModal').classList.add('hidden');
+                document.getElementById('editGuidelineForm').reset();
+            }
+
+            document.getElementById('editGuidelineForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                const id = data.id;
+                delete data.id;
+                
+                // 金額を円に変換
+                if (data.max_amount) data.max_amount = parseInt(data.max_amount) * 10000;
+                if (data.min_amount) data.min_amount = parseInt(data.min_amount) * 10000;
+                
+                try {
+                    await axios.put(\`/api/subsidy-guidelines/\${id}\`, data);
+                    showToast('公募要領を更新しました');
+                    closeEditGuidelineModal();
+                    loadGuidelines();
+                } catch (error) {
+                    showToast('更新に失敗しました', 'error');
+                }
+            });
+            
+            // ステータス切り替え
+            async function toggleGuidelineStatus(id, currentStatus) {
+                const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+                const message = newStatus === 'active' ? '有効にしますか？' : '終了にしますか？';
+                
+                if (!confirm(message)) return;
+                
+                try {
+                    await axios.patch(\`/api/subsidy-guidelines/\${id}/status\`, { status: newStatus });
+                    showToast(\`ステータスを\${newStatus === 'active' ? '有効' : '終了'}に変更しました\`);
+                    loadGuidelines();
+                } catch (error) {
+                    showToast('ステータス変更に失敗しました', 'error');
+                }
+            }
+            
+            // 公募要領削除
+            async function deleteGuideline(id) {
+                if (!confirm('この公募要領を削除しますか？\\n※この操作は取り消せません')) return;
+                
+                try {
+                    await axios.delete(\`/api/subsidy-guidelines/\${id}\`);
+                    showToast('公募要領を削除しました');
+                    loadGuidelines();
+                } catch (error) {
+                    showToast('削除に失敗しました', 'error');
+                }
+            }
 
             // 初期読み込み
             loadSubsidyTypes();
