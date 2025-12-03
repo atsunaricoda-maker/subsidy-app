@@ -2981,11 +2981,11 @@ app.get('/client/:id', async (c) => {
                 
                 try {
                     await axios.delete(\`/api/generated-documents/\${docId}\`);
-                    showMessage('success', '文書を削除しました');
+                    showToast('文書を削除しました');
                     loadGeneratedDocuments();
                 } catch (error) {
                     console.error('Delete error:', error);
-                    showMessage('error', '削除に失敗しました');
+                    showToast('削除に失敗しました', 'error');
                 }
             }
             
@@ -3227,12 +3227,12 @@ app.get('/client/:id', async (c) => {
                 
                 try {
                     await axios.delete(\`/api/generated-documents/\${docId}\`);
-                    showMessage('success', '文書を削除しました');
+                    showToast('文書を削除しました');
                     closeDocumentDetailModal();
                     loadGeneratedDocuments();
                 } catch (error) {
                     console.error('Delete error:', error);
-                    showMessage('error', '削除に失敗しました');
+                    showToast('削除に失敗しました', 'error');
                 }
             }
             
