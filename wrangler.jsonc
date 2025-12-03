@@ -18,5 +18,18 @@
       "binding": "R2",
       "bucket_name": "subsidy-app-documents"
     }
-  ]
+  ],
+  "vars": {
+    "GEMINI_API_KEY": "",
+    "CRON_SECRET": ""
+  },
+  // Cron Triggers for scheduled guideline monitoring
+  // Note: Cron triggers are configured in Cloudflare Dashboard for Pages
+  // For Workers, use the following format:
+  // "triggers": {
+  //   "crons": [
+  //     "0 9 * * *",    // Daily at 9:00 AM JST (0:00 UTC)
+  //     "0 9 1 * *"     // Monthly on 1st at 9:00 AM JST
+  //   ]
+  // }
 }
