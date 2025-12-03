@@ -7209,10 +7209,17 @@ ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text |
     try {
       const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
       
-      // JSONを抽出
-      const jsonMatch = response.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0])
+      // JSONを抽出してクリーニング
+      let jsonStr = response.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+      const startIdx = jsonStr.indexOf('{')
+      const endIdx = jsonStr.lastIndexOf('}')
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        jsonStr = jsonStr.substring(startIdx, endIdx + 1)
+      }
+      jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, ' ')
+      
+      if (jsonStr) {
+        const result = JSON.parse(jsonStr)
         
         // スコアを保存
         await DB.prepare(`
@@ -7331,8 +7338,18 @@ JSON形式で回答してください：
 
   try {
     const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
+    
+    // JSONを抽出してクリーニング
+    let jsonStr = response.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+    const startIdx = jsonStr.indexOf('{')
+    const endIdx = jsonStr.lastIndexOf('}')
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      jsonStr = jsonStr.substring(startIdx, endIdx + 1)
+    }
+    jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, ' ')
+    
+    if (jsonStr) {
+      const result = JSON.parse(jsonStr)
       return c.json(JSON.parse(jsonMatch[0]))
     }
     return c.json({ error: 'AI分析の解析に失敗しました' }, 500)
@@ -7459,10 +7476,22 @@ ${(successCases.results || []).slice(0, 3).map((c: any, i: number) => `
 
   try {
     const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
     
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0])
+    // JSONを抽出してクリーニング
+    let jsonStr = response
+    // マークダウンのコードブロックを除去
+    jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+    // 最初の { から最後の } までを抽出
+    const startIdx = jsonStr.indexOf('{')
+    const endIdx = jsonStr.lastIndexOf('}')
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      jsonStr = jsonStr.substring(startIdx, endIdx + 1)
+    }
+    // 制御文字を除去
+    jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, ' ')
+    
+    if (jsonStr) {
+      const result = JSON.parse(jsonStr)
       
       // 予測結果をDBに保存
       await DB.prepare(`
@@ -7490,10 +7519,21 @@ ${(successCases.results || []).slice(0, 3).map((c: any, i: number) => `
       })
     }
     
-    return c.json({ error: 'AI分析の解析に失敗しました' }, 500)
-  } catch (error) {
+    // JSON解析に失敗した場合のフォールバック
+    return c.json({ 
+      error: 'AI分析の解析に失敗しました',
+      prediction: {
+        adoption_probability: 50,
+        confidence_level: 'low',
+        overall_assessment: 'C',
+        improvement_suggestions: [{ priority: 'high', suggestion: 'ヒアリング情報を充実させてください', expected_impact: '予測精度の向上' }]
+      }
+    }, 500)
+  } catch (error: any) {
+    console.error('Predict adoption error:', error?.message || error)
     return c.json({ 
       error: 'AI分析に失敗しました',
+      details: error?.message || 'Unknown error',
       prediction: {
         adoption_probability: 50,
         confidence_level: 'low',
@@ -7594,10 +7634,19 @@ ${(subsidies.results || []).map((s: any) => `
 
   try {
     const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
     
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0])
+    // JSONを抽出してクリーニング
+    let jsonStr = response
+    jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+    const startIdx = jsonStr.indexOf('{')
+    const endIdx = jsonStr.lastIndexOf('}')
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      jsonStr = jsonStr.substring(startIdx, endIdx + 1)
+    }
+    jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, ' ')
+    
+    if (jsonStr) {
+      const result = JSON.parse(jsonStr)
       
       // 各補助金のスコアをDBに保存
       for (const rec of (result.recommendations || [])) {
