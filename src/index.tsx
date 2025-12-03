@@ -3617,31 +3617,47 @@ app.get('/portal/:token', async (c) => {
                                 <!-- 書類アップロードタブ -->
                                 <div id="panelDocuments" class="p-4">
                                     <div class="mb-3">
-                                        <h3 class="text-sm font-medium mb-2">必要書類</h3>
-                                        <div id="checklistItems" class="space-y-1 text-xs max-h-24 overflow-y-auto"></div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <select id="documentType" class="w-full px-3 py-2 border rounded-lg text-sm border-green-500">
-                                            <option value="">書類の種類を選択</option>
-                                        </select>
-                                    </div>
-
-                                    <div id="uploadSection" class="hidden mb-3">
-                                        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center transition-colors">
-                                            <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-1"></i>
-                                            <p class="text-xs text-gray-600 mb-2">ドラッグ&ドロップ または</p>
-                                            <input type="file" id="fileInput" class="hidden" multiple>
-                                            <button onclick="document.getElementById('fileInput').click()" 
-                                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-                                                <i class="fas fa-file mr-1"></i>選択
-                                            </button>
-                                        </div>
+                                        <h3 class="text-sm font-medium mb-2">
+                                            <i class="fas fa-folder-open mr-1 text-green-600"></i>必要書類
+                                            <span class="text-xs text-gray-500 font-normal ml-1">（タップでアップロード）</span>
+                                        </h3>
+                                        <div id="checklistItems" class="space-y-1.5"></div>
                                     </div>
 
                                     <div>
-                                        <h3 class="text-sm font-medium mb-2">アップロード済み</h3>
-                                        <div id="uploadedDocuments" class="max-h-32 overflow-y-auto text-sm"></div>
+                                        <h3 class="text-sm font-medium mb-2">
+                                            <i class="fas fa-check-circle mr-1 text-green-600"></i>アップロード済み
+                                        </h3>
+                                        <div id="uploadedDocuments" class="max-h-40 overflow-y-auto text-sm"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 書類アップロードモーダル -->
+                                <div id="documentUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                                    <div class="bg-white rounded-xl w-full max-w-sm shadow-xl">
+                                        <div class="flex items-center justify-between p-4 border-b bg-green-600 text-white rounded-t-xl">
+                                            <h3 id="uploadModalTitle" class="font-bold text-sm">
+                                                <i class="fas fa-upload mr-2"></i>書類アップロード
+                                            </h3>
+                                            <button onclick="closeUploadModal()" class="text-white hover:text-green-200">
+                                                <i class="fas fa-times text-lg"></i>
+                                            </button>
+                                        </div>
+                                        <div class="p-4">
+                                            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-green-500 hover:bg-green-50 cursor-pointer">
+                                                <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                                <p class="text-sm text-gray-600 mb-3">ファイルをドラッグ&ドロップ</p>
+                                                <input type="file" id="fileInput" class="hidden" multiple>
+                                                <input type="hidden" id="selectedDocumentType" value="">
+                                                <button onclick="document.getElementById('fileInput').click()" 
+                                                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                                    <i class="fas fa-folder-open mr-1"></i>ファイルを選択
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-gray-500 mt-3 text-center">
+                                                対応形式: PDF, Word, Excel, 画像ファイル
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -3835,16 +3851,35 @@ app.get('/portal/:token', async (c) => {
                 const uploadedDocs = docsResponse.data;
                 const uploadedTypes = new Set(uploadedDocs.map(d => d.document_type));
                 
-                document.getElementById('checklistItems').innerHTML = items.map(item => \`
-                    <div class="flex items-center gap-1.5 py-0.5">
-                        <i class="fas fa-\${uploadedTypes.has(item.document_type) ? 'check-circle text-green-500' : 'circle text-gray-300'} text-xs"></i>
-                        <span class="\${uploadedTypes.has(item.document_type) ? 'text-green-700' : 'text-gray-600'}">\${item.document_type}</span>
-                    </div>
-                \`).join('');
-
-                const select = document.getElementById('documentType');
-                select.innerHTML = '<option value="">書類の種類を選択</option>' + 
-                    items.map(item => \`<option value="\${item.document_type}">\${item.document_type}</option>\`).join('');
+                document.getElementById('checklistItems').innerHTML = items.map(item => {
+                    const isUploaded = uploadedTypes.has(item.document_type);
+                    return \`
+                        <div onclick="openUploadModal('\${item.document_type.replace(/'/g, "\\\\'")}', \${isUploaded})" 
+                             class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all \${isUploaded ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200 hover:bg-green-50 hover:border-green-300'}">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center \${isUploaded ? 'bg-green-500' : 'bg-gray-300'}">
+                                <i class="fas \${isUploaded ? 'fa-check' : 'fa-plus'} text-white text-xs"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <span class="text-sm \${isUploaded ? 'text-green-700 font-medium' : 'text-gray-700'}">\${item.document_type}</span>
+                                \${item.is_required ? '<span class="ml-1 text-xs text-red-500">*必須</span>' : ''}
+                            </div>
+                            <i class="fas fa-chevron-right text-xs \${isUploaded ? 'text-green-400' : 'text-gray-400'}"></i>
+                        </div>
+                    \`;
+                }).join('');
+            }
+            
+            function openUploadModal(documentType, isUploaded) {
+                document.getElementById('selectedDocumentType').value = documentType;
+                document.getElementById('uploadModalTitle').innerHTML = \`
+                    <i class="fas fa-\${isUploaded ? 'sync-alt' : 'upload'} mr-2"></i>\${documentType}
+                \`;
+                document.getElementById('documentUploadModal').classList.remove('hidden');
+            }
+            
+            function closeUploadModal() {
+                document.getElementById('documentUploadModal').classList.add('hidden');
+                document.getElementById('fileInput').value = '';
             }
 
             async function loadDocuments() {
@@ -3918,22 +3953,12 @@ app.get('/portal/:token', async (c) => {
                 loadCommunications();
             });
 
-            // 書類の種類選択時の処理
-            document.getElementById('documentType').addEventListener('change', (e) => {
-                const uploadSection = document.getElementById('uploadSection');
-                if (e.target.value) {
-                    uploadSection.classList.remove('hidden');
-                } else {
-                    uploadSection.classList.add('hidden');
-                }
-            });
-
             document.getElementById('fileInput').addEventListener('change', async (e) => {
                 const files = e.target.files;
-                const documentType = document.getElementById('documentType').value;
+                const documentType = document.getElementById('selectedDocumentType').value;
                 
                 if (!documentType) {
-                    showMessage('error', '書類の種類を選択してください');
+                    showMessage('error', '書類の種類が選択されていません');
                     return;
                 }
                 
@@ -3962,8 +3987,9 @@ app.get('/portal/:token', async (c) => {
                         }
                     }
                     
-                    showMessage('success', \`\${successCount}件の書類をアップロードしました！\`);
+                    showMessage('success', \`「\${documentType}」をアップロードしました！\`);
                     document.getElementById('fileInput').value = '';
+                    closeUploadModal();
                     await loadDocuments();
                     await loadChecklist();
                 } catch (error) {
@@ -3976,25 +4002,25 @@ app.get('/portal/:token', async (c) => {
                 }
             });
 
-            // ドラッグ&ドロップ機能
+            // ドラッグ&ドロップ機能（モーダル内）
             const dropZone = document.getElementById('dropZone');
             
             dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                dropZone.classList.add('border-green-500', 'bg-green-50');
+                dropZone.classList.add('border-green-500', 'bg-green-100');
             });
             
             dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('border-green-500', 'bg-green-50');
+                dropZone.classList.remove('border-green-500', 'bg-green-100');
             });
             
             dropZone.addEventListener('drop', async (e) => {
                 e.preventDefault();
-                dropZone.classList.remove('border-green-500', 'bg-green-50');
+                dropZone.classList.remove('border-green-500', 'bg-green-100');
                 
-                const documentType = document.getElementById('documentType').value;
+                const documentType = document.getElementById('selectedDocumentType').value;
                 if (!documentType) {
-                    showMessage('error', '書類の種類を選択してください');
+                    showMessage('error', '書類の種類が選択されていません');
                     return;
                 }
                 
@@ -4023,7 +4049,8 @@ app.get('/portal/:token', async (c) => {
                         }
                     }
                     
-                    showMessage('success', \`\${successCount}件の書類をアップロードしました！\`);
+                    showMessage('success', \`「\${documentType}」をアップロードしました！\`);
+                    closeUploadModal();
                     await loadDocuments();
                     await loadChecklist();
                 } catch (error) {
@@ -4033,6 +4060,13 @@ app.get('/portal/:token', async (c) => {
                     } else {
                         showMessage('error', 'ネットワークエラーが発生しました。もう一度お試しください。');
                     }
+                }
+            });
+            
+            // モーダル外クリックで閉じる
+            document.getElementById('documentUploadModal').addEventListener('click', (e) => {
+                if (e.target.id === 'documentUploadModal') {
+                    closeUploadModal();
                 }
             });
 
