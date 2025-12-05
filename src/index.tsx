@@ -2164,6 +2164,109 @@ app.get('/subsidy-types', async (c) => {
             </div>
         </div>
 
+        <!-- ヒアリング質問編集モーダル -->
+        <div id="hearingEditorModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div class="bg-white rounded-lg max-w-4xl w-full mx-4 my-8 max-h-[90vh] flex flex-col">
+                <div class="bg-purple-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-comments mr-2"></i>
+                        <span id="hearingEditorTitle">ヒアリング質問編集</span>
+                    </h3>
+                    <button onclick="closeHearingEditor()" class="text-white hover:text-gray-200">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="p-6 overflow-y-auto flex-1">
+                    <!-- 共通質問への切り替え -->
+                    <div class="mb-4 flex gap-2">
+                        <button id="btnShowSpecific" onclick="showSpecificQuestions()" 
+                                class="px-4 py-2 rounded-lg bg-purple-600 text-white">
+                            固有質問
+                        </button>
+                        <button id="btnShowCommon" onclick="showCommonQuestions()" 
+                                class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">
+                            共通質問（全申請種別）
+                        </button>
+                    </div>
+                    
+                    <!-- 質問一覧 -->
+                    <div id="hearingQuestionsList" class="space-y-3 mb-4">
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">読み込み中...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 新規質問追加フォーム -->
+                    <div class="border-t pt-4">
+                        <h4 class="font-bold text-gray-700 mb-3">
+                            <i class="fas fa-plus-circle mr-1"></i>新しい質問を追加
+                        </h4>
+                        <div class="space-y-3 bg-gray-50 p-4 rounded-lg">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">質問文 *</label>
+                                    <input type="text" id="newQuestionText" placeholder="例：御社の事業内容を教えてください"
+                                           class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
+                                    <select id="newQuestionCategory" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="企業情報">企業情報</option>
+                                        <option value="課題分析">課題分析</option>
+                                        <option value="事業計画">事業計画</option>
+                                        <option value="IT計画">IT計画</option>
+                                        <option value="将来計画">将来計画</option>
+                                        <option value="その他">その他</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">回答タイプ</label>
+                                    <select id="newQuestionType" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="text">短文テキスト</option>
+                                        <option value="textarea">長文テキスト</option>
+                                        <option value="number">数値</option>
+                                        <option value="select">選択式</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">必須</label>
+                                    <select id="newQuestionRequired" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="1">必須</option>
+                                        <option value="0">任意</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ヘルプテキスト</label>
+                                <input type="text" id="newQuestionHelp" placeholder="回答のヒントや説明"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">回答例</label>
+                                <input type="text" id="newQuestionExample" placeholder="例：製造業（金属加工）"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            <button onclick="addHearingQuestion()" 
+                                    class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                                <i class="fas fa-plus mr-1"></i>質問を追加
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="px-6 py-4 border-t bg-gray-50 rounded-b-lg">
+                    <button onclick="closeHearingEditor()" 
+                            class="w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">
+                        閉じる
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             // 認証チェック
@@ -2293,7 +2396,12 @@ app.get('/subsidy-types', async (c) => {
                                         <div class="flex gap-2 mt-3">
                                             <button onclick="viewSubsidyDetail(\${subsidy.id})" 
                                                     class="flex-1 bg-gray-600 text-white px-3 py-2 rounded hover:bg-gray-700 text-sm">
-                                                <i class="fas fa-eye mr-1"></i>詳細・編集
+                                                <i class="fas fa-eye mr-1"></i>詳細
+                                            </button>
+                                            <button onclick="openHearingEditor(\${subsidy.id}, '\${subsidy.name.replace(/'/g, "\\\\\'")}')"
+                                                    class="flex-1 bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 text-sm"
+                                                    title="ヒアリング質問を編集">
+                                                <i class="fas fa-comments mr-1"></i>ヒアリング
                                             </button>
                                             <button data-subsidy-id="\${subsidy.id}" data-subsidy-name="\${subsidy.name.replace(/"/g, '&quot;')}"
                                                     onclick="deleteSubsidyType(this.dataset.subsidyId, this.dataset.subsidyName)" 
@@ -2559,6 +2667,197 @@ app.get('/subsidy-types', async (c) => {
                     } else {
                         alert('削除に失敗しました');
                     }
+                    console.error(error);
+                }
+            }
+
+            // ===============================
+            // ヒアリング質問編集機能
+            // ===============================
+            let currentHearingSubsidyId = null;
+            let currentHearingSubsidyName = '';
+            let hearingQuestions = [];
+            let showingCommonQuestions = false;
+            
+            async function openHearingEditor(subsidyId, subsidyName) {
+                currentHearingSubsidyId = subsidyId;
+                currentHearingSubsidyName = subsidyName;
+                showingCommonQuestions = false;
+                
+                document.getElementById('hearingEditorTitle').textContent = subsidyName + ' のヒアリング質問';
+                document.getElementById('hearingEditorModal').classList.remove('hidden');
+                document.getElementById('btnShowSpecific').className = 'px-4 py-2 rounded-lg bg-purple-600 text-white';
+                document.getElementById('btnShowCommon').className = 'px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300';
+                
+                await loadHearingQuestions(subsidyId);
+            }
+            
+            function closeHearingEditor() {
+                document.getElementById('hearingEditorModal').classList.add('hidden');
+                currentHearingSubsidyId = null;
+                currentHearingSubsidyName = '';
+            }
+            
+            function showSpecificQuestions() {
+                showingCommonQuestions = false;
+                document.getElementById('btnShowSpecific').className = 'px-4 py-2 rounded-lg bg-purple-600 text-white';
+                document.getElementById('btnShowCommon').className = 'px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300';
+                loadHearingQuestions(currentHearingSubsidyId);
+            }
+            
+            function showCommonQuestions() {
+                showingCommonQuestions = true;
+                document.getElementById('btnShowSpecific').className = 'px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300';
+                document.getElementById('btnShowCommon').className = 'px-4 py-2 rounded-lg bg-purple-600 text-white';
+                document.getElementById('hearingEditorTitle').textContent = '共通ヒアリング質問（全申請種別）';
+                loadHearingQuestions(0);
+            }
+            
+            async function loadHearingQuestions(subsidyTypeId) {
+                const container = document.getElementById('hearingQuestionsList');
+                container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl"></i><p class="mt-2">読み込み中...</p></div>';
+                
+                try {
+                    const response = await axios.get('/api/hearing-questions?subsidy_type_id=' + subsidyTypeId);
+                    hearingQuestions = response.data;
+                    renderHearingQuestions();
+                } catch (error) {
+                    container.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-circle text-2xl"></i><p class="mt-2">読み込みに失敗しました</p></div>';
+                    console.error('Error loading hearing questions:', error);
+                }
+            }
+            
+            function renderHearingQuestions() {
+                const container = document.getElementById('hearingQuestionsList');
+                
+                if (hearingQuestions.length === 0) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-comments text-3xl mb-2"></i><p>まだ質問がありません。下のフォームから追加してください。</p></div>';
+                    return;
+                }
+                
+                // カテゴリでグループ化
+                const grouped = {};
+                hearingQuestions.forEach(q => {
+                    const cat = q.category || 'その他';
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(q);
+                });
+                
+                const categoryColors = {
+                    '企業情報': 'bg-blue-100 border-blue-500',
+                    '課題分析': 'bg-orange-100 border-orange-500',
+                    '事業計画': 'bg-green-100 border-green-500',
+                    'IT計画': 'bg-indigo-100 border-indigo-500',
+                    '将来計画': 'bg-purple-100 border-purple-500',
+                    'その他': 'bg-gray-100 border-gray-500'
+                };
+                
+                let html = '';
+                Object.keys(grouped).forEach(category => {
+                    const questions = grouped[category];
+                    const colors = categoryColors[category] || categoryColors['その他'];
+                    
+                    html += '<div class="mb-4">';
+                    html += '<h5 class="font-bold text-gray-600 mb-2 flex items-center"><i class="fas fa-tag mr-2"></i>' + category + ' (' + questions.length + '件)</h5>';
+                    html += '<div class="space-y-2">';
+                    
+                    questions.forEach((q, index) => {
+                        const typeLabel = {'text': '短文', 'textarea': '長文', 'number': '数値', 'select': '選択'}[q.question_type] || q.question_type;
+                        const requiredBadge = q.is_required ? '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs">必須</span>' : '<span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">任意</span>';
+                        
+                        html += '<div class="' + colors + ' border-l-4 rounded-lg p-3 flex items-start gap-3">';
+                        html += '<div class="flex-1">';
+                        html += '<div class="flex items-center gap-2 mb-1">';
+                        html += '<span class="font-medium text-gray-800">' + q.question_text + '</span>';
+                        html += requiredBadge;
+                        html += '<span class="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs">' + typeLabel + '</span>';
+                        html += '</div>';
+                        if (q.help_text) {
+                            html += '<p class="text-sm text-gray-600"><i class="fas fa-info-circle mr-1"></i>' + q.help_text + '</p>';
+                        }
+                        if (q.example_answer) {
+                            html += '<p class="text-sm text-gray-500"><i class="fas fa-lightbulb mr-1"></i>例: ' + q.example_answer + '</p>';
+                        }
+                        html += '</div>';
+                        html += '<div class="flex gap-1">';
+                        html += '<button onclick="editHearingQuestion(' + q.id + ')" class="text-blue-600 hover:text-blue-800 p-1" title="編集"><i class="fas fa-edit"></i></button>';
+                        html += '<button onclick="deleteHearingQuestion(' + q.id + ')" class="text-red-600 hover:text-red-800 p-1" title="削除"><i class="fas fa-trash"></i></button>';
+                        html += '</div>';
+                        html += '</div>';
+                    });
+                    
+                    html += '</div></div>';
+                });
+                
+                container.innerHTML = html;
+            }
+            
+            async function addHearingQuestion() {
+                const text = document.getElementById('newQuestionText').value.trim();
+                if (!text) {
+                    alert('質問文を入力してください');
+                    return;
+                }
+                
+                const targetSubsidyId = showingCommonQuestions ? 0 : currentHearingSubsidyId;
+                
+                const data = {
+                    subsidy_type_id: targetSubsidyId,
+                    question_text: text,
+                    question_type: document.getElementById('newQuestionType').value,
+                    category: document.getElementById('newQuestionCategory').value,
+                    is_required: document.getElementById('newQuestionRequired').value === '1',
+                    help_text: document.getElementById('newQuestionHelp').value.trim() || null,
+                    example_answer: document.getElementById('newQuestionExample').value.trim() || null
+                };
+                
+                try {
+                    await axios.post('/api/hearing-questions', data);
+                    
+                    // フォームをクリア
+                    document.getElementById('newQuestionText').value = '';
+                    document.getElementById('newQuestionHelp').value = '';
+                    document.getElementById('newQuestionExample').value = '';
+                    
+                    // リロード
+                    await loadHearingQuestions(targetSubsidyId);
+                } catch (error) {
+                    alert('追加に失敗しました');
+                    console.error(error);
+                }
+            }
+            
+            async function editHearingQuestion(id) {
+                const question = hearingQuestions.find(q => q.id === id);
+                if (!question) return;
+                
+                const newText = prompt('質問文を編集:', question.question_text);
+                if (newText === null || newText.trim() === '') return;
+                
+                try {
+                    await axios.put('/api/hearing-questions/' + id, {
+                        ...question,
+                        question_text: newText.trim()
+                    });
+                    
+                    const targetSubsidyId = showingCommonQuestions ? 0 : currentHearingSubsidyId;
+                    await loadHearingQuestions(targetSubsidyId);
+                } catch (error) {
+                    alert('更新に失敗しました');
+                    console.error(error);
+                }
+            }
+            
+            async function deleteHearingQuestion(id) {
+                if (!confirm('この質問を削除しますか？\\n関連する回答データも削除されます。')) return;
+                
+                try {
+                    await axios.delete('/api/hearing-questions/' + id);
+                    
+                    const targetSubsidyId = showingCommonQuestions ? 0 : currentHearingSubsidyId;
+                    await loadHearingQuestions(targetSubsidyId);
+                } catch (error) {
+                    alert('削除に失敗しました');
                     console.error(error);
                 }
             }
@@ -10075,6 +10374,119 @@ app.get('/api/hearing-questions/:subsidyTypeId', async (c) => {
   mergedQuestions.sort((a, b) => a.display_order - b.display_order)
   
   return c.json(mergedQuestions)
+})
+
+// ヒアリング質問を全件取得（管理用）
+app.get('/api/hearing-questions', async (c) => {
+  const { DB } = c.env
+  const subsidyTypeId = c.req.query('subsidy_type_id')
+  
+  let query = `
+    SELECT hq.*, st.name as subsidy_type_name
+    FROM hearing_questions hq
+    LEFT JOIN subsidy_types st ON hq.subsidy_type_id = st.id
+  `
+  
+  if (subsidyTypeId !== undefined) {
+    query += ` WHERE hq.subsidy_type_id = ${parseInt(subsidyTypeId)}`
+  }
+  
+  query += ` ORDER BY hq.subsidy_type_id, hq.display_order`
+  
+  const result = await DB.prepare(query).all()
+  return c.json(result.results || [])
+})
+
+// ヒアリング質問を新規作成
+app.post('/api/hearing-questions', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  // display_orderを取得
+  const maxOrderResult = await DB.prepare(`
+    SELECT MAX(display_order) as max_order FROM hearing_questions WHERE subsidy_type_id = ?
+  `).bind(data.subsidy_type_id).first()
+  const maxOrder = (maxOrderResult as any)?.max_order || 0
+  
+  const result = await DB.prepare(`
+    INSERT INTO hearing_questions 
+    (subsidy_type_id, question_key, question_text, question_type, options, category, is_required, display_order, help_text, example_answer, document_section)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.subsidy_type_id,
+    data.question_key || `q_${Date.now()}`,
+    data.question_text,
+    data.question_type || 'text',
+    data.options ? JSON.stringify(data.options) : null,
+    data.category || null,
+    data.is_required !== undefined ? (data.is_required ? 1 : 0) : 1,
+    maxOrder + 1,
+    data.help_text || null,
+    data.example_answer || null,
+    data.document_section || null
+  ).run()
+  
+  return c.json({ success: true, id: result.meta.last_row_id, message: 'ヒアリング質問を作成しました' })
+})
+
+// ヒアリング質問を更新
+app.put('/api/hearing-questions/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE hearing_questions SET
+      question_text = ?,
+      question_type = ?,
+      options = ?,
+      category = ?,
+      is_required = ?,
+      display_order = ?,
+      help_text = ?,
+      example_answer = ?,
+      document_section = ?
+    WHERE id = ?
+  `).bind(
+    data.question_text,
+    data.question_type || 'text',
+    data.options ? JSON.stringify(data.options) : null,
+    data.category || null,
+    data.is_required !== undefined ? (data.is_required ? 1 : 0) : 1,
+    data.display_order || 0,
+    data.help_text || null,
+    data.example_answer || null,
+    data.document_section || null,
+    id
+  ).run()
+  
+  return c.json({ success: true, message: 'ヒアリング質問を更新しました' })
+})
+
+// ヒアリング質問を削除
+app.delete('/api/hearing-questions/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  // 関連する回答も削除される（CASCADE）
+  await DB.prepare(`DELETE FROM hearing_questions WHERE id = ?`).bind(id).run()
+  
+  return c.json({ success: true, message: 'ヒアリング質問を削除しました' })
+})
+
+// ヒアリング質問の並び替え
+app.put('/api/hearing-questions/reorder', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  // data.orders = [{ id: 1, display_order: 0 }, { id: 2, display_order: 1 }, ...]
+  for (const item of data.orders) {
+    await DB.prepare(`
+      UPDATE hearing_questions SET display_order = ? WHERE id = ?
+    `).bind(item.display_order, item.id).run()
+  }
+  
+  return c.json({ success: true, message: '並び替えを保存しました' })
 })
 
 // 顧客のヒアリング回答取得
