@@ -295,16 +295,8 @@ app.get('/', (c) => {
                     </a>
                     
                     <div class="pt-4 pb-2">
-                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">顧客管理</p>
+                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">案件管理</p>
                     </div>
-                    <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-tachometer-alt w-5"></i>
-                        <span>ダッシュボード</span>
-                    </a>
-                    <a href="/clients" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-users w-5"></i>
-                        <span>顧客管理</span>
-                    </a>
                     <a href="/cases" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-folder-open w-5"></i>
                         <span>案件一覧</span>
@@ -13459,22 +13451,22 @@ app.get('/admin/pipelines', (c) => {
                     </a>
                     
                     <div class="pt-4 pb-2">
-                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">顧客管理</p>
+                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">案件管理</p>
                     </div>
-                    <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-users w-5"></i>
-                        <span>顧客一覧</span>
+                    <a href="/cases" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-folder-open w-5"></i>
+                        <span>案件一覧</span>
                     </a>
                     
                     <div class="pt-4 pb-2">
                         <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
                     </div>
-                    <a href="/subsidy-types" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=行政書士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-building w-5"></i>
                         <span>補助金一覧</span>
                         <span class="ml-auto text-xs bg-blue-700 px-2 py-0.5 rounded">行政書士</span>
                     </a>
-                    <a href="/subsidy-types?category=employment" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=社労士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-hand-holding-usd w-5"></i>
                         <span>助成金一覧</span>
                         <span class="ml-auto text-xs bg-green-700 px-2 py-0.5 rounded">社労士</span>
