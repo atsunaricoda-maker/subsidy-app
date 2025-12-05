@@ -2177,7 +2177,8 @@ app.get('/subsidy-types', async (c) => {
                                                     class="flex-1 bg-gray-600 text-white px-3 py-2 rounded hover:bg-gray-700 text-sm">
                                                 <i class="fas fa-eye mr-1"></i>詳細・編集
                                             </button>
-                                            <button onclick="deleteSubsidyType(\${subsidy.id}, '\${subsidy.name.replace(/'/g, "\\\\'")})" 
+                                            <button data-subsidy-id="\${subsidy.id}" data-subsidy-name="\${subsidy.name.replace(/"/g, '&quot;')}"
+                                                    onclick="deleteSubsidyType(this.dataset.subsidyId, this.dataset.subsidyName)" 
                                                     class="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 text-sm"
                                                     title="この補助金種別を削除">
                                                 <i class="fas fa-trash"></i>
@@ -2351,7 +2352,8 @@ app.get('/subsidy-types', async (c) => {
                                         class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
                                     閉じる
                                 </button>
-                                <button onclick="deleteSubsidyType(\${subsidy.id}, '\${subsidy.name.replace(/'/g, "\\\\'")}'); closeEditSubsidyModal();" 
+                                <button data-subsidy-id="\${subsidy.id}" data-subsidy-name="\${subsidy.name.replace(/"/g, '&quot;')}"
+                                        onclick="deleteSubsidyType(this.dataset.subsidyId, this.dataset.subsidyName); closeEditSubsidyModal();" 
                                         class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
                                     <i class="fas fa-trash mr-2"></i>この補助金種別を削除
                                 </button>
