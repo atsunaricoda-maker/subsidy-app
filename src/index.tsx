@@ -2003,6 +2003,7 @@ app.get('/subsidy-types', async (c) => {
                         <select name="category" class="w-full px-3 py-2 border rounded-lg">
                             <option value="行政書士管轄">行政書士管轄（補助金）</option>
                             <option value="社労士管轄">社労士管轄（助成金）</option>
+                            <option value="事業転換系">事業転換系</option>
                             <option value="その他">その他</option>
                         </select>
                     </div>
@@ -2104,6 +2105,13 @@ app.get('/subsidy-types', async (c) => {
                     header: 'bg-blue-600',
                     icon: 'fa-users'
                 },
+                '事業転換系': { 
+                    bg: 'bg-purple-50', 
+                    border: 'border-purple-500', 
+                    badge: 'bg-purple-100 text-purple-800',
+                    header: 'bg-purple-600',
+                    icon: 'fa-exchange-alt'
+                },
                 'その他': { 
                     bg: 'bg-gray-50', 
                     border: 'border-gray-400', 
@@ -2130,8 +2138,11 @@ app.get('/subsidy-types', async (c) => {
                     grouped[cat].push(subsidy);
                 });
                 
-                // カテゴリの表示順序
-                const categoryOrder = ['行政書士管轄', '社労士管轄', 'その他'];
+                // カテゴリの表示順序（存在するカテゴリをすべて表示）
+                const knownCategories = ['行政書士管轄', '社労士管轄', '事業転換系', 'その他'];
+                // DBに存在するが上記にないカテゴリも追加
+                const allCategories = [...new Set([...knownCategories, ...Object.keys(grouped)])];
+                const categoryOrder = allCategories.filter(cat => grouped[cat]);
                 
                 // 非表示カテゴリ（顧客向けには表示しない）
                 const hiddenCategories = ['社労士管轄'];
