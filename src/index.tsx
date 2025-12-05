@@ -3702,16 +3702,15 @@ app.get('/client/:id', async (c) => {
                     }
                     
                     try {
-                        await axios.post('/api/client-pipelines', {
-                            client_id: CLIENT_ID,
-                            template_id: templateId
+                        await axios.post(\`/api/clients/\${CLIENT_ID}/apply-pipeline\`, {
+                            template_id: parseInt(templateId)
                         });
                         closeAssignPipelineModal();
                         loadClientPipelines();
                         alert('パイプラインを割り当てました');
                     } catch (error) {
                         console.error('Error assigning pipeline:', error);
-                        alert('パイプラインの割り当てに失敗しました');
+                        alert('パイプラインの割り当てに失敗しました: ' + (error.response?.data?.error || error.message));
                     }
                 });
             }
@@ -13969,6 +13968,60 @@ app.get('/admin/pipelines', (c) => {
                 }
             }
             
+            // テンプレート編集
+            let editingTemplateId = null;
+            
+            async function editTemplate(id) {
+                try {
+                    editingTemplateId = id;
+                    const response = await axios.get('/api/pipeline-templates/' + id);
+                    const template = response.data;
+                    
+                    // フォームに値を設定
+                    document.querySelector('input[name="name"]').value = template.name;
+                    document.querySelector('textarea[name="description"]').value = template.description || '';
+                    document.querySelector('select[name="category"]').value = template.category || 'general';
+                    document.querySelector('input[name="service_start_offset"]').value = template.service_start_offset || 0;
+                    document.querySelector('input[name="service_end_offset"]').value = template.service_end_offset || 30;
+                    
+                    const progressReflection = document.querySelector('input[name="progress_reflection"]');
+                    if (progressReflection) progressReflection.checked = template.progress_reflection;
+                    const allowExternal = document.querySelector('input[name="allow_external_tasks"]');
+                    if (allowExternal) allowExternal.checked = template.allow_external_tasks;
+                    const requiresApproval = document.querySelector('input[name="requires_approval"]');
+                    if (requiresApproval) requiresApproval.checked = template.requires_approval;
+                    
+                    // タスクリストをクリアして再設定
+                    document.getElementById('tasksList').innerHTML = '';
+                    taskCounter = 0;
+                    
+                    if (template.tasks && template.tasks.length > 0) {
+                        template.tasks.forEach(task => {
+                            addTaskRow();
+                            const row = document.getElementById('task-row-' + (taskCounter - 1));
+                            if (row) {
+                                row.querySelector('input[name*="[task_name]"]').value = task.task_name;
+                                row.querySelector('select[name*="[task_type]"]').value = task.task_type || 'internal';
+                                row.querySelector('select[name*="[is_required]"]').value = task.is_required ? '1' : '0';
+                                row.querySelector('input[name*="[days_offset_start]"]').value = task.days_offset_start || 0;
+                                row.querySelector('input[name*="[days_offset_end]"]').value = task.days_offset_end || 7;
+                                const descInput = row.querySelector('input[name*="[description]"]');
+                                if (descInput) descInput.value = task.description || '';
+                            }
+                        });
+                    } else {
+                        addTaskRow();
+                    }
+                    
+                    closeTemplateDetailModal();
+                    document.getElementById('newTemplateModal').classList.remove('hidden');
+                    loadUsers();
+                } catch (error) {
+                    console.error('Error loading template for edit:', error);
+                    alert('テンプレートの読み込みに失敗しました');
+                }
+            }
+            
             // フォーム送信
             document.getElementById('newTemplateForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -14004,15 +14057,28 @@ app.get('/admin/pipelines', (c) => {
                 });
                 
                 try {
-                    await axios.post('/api/pipeline-templates', data);
-                    alert('テンプレートを作成しました');
+                    if (editingTemplateId) {
+                        await axios.put('/api/pipeline-templates/' + editingTemplateId, data);
+                        alert('テンプレートを更新しました');
+                        editingTemplateId = null;
+                    } else {
+                        await axios.post('/api/pipeline-templates', data);
+                        alert('テンプレートを作成しました');
+                    }
                     closeNewTemplateModal();
                     loadTemplates();
                 } catch (error) {
-                    console.error('Error creating template:', error);
-                    alert('作成に失敗しました');
+                    console.error('Error saving template:', error);
+                    alert('保存に失敗しました');
                 }
             });
+            
+            // モーダルを閉じる時にeditingTemplateIdをリセット
+            const originalCloseNewTemplateModal = closeNewTemplateModal;
+            closeNewTemplateModal = function() {
+                editingTemplateId = null;
+                originalCloseNewTemplateModal();
+            };
             
             // 初期読み込み
             loadTemplates();
