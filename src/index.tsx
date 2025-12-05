@@ -2640,6 +2640,10 @@ app.get('/client/:id', async (c) => {
                                 class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
                             <i class="fas fa-file-alt mr-2"></i>生成文書
                         </button>
+                        <button onclick="switchClientTab('pipeline')" id="client-tab-pipeline" 
+                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-tasks mr-2"></i>タスク進捗
+                        </button>
                     </div>
                 </div>
 
@@ -2787,6 +2791,96 @@ app.get('/client/:id', async (c) => {
                         </div>
                     </div>
                 </div>
+
+                <!-- タスクパイプラインタブ -->
+                <div id="client-content-pipeline" class="hidden space-y-6">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-lg font-bold">
+                                <i class="fas fa-tasks mr-2 text-green-600"></i>タスク進捗管理
+                            </h2>
+                            <button onclick="openAssignPipelineModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                <i class="fas fa-plus mr-1"></i>パイプラインを割り当て
+                            </button>
+                        </div>
+                        
+                        <!-- パイプライン一覧 -->
+                        <div id="clientPipelinesList">
+                            <div class="text-center text-gray-500 py-8">
+                                <i class="fas fa-spinner fa-spin text-2xl"></i>
+                                <p class="mt-2">読み込み中...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- パイプライン割り当てモーダル -->
+        <div id="assignPipelineModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full">
+                <h3 class="text-xl font-bold mb-4">
+                    <i class="fas fa-tasks mr-2 text-green-600"></i>パイプラインを割り当て
+                </h3>
+                <form id="assignPipelineForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">テンプレート <span class="text-red-500">*</span></label>
+                        <select id="pipelineTemplateSelect" class="w-full px-3 py-2 border rounded-lg" required>
+                            <option value="">選択してください</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2 pt-4">
+                        <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                            <i class="fas fa-check mr-1"></i>割り当て
+                        </button>
+                        <button type="button" onclick="closeAssignPipelineModal()" 
+                                class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                            キャンセル
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- タスク詳細モーダル -->
+        <div id="taskDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-lg p-6 max-w-lg w-full">
+                <h3 class="text-xl font-bold mb-4" id="taskDetailTitle">
+                    <i class="fas fa-clipboard-check mr-2 text-blue-600"></i>タスク詳細
+                </h3>
+                <form id="taskDetailForm" class="space-y-4">
+                    <input type="hidden" id="taskDetailId">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">ステータス</label>
+                        <select id="taskDetailStatus" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="pending">未着手</option>
+                            <option value="in_progress">進行中</option>
+                            <option value="completed">完了</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">進捗率</label>
+                        <div class="flex items-center gap-3">
+                            <input type="range" id="taskDetailProgress" min="0" max="100" step="10" class="flex-1" 
+                                   oninput="document.getElementById('taskProgressValue').textContent = this.value + '%'">
+                            <span id="taskProgressValue" class="text-sm font-medium w-12 text-right">0%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">メモ</label>
+                        <textarea id="taskDetailNotes" rows="3" class="w-full px-3 py-2 border rounded-lg" 
+                                  placeholder="作業メモを入力..."></textarea>
+                    </div>
+                    <div class="flex gap-2 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-save mr-1"></i>保存
+                        </button>
+                        <button type="button" onclick="closeTaskDetailModal()" 
+                                class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                            キャンセル
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -3400,7 +3494,7 @@ app.get('/client/:id', async (c) => {
 
             // タブ切り替え
             function switchClientTab(tab) {
-                ['overview', 'ai', 'documents'].forEach(t => {
+                ['overview', 'ai', 'documents', 'pipeline'].forEach(t => {
                     const content = document.getElementById('client-content-' + t);
                     const tabBtn = document.getElementById('client-tab-' + t);
                     if (content) content.classList.add('hidden');
@@ -3424,7 +3518,242 @@ app.get('/client/:id', async (c) => {
                     loadMatchScores();
                 } else if (tab === 'documents') {
                     loadGeneratedDocuments();
+                } else if (tab === 'pipeline') {
+                    loadClientPipelines();
                 }
+            }
+
+            // ===============================
+            // パイプライン機能
+            // ===============================
+            
+            let currentPipelines = [];
+            
+            // クライアントのパイプライン一覧を読み込み
+            async function loadClientPipelines() {
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/pipelines\`);
+                    currentPipelines = response.data;
+                    renderClientPipelines();
+                } catch (error) {
+                    console.error('Error loading pipelines:', error);
+                    const container = document.getElementById('clientPipelinesList');
+                    if (container) {
+                        container.innerHTML = '<div class="text-center text-red-500 py-4">パイプラインの読み込みに失敗しました</div>';
+                    }
+                }
+            }
+            
+            // パイプライン一覧をレンダリング
+            function renderClientPipelines() {
+                const container = document.getElementById('clientPipelinesList');
+                if (!container) return;
+                
+                if (currentPipelines.length === 0) {
+                    container.innerHTML = \`
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-tasks text-4xl mb-2 text-gray-300"></i>
+                            <p>パイプラインが割り当てられていません</p>
+                            <p class="text-sm mt-2">「パイプラインを割り当て」ボタンでタスク管理を開始できます</p>
+                        </div>
+                    \`;
+                    return;
+                }
+                
+                container.innerHTML = currentPipelines.map(pipeline => {
+                    const statusColors = {
+                        active: 'bg-blue-100 text-blue-800',
+                        completed: 'bg-green-100 text-green-800',
+                        paused: 'bg-yellow-100 text-yellow-800'
+                    };
+                    const statusLabels = {
+                        active: '進行中',
+                        completed: '完了',
+                        paused: '一時停止'
+                    };
+                    
+                    return \`
+                        <div class="border rounded-lg p-4 mb-4">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 class="font-bold text-lg">\${pipeline.template_name || 'パイプライン'}</h3>
+                                    <span class="inline-block px-2 py-1 rounded text-xs \${statusColors[pipeline.status] || 'bg-gray-100 text-gray-800'}">
+                                        \${statusLabels[pipeline.status] || pipeline.status}
+                                    </span>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-2xl font-bold text-blue-600">\${pipeline.progress_percentage || 0}%</div>
+                                    <div class="text-xs text-gray-500">\${pipeline.completed_tasks || 0}/\${pipeline.total_tasks || 0} タスク完了</div>
+                                </div>
+                            </div>
+                            
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                                <div class="bg-blue-600 h-2 rounded-full transition-all" style="width: \${pipeline.progress_percentage || 0}%"></div>
+                            </div>
+                            
+                            <div id="pipeline-tasks-\${pipeline.id}" class="space-y-2">
+                                <div class="text-center text-gray-400 py-2">
+                                    <i class="fas fa-spinner fa-spin"></i> タスク読み込み中...
+                                </div>
+                            </div>
+                        </div>
+                    \`;
+                }).join('');
+                
+                // 各パイプラインのタスクを読み込み
+                currentPipelines.forEach(pipeline => {
+                    loadPipelineTasks(pipeline.id);
+                });
+            }
+            
+            // パイプラインのタスク一覧を読み込み
+            async function loadPipelineTasks(pipelineId) {
+                try {
+                    const response = await axios.get(\`/api/pipelines/\${pipelineId}/tasks\`);
+                    const tasks = response.data;
+                    renderPipelineTasks(pipelineId, tasks);
+                } catch (error) {
+                    console.error('Error loading pipeline tasks:', error);
+                }
+            }
+            
+            // タスク一覧をレンダリング
+            function renderPipelineTasks(pipelineId, tasks) {
+                const container = document.getElementById('pipeline-tasks-' + pipelineId);
+                if (!container) return;
+                
+                if (tasks.length === 0) {
+                    container.innerHTML = '<div class="text-center text-gray-400 py-2">タスクがありません</div>';
+                    return;
+                }
+                
+                const statusIcons = {
+                    pending: '<i class="fas fa-circle text-gray-300"></i>',
+                    in_progress: '<i class="fas fa-spinner fa-spin text-blue-500"></i>',
+                    completed: '<i class="fas fa-check-circle text-green-500"></i>'
+                };
+                const statusLabels = {
+                    pending: '未着手',
+                    in_progress: '進行中',
+                    completed: '完了'
+                };
+                const taskTypeColors = {
+                    document: 'bg-blue-50 border-blue-200',
+                    review: 'bg-purple-50 border-purple-200',
+                    submission: 'bg-green-50 border-green-200',
+                    other: 'bg-gray-50 border-gray-200'
+                };
+                
+                container.innerHTML = tasks.map((task, index) => \`
+                    <div class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:shadow-md transition \${taskTypeColors[task.task_type] || taskTypeColors.other}"
+                         onclick="openTaskDetail(\${task.id}, '\${task.task_name.replace(/'/g, "\\\\'")}', '\${task.status}', \${task.progress_percentage || 0}, '\${(task.notes || '').replace(/'/g, "\\\\'")}')">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center text-sm font-bold">
+                            \${index + 1}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                \${statusIcons[task.status] || statusIcons.pending}
+                                <span class="font-medium truncate">\${task.task_name}</span>
+                                \${task.is_required ? '<span class="text-red-500 text-xs">*必須</span>' : ''}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                <span class="inline-block px-2 py-0.5 rounded bg-white">\${statusLabels[task.status] || task.status}</span>
+                                \${task.progress_percentage > 0 ? \`<span class="ml-2">\${task.progress_percentage}%</span>\` : ''}
+                                \${task.assignee_name ? \`<span class="ml-2"><i class="fas fa-user text-gray-400"></i> \${task.assignee_name}</span>\` : ''}
+                            </div>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </div>
+                    </div>
+                \`).join('');
+            }
+            
+            // パイプライン割り当てモーダル
+            async function openAssignPipelineModal() {
+                document.getElementById('assignPipelineModal').classList.remove('hidden');
+                
+                // テンプレート一覧を読み込み
+                try {
+                    const response = await axios.get('/api/pipeline-templates');
+                    const templates = response.data;
+                    const select = document.getElementById('pipelineTemplateSelect');
+                    select.innerHTML = '<option value="">選択してください</option>' +
+                        templates.map(t => \`<option value="\${t.id}">\${t.name}</option>\`).join('');
+                } catch (error) {
+                    console.error('Error loading templates:', error);
+                }
+            }
+            
+            function closeAssignPipelineModal() {
+                document.getElementById('assignPipelineModal').classList.add('hidden');
+            }
+            
+            // パイプライン割り当て
+            const assignPipelineFormEl = document.getElementById('assignPipelineForm');
+            if (assignPipelineFormEl) {
+                assignPipelineFormEl.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const templateId = document.getElementById('pipelineTemplateSelect').value;
+                    
+                    if (!templateId) {
+                        alert('テンプレートを選択してください');
+                        return;
+                    }
+                    
+                    try {
+                        await axios.post('/api/client-pipelines', {
+                            client_id: CLIENT_ID,
+                            template_id: templateId
+                        });
+                        closeAssignPipelineModal();
+                        loadClientPipelines();
+                        alert('パイプラインを割り当てました');
+                    } catch (error) {
+                        console.error('Error assigning pipeline:', error);
+                        alert('パイプラインの割り当てに失敗しました');
+                    }
+                });
+            }
+            
+            // タスク詳細モーダル
+            function openTaskDetail(taskId, taskName, status, progress, notes) {
+                document.getElementById('taskDetailModal').classList.remove('hidden');
+                document.getElementById('taskDetailTitle').innerHTML = '<i class="fas fa-clipboard-check mr-2 text-blue-600"></i>' + taskName;
+                document.getElementById('taskDetailId').value = taskId;
+                document.getElementById('taskDetailStatus').value = status;
+                document.getElementById('taskDetailProgress').value = progress;
+                document.getElementById('taskProgressValue').textContent = progress + '%';
+                document.getElementById('taskDetailNotes').value = notes || '';
+            }
+            
+            function closeTaskDetailModal() {
+                document.getElementById('taskDetailModal').classList.add('hidden');
+            }
+            
+            // タスク更新
+            const taskDetailFormEl = document.getElementById('taskDetailForm');
+            if (taskDetailFormEl) {
+                taskDetailFormEl.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const taskId = document.getElementById('taskDetailId').value;
+                    const status = document.getElementById('taskDetailStatus').value;
+                    const progress = parseInt(document.getElementById('taskDetailProgress').value);
+                    const notes = document.getElementById('taskDetailNotes').value;
+                    
+                    try {
+                        await axios.put(\`/api/pipeline-tasks/\${taskId}\`, {
+                            status: status,
+                            progress_percentage: progress,
+                            notes: notes
+                        });
+                        closeTaskDetailModal();
+                        loadClientPipelines();
+                    } catch (error) {
+                        console.error('Error updating task:', error);
+                        alert('タスクの更新に失敗しました');
+                    }
+                });
             }
 
             // ===============================
