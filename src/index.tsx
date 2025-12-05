@@ -256,6 +256,100 @@ app.delete('/api/admin/users/:id', async (c) => {
 })
 
 // ===============================
+// サイト設定API
+// ===============================
+
+// 設定一覧取得
+app.get('/api/settings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value, setting_type, description
+      FROM site_settings
+      ORDER BY id
+    `).all()
+    
+    // キーと値のオブジェクトに変換
+    const settingsObj: Record<string, any> = {}
+    for (const s of (settings.results || [])) {
+      settingsObj[(s as any).setting_key] = {
+        value: (s as any).setting_value,
+        type: (s as any).setting_type,
+        description: (s as any).description
+      }
+    }
+    
+    return c.json(settingsObj)
+  } catch (error) {
+    // テーブルが存在しない場合はデフォルト値を返す
+    return c.json({
+      company_name: { value: '株式会社サンプル事務所', type: 'text' },
+      company_address: { value: '〒000-0000 東京都○○区○○1-2-3', type: 'text' },
+      company_phone: { value: '03-0000-0000', type: 'text' },
+      company_email: { value: 'info@example.com', type: 'text' },
+      privacy_policy: { value: 'プライバシーポリシーを設定してください', type: 'textarea' },
+      legal_notice: { value: '特定商取引法に基づく表記を設定してください', type: 'textarea' }
+    })
+  }
+})
+
+// 設定を更新
+app.put('/api/settings', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    for (const [key, value] of Object.entries(data)) {
+      await DB.prepare(`
+        INSERT INTO site_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(setting_key) DO UPDATE SET
+          setting_value = excluded.setting_value,
+          updated_at = CURRENT_TIMESTAMP
+      `).bind(key, value).run()
+    }
+    
+    return c.json({ success: true, message: '設定を保存しました' })
+  } catch (error) {
+    console.error('Error saving settings:', error)
+    return c.json({ error: '設定の保存に失敗しました' }, 500)
+  }
+})
+
+// 公開用設定取得（認証不要）
+app.get('/api/public/settings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value
+      FROM site_settings
+      WHERE setting_key IN ('company_name', 'company_address', 'company_phone', 'company_email', 
+                            'company_representative', 'company_registration',
+                            'privacy_policy', 'legal_notice', 'terms_of_service', 'footer_text')
+    `).all()
+    
+    const settingsObj: Record<string, string> = {}
+    for (const s of (settings.results || [])) {
+      settingsObj[(s as any).setting_key] = (s as any).setting_value || ''
+    }
+    
+    return c.json(settingsObj)
+  } catch (error) {
+    // デフォルト値を返す
+    return c.json({
+      company_name: '株式会社サンプル事務所',
+      company_address: '〒000-0000 東京都○○区○○1-2-3',
+      company_phone: '03-0000-0000',
+      company_email: 'info@example.com',
+      privacy_policy: 'プライバシーポリシーを設定してください',
+      legal_notice: '特定商取引法に基づく表記を設定してください'
+    })
+  }
+})
+
+// ===============================
 // 管理者画面
 // ===============================
 
@@ -14561,82 +14655,70 @@ app.get('/admin/pipelines', (c) => {
 })
 
 // ===============================
-// プライバシーポリシーページ
+// プライバシーポリシーページ（動的）
 // ===============================
 
-app.get('/privacy-policy', (c) => {
+app.get('/privacy-policy', async (c) => {
+  const { DB } = c.env
+  
+  let privacyPolicy = ''
+  let companyName = ''
+  let footerText = ''
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key IN ('privacy_policy', 'company_name', 'footer_text')
+    `).all()
+    
+    for (const s of (settings.results || [])) {
+      if ((s as any).setting_key === 'privacy_policy') privacyPolicy = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'company_name') companyName = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'footer_text') footerText = (s as any).setting_value || ''
+    }
+  } catch (e) {
+    // テーブルがない場合はデフォルト値を使用
+  }
+  
+  // Markdownを簡易的にHTMLに変換
+  const markdownToHtml = (text: string) => {
+    if (!text) return '<p class="text-gray-500">プライバシーポリシーが設定されていません。</p>'
+    return text
+      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-6 mb-3 text-gray-800">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-gray-800">$1</h1>')
+      .replace(/^- (.+)$/gm, '<li class="ml-4 text-gray-700">$1</li>')
+      .replace(/\n\n/g, '</p><p class="text-gray-700 mb-4">')
+      .replace(/\n/g, '<br>')
+  }
+  
+  const contentHtml = markdownToHtml(privacyPolicy)
+  
   return c.html(`
     <!DOCTYPE html>
     <html lang="ja">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>プライバシーポリシー - 助成金申請管理システム</title>
+        <title>プライバシーポリシー - ${companyName || '助成金申請管理システム'}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
     <body class="bg-gray-50">
-        <div class="min-h-screen">
+        <div class="min-h-screen flex flex-col">
             <header class="bg-blue-600 text-white shadow-lg">
                 <div class="container mx-auto px-4 py-4">
                     <h1 class="text-2xl font-bold">
                         <i class="fas fa-shield-alt mr-2"></i>
                         プライバシーポリシー
                     </h1>
+                    ${companyName ? `<p class="text-blue-100 text-sm mt-1">${companyName}</p>` : ''}
                 </div>
             </header>
             
-            <div class="container mx-auto px-4 py-8 max-w-4xl">
+            <div class="container mx-auto px-4 py-8 max-w-4xl flex-1">
                 <div class="bg-white rounded-lg shadow p-6 md:p-8 prose max-w-none">
-                    <p class="text-gray-600 mb-6">最終更新日: 2024年1月1日</p>
-                    
-                    <section class="mb-8">
-                        <h2 class="text-xl font-bold mb-4 text-gray-800">1. 個人情報の収集について</h2>
-                        <p class="text-gray-700 mb-4">
-                            当社は、補助金・助成金申請支援サービスの提供にあたり、以下の個人情報を収集させていただく場合があります。
-                        </p>
-                        <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
-                            <li>氏名、会社名、住所</li>
-                            <li>電話番号、メールアドレス</li>
-                            <li>財務情報（決算書、確定申告書等に記載の情報）</li>
-                            <li>登記情報（登記簿謄本に記載の情報）</li>
-                            <li>その他、申請に必要な情報</li>
-                        </ul>
-                    </section>
-                    
-                    <section class="mb-8">
-                        <h2 class="text-xl font-bold mb-4 text-gray-800">2. 個人情報の利用目的</h2>
-                        <p class="text-gray-700 mb-4">収集した個人情報は、以下の目的で利用いたします。</p>
-                        <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
-                            <li>補助金・助成金の申請書類の作成支援</li>
-                            <li>お客様へのご連絡・ご案内</li>
-                            <li>サービス品質の向上</li>
-                            <li>法令に基づく対応</li>
-                        </ul>
-                    </section>
-                    
-                    <section class="mb-8">
-                        <h2 class="text-xl font-bold mb-4 text-gray-800">3. 個人情報の第三者提供</h2>
-                        <p class="text-gray-700">
-                            当社は、法令に基づく場合を除き、お客様の同意なく個人情報を第三者に提供することはありません。
-                            ただし、補助金・助成金申請のため、行政機関等への提出が必要な場合は、事前にお客様の同意を得た上で提供いたします。
-                        </p>
-                    </section>
-                    
-                    <section class="mb-8">
-                        <h2 class="text-xl font-bold mb-4 text-gray-800">4. 個人情報の管理</h2>
-                        <p class="text-gray-700">
-                            当社は、個人情報の漏洩、滅失、毀損を防止するため、適切なセキュリティ対策を講じます。
-                            また、従業員に対して個人情報保護に関する教育・啓発を行います。
-                        </p>
-                    </section>
-                    
-                    <section class="mb-8">
-                        <h2 class="text-xl font-bold mb-4 text-gray-800">5. お問い合わせ</h2>
-                        <p class="text-gray-700">
-                            個人情報の取り扱いに関するお問い合わせは、当社までご連絡ください。
-                        </p>
-                    </section>
+                    ${contentHtml}
                 </div>
                 
                 <div class="mt-6 text-center">
@@ -14645,6 +14727,12 @@ app.get('/privacy-policy', (c) => {
                     </a>
                 </div>
             </div>
+            
+            <footer class="bg-gray-100 border-t py-4 mt-8">
+                <div class="container mx-auto px-4 text-center text-sm text-gray-600">
+                    ${footerText || ''}
+                </div>
+            </footer>
         </div>
     </body>
     </html>
@@ -14655,86 +14743,67 @@ app.get('/privacy-policy', (c) => {
 // 特定商取引法に基づく表記
 // ===============================
 
-app.get('/legal', (c) => {
+app.get('/legal', async (c) => {
+  const { DB } = c.env
+  
+  let legalNotice = ''
+  let companyName = ''
+  let footerText = ''
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key IN ('legal_notice', 'company_name', 'footer_text')
+    `).all()
+    
+    for (const s of (settings.results || [])) {
+      if ((s as any).setting_key === 'legal_notice') legalNotice = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'company_name') companyName = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'footer_text') footerText = (s as any).setting_value || ''
+    }
+  } catch (e) {
+    // テーブルがない場合はデフォルト値を使用
+  }
+  
+  // Markdownを簡易的にHTMLに変換
+  const markdownToHtml = (text: string) => {
+    if (!text) return '<p class="text-gray-500">特定商取引法に基づく表記が設定されていません。</p>'
+    return text
+      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-6 mb-3 text-gray-800">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-gray-800">$1</h1>')
+      .replace(/^- (.+)$/gm, '<li class="ml-4 text-gray-700">$1</li>')
+      .replace(/\n\n/g, '</p><p class="text-gray-700 mb-4">')
+      .replace(/\n/g, '<br>')
+  }
+  
+  const contentHtml = markdownToHtml(legalNotice)
+  
   return c.html(`
     <!DOCTYPE html>
     <html lang="ja">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>特定商取引法に基づく表記 - 助成金申請管理システム</title>
+        <title>特定商取引法に基づく表記 - ${companyName || '助成金申請管理システム'}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
     <body class="bg-gray-50">
-        <div class="min-h-screen">
+        <div class="min-h-screen flex flex-col">
             <header class="bg-blue-600 text-white shadow-lg">
                 <div class="container mx-auto px-4 py-4">
                     <h1 class="text-2xl font-bold">
                         <i class="fas fa-balance-scale mr-2"></i>
                         特定商取引法に基づく表記
                     </h1>
+                    ${companyName ? `<p class="text-blue-100 text-sm mt-1">${companyName}</p>` : ''}
                 </div>
             </header>
             
-            <div class="container mx-auto px-4 py-8 max-w-4xl">
-                <div class="bg-white rounded-lg shadow p-6 md:p-8">
-                    <table class="w-full">
-                        <tbody class="divide-y">
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700 w-1/3">販売業者</td>
-                                <td class="py-4 text-gray-600">株式会社〇〇〇〇</td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">代表者名</td>
-                                <td class="py-4 text-gray-600">代表取締役 〇〇 〇〇</td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">所在地</td>
-                                <td class="py-4 text-gray-600">〒000-0000 東京都〇〇区〇〇 0-0-0</td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">電話番号</td>
-                                <td class="py-4 text-gray-600">03-0000-0000</td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">メールアドレス</td>
-                                <td class="py-4 text-gray-600">info@example.com</td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">サービス料金</td>
-                                <td class="py-4 text-gray-600">
-                                    各サービスページに表示される価格に準じます。<br>
-                                    表示価格は税込価格です。
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">支払方法</td>
-                                <td class="py-4 text-gray-600">
-                                    クレジットカード決済<br>
-                                    銀行振込
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">支払時期</td>
-                                <td class="py-4 text-gray-600">
-                                    クレジットカード: 即時決済<br>
-                                    銀行振込: 請求書発行後14日以内
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">サービス提供時期</td>
-                                <td class="py-4 text-gray-600">お申込み確認後、速やかにサービスを開始します。</td>
-                            </tr>
-                            <tr>
-                                <td class="py-4 pr-4 font-medium text-gray-700">キャンセル・返金</td>
-                                <td class="py-4 text-gray-600">
-                                    サービス開始前のキャンセル: 手付金を除き返金いたします。<br>
-                                    サービス開始後のキャンセル: 進捗状況に応じて精算いたします。
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div class="container mx-auto px-4 py-8 max-w-4xl flex-1">
+                <div class="bg-white rounded-lg shadow p-6 md:p-8 prose max-w-none">
+                    ${contentHtml}
                 </div>
                 
                 <div class="mt-6 text-center">
@@ -14743,6 +14812,12 @@ app.get('/legal', (c) => {
                     </a>
                 </div>
             </div>
+            
+            <footer class="bg-gray-100 border-t py-4 mt-8">
+                <div class="container mx-auto px-4 text-center text-sm text-gray-600">
+                    ${footerText || ''}
+                </div>
+            </footer>
         </div>
     </body>
     </html>
@@ -15178,6 +15253,87 @@ app.get('/admin/settings', async (c) => {
                 </div>
             </div>
             
+            <!-- 法務設定 -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="p-4 border-b bg-gradient-to-r from-indigo-50 to-purple-50">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fas fa-gavel text-indigo-600"></i>
+                        法務設定
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">プライバシーポリシー・特定商取引法に基づく表記を設定します（Markdown対応）</p>
+                </div>
+                <div class="p-4 space-y-6">
+                    <!-- 代表者・登録番号 -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">代表者名</label>
+                            <input type="text" id="company_representative" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 代表 山田太郎">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">登録番号等</label>
+                            <input type="text" id="company_registration" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 行政書士登録番号: 第00000号">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                        <input type="email" id="company_email" class="w-full px-3 py-2 border rounded-lg" placeholder="例: info@example.com">
+                    </div>
+                    
+                    <!-- プライバシーポリシー -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-shield-alt text-green-600 mr-1"></i>プライバシーポリシー
+                        </label>
+                        <p class="text-xs text-gray-500 mb-2">顧客ポータルに表示されます。Markdown記法が使えます。</p>
+                        <textarea id="privacy_policy" rows="12" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## プライバシーポリシー&#10;&#10;### 1. 個人情報の取得&#10;..."></textarea>
+                        <button type="button" onclick="previewPrivacyPolicy()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-eye mr-1"></i>プレビュー
+                        </button>
+                    </div>
+                    
+                    <!-- 特定商取引法に基づく表記 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-file-contract text-orange-600 mr-1"></i>特定商取引法に基づく表記
+                        </label>
+                        <p class="text-xs text-gray-500 mb-2">顧客ポータルに表示されます。Markdown記法が使えます。</p>
+                        <textarea id="legal_notice" rows="12" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## 特定商取引法に基づく表記&#10;&#10;### 事業者名&#10;..."></textarea>
+                        <button type="button" onclick="previewLegalNotice()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-eye mr-1"></i>プレビュー
+                        </button>
+                    </div>
+                    
+                    <!-- 利用規約 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-scroll text-purple-600 mr-1"></i>利用規約
+                        </label>
+                        <p class="text-xs text-gray-500 mb-2">サービス利用規約。Markdown記法が使えます。</p>
+                        <textarea id="terms_of_service" rows="10" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## 利用規約&#10;&#10;### 第1条（適用）&#10;..."></textarea>
+                    </div>
+                    
+                    <!-- フッター -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">フッターテキスト</label>
+                        <input type="text" id="footer_text" class="w-full px-3 py-2 border rounded-lg" placeholder="例: © 2024 株式会社サンプル All Rights Reserved.">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- プレビューモーダル -->
+            <div id="previewModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg max-w-3xl w-full max-h-[80vh] overflow-hidden">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 id="previewTitle" class="text-lg font-bold">プレビュー</h3>
+                        <button onclick="closePreview()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <div id="previewContent" class="p-6 overflow-y-auto max-h-[60vh] prose prose-sm max-w-none">
+                    </div>
+                </div>
+            </div>
+            
             <!-- 保存ボタン -->
             <div class="flex justify-end gap-3">
                 <a href="/" class="px-6 py-2 border rounded-lg hover:bg-gray-50">キャンセル</a>
@@ -15197,21 +15353,44 @@ app.get('/admin/settings', async (c) => {
             
             axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
             
+            // 設定値を取得するヘルパー
+            function getSettingValue(settings, key) {
+                if (settings[key]) {
+                    return settings[key].value || settings[key] || '';
+                }
+                return '';
+            }
+            
             // 設定を読み込み
             async function loadSettings() {
                 try {
                     const response = await axios.get('/api/settings');
                     const settings = response.data;
                     
-                    document.getElementById('bank_name').value = settings.bank_name || '';
-                    document.getElementById('bank_branch').value = settings.bank_branch || '';
-                    document.getElementById('bank_account_type').value = settings.bank_account_type || '普通';
-                    document.getElementById('bank_account_number').value = settings.bank_account_number || '';
-                    document.getElementById('bank_account_holder').value = settings.bank_account_holder || '';
-                    document.getElementById('company_name').value = settings.company_name || '';
-                    document.getElementById('company_address').value = settings.company_address || '';
-                    document.getElementById('company_phone').value = settings.company_phone || '';
-                    document.getElementById('stripe_enabled').checked = settings.stripe_enabled === true;
+                    // 銀行情報
+                    document.getElementById('bank_name').value = getSettingValue(settings, 'bank_name');
+                    document.getElementById('bank_branch').value = getSettingValue(settings, 'bank_branch');
+                    document.getElementById('bank_account_type').value = getSettingValue(settings, 'bank_account_type') || '普通';
+                    document.getElementById('bank_account_number').value = getSettingValue(settings, 'bank_account_number');
+                    document.getElementById('bank_account_holder').value = getSettingValue(settings, 'bank_account_holder');
+                    
+                    // 会社情報
+                    document.getElementById('company_name').value = getSettingValue(settings, 'company_name');
+                    document.getElementById('company_address').value = getSettingValue(settings, 'company_address');
+                    document.getElementById('company_phone').value = getSettingValue(settings, 'company_phone');
+                    document.getElementById('company_email').value = getSettingValue(settings, 'company_email');
+                    document.getElementById('company_representative').value = getSettingValue(settings, 'company_representative');
+                    document.getElementById('company_registration').value = getSettingValue(settings, 'company_registration');
+                    
+                    // 法務設定
+                    document.getElementById('privacy_policy').value = getSettingValue(settings, 'privacy_policy');
+                    document.getElementById('legal_notice').value = getSettingValue(settings, 'legal_notice');
+                    document.getElementById('terms_of_service').value = getSettingValue(settings, 'terms_of_service');
+                    document.getElementById('footer_text').value = getSettingValue(settings, 'footer_text');
+                    
+                    // Stripe
+                    const stripeEnabled = getSettingValue(settings, 'stripe_enabled');
+                    document.getElementById('stripe_enabled').checked = stripeEnabled === 'true' || stripeEnabled === true;
                 } catch (error) {
                     console.error('Error loading settings:', error);
                 }
@@ -15221,14 +15400,25 @@ app.get('/admin/settings', async (c) => {
             async function saveSettings() {
                 try {
                     const settings = {
+                        // 銀行情報
                         bank_name: document.getElementById('bank_name').value,
                         bank_branch: document.getElementById('bank_branch').value,
                         bank_account_type: document.getElementById('bank_account_type').value,
                         bank_account_number: document.getElementById('bank_account_number').value,
                         bank_account_holder: document.getElementById('bank_account_holder').value,
+                        // 会社情報
                         company_name: document.getElementById('company_name').value,
                         company_address: document.getElementById('company_address').value,
                         company_phone: document.getElementById('company_phone').value,
+                        company_email: document.getElementById('company_email').value,
+                        company_representative: document.getElementById('company_representative').value,
+                        company_registration: document.getElementById('company_registration').value,
+                        // 法務設定
+                        privacy_policy: document.getElementById('privacy_policy').value,
+                        legal_notice: document.getElementById('legal_notice').value,
+                        terms_of_service: document.getElementById('terms_of_service').value,
+                        footer_text: document.getElementById('footer_text').value,
+                        // Stripe
                         stripe_enabled: document.getElementById('stripe_enabled').checked ? 'true' : 'false'
                     };
                     
@@ -15238,6 +15428,38 @@ app.get('/admin/settings', async (c) => {
                     console.error('Error saving settings:', error);
                     alert('設定の保存に失敗しました');
                 }
+            }
+            
+            // Markdownを簡易的にHTMLに変換
+            function simpleMarkdown(text) {
+                if (!text) return '';
+                return text
+                    .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
+                    .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-6 mb-3">$1</h2>')
+                    .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-6 mb-4">$1</h1>')
+                    .replace(/^- (.+)$/gm, '<li class="ml-4">$1</li>')
+                    .replace(/\\n/g, '<br>');
+            }
+            
+            // プライバシーポリシーのプレビュー
+            function previewPrivacyPolicy() {
+                const content = document.getElementById('privacy_policy').value;
+                document.getElementById('previewTitle').textContent = 'プライバシーポリシー プレビュー';
+                document.getElementById('previewContent').innerHTML = simpleMarkdown(content);
+                document.getElementById('previewModal').classList.remove('hidden');
+            }
+            
+            // 特商法のプレビュー
+            function previewLegalNotice() {
+                const content = document.getElementById('legal_notice').value;
+                document.getElementById('previewTitle').textContent = '特定商取引法に基づく表記 プレビュー';
+                document.getElementById('previewContent').innerHTML = simpleMarkdown(content);
+                document.getElementById('previewModal').classList.remove('hidden');
+            }
+            
+            // プレビューを閉じる
+            function closePreview() {
+                document.getElementById('previewModal').classList.add('hidden');
             }
             
             loadSettings();
