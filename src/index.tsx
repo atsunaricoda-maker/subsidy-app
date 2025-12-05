@@ -124,8 +124,31 @@ async function getCurrentUser(c: any) {
   if (!authHeader) return null
   
   try {
-    // Authorization: Bearer username:role の形式
-    const [username, role] = authHeader.replace('Bearer ', '').split(':')
+    const token = authHeader.replace('Bearer ', '')
+    // トークンはBase64エンコードされている: id:timestamp (例: MToxNzY0OTQ4NDYwOTY3 -> 1:1764948460967)
+    let decoded = token
+    try {
+      decoded = atob(token)
+    } catch {
+      // Base64デコード失敗時はそのまま使用
+    }
+    
+    const parts = decoded.split(':')
+    if (parts.length === 2) {
+      const userId = parseInt(parts[0])
+      if (!isNaN(userId)) {
+        // DBからユーザー情報を取得
+        const { DB } = c.env
+        const user = await DB.prepare(`
+          SELECT id, username, name, 'admin' as role FROM admin_users WHERE id = ?
+        `).bind(userId).first()
+        if (user) {
+          return user
+        }
+      }
+    }
+    // 古い形式のフォールバック: username:role
+    const [username, role] = decoded.split(':')
     return { username, role: role || 'staff' }
   } catch {
     return null
@@ -247,65 +270,183 @@ app.get('/', (c) => {
         <title>助成金申請管理システム - 管理者</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            .sidebar-link { transition: all 0.2s; }
+            .sidebar-link:hover { background-color: rgba(255,255,255,0.1); }
+            .sidebar-link.active { background-color: rgba(255,255,255,0.2); border-left: 3px solid white; }
+        </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <!-- ヘッダー -->
-            <header class="bg-blue-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <h1 class="text-lg md:text-2xl font-bold">
-                            <i class="fas fa-file-invoice-dollar mr-1 md:mr-2"></i>
-                            <span class="hidden sm:inline">助成金申請管理システム</span>
-                            <span class="sm:hidden">助成金管理</span>
-                        </h1>
-                        <div class="flex items-center gap-2 md:gap-4 text-xs md:text-sm">
-                            <span id="adminName" class="hidden sm:inline">
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            <!-- 左サイドバー -->
+            <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50">
+                <div class="p-4 border-b border-blue-700">
+                    <h1 class="text-xl font-bold flex items-center gap-2">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>助成金管理</span>
+                    </h1>
+                    <p class="text-xs text-blue-300 mt-1">Subsidy Manager</p>
+                </div>
+                
+                <nav class="p-4 space-y-1">
+                    <a href="/" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-home w-5"></i>
+                        <span>ダッシュボード</span>
+                    </a>
+                    
+                    <div class="pt-4 pb-2">
+                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">顧客管理</p>
+                    </div>
+                    <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-users w-5"></i>
+                        <span>顧客一覧</span>
+                    </a>
+                    <a href="#" onclick="openNewClientModal(); return false;" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-user-plus w-5"></i>
+                        <span>新規顧客登録</span>
+                    </a>
+                    
+                    <div class="pt-4 pb-2">
+                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
+                    </div>
+                    <a href="/subsidy-types" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-building w-5"></i>
+                        <span>補助金一覧</span>
+                        <span class="ml-auto text-xs bg-blue-700 px-2 py-0.5 rounded">行政書士</span>
+                    </a>
+                    <a href="/subsidy-types?category=employment" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-hand-holding-usd w-5"></i>
+                        <span>助成金一覧</span>
+                        <span class="ml-auto text-xs bg-green-700 px-2 py-0.5 rounded">社労士</span>
+                    </a>
+                    <a href="/admin/pipelines" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-project-diagram w-5"></i>
+                        <span>パイプライン管理</span>
+                    </a>
+                    
+                    <div class="pt-4 pb-2">
+                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">設定</p>
+                    </div>
+                    <a href="/admin/guidelines" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-book-open w-5"></i>
+                        <span>公募要領管理</span>
+                    </a>
+                    <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-users-cog w-5"></i>
+                        <span>従業員管理</span>
+                    </a>
+                    <a href="/admin/payments" id="sidebarPaymentsLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-credit-card w-5"></i>
+                        <span>支払い確認</span>
+                        <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
+                    </a>
+                    <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-cog w-5"></i>
+                        <span>システム設定</span>
+                    </a>
+                    <a href="/admin/backup" id="sidebarBackupLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-database w-5"></i>
+                        <span>バックアップ</span>
+                    </a>
+                </nav>
+                
+                <!-- ユーザー情報 -->
+                <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-blue-700 bg-blue-900">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p id="sidebarAdminName" class="text-sm font-medium truncate">管理者</p>
+                            <p class="text-xs text-blue-300">管理者モード</p>
+                        </div>
+                        <button onclick="logout()" class="text-blue-300 hover:text-white" title="ログアウト">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+            
+            <!-- サイドバーオーバーレイ（モバイル用） -->
+            <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden"></div>
+            
+            <!-- メインコンテンツ -->
+            <main class="flex-1 min-h-screen">
+                <!-- トップバー -->
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">ダッシュボード</h2>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="loadData()" class="text-gray-500 hover:text-gray-700" title="更新">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <span id="adminName" class="text-sm text-gray-600 hidden sm:inline">
                                 <i class="fas fa-user-shield mr-1"></i>
                                 管理者モード
                             </span>
-                            <button onclick="logout()" class="hover:underline">
-                                <i class="fas fa-sign-out-alt mr-1"></i>
-                                <span class="hidden sm:inline">ログアウト</span>
-                                <span class="sm:hidden">終了</span>
-                            </button>
                         </div>
                     </div>
-                </div>
-            </header>
+                </header>
+                
+                <div class="p-4 lg:p-6">
+                    <!-- ステータスカード -->
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 lg:gap-4 mb-6" id="statusCards">
+                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-yellow-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('inquiry')">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">見込み</div>
+                                    <div class="text-2xl lg:text-3xl font-bold text-yellow-500" id="count-inquiry">-</div>
+                                </div>
+                                <i class="fas fa-search text-yellow-200 text-2xl lg:text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-blue-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('consulting')">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">相談中</div>
+                                    <div class="text-2xl lg:text-3xl font-bold text-blue-500" id="count-consulting">-</div>
+                                </div>
+                                <i class="fas fa-comments text-blue-200 text-2xl lg:text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('preparing')">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">書類準備</div>
+                                    <div class="text-2xl lg:text-3xl font-bold text-orange-500" id="count-preparing">-</div>
+                                </div>
+                                <i class="fas fa-folder-open text-orange-200 text-2xl lg:text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-purple-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('applying')">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">申請中</div>
+                                    <div class="text-2xl lg:text-3xl font-bold text-purple-500" id="count-applying">-</div>
+                                </div>
+                                <i class="fas fa-paper-plane text-purple-200 text-2xl lg:text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('completed')">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">完了</div>
+                                    <div class="text-2xl lg:text-3xl font-bold text-green-500" id="count-completed">-</div>
+                                </div>
+                                <i class="fas fa-check-circle text-green-200 text-2xl lg:text-3xl"></i>
+                            </div>
+                        </div>
+                    </div>
 
-            <!-- メインコンテンツ -->
-            <div class="container mx-auto px-4 py-8">
-                <!-- ステータスカード -->
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8" id="statusCards">
-                    <div class="bg-white p-6 rounded-lg shadow">
-                        <div class="text-gray-500 text-sm mb-2">見込み</div>
-                        <div class="text-3xl font-bold text-yellow-500" id="count-inquiry">-</div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow">
-                        <div class="text-gray-500 text-sm mb-2">相談中</div>
-                        <div class="text-3xl font-bold text-blue-500" id="count-consulting">-</div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow">
-                        <div class="text-gray-500 text-sm mb-2">書類準備中</div>
-                        <div class="text-3xl font-bold text-orange-500" id="count-preparing">-</div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow">
-                        <div class="text-gray-500 text-sm mb-2">申請中</div>
-                        <div class="text-3xl font-bold text-purple-500" id="count-applying">-</div>
-                    </div>
-                    <div class="bg-white p-6 rounded-lg shadow">
-                        <div class="text-gray-500 text-sm mb-2">完了</div>
-                        <div class="text-3xl font-bold text-green-500" id="count-completed">-</div>
-                    </div>
-                </div>
-
-                <!-- フィルターと新規登録 -->
-                <div class="bg-white rounded-lg shadow p-4 mb-6">
-                    <div class="space-y-3">
-                        <!-- 検索・フィルター -->
-                        <div class="flex flex-col sm:flex-row gap-2">
-                            <select id="filterStatus" class="px-4 py-3 border rounded-lg text-base">
+                    <!-- 検索・フィルター -->
+                    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <select id="filterStatus" class="px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                 <option value="">全ステータス</option>
                                 <option value="inquiry">見込み</option>
                                 <option value="consulting">相談中</option>
@@ -313,112 +454,124 @@ app.get('/', (c) => {
                                 <option value="applying">申請中</option>
                                 <option value="completed">完了</option>
                             </select>
-                            <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索" 
-                                   class="flex-1 px-4 py-3 border rounded-lg text-base">
-                        </div>
-                        <!-- アクションボタン -->
-                        <div id="actionButtons" class="grid grid-cols-2 md:grid-cols-5 gap-2">
-                            <a href="/subsidy-types" 
-                               class="bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 text-center text-sm md:text-base">
-                                <i class="fas fa-file-contract mr-1"></i>
-                                <span class="hidden sm:inline">助成金種別管理</span>
-                                <span class="sm:hidden">助成金管理</span>
-                            </a>
-                            <a href="/admin/guidelines" 
-                               class="bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 text-center text-sm md:text-base">
-                                <i class="fas fa-book-open mr-1"></i>
-                                <span class="hidden sm:inline">公募要領管理</span>
-                                <span class="sm:hidden">公募要領</span>
-                            </a>
-                            <a href="/admin/users" id="employeeManagementBtn"
-                               class="hidden bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 text-center text-sm md:text-base">
-                                <i class="fas fa-users-cog mr-1"></i>
-                                <span class="hidden sm:inline">従業員管理</span>
-                                <span class="sm:hidden">従業員</span>
-                            </a>
-                            <a href="/admin/backup" id="backupManagementBtn"
-                               class="hidden bg-amber-600 text-white px-4 py-3 rounded-lg hover:bg-amber-700 text-center text-sm md:text-base">
-                                <i class="fas fa-database mr-1"></i>
-                                <span class="hidden sm:inline">バックアップ</span>
-                                <span class="sm:hidden">バックアップ</span>
-                            </a>
+                            <div class="flex-1 relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
+                                       class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
                             <button onclick="openNewClientModal()" 
-                                    class="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 text-sm md:text-base">
-                                <i class="fas fa-plus mr-1"></i>
-                                <span class="hidden sm:inline">新規顧客登録</span>
-                                <span class="sm:hidden">新規登録</span>
+                                    class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 text-sm font-medium whitespace-nowrap">
+                                <i class="fas fa-plus mr-2"></i>新規登録
                             </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- 統計・レポート -->
-                <div class="bg-white rounded-lg shadow p-6 mb-6">
-                    <h2 class="text-xl font-bold mb-4">
-                        <i class="fas fa-chart-bar mr-2"></i>統計情報
-                    </h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="border rounded-lg p-4">
-                            <div class="text-sm text-gray-500 mb-1">総顧客数</div>
-                            <div class="text-2xl font-bold" id="stat-total">-</div>
-                        </div>
-                        <div class="border rounded-lg p-4">
-                            <div class="text-sm text-gray-500 mb-1">今月の新規顧客</div>
-                            <div class="text-2xl font-bold text-blue-600" id="stat-new-month">-</div>
-                        </div>
-                        <div class="border rounded-lg p-4">
-                            <div class="text-sm text-gray-500 mb-1">今月の完了件数</div>
-                            <div class="text-2xl font-bold text-green-600" id="stat-completed-month">-</div>
-                        </div>
-                    </div>
-                </div>
+                    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        <!-- 左側：顧客一覧 -->
+                        <div class="xl:col-span-2">
+                            <!-- 申請期限アラート -->
+                            <div id="deadlineAlertSection" class="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl shadow-sm p-4 mb-6 hidden border border-red-100">
+                                <h2 class="text-base font-bold mb-3 text-red-600 flex items-center gap-2">
+                                    <i class="fas fa-exclamation-triangle"></i>申請期限が近い案件
+                                </h2>
+                                <div id="deadlineAlertList" class="space-y-2"></div>
+                            </div>
 
-                <!-- 申請期限アラート -->
-                <div id="deadlineAlertSection" class="bg-white rounded-lg shadow p-6 mb-6 hidden">
-                    <h2 class="text-xl font-bold mb-4 text-red-600">
-                        <i class="fas fa-exclamation-triangle mr-2"></i>申請期限が近い案件
-                    </h2>
-                    <div id="deadlineAlertList" class="space-y-3">
-                        <!-- 期限が近い案件がここに表示される -->
-                    </div>
-                </div>
-
-                <!-- 顧客一覧 -->
-                <div class="bg-white rounded-lg shadow">
-                    <div class="p-6">
-                        <h2 class="text-xl font-bold mb-4">顧客一覧</h2>
-                        <div id="clientsList">
-                            <div class="text-center py-8 text-gray-500">
-                                <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
-                                <div>読み込み中...</div>
+                            <!-- 顧客一覧 -->
+                            <div class="bg-white rounded-xl shadow-sm">
+                                <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                                    <h2 class="text-base font-bold text-gray-800">顧客一覧</h2>
+                                    <span id="clientCount" class="text-sm text-gray-500">-件</span>
+                                </div>
+                                <div id="clientsList" class="divide-y divide-gray-100">
+                                    <div class="text-center py-12 text-gray-500">
+                                        <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                                        <div>読み込み中...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 右側：統計・お知らせ -->
+                        <div class="space-y-6">
+                            <!-- 統計情報 -->
+                            <div class="bg-white rounded-xl shadow-sm p-4">
+                                <h2 class="text-base font-bold mb-4 flex items-center gap-2">
+                                    <i class="fas fa-chart-bar text-blue-600"></i>統計情報
+                                </h2>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <span class="text-sm text-gray-600">総顧客数</span>
+                                        <span class="text-xl font-bold" id="stat-total">-</span>
+                                    </div>
+                                    <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                                        <span class="text-sm text-blue-600">今月の新規</span>
+                                        <span class="text-xl font-bold text-blue-600" id="stat-new-month">-</span>
+                                    </div>
+                                    <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                                        <span class="text-sm text-green-600">今月の完了</span>
+                                        <span class="text-xl font-bold text-green-600" id="stat-completed-month">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 最近の活動 -->
+                            <div class="bg-white rounded-xl shadow-sm p-4">
+                                <h2 class="text-base font-bold mb-4 flex items-center gap-2">
+                                    <i class="fas fa-history text-purple-600"></i>最近の活動
+                                </h2>
+                                <div id="recentActivity" class="space-y-3 text-sm">
+                                    <div class="text-gray-500 text-center py-4">読み込み中...</div>
+                                </div>
+                            </div>
+                            
+                            <!-- クイックアクション -->
+                            <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl shadow-sm p-4 text-white">
+                                <h2 class="text-base font-bold mb-3 flex items-center gap-2">
+                                    <i class="fas fa-bolt"></i>クイックアクション
+                                </h2>
+                                <div class="space-y-2">
+                                    <button onclick="openNewClientModal()" class="w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm text-left flex items-center gap-2">
+                                        <i class="fas fa-user-plus w-5"></i>新規顧客登録
+                                    </button>
+                                    <a href="/subsidy-types" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                                        <i class="fas fa-list w-5"></i>補助金・助成金一覧
+                                    </a>
+                                    <a href="/admin/guidelines" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                                        <i class="fas fa-book w-5"></i>公募要領を確認
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
 
         <!-- 新規顧客登録モーダル -->
         <div id="newClientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-lg p-4 md:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="bg-white rounded-lg p-4 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <h3 class="text-xl font-bold mb-4">新規顧客登録</h3>
                 <form id="newClientForm" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-1">顧客名 *</label>
-                        <input type="text" name="name" required class="w-full px-3 py-2 border rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">顧客名 *</label>
+                            <input type="text" name="name" required class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">会社名</label>
+                            <input type="text" name="company_name" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">メールアドレス</label>
+                            <input type="email" name="email" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">電話番号</label>
+                            <input type="tel" name="phone" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">会社名</label>
-                        <input type="text" name="company_name" class="w-full px-3 py-2 border rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">メールアドレス</label>
-                        <input type="email" name="email" class="w-full px-3 py-2 border rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">電話番号</label>
-                        <input type="tel" name="phone" class="w-full px-3 py-2 border rounded-lg">
-                    </div>
+                    
                     <div>
                         <label class="block text-sm font-medium mb-1">申請する助成金 *</label>
                         <div class="relative">
@@ -435,16 +588,55 @@ app.get('/', (c) => {
                             </div>
                         </div>
                     </div>
+                    
                     <div>
                         <label class="block text-sm font-medium mb-1">担当者</label>
                         <select name="assigned_to" id="newClientAssignedTo" class="w-full px-3 py-2 border rounded-lg">
                             <option value="">未割り当て</option>
                         </select>
                     </div>
+                    
+                    <!-- 契約・支払い設定 -->
+                    <div class="border rounded-lg p-4 bg-gray-50 space-y-4">
+                        <h4 class="font-medium text-sm text-gray-700 flex items-center gap-2">
+                            <i class="fas fa-file-contract text-blue-600"></i>契約・支払い設定
+                        </h4>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="flex items-center gap-2 mb-2">
+                                    <input type="checkbox" name="deposit_required" id="depositRequired" class="rounded text-blue-600" onchange="toggleDepositFields()">
+                                    <span class="text-sm font-medium">手付金が必要</span>
+                                </label>
+                                <div id="depositFields" class="hidden space-y-2">
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">手付金額（円）</label>
+                                        <input type="number" name="deposit_amount" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 50000">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-2 mb-2">
+                                    <input type="checkbox" name="withholding_tax" class="rounded text-blue-600">
+                                    <span class="text-sm font-medium">源泉徴収あり</span>
+                                </label>
+                                <p class="text-xs text-gray-500">報酬から源泉徴収を行う場合</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">電子契約URL</label>
+                            <input type="url" name="contract_url" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="https://...">
+                            <p class="text-xs text-gray-500 mt-1">CloudSign、freeeサインなどの電子契約URL</p>
+                        </div>
+                    </div>
+                    
                     <div>
                         <label class="block text-sm font-medium mb-1">メモ</label>
-                        <textarea name="notes" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                        <textarea name="notes" rows="2" class="w-full px-3 py-2 border rounded-lg"></textarea>
                     </div>
+                    
                     <div class="flex gap-2 pt-4">
                         <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 text-base">
                             登録
@@ -460,6 +652,31 @@ app.get('/', (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+            // サイドバートグル
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                sidebar.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
+            
+            // 手付金フィールドのトグル
+            function toggleDepositFields() {
+                const checkbox = document.getElementById('depositRequired');
+                const fields = document.getElementById('depositFields');
+                if (checkbox.checked) {
+                    fields.classList.remove('hidden');
+                } else {
+                    fields.classList.add('hidden');
+                }
+            }
+            
+            // ステータスでフィルター
+            function filterByStatus(status) {
+                document.getElementById('filterStatus').value = status;
+                filterClients();
+            }
+            
             // 認証チェック
             function checkAuth() {
                 const token = localStorage.getItem('admin_token');
@@ -475,6 +692,8 @@ app.get('/', (c) => {
                         <i class="fas fa-user-shield mr-1"></i>
                         \${adminName}
                     \`;
+                    const sidebarName = document.getElementById('sidebarAdminName');
+                    if (sidebarName) sidebarName.textContent = adminName;
                 }
                 
                 return true;
@@ -493,23 +712,41 @@ app.get('/', (c) => {
                 // リダイレクト処理は checkAuth 内で実行
             }
             
-            // adminロールのみ従業員管理・バックアップボタン表示
+            // adminロールのみ従業員管理・バックアップ・支払い・設定リンク表示
             const adminRole = localStorage.getItem('admin_role');
             if (adminRole === 'admin') {
-                const employeeBtn = document.getElementById('employeeManagementBtn');
-                const backupBtn = document.getElementById('backupManagementBtn');
-                if (employeeBtn) {
-                    employeeBtn.classList.remove('hidden');
+                const employeeLink = document.getElementById('sidebarEmployeeLink');
+                const backupLink = document.getElementById('sidebarBackupLink');
+                const paymentsLink = document.getElementById('sidebarPaymentsLink');
+                const settingsLink = document.getElementById('sidebarSettingsLink');
+                if (employeeLink) {
+                    employeeLink.classList.remove('hidden');
                 }
-                if (backupBtn) {
-                    backupBtn.classList.remove('hidden');
+                if (backupLink) {
+                    backupLink.classList.remove('hidden');
                 }
-            } else {
-                // staffの場合はボタンを3列にする
-                const actionButtons = document.getElementById('actionButtons');
-                if (actionButtons) {
-                    actionButtons.classList.remove('md:grid-cols-5');
-                    actionButtons.classList.add('md:grid-cols-3');
+                if (paymentsLink) {
+                    paymentsLink.classList.remove('hidden');
+                    // 支払い待ち件数を取得
+                    loadPendingPaymentsCount();
+                }
+                if (settingsLink) {
+                    settingsLink.classList.remove('hidden');
+                }
+            }
+            
+            // 支払い待ち件数を取得
+            async function loadPendingPaymentsCount() {
+                try {
+                    const response = await axios.get('/api/payments/pending');
+                    const count = response.data.length;
+                    const badge = document.getElementById('pendingPaymentsBadge');
+                    if (badge && count > 0) {
+                        badge.textContent = count;
+                        badge.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error loading pending payments count:', error);
                 }
             }
         
@@ -547,11 +784,73 @@ app.get('/', (c) => {
                     updateStatistics();
                     renderClients(allClients);
                     renderDeadlineAlerts(allClients);
+                    loadRecentActivity();
                 } catch (error) {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
                         '<div class="text-center py-8 text-red-500">データの読み込みに失敗しました</div>';
                 }
+            }
+            
+            // 最近の活動を読み込む
+            async function loadRecentActivity() {
+                try {
+                    const response = await axios.get('/api/recent-activity');
+                    const activities = response.data;
+                    
+                    const container = document.getElementById('recentActivity');
+                    
+                    if (!activities || activities.length === 0) {
+                        container.innerHTML = '<div class="text-gray-500 text-center py-4">最近の活動はありません</div>';
+                        return;
+                    }
+                    
+                    const activityIcons = {
+                        'new_client': { icon: 'fa-user-plus', color: 'text-green-500', bg: 'bg-green-100' },
+                        'document_upload': { icon: 'fa-upload', color: 'text-blue-500', bg: 'bg-blue-100' },
+                        'status_change': { icon: 'fa-exchange-alt', color: 'text-purple-500', bg: 'bg-purple-100' },
+                        'communication': { icon: 'fa-comment', color: 'text-yellow-500', bg: 'bg-yellow-100' },
+                        'document_approved': { icon: 'fa-check-circle', color: 'text-green-500', bg: 'bg-green-100' },
+                        'document_rejected': { icon: 'fa-times-circle', color: 'text-red-500', bg: 'bg-red-100' }
+                    };
+                    
+                    container.innerHTML = activities.slice(0, 10).map(activity => {
+                        const actStyle = activityIcons[activity.type] || { icon: 'fa-circle', color: 'text-gray-500', bg: 'bg-gray-100' };
+                        const timeAgo = formatTimeAgo(activity.created_at);
+                        
+                        return \`
+                            <div class="flex items-start gap-3 p-2 rounded hover:bg-gray-50 transition">
+                                <div class="w-8 h-8 rounded-full \${actStyle.bg} flex items-center justify-center flex-shrink-0">
+                                    <i class="fas \${actStyle.icon} \${actStyle.color} text-xs"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-gray-700 leading-tight">\${activity.description}</p>
+                                    <p class="text-xs text-gray-400 mt-0.5">\${timeAgo}</p>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading recent activity:', error);
+                    document.getElementById('recentActivity').innerHTML = 
+                        '<div class="text-gray-500 text-center py-4">読み込みエラー</div>';
+                }
+            }
+            
+            // 時間の相対表示
+            function formatTimeAgo(dateStr) {
+                const date = new Date(dateStr);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMins / 60);
+                const diffDays = Math.floor(diffHours / 24);
+                
+                if (diffMins < 1) return 'たった今';
+                if (diffMins < 60) return diffMins + '分前';
+                if (diffHours < 24) return diffHours + '時間前';
+                if (diffDays < 7) return diffDays + '日前';
+                return date.toLocaleDateString('ja-JP');
             }
             
             // 申請期限アラート表示
@@ -962,6 +1261,15 @@ app.get('/', (c) => {
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData);
                 
+                // チェックボックスの値を変換
+                data.deposit_required = document.getElementById('depositRequired')?.checked ? 1 : 0;
+                data.withholding_tax = document.getElementById('withholdingTax')?.checked ? 1 : 0;
+                
+                // 数値フィールドを変換
+                if (data.deposit_amount) {
+                    data.deposit_amount = parseInt(data.deposit_amount) || 0;
+                }
+                
                 try {
                     await axios.post('/api/clients', data);
                     closeNewClientModal();
@@ -985,6 +1293,76 @@ app.get('/', (c) => {
 // ===============================
 // API: 顧客管理
 // ===============================
+
+// 最近の活動を取得
+app.get('/api/recent-activity', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // 最近のコミュニケーション
+    const communications = await DB.prepare(`
+      SELECT 
+        comm.id,
+        'communication' as type,
+        CASE 
+          WHEN comm.sender_type = 'client' THEN '顧客 ' || cl.name || ' からメッセージ'
+          ELSE comm.sender_name || ' が ' || cl.name || ' へ返信'
+        END as description,
+        comm.created_at
+      FROM communications comm
+      JOIN clients cl ON comm.client_id = cl.id
+      ORDER BY comm.created_at DESC
+      LIMIT 5
+    `).all()
+    
+    // 最近のドキュメントアップロード
+    const documents = await DB.prepare(`
+      SELECT 
+        d.id,
+        CASE 
+          WHEN d.status = 'approved' THEN 'document_approved'
+          WHEN d.status = 'rejected' THEN 'document_rejected'
+          ELSE 'document_upload'
+        END as type,
+        CASE 
+          WHEN d.status = 'approved' THEN cl.name || ' の「' || d.document_type || '」を承認'
+          WHEN d.status = 'rejected' THEN cl.name || ' の「' || d.document_type || '」を差戻し'
+          ELSE cl.name || ' が「' || d.document_type || '」をアップロード'
+        END as description,
+        d.uploaded_at as created_at
+      FROM documents d
+      JOIN clients cl ON d.client_id = cl.id
+      ORDER BY d.uploaded_at DESC
+      LIMIT 5
+    `).all()
+    
+    // 最近登録された顧客
+    const newClients = await DB.prepare(`
+      SELECT 
+        id,
+        'new_client' as type,
+        '新規顧客「' || name || '」を登録' as description,
+        created_at
+      FROM clients
+      ORDER BY created_at DESC
+      LIMIT 5
+    `).all()
+    
+    // 全ての活動をマージしてソート
+    const allActivities = [
+      ...(communications.results || []),
+      ...(documents.results || []),
+      ...(newClients.results || [])
+    ].sort((a: any, b: any) => {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }).slice(0, 15)
+    
+    return c.json(allActivities)
+  } catch (error: any) {
+    console.error('Error fetching recent activity:', error)
+    return c.json([])
+  }
+})
 
 // 顧客一覧取得
 app.get('/api/clients', async (c) => {
@@ -1084,8 +1462,8 @@ app.post('/api/clients', async (c) => {
   const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
   
   const result = await DB.prepare(`
-    INSERT INTO clients (name, company_name, email, phone, access_token, assigned_staff, assigned_to, notes, subsidy_type_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (name, company_name, email, phone, access_token, assigned_staff, assigned_to, notes, subsidy_type_id, deposit_required, deposit_amount, withholding_tax, contract_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
     data.company_name || null,
@@ -1095,7 +1473,11 @@ app.post('/api/clients', async (c) => {
     data.assigned_staff || null,
     data.assigned_to || null,
     data.notes || null,
-    data.subsidy_type_id || null
+    data.subsidy_type_id || null,
+    data.deposit_required ? 1 : 0,
+    data.deposit_amount || 0,
+    data.withholding_tax ? 1 : 0,
+    data.contract_url || null
   ).run()
   
   return c.json({ 
@@ -1136,6 +1518,62 @@ app.put('/api/clients/:id', async (c) => {
   ).run()
   
   return c.json({ success: true })
+})
+
+// 顧客部分更新（PATCH）
+app.patch('/api/clients/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  // 現在の顧客データを取得
+  const current = await DB.prepare('SELECT * FROM clients WHERE id = ?').bind(id).first()
+  if (!current) {
+    return c.json({ error: '顧客が見つかりません' }, 404)
+  }
+  
+  // 更新対象のフィールドのみマージ
+  const updated = {
+    name: data.name !== undefined ? data.name : current.name,
+    company_name: data.company_name !== undefined ? data.company_name : current.company_name,
+    email: data.email !== undefined ? data.email : current.email,
+    phone: data.phone !== undefined ? data.phone : current.phone,
+    status: data.status !== undefined ? data.status : current.status,
+    assigned_staff: data.assigned_staff !== undefined ? data.assigned_staff : current.assigned_staff,
+    assigned_to: data.assigned_to !== undefined ? data.assigned_to : current.assigned_to,
+    notes: data.notes !== undefined ? data.notes : current.notes,
+    subsidy_type_id: data.subsidy_type_id !== undefined ? data.subsidy_type_id : current.subsidy_type_id,
+    deposit_required: data.deposit_required !== undefined ? data.deposit_required : current.deposit_required,
+    deposit_amount: data.deposit_amount !== undefined ? data.deposit_amount : current.deposit_amount,
+    withholding_tax: data.withholding_tax !== undefined ? data.withholding_tax : current.withholding_tax,
+    contract_url: data.contract_url !== undefined ? data.contract_url : current.contract_url
+  }
+  
+  await DB.prepare(`
+    UPDATE clients 
+    SET name = ?, company_name = ?, email = ?, phone = ?, 
+        status = ?, assigned_staff = ?, assigned_to = ?, notes = ?, subsidy_type_id = ?,
+        deposit_required = ?, deposit_amount = ?, withholding_tax = ?, contract_url = ?,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    updated.name,
+    updated.company_name,
+    updated.email,
+    updated.phone,
+    updated.status,
+    updated.assigned_staff,
+    updated.assigned_to,
+    updated.notes,
+    updated.subsidy_type_id,
+    updated.deposit_required,
+    updated.deposit_amount,
+    updated.withholding_tax,
+    updated.contract_url,
+    id
+  ).run()
+  
+  return c.json({ success: true, message: '顧客情報を更新しました' })
 })
 
 // 顧客削除（adminのみ）
@@ -3807,23 +4245,37 @@ app.get('/portal/:token', async (c) => {
         <div class="min-h-screen">
             <header class="bg-green-600 text-white shadow-lg">
                 <div class="container mx-auto px-4 py-3 md:py-4">
-                    <h1 class="text-lg md:text-2xl font-bold">
-                        <i class="fas fa-user-circle mr-1 md:mr-2"></i>
-                        ${client.name} 様
-                    </h1>
-                    <p class="text-xs md:text-sm mt-1">助成金申請の書類提出とやり取り</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-lg md:text-2xl font-bold">
+                                <i class="fas fa-user-circle mr-1 md:mr-2"></i>
+                                ${client.name} 様
+                            </h1>
+                            <p class="text-xs md:text-sm mt-1">助成金申請の書類提出とやり取り</p>
+                        </div>
+                        <button onclick="openNewApplicationModal()" 
+                                class="bg-white text-green-600 px-3 py-2 rounded-lg hover:bg-green-50 text-sm font-medium flex items-center gap-2 shadow">
+                            <i class="fas fa-plus-circle"></i>
+                            <span class="hidden sm:inline">新規申込</span>
+                        </button>
+                    </div>
                 </div>
             </header>
 
             <div class="container mx-auto px-4 py-4 lg:py-6">
+                <!-- お知らせバナー -->
+                <div id="announcementBanner" class="hidden mb-4">
+                    <!-- お知らせが動的に挿入される -->
+                </div>
+                
                 <!-- PC: 2カラムレイアウト / モバイル: 縦並び -->
                 <div class="lg:grid lg:grid-cols-12 lg:gap-6">
                     
-                    <!-- 左カラム: ステータス + ヒアリング質問 -->
+                    <!-- 左カラム: ステータス + パイプライン進捗 + ヒアリング質問 -->
                     <div class="lg:col-span-8 space-y-4 lg:space-y-6">
-                        <!-- 現在のステータス (コンパクト) -->
+                        <!-- 現在のステータスとパイプライン進捗 -->
                         <div class="bg-white rounded-lg shadow p-4">
-                            <div class="flex items-center justify-between">
+                            <div class="flex items-center justify-between mb-4">
                                 <div class="flex items-center gap-3">
                                     <div class="text-2xl" id="statusIcon"></div>
                                     <div>
@@ -3838,6 +4290,36 @@ app.get('/portal/:token', async (c) => {
                             </div>
                             <div class="mt-3 w-full bg-indigo-200 rounded-full h-2">
                                 <div id="hearingProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                            </div>
+                            
+                            <!-- パイプライン進捗 -->
+                            <div id="pipelineProgressSection" class="mt-4 pt-4 border-t hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-sm font-medium text-gray-700">
+                                        <i class="fas fa-tasks mr-1 text-green-600"></i>サービス進捗状況
+                                    </h3>
+                                    <span id="pipelineProgressText" class="text-sm font-bold text-green-600">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div id="pipelineProgressBar" class="bg-gradient-to-r from-green-500 to-teal-500 h-3 rounded-full transition-all" style="width: 0%"></div>
+                                </div>
+                                <div id="pipelineTasksList" class="mt-3 space-y-2 text-sm">
+                                    <!-- タスク一覧が表示される -->
+                                </div>
+                            </div>
+                            
+                            <!-- 手付金・契約セクション -->
+                            <div id="depositSection" class="mt-4 pt-4 border-t hidden">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="text-sm font-medium text-gray-700">
+                                        <i class="fas fa-credit-card mr-1 text-blue-600"></i>手付金・契約
+                                    </h3>
+                                    <span id="depositStatusBadge" class="text-xs px-2 py-1 rounded-full"></span>
+                                </div>
+                                
+                                <div id="depositContent" class="space-y-3">
+                                    <!-- 手付金情報が表示される -->
+                                </div>
                             </div>
                         </div>
 
@@ -4049,6 +4531,119 @@ app.get('/portal/:token', async (c) => {
                     </div>
                 </div>
             </div>
+            
+            <!-- 書類データ入力モーダル（登記簿/財務諸表/確定申告書） -->
+            <div id="dataInputModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-end sm:items-center justify-center">
+                <div class="bg-white w-full sm:w-[600px] sm:max-w-2xl sm:rounded-lg sm:m-4 rounded-t-2xl max-h-[90vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b bg-blue-600 text-white sm:rounded-t-lg rounded-t-2xl">
+                        <h3 id="dataInputTitle" class="font-bold"><i class="fas fa-edit mr-2"></i>データ入力・確認</h3>
+                        <button onclick="closeDataInputModal()" class="text-white hover:text-blue-200">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-4 bg-blue-50 border-b">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                            <div class="text-sm text-blue-800">
+                                <p class="font-medium">アップロードした書類を基に、以下の情報を入力・確認してください。</p>
+                                <p class="text-xs mt-1">この情報は補助金申請書の自動作成や財務指標の計算に使用されます。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="dataInputContent" class="flex-1 overflow-y-auto p-4">
+                        <!-- 動的にフォームが挿入される -->
+                    </div>
+                    
+                    <div class="p-4 border-t bg-gray-50 flex gap-2">
+                        <button onclick="closeDataInputModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-100">
+                            後で入力する
+                        </button>
+                        <button onclick="saveDataInput()" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-save mr-1"></i>保存して確定
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 財務指標表示モーダル -->
+            <div id="financialIndicatorsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white w-full max-w-2xl rounded-lg max-h-[80vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-t-lg">
+                        <h3 class="font-bold"><i class="fas fa-chart-line mr-2"></i>自動計算された財務指標</h3>
+                        <button onclick="closeFinancialIndicatorsModal()" class="text-white hover:text-green-200">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="financialIndicatorsContent" class="flex-1 overflow-y-auto p-4">
+                        <!-- 財務指標が表示される -->
+                    </div>
+                    
+                    <div class="p-4 border-t">
+                        <button onclick="closeFinancialIndicatorsModal()" class="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200">
+                            閉じる
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 新規申込モーダル -->
+            <div id="newApplicationModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-end sm:items-center justify-center">
+                <div class="bg-white w-full sm:w-[500px] sm:max-w-lg sm:rounded-lg sm:m-4 rounded-t-2xl max-h-[90vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b bg-green-600 text-white sm:rounded-t-lg rounded-t-2xl">
+                        <h3 class="font-bold"><i class="fas fa-plus-circle mr-2"></i>新規申込</h3>
+                        <button onclick="closeNewApplicationModal()" class="text-white hover:text-green-200">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                                <div class="text-sm text-blue-800">
+                                    <p class="font-medium">新しい補助金・助成金をお申し込みいただけます</p>
+                                    <p class="mt-1">ご希望の補助金を選択して、必要事項をご記入ください。</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <form id="newApplicationForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">申請する補助金・助成金 *</label>
+                                <select name="subsidy_type_id" id="applicationSubsidyType" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                                    <option value="">選択してください</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-1">申込の目的・相談内容</label>
+                                <textarea name="notes" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="申請したい理由や、ご相談したい内容をご記入ください"></textarea>
+                            </div>
+                            
+                            <div class="pt-2">
+                                <label class="flex items-start gap-2">
+                                    <input type="checkbox" name="privacy_agreed" required class="mt-1 rounded text-green-600">
+                                    <span class="text-sm text-gray-600">
+                                        <a href="/privacy-policy" target="_blank" class="text-green-600 underline">プライバシーポリシー</a>に同意します
+                                    </span>
+                                </label>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div class="p-4 border-t bg-gray-50 flex gap-2 sm:rounded-b-lg">
+                        <button onclick="closeNewApplicationModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-100">
+                            キャンセル
+                        </button>
+                        <button onclick="submitNewApplication()" class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                            <i class="fas fa-paper-plane mr-1"></i>申込む
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -4112,6 +4707,441 @@ app.get('/portal/:token', async (c) => {
                 document.getElementById('statusIcon').textContent = info.icon;
                 document.getElementById('statusText').textContent = info.text;
                 document.getElementById('statusDescription').textContent = info.desc;
+            }
+            
+            // お知らせを読み込む
+            async function loadAnnouncements() {
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/announcements\`);
+                    const announcements = response.data;
+                    
+                    if (announcements.length === 0) {
+                        document.getElementById('announcementBanner').classList.add('hidden');
+                        return;
+                    }
+                    
+                    const container = document.getElementById('announcementBanner');
+                    container.classList.remove('hidden');
+                    
+                    const typeStyles = {
+                        info: { bg: 'bg-blue-50 border-blue-200', icon: 'fa-info-circle text-blue-600', text: 'text-blue-800' },
+                        warning: { bg: 'bg-yellow-50 border-yellow-200', icon: 'fa-exclamation-triangle text-yellow-600', text: 'text-yellow-800' },
+                        urgent: { bg: 'bg-red-50 border-red-200', icon: 'fa-exclamation-circle text-red-600', text: 'text-red-800' },
+                        maintenance: { bg: 'bg-gray-50 border-gray-200', icon: 'fa-tools text-gray-600', text: 'text-gray-800' }
+                    };
+                    
+                    container.innerHTML = announcements.map(a => {
+                        const style = typeStyles[a.type] || typeStyles.info;
+                        return \`
+                            <div class="rounded-lg border p-3 mb-2 \${style.bg} \${a.is_read ? 'opacity-70' : ''}">
+                                <div class="flex items-start gap-3">
+                                    <i class="fas \${style.icon} mt-0.5"></i>
+                                    <div class="flex-1">
+                                        <div class="font-medium \${style.text}">\${a.title}</div>
+                                        <div class="text-sm \${style.text} mt-1">\${a.content}</div>
+                                    </div>
+                                    \${!a.is_read ? \`
+                                        <button onclick="markAnnouncementRead(\${a.id})" class="text-xs text-gray-500 hover:text-gray-700">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    \` : ''}
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading announcements:', error);
+                }
+            }
+            
+            async function markAnnouncementRead(announcementId) {
+                try {
+                    await axios.post(\`/api/announcements/\${announcementId}/read\`, {
+                        client_id: CLIENT_ID
+                    });
+                    loadAnnouncements();
+                } catch (error) {
+                    console.error('Error marking announcement read:', error);
+                }
+            }
+            
+            // パイプライン進捗を読み込む
+            async function loadPipelineProgress() {
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/pipelines\`);
+                    const pipelines = response.data;
+                    
+                    if (pipelines.length === 0) {
+                        document.getElementById('pipelineProgressSection').classList.add('hidden');
+                        return;
+                    }
+                    
+                    // アクティブなパイプラインを取得（最新のもの）
+                    const activePipeline = pipelines.find(p => p.status === 'active') || pipelines[0];
+                    
+                    const section = document.getElementById('pipelineProgressSection');
+                    section.classList.remove('hidden');
+                    
+                    // 進捗率を更新
+                    const progress = activePipeline.progress_percentage || 0;
+                    document.getElementById('pipelineProgressText').textContent = progress + '%';
+                    document.getElementById('pipelineProgressBar').style.width = progress + '%';
+                    
+                    // タスク一覧を取得
+                    const tasksResponse = await axios.get(\`/api/pipelines/\${activePipeline.id}/tasks\`);
+                    const tasks = tasksResponse.data;
+                    
+                    const tasksContainer = document.getElementById('pipelineTasksList');
+                    
+                    if (tasks.length === 0) {
+                        tasksContainer.innerHTML = '<div class="text-gray-500 text-center py-2">タスクがありません</div>';
+                        return;
+                    }
+                    
+                    const statusStyles = {
+                        pending: { bg: 'bg-gray-100', text: 'text-gray-600', icon: 'fa-circle' },
+                        in_progress: { bg: 'bg-blue-100', text: 'text-blue-600', icon: 'fa-spinner fa-spin' },
+                        completed: { bg: 'bg-green-100', text: 'text-green-600', icon: 'fa-check' },
+                        skipped: { bg: 'bg-gray-100', text: 'text-gray-400', icon: 'fa-minus' }
+                    };
+                    
+                    const taskTypeLabels = {
+                        internal: '自社対応',
+                        external: '顧客対応',
+                        both: '共同'
+                    };
+                    
+                    tasksContainer.innerHTML = tasks.slice(0, 5).map((task, index) => {
+                        const style = statusStyles[task.status] || statusStyles.pending;
+                        const isCustomerTask = task.task_type === 'external' || task.task_type === 'both';
+                        
+                        return \`
+                            <div class="flex items-center gap-2 p-2 rounded \${style.bg}">
+                                <div class="w-6 h-6 rounded-full flex items-center justify-center \${task.status === 'completed' ? 'bg-green-500' : 'bg-gray-300'} text-white text-xs">
+                                    <i class="fas \${style.icon}"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium \${style.text}">\${task.task_name}</div>
+                                    <div class="text-xs text-gray-500">
+                                        \${isCustomerTask ? '<span class="text-orange-600"><i class="fas fa-user mr-1"></i>顧客対応</span> · ' : ''}
+                                        \${task.end_date ? '期限: ' + task.end_date : ''}
+                                    </div>
+                                </div>
+                                \${task.status === 'pending' && isCustomerTask ? \`
+                                    <span class="text-xs px-2 py-1 bg-orange-100 text-orange-600 rounded">対応待ち</span>
+                                \` : ''}
+                            </div>
+                        \`;
+                    }).join('');
+                    
+                    if (tasks.length > 5) {
+                        tasksContainer.innerHTML += \`
+                            <div class="text-center text-xs text-gray-500 mt-2">
+                                他 \${tasks.length - 5} 件のタスクがあります
+                            </div>
+                        \`;
+                    }
+                } catch (error) {
+                    console.error('Error loading pipeline progress:', error);
+                }
+            }
+            
+            // 手付金・契約情報を読み込む
+            async function loadDepositInfo() {
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
+                    const client = response.data;
+                    
+                    const section = document.getElementById('depositSection');
+                    const badge = document.getElementById('depositStatusBadge');
+                    const content = document.getElementById('depositContent');
+                    
+                    if (!section) return;
+                    
+                    // 手付金が不要な場合は非表示
+                    if (!client.deposit_required) {
+                        section.classList.add('hidden');
+                        return;
+                    }
+                    
+                    section.classList.remove('hidden');
+                    
+                    // ステータスバッジ
+                    if (client.deposit_paid) {
+                        badge.className = 'text-xs px-2 py-1 rounded-full bg-green-100 text-green-700';
+                        badge.innerHTML = '<i class="fas fa-check mr-1"></i>支払い済み';
+                    } else {
+                        badge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700';
+                        badge.innerHTML = '<i class="fas fa-clock mr-1"></i>未払い';
+                    }
+                    
+                    // 金額フォーマット
+                    const amount = (client.deposit_amount || 0).toLocaleString();
+                    
+                    if (client.deposit_paid) {
+                        // 支払い済みの場合
+                        content.innerHTML = \`
+                            <div class="bg-green-50 rounded-lg p-4">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                                        <i class="fas fa-check text-white"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-green-800">¥\${amount}</div>
+                                        <div class="text-xs text-green-600">
+                                            \${client.deposit_paid_at ? new Date(client.deposit_paid_at).toLocaleDateString('ja-JP') + ' にお支払い完了' : 'お支払い完了'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    支払方法: \${client.deposit_payment_method || '不明'}
+                                </div>
+                            </div>
+                            \${client.contract_url ? \`
+                                <a href="\${client.contract_url}" target="_blank" class="flex items-center gap-2 p-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100">
+                                    <i class="fas fa-file-signature"></i>
+                                    <span class="text-sm font-medium">電子契約書を確認</span>
+                                    <i class="fas fa-external-link-alt ml-auto text-xs"></i>
+                                </a>
+                            \` : ''}
+                        \`;
+                    } else if (client.deposit_transfer_reported) {
+                        // 振込報告済み・確認待ちの場合
+                        badge.className = 'text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700';
+                        badge.innerHTML = '<i class="fas fa-hourglass-half mr-1"></i>確認中';
+                        
+                        content.innerHTML = \`
+                            <div class="bg-blue-50 rounded-lg p-4">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                        <i class="fas fa-hourglass-half text-white"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-blue-800">¥\${amount}</div>
+                                        <div class="text-xs text-blue-600">
+                                            振込報告済み - 確認をお待ちください
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-2">
+                                    <i class="fas fa-clock mr-1"></i>
+                                    報告日時: \${client.deposit_transfer_reported_at ? new Date(client.deposit_transfer_reported_at).toLocaleString('ja-JP') : '-'}
+                                </div>
+                            </div>
+                            <div class="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
+                                <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                                担当者が振込を確認後、ステータスが更新されます。
+                            </div>
+                            \${client.contract_url ? \`
+                                <a href="\${client.contract_url}" target="_blank" class="flex items-center gap-2 p-3 mt-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100">
+                                    <i class="fas fa-file-signature"></i>
+                                    <span class="text-sm font-medium">電子契約書を確認</span>
+                                    <i class="fas fa-external-link-alt ml-auto text-xs"></i>
+                                </a>
+                            \` : ''}
+                        \`;
+                    } else {
+                        // 未払いの場合
+                        content.innerHTML = \`
+                            <div class="bg-yellow-50 rounded-lg p-4">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center">
+                                        <i class="fas fa-yen-sign text-white"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-yellow-800">¥\${amount}</div>
+                                        <div class="text-xs text-yellow-600">手付金のお支払いをお願いいたします</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 space-y-2">
+                                <p class="text-sm font-medium text-gray-700">お支払い方法</p>
+                                <button onclick="showPaymentModal('credit')" class="w-full flex items-center gap-3 p-3 bg-white border rounded-lg hover:bg-gray-50">
+                                    <div class="w-8 h-8 rounded bg-blue-100 flex items-center justify-center">
+                                        <i class="fas fa-credit-card text-blue-600"></i>
+                                    </div>
+                                    <div class="flex-1 text-left">
+                                        <div class="text-sm font-medium">クレジットカード</div>
+                                        <div class="text-xs text-gray-500">VISA, Mastercard, JCB</div>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </button>
+                                <button onclick="showPaymentModal('bank')" class="w-full flex items-center gap-3 p-3 bg-white border rounded-lg hover:bg-gray-50">
+                                    <div class="w-8 h-8 rounded bg-green-100 flex items-center justify-center">
+                                        <i class="fas fa-university text-green-600"></i>
+                                    </div>
+                                    <div class="flex-1 text-left">
+                                        <div class="text-sm font-medium">銀行振込</div>
+                                        <div class="text-xs text-gray-500">お振込先情報を表示</div>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </button>
+                            </div>
+                            
+                            \${client.contract_url ? \`
+                                <a href="\${client.contract_url}" target="_blank" class="flex items-center gap-2 p-3 mt-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100">
+                                    <i class="fas fa-file-signature"></i>
+                                    <span class="text-sm font-medium">電子契約書を確認</span>
+                                    <i class="fas fa-external-link-alt ml-auto text-xs"></i>
+                                </a>
+                            \` : ''}
+                        \`;
+                    }
+                } catch (error) {
+                    console.error('Error loading deposit info:', error);
+                }
+            }
+            
+            // 銀行振込情報を取得
+            let bankInfo = {};
+            async function loadBankInfo() {
+                try {
+                    const response = await axios.get('/api/bank-info');
+                    bankInfo = response.data;
+                } catch (error) {
+                    console.error('Error loading bank info:', error);
+                }
+            }
+            loadBankInfo();
+            
+            // 支払いモーダル表示
+            async function showPaymentModal(method) {
+                const amount = document.querySelector('#depositContent .font-bold')?.textContent || '¥0';
+                
+                if (method === 'credit') {
+                    // Stripeが有効か確認
+                    try {
+                        const settingsRes = await axios.get('/api/settings');
+                        if (settingsRes.data.stripe_enabled) {
+                            // Stripe決済セッション作成
+                            showMessage('決済ページを準備しています...', 'info');
+                            const response = await axios.post(\`/api/clients/\${CLIENT_ID}/create-checkout-session\`, {
+                                success_url: window.location.origin,
+                                cancel_url: window.location.origin
+                            });
+                            if (response.data.checkout_url) {
+                                window.location.href = response.data.checkout_url;
+                            }
+                        } else {
+                            alert('クレジットカード決済機能は現在ご利用いただけません。\\n\\nお手数ですが、銀行振込をご利用ください。');
+                        }
+                    } catch (error) {
+                        console.error('Stripe error:', error);
+                        alert('決済の準備中にエラーが発生しました。\\n銀行振込をご利用いただくか、担当者までお問い合わせください。');
+                    }
+                } else if (method === 'bank') {
+                    showBankTransferModal(amount);
+                }
+            }
+            
+            // 銀行振込モーダル
+            function showBankTransferModal(amount) {
+                const modal = document.createElement('div');
+                modal.id = 'bankTransferModal';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = \`
+                    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                        <div class="p-4 border-b flex justify-between items-center">
+                            <h3 class="text-lg font-bold">銀行振込でのお支払い</h3>
+                            <button onclick="closeBankTransferModal()" class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="p-4 space-y-4">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <h4 class="font-bold text-green-800 mb-3">
+                                    <i class="fas fa-university mr-2"></i>振込先情報
+                                </h4>
+                                <table class="w-full text-sm">
+                                    <tr>
+                                        <td class="py-1 text-gray-600">銀行名</td>
+                                        <td class="py-1 font-medium">\${bankInfo.bank_name || '（未設定）'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-1 text-gray-600">支店名</td>
+                                        <td class="py-1 font-medium">\${bankInfo.bank_branch || '（未設定）'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-1 text-gray-600">口座種別</td>
+                                        <td class="py-1 font-medium">\${bankInfo.bank_account_type || '普通'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-1 text-gray-600">口座番号</td>
+                                        <td class="py-1 font-medium">\${bankInfo.bank_account_number || '（未設定）'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-1 text-gray-600">口座名義</td>
+                                        <td class="py-1 font-medium">\${bankInfo.bank_account_holder || '（未設定）'}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                <div class="flex items-center gap-2 text-yellow-800">
+                                    <i class="fas fa-yen-sign"></i>
+                                    <span class="font-bold">お振込み金額: \${amount}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="text-sm text-gray-600">
+                                <p class="mb-2"><i class="fas fa-info-circle text-blue-500 mr-1"></i>お振込み後、下のボタンから完了報告をお願いします。</p>
+                            </div>
+                            
+                            <button id="reportTransferBtn" onclick="reportBankTransfer()" class="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                                <i class="fas fa-check mr-2"></i>振込完了を報告する
+                            </button>
+                        </div>
+                    </div>
+                \`;
+                document.body.appendChild(modal);
+            }
+            
+            function closeBankTransferModal() {
+                const modal = document.getElementById('bankTransferModal');
+                if (modal) modal.remove();
+            }
+            
+            // 振込完了報告
+            async function reportBankTransfer() {
+                if (!confirm('振込完了を報告しますか？\\n\\n※まだお振込みが完了していない場合は、振込完了後に報告してください。')) {
+                    return;
+                }
+                
+                // ボタンを無効化して二重送信防止
+                const btn = document.getElementById('reportTransferBtn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>送信中...';
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                
+                try {
+                    const clientRes = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
+                    const amount = clientRes.data.deposit_amount || 0;
+                    
+                    await axios.post(\`/api/clients/\${CLIENT_ID}/report-transfer\`, {
+                        payment_type: 'deposit',
+                        amount: amount,
+                        notes: '顧客ポータルから報告'
+                    });
+                    
+                    closeBankTransferModal();
+                    showMessage('振込完了報告を送信しました。確認までしばらくお待ちください。', 'success');
+                    
+                    // 手付金セクションを即座に更新
+                    loadDepositInfo();
+                } catch (error) {
+                    console.error('Error reporting transfer:', error);
+                    alert('報告の送信に失敗しました。お手数ですが、担当者に直接ご連絡ください。');
+                    
+                    // エラー時はボタンを復活
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-check mr-2"></i>振込完了を報告する';
+                        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
+                }
             }
 
             async function loadChecklist() {
@@ -4264,6 +5294,16 @@ app.get('/portal/:token', async (c) => {
                     closeUploadModal();
                     await loadDocuments();
                     await loadChecklist();
+                    
+                    // 特定の書類タイプの場合、データ入力モーダルを表示
+                    const docType = documentType.toLowerCase();
+                    if (docType.includes('登記') || docType.includes('謄本') || docType.includes('履歴事項')) {
+                        showDataInputModal('registry', documentType);
+                    } else if (docType.includes('決算') || docType.includes('財務') || docType.includes('貸借') || docType.includes('損益')) {
+                        showDataInputModal('financial', documentType);
+                    } else if (docType.includes('確定申告')) {
+                        showDataInputModal('tax_return', documentType);
+                    }
                 } catch (error) {
                     console.error('Upload error:', error);
                     if (error.response) {
@@ -4325,6 +5365,16 @@ app.get('/portal/:token', async (c) => {
                     closeUploadModal();
                     await loadDocuments();
                     await loadChecklist();
+                    
+                    // 特定の書類タイプの場合、データ入力モーダルを表示
+                    const docType = documentType.toLowerCase();
+                    if (docType.includes('登記') || docType.includes('謄本') || docType.includes('履歴事項')) {
+                        showDataInputModal('registry', documentType);
+                    } else if (docType.includes('決算') || docType.includes('財務') || docType.includes('貸借') || docType.includes('損益')) {
+                        showDataInputModal('financial', documentType);
+                    } else if (docType.includes('確定申告')) {
+                        showDataInputModal('tax_return', documentType);
+                    }
                 } catch (error) {
                     console.error('Upload error:', error);
                     if (error.response) {
@@ -4509,9 +5559,35 @@ app.get('/portal/:token', async (c) => {
                 const currentAnswer = hearingAnswers[question.id] || '';
                 const inputType = question.input_type || 'textarea';
                 
+                // ヘルプテキスト（書き方ガイド）
+                const helpSection = question.help_text ? \`
+                    <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-lightbulb text-blue-500 mt-0.5"></i>
+                            <div class="text-sm text-blue-700">\${question.help_text}</div>
+                        </div>
+                    </div>
+                \` : '';
+                
+                // 記入例
+                const exampleSection = question.example_answer ? \`
+                    <details class="mb-3 group">
+                        <summary class="text-sm text-gray-500 cursor-pointer hover:text-indigo-600 select-none">
+                            <i class="fas fa-file-alt mr-1"></i>記入例を見る
+                        </summary>
+                        <div class="mt-2 p-3 bg-gray-50 border rounded-lg text-sm text-gray-700">
+                            <div class="whitespace-pre-wrap">\${question.example_answer}</div>
+                            <button onclick="useExampleById(\${question.id})" 
+                                    class="mt-2 text-xs px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">
+                                <i class="fas fa-copy mr-1"></i>この例文をベースに使う
+                            </button>
+                        </div>
+                    </details>
+                \` : '';
+                
                 // 入力ボタン群
                 const actionButtons = \`
-                    <div class="flex gap-1 mt-2">
+                    <div class="flex flex-wrap gap-1 mt-2">
                         <button onclick="openAiSuggestModal(\${question.id})" 
                                 class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200">
                             <i class="fas fa-magic mr-1"></i>AI提案
@@ -4519,6 +5595,10 @@ app.get('/portal/:token', async (c) => {
                         <button onclick="openTemplateModal(\${question.id})" 
                                 class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
                             <i class="fas fa-list-alt mr-1"></i>テンプレ
+                        </button>
+                        <button onclick="showWritingGuide(\${question.id})" 
+                                class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">
+                            <i class="fas fa-book mr-1"></i>書き方ガイド
                         </button>
                     </div>
                 \`;
@@ -4541,6 +5621,8 @@ app.get('/portal/:token', async (c) => {
                     \`;
                 } else {
                     return \`
+                        \${helpSection}
+                        \${exampleSection}
                         <textarea id="answer-\${question.id}" onchange="updateHearingAnswer(\${question.id}, this.value)"
                                   placeholder="回答を入力してください..."
                                   rows="3"
@@ -4548,6 +5630,105 @@ app.get('/portal/:token', async (c) => {
                         \${actionButtons}
                     \`;
                 }
+            }
+            
+            // 記入例をテキストエリアにコピー
+            function useExampleById(questionId) {
+                const question = hearingQuestions.find(q => q.id === questionId);
+                if (!question || !question.example_answer) return;
+                
+                const textarea = document.getElementById(\`answer-\${questionId}\`);
+                if (textarea) {
+                    textarea.value = question.example_answer;
+                    updateHearingAnswer(questionId, question.example_answer);
+                    showMessage('success', '記入例を適用しました。必要に応じて編集してください。');
+                }
+            }
+            
+            // 書き方ガイドモーダル表示
+            async function showWritingGuide(questionId) {
+                const question = hearingQuestions.find(q => q.id === questionId);
+                if (!question) return;
+                
+                // 事業計画テンプレートからガイド情報を取得（あれば）
+                let guideContent = '';
+                
+                try {
+                    const response = await axios.get(\`/api/business-plan-templates/\${currentSubsidyTypeId || 1}\`);
+                    const templates = response.data;
+                    const matchingTemplate = templates.find(t => t.section_key === question.document_section);
+                    
+                    if (matchingTemplate) {
+                        guideContent = \`
+                            <div class="space-y-4">
+                                \${matchingTemplate.writing_guide ? \`
+                                    <div class="bg-blue-50 p-4 rounded-lg">
+                                        <h4 class="font-bold text-blue-700 mb-2"><i class="fas fa-pen mr-1"></i>書き方のポイント</h4>
+                                        <div class="text-sm text-blue-800 whitespace-pre-wrap">\${matchingTemplate.writing_guide}</div>
+                                    </div>
+                                \` : ''}
+                                
+                                \${matchingTemplate.key_points && matchingTemplate.key_points.length ? \`
+                                    <div class="bg-green-50 p-4 rounded-lg">
+                                        <h4 class="font-bold text-green-700 mb-2"><i class="fas fa-check-circle mr-1"></i>重要ポイント</h4>
+                                        <ul class="space-y-1">
+                                            \${matchingTemplate.key_points.map(p => \`<li class="flex items-start gap-2 text-sm text-green-800"><i class="fas fa-check text-green-500 mt-1"></i>\${p}</li>\`).join('')}
+                                        </ul>
+                                    </div>
+                                \` : ''}
+                                
+                                \${matchingTemplate.common_mistakes && matchingTemplate.common_mistakes.length ? \`
+                                    <div class="bg-red-50 p-4 rounded-lg">
+                                        <h4 class="font-bold text-red-700 mb-2"><i class="fas fa-exclamation-triangle mr-1"></i>よくある間違い</h4>
+                                        <ul class="space-y-1">
+                                            \${matchingTemplate.common_mistakes.map(m => \`<li class="flex items-start gap-2 text-sm text-red-800"><i class="fas fa-times text-red-500 mt-1"></i>\${m}</li>\`).join('')}
+                                        </ul>
+                                    </div>
+                                \` : ''}
+                                
+                                \${matchingTemplate.example_text ? \`
+                                    <div class="bg-gray-50 p-4 rounded-lg">
+                                        <h4 class="font-bold text-gray-700 mb-2"><i class="fas fa-file-alt mr-1"></i>完成例</h4>
+                                        <div class="text-sm text-gray-700 whitespace-pre-wrap border-l-4 border-gray-300 pl-3">\${matchingTemplate.example_text}</div>
+                                    </div>
+                                \` : ''}
+                            </div>
+                        \`;
+                    }
+                } catch (error) {
+                    console.error('ガイド取得エラー:', error);
+                }
+                
+                // フォールバック
+                if (!guideContent) {
+                    guideContent = \`
+                        <div class="space-y-4">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <h4 class="font-bold text-blue-700 mb-2"><i class="fas fa-pen mr-1"></i>一般的な書き方のコツ</h4>
+                                <ul class="space-y-2 text-sm text-blue-800">
+                                    <li class="flex items-start gap-2"><i class="fas fa-check text-blue-500 mt-1"></i>具体的な数字を入れる（○○%削減、○○時間短縮など）</li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check text-blue-500 mt-1"></i>課題と解決策の因果関係を明確に</li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check text-blue-500 mt-1"></i>5W1H（いつ、どこで、誰が、何を、なぜ、どのように）を意識</li>
+                                    <li class="flex items-start gap-2"><i class="fas fa-check text-blue-500 mt-1"></i>専門用語は噛み砕いて説明</li>
+                                </ul>
+                            </div>
+                            \${question.help_text ? \`
+                                <div class="bg-yellow-50 p-4 rounded-lg">
+                                    <h4 class="font-bold text-yellow-700 mb-2"><i class="fas fa-lightbulb mr-1"></i>この質問について</h4>
+                                    <div class="text-sm text-yellow-800">\${question.help_text}</div>
+                                </div>
+                            \` : ''}
+                        </div>
+                    \`;
+                }
+                
+                // モーダルを再利用（AI提案モーダルを流用）
+                const modal = document.getElementById('aiSuggestModal');
+                document.getElementById('suggestQuestionText').textContent = question.question_text;
+                document.getElementById('suggestContent').innerHTML = guideContent;
+                document.getElementById('suggestActions').classList.add('hidden');
+                modal.querySelector('h3').innerHTML = '<i class="fas fa-book mr-2"></i>書き方ガイド';
+                modal.classList.remove('hidden');
             }
             
             function updateHearingAnswer(questionId, value) {
@@ -5000,10 +6181,590 @@ app.get('/portal/:token', async (c) => {
             }
             
             // ===============================
+            // 書類データ入力機能
+            // ===============================
+            
+            let currentDataInputType = null;
+            let currentDataInputDocType = null;
+            
+            function showDataInputModal(type, docType) {
+                currentDataInputType = type;
+                currentDataInputDocType = docType;
+                
+                const modal = document.getElementById('dataInputModal');
+                const title = document.getElementById('dataInputTitle');
+                const content = document.getElementById('dataInputContent');
+                
+                let titleText = '';
+                let formHtml = '';
+                
+                if (type === 'registry') {
+                    titleText = '<i class="fas fa-building mr-2"></i>登記簿謄本 データ入力';
+                    formHtml = \`
+                        <div class="space-y-4">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                                <p class="text-sm text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>登記簿謄本に記載されている内容を入力してください</p>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="sm:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">会社名（商号）<span class="text-red-500">*</span></label>
+                                    <input type="text" id="reg_company_name" class="w-full px-3 py-2 border rounded-lg" placeholder="株式会社〇〇">
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">本店所在地<span class="text-red-500">*</span></label>
+                                    <input type="text" id="reg_address" class="w-full px-3 py-2 border rounded-lg" placeholder="東京都〇〇区〇〇1-1-1">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">設立年月日</label>
+                                    <input type="date" id="reg_establishment" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">資本金（円）</label>
+                                    <input type="number" id="reg_capital" class="w-full px-3 py-2 border rounded-lg" placeholder="10000000">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">代表者名<span class="text-red-500">*</span></label>
+                                    <input type="text" id="reg_representative" class="w-full px-3 py-2 border rounded-lg" placeholder="山田 太郎">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">代表者役職</label>
+                                    <input type="text" id="reg_rep_title" class="w-full px-3 py-2 border rounded-lg" placeholder="代表取締役" value="代表取締役">
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">法人番号（13桁）</label>
+                                    <input type="text" id="reg_corporate_number" class="w-full px-3 py-2 border rounded-lg" placeholder="1234567890123" maxlength="13">
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">事業目的（主なもの）</label>
+                                    <textarea id="reg_business_purpose" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="1. ソフトウェアの開発及び販売&#10;2. ITコンサルティング&#10;3. 前各号に附帯する一切の事業"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    \`;
+                } else if (type === 'financial') {
+                    titleText = '<i class="fas fa-file-invoice-dollar mr-2"></i>財務諸表 データ入力';
+                    formHtml = \`
+                        <div class="space-y-4">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                                <p class="text-sm text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>決算書（損益計算書・貸借対照表）の主要項目を入力してください</p>
+                            </div>
+                            
+                            <div class="border-b pb-2 mb-4">
+                                <h4 class="font-bold text-blue-600"><i class="fas fa-calendar mr-1"></i>決算期情報</h4>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">決算期<span class="text-red-500">*</span></label>
+                                    <input type="text" id="fin_fiscal_year" class="w-full px-3 py-2 border rounded-lg" placeholder="2024年3月期">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">従業員数</label>
+                                    <input type="number" id="fin_employee_count" class="w-full px-3 py-2 border rounded-lg" placeholder="25">
+                                </div>
+                            </div>
+                            
+                            <div class="border-b pb-2 mb-4 mt-6">
+                                <h4 class="font-bold text-green-600"><i class="fas fa-chart-line mr-1"></i>損益計算書（PL）</h4>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">売上高（円）<span class="text-red-500">*</span></label>
+                                    <input type="number" id="fin_revenue" class="w-full px-3 py-2 border rounded-lg" placeholder="100000000">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">売上原価（円）</label>
+                                    <input type="number" id="fin_cost_of_sales" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">売上総利益（円）</label>
+                                    <input type="number" id="fin_gross_profit" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">販売費及び一般管理費（円）</label>
+                                    <input type="number" id="fin_selling_admin" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">営業利益（円）<span class="text-red-500">*</span></label>
+                                    <input type="number" id="fin_operating_income" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">経常利益（円）</label>
+                                    <input type="number" id="fin_ordinary_income" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">当期純利益（円）</label>
+                                    <input type="number" id="fin_net_income" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                            
+                            <div class="border-b pb-2 mb-4 mt-6">
+                                <h4 class="font-bold text-orange-600"><i class="fas fa-coins mr-1"></i>販管費内訳（補助金申請で重要）</h4>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">人件費（円）<span class="text-red-500">*</span></label>
+                                    <input type="number" id="fin_personnel" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">減価償却費（円）<span class="text-red-500">*</span></label>
+                                    <input type="number" id="fin_depreciation" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">地代家賃（円）</label>
+                                    <input type="number" id="fin_rent" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">研究開発費（円）</label>
+                                    <input type="number" id="fin_rd" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                            
+                            <div class="border-b pb-2 mb-4 mt-6">
+                                <h4 class="font-bold text-purple-600"><i class="fas fa-balance-scale mr-1"></i>貸借対照表（BS）</h4>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">総資産（円）</label>
+                                    <input type="number" id="fin_total_assets" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">流動資産（円）</label>
+                                    <input type="number" id="fin_current_assets" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">負債合計（円）</label>
+                                    <input type="number" id="fin_total_liabilities" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">流動負債（円）</label>
+                                    <input type="number" id="fin_current_liabilities" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">純資産（円）</label>
+                                    <input type="number" id="fin_net_assets" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">資本金（円）</label>
+                                    <input type="number" id="fin_capital_stock" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                        </div>
+                    \`;
+                } else if (type === 'tax_return') {
+                    titleText = '<i class="fas fa-file-alt mr-2"></i>確定申告書 データ入力';
+                    formHtml = \`
+                        <div class="space-y-4">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                                <p class="text-sm text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>確定申告書（青色申告決算書）の内容を入力してください（個人事業主向け）</p>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">申告年度<span class="text-red-500">*</span></label>
+                                    <input type="text" id="tax_year" class="w-full px-3 py-2 border rounded-lg" placeholder="令和5年分">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">従業員数（専従者含む）</label>
+                                    <input type="number" id="tax_employee_count" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                            
+                            <div class="border-b pb-2 mb-4 mt-6">
+                                <h4 class="font-bold text-green-600"><i class="fas fa-yen-sign mr-1"></i>収入金額</h4>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">事業所得（営業等）<span class="text-red-500">*</span></label>
+                                    <input type="number" id="tax_business_income" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">合計所得金額</label>
+                                    <input type="number" id="tax_total_income" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                            
+                            <div class="border-b pb-2 mb-4 mt-6">
+                                <h4 class="font-bold text-orange-600"><i class="fas fa-receipt mr-1"></i>必要経費</h4>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">必要経費合計</label>
+                                    <input type="number" id="tax_total_expenses" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">給料賃金</label>
+                                    <input type="number" id="tax_salary_wages" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">減価償却費</label>
+                                    <input type="number" id="tax_depreciation" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">地代家賃</label>
+                                    <input type="number" id="tax_rent" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                            
+                            <div class="border-b pb-2 mb-4 mt-6">
+                                <h4 class="font-bold text-blue-600"><i class="fas fa-calculator mr-1"></i>所得・税額</h4>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">課税所得金額</label>
+                                    <input type="number" id="tax_taxable_income" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">青色申告特別控除額</label>
+                                    <input type="number" id="tax_blue_deduction" class="w-full px-3 py-2 border rounded-lg" placeholder="650000">
+                                </div>
+                            </div>
+                        </div>
+                    \`;
+                }
+                
+                title.innerHTML = titleText;
+                content.innerHTML = formHtml;
+                modal.classList.remove('hidden');
+                
+                // 既存データがあれば読み込む
+                loadExistingData(type);
+            }
+            
+            async function loadExistingData(type) {
+                try {
+                    if (type === 'registry') {
+                        const response = await axios.get(\`/api/clients/\${CLIENT_ID}/registry-data\`);
+                        if (response.data) {
+                            const d = response.data;
+                            if (d.company_name) document.getElementById('reg_company_name').value = d.company_name;
+                            if (d.head_office_address) document.getElementById('reg_address').value = d.head_office_address;
+                            if (d.establishment_date) document.getElementById('reg_establishment').value = d.establishment_date;
+                            if (d.capital_amount) document.getElementById('reg_capital').value = d.capital_amount;
+                            if (d.representative_name) document.getElementById('reg_representative').value = d.representative_name;
+                            if (d.representative_title) document.getElementById('reg_rep_title').value = d.representative_title;
+                            if (d.corporate_number) document.getElementById('reg_corporate_number').value = d.corporate_number;
+                            if (d.business_purpose && d.business_purpose.length) {
+                                document.getElementById('reg_business_purpose').value = d.business_purpose.join('\\n');
+                            }
+                        }
+                    } else if (type === 'financial') {
+                        const response = await axios.get(\`/api/clients/\${CLIENT_ID}/financial-statements\`);
+                        if (response.data && response.data.length > 0) {
+                            const d = response.data[0];
+                            if (d.fiscal_year) document.getElementById('fin_fiscal_year').value = d.fiscal_year;
+                            if (d.employee_count) document.getElementById('fin_employee_count').value = d.employee_count;
+                            if (d.revenue) document.getElementById('fin_revenue').value = d.revenue;
+                            if (d.cost_of_sales) document.getElementById('fin_cost_of_sales').value = d.cost_of_sales;
+                            if (d.gross_profit) document.getElementById('fin_gross_profit').value = d.gross_profit;
+                            if (d.selling_admin_expenses) document.getElementById('fin_selling_admin').value = d.selling_admin_expenses;
+                            if (d.operating_income) document.getElementById('fin_operating_income').value = d.operating_income;
+                            if (d.ordinary_income) document.getElementById('fin_ordinary_income').value = d.ordinary_income;
+                            if (d.net_income) document.getElementById('fin_net_income').value = d.net_income;
+                            if (d.personnel_expenses) document.getElementById('fin_personnel').value = d.personnel_expenses;
+                            if (d.depreciation) document.getElementById('fin_depreciation').value = d.depreciation;
+                            if (d.rent_expenses) document.getElementById('fin_rent').value = d.rent_expenses;
+                            if (d.rd_expenses) document.getElementById('fin_rd').value = d.rd_expenses;
+                            if (d.total_assets) document.getElementById('fin_total_assets').value = d.total_assets;
+                            if (d.current_assets) document.getElementById('fin_current_assets').value = d.current_assets;
+                            if (d.total_liabilities) document.getElementById('fin_total_liabilities').value = d.total_liabilities;
+                            if (d.current_liabilities) document.getElementById('fin_current_liabilities').value = d.current_liabilities;
+                            if (d.total_net_assets) document.getElementById('fin_net_assets').value = d.total_net_assets;
+                            if (d.capital_stock) document.getElementById('fin_capital_stock').value = d.capital_stock;
+                        }
+                    } else if (type === 'tax_return') {
+                        const response = await axios.get(\`/api/clients/\${CLIENT_ID}/tax-return\`);
+                        if (response.data && response.data.length > 0) {
+                            const d = response.data[0];
+                            if (d.tax_year) document.getElementById('tax_year').value = d.tax_year;
+                            if (d.employee_count) document.getElementById('tax_employee_count').value = d.employee_count;
+                            if (d.business_income) document.getElementById('tax_business_income').value = d.business_income;
+                            if (d.total_income) document.getElementById('tax_total_income').value = d.total_income;
+                            if (d.total_expenses) document.getElementById('tax_total_expenses').value = d.total_expenses;
+                            if (d.salary_wages) document.getElementById('tax_salary_wages').value = d.salary_wages;
+                            if (d.depreciation_expense) document.getElementById('tax_depreciation').value = d.depreciation_expense;
+                            if (d.rent_cost) document.getElementById('tax_rent').value = d.rent_cost;
+                            if (d.taxable_income) document.getElementById('tax_taxable_income').value = d.taxable_income;
+                            if (d.blue_return_deduction) document.getElementById('tax_blue_deduction').value = d.blue_return_deduction;
+                        }
+                    }
+                } catch (error) {
+                    console.error('既存データ読み込みエラー:', error);
+                }
+            }
+            
+            function closeDataInputModal() {
+                document.getElementById('dataInputModal').classList.add('hidden');
+                currentDataInputType = null;
+                currentDataInputDocType = null;
+            }
+            
+            async function saveDataInput() {
+                try {
+                    let data = {};
+                    let endpoint = '';
+                    
+                    if (currentDataInputType === 'registry') {
+                        data = {
+                            company_name: document.getElementById('reg_company_name').value,
+                            head_office_address: document.getElementById('reg_address').value,
+                            establishment_date: document.getElementById('reg_establishment').value,
+                            capital_amount: parseInt(document.getElementById('reg_capital').value) || null,
+                            representative_name: document.getElementById('reg_representative').value,
+                            representative_title: document.getElementById('reg_rep_title').value,
+                            corporate_number: document.getElementById('reg_corporate_number').value,
+                            business_purpose: document.getElementById('reg_business_purpose').value.split('\\n').filter(s => s.trim()),
+                            verified: true
+                        };
+                        endpoint = \`/api/clients/\${CLIENT_ID}/registry-data\`;
+                    } else if (currentDataInputType === 'financial') {
+                        data = {
+                            fiscal_year: document.getElementById('fin_fiscal_year').value,
+                            employee_count: parseInt(document.getElementById('fin_employee_count').value) || null,
+                            revenue: parseInt(document.getElementById('fin_revenue').value) || null,
+                            cost_of_sales: parseInt(document.getElementById('fin_cost_of_sales').value) || null,
+                            gross_profit: parseInt(document.getElementById('fin_gross_profit').value) || null,
+                            selling_admin_expenses: parseInt(document.getElementById('fin_selling_admin').value) || null,
+                            operating_income: parseInt(document.getElementById('fin_operating_income').value) || null,
+                            ordinary_income: parseInt(document.getElementById('fin_ordinary_income').value) || null,
+                            net_income: parseInt(document.getElementById('fin_net_income').value) || null,
+                            personnel_expenses: parseInt(document.getElementById('fin_personnel').value) || null,
+                            depreciation: parseInt(document.getElementById('fin_depreciation').value) || null,
+                            rent_expenses: parseInt(document.getElementById('fin_rent').value) || null,
+                            rd_expenses: parseInt(document.getElementById('fin_rd').value) || null,
+                            total_assets: parseInt(document.getElementById('fin_total_assets').value) || null,
+                            current_assets: parseInt(document.getElementById('fin_current_assets').value) || null,
+                            total_liabilities: parseInt(document.getElementById('fin_total_liabilities').value) || null,
+                            current_liabilities: parseInt(document.getElementById('fin_current_liabilities').value) || null,
+                            total_net_assets: parseInt(document.getElementById('fin_net_assets').value) || null,
+                            capital_stock: parseInt(document.getElementById('fin_capital_stock').value) || null,
+                            verified: true
+                        };
+                        endpoint = \`/api/clients/\${CLIENT_ID}/financial-statements\`;
+                    } else if (currentDataInputType === 'tax_return') {
+                        data = {
+                            tax_year: document.getElementById('tax_year').value,
+                            employee_count: parseInt(document.getElementById('tax_employee_count').value) || null,
+                            business_income: parseInt(document.getElementById('tax_business_income').value) || null,
+                            total_income: parseInt(document.getElementById('tax_total_income').value) || null,
+                            total_expenses: parseInt(document.getElementById('tax_total_expenses').value) || null,
+                            salary_wages: parseInt(document.getElementById('tax_salary_wages').value) || null,
+                            depreciation_expense: parseInt(document.getElementById('tax_depreciation').value) || null,
+                            rent_cost: parseInt(document.getElementById('tax_rent').value) || null,
+                            taxable_income: parseInt(document.getElementById('tax_taxable_income').value) || null,
+                            blue_return_deduction: parseInt(document.getElementById('tax_blue_deduction').value) || null,
+                            verified: true
+                        };
+                        endpoint = \`/api/clients/\${CLIENT_ID}/tax-return\`;
+                    }
+                    
+                    const response = await axios.post(endpoint, data);
+                    
+                    if (response.data.success) {
+                        showMessage('success', 'データを保存しました！');
+                        closeDataInputModal();
+                        
+                        // 財務諸表の場合は財務指標を表示
+                        if (currentDataInputType === 'financial') {
+                            setTimeout(() => showFinancialIndicators(), 500);
+                        }
+                    }
+                } catch (error) {
+                    console.error('データ保存エラー:', error);
+                    showMessage('error', 'データの保存に失敗しました');
+                }
+            }
+            
+            async function showFinancialIndicators() {
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/financial-indicators\`);
+                    const indicators = response.data;
+                    
+                    if (!indicators || indicators.length === 0) {
+                        return;
+                    }
+                    
+                    const latest = indicators[0];
+                    const modal = document.getElementById('financialIndicatorsModal');
+                    const content = document.getElementById('financialIndicatorsContent');
+                    
+                    const formatNumber = (num) => {
+                        if (num === null || num === undefined) return '-';
+                        return num.toLocaleString();
+                    };
+                    
+                    const formatPercent = (num) => {
+                        if (num === null || num === undefined) return '-';
+                        return (num * 100).toFixed(1) + '%';
+                    };
+                    
+                    content.innerHTML = \`
+                        <div class="space-y-4">
+                            <div class="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg p-4 border border-green-200">
+                                <h4 class="font-bold text-green-700 mb-3"><i class="fas fa-star mr-1"></i>補助金申請で重要な指標</h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-white rounded-lg p-3 text-center">
+                                        <div class="text-xs text-gray-500 mb-1">労働生産性</div>
+                                        <div class="text-xl font-bold text-green-600">\${formatNumber(latest.labor_productivity)}円</div>
+                                        <div class="text-xs text-gray-400">従業員1人あたり</div>
+                                    </div>
+                                    <div class="bg-white rounded-lg p-3 text-center">
+                                        <div class="text-xs text-gray-500 mb-1">付加価値額</div>
+                                        <div class="text-xl font-bold text-teal-600">\${formatNumber(latest.added_value)}円</div>
+                                        <div class="text-xs text-gray-400">営業利益+人件費+減価償却</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                <h4 class="font-bold text-blue-700 mb-3"><i class="fas fa-chart-pie mr-1"></i>収益性指標</h4>
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">売上総利益率</span>
+                                        <span class="font-medium">\${formatPercent(latest.gross_profit_margin)}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">営業利益率</span>
+                                        <span class="font-medium">\${formatPercent(latest.operating_profit_margin)}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">経常利益率</span>
+                                        <span class="font-medium">\${formatPercent(latest.ordinary_profit_margin)}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">当期純利益率</span>
+                                        <span class="font-medium">\${formatPercent(latest.net_profit_margin)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                                <h4 class="font-bold text-purple-700 mb-3"><i class="fas fa-shield-alt mr-1"></i>安全性指標</h4>
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">自己資本比率</span>
+                                        <span class="font-medium">\${formatPercent(latest.equity_ratio)}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">流動比率</span>
+                                        <span class="font-medium">\${formatPercent(latest.current_ratio)}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">ROE</span>
+                                        <span class="font-medium">\${formatPercent(latest.roe)}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">ROA</span>
+                                        <span class="font-medium">\${formatPercent(latest.roa)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-xs text-gray-500 text-center mt-4">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                これらの指標は入力された財務データから自動計算されました
+                            </div>
+                        </div>
+                    \`;
+                    
+                    modal.classList.remove('hidden');
+                } catch (error) {
+                    console.error('財務指標取得エラー:', error);
+                }
+            }
+            
+            function closeFinancialIndicatorsModal() {
+                document.getElementById('financialIndicatorsModal').classList.add('hidden');
+            }
+            
+            // ===============================
+            // 新規申込機能
+            // ===============================
+            
+            async function openNewApplicationModal() {
+                // 補助金種別を読み込む
+                try {
+                    const response = await axios.get('/api/subsidy-types');
+                    const subsidyTypes = response.data;
+                    
+                    const select = document.getElementById('applicationSubsidyType');
+                    select.innerHTML = '<option value="">選択してください</option>';
+                    
+                    // カテゴリでグループ化
+                    const grouped = {};
+                    subsidyTypes.forEach(type => {
+                        const cat = type.category || 'その他';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(type);
+                    });
+                    
+                    Object.entries(grouped).forEach(([category, types]) => {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = category;
+                        types.forEach(type => {
+                            const option = document.createElement('option');
+                            option.value = type.id;
+                            option.textContent = type.name;
+                            optgroup.appendChild(option);
+                        });
+                        select.appendChild(optgroup);
+                    });
+                    
+                } catch (error) {
+                    console.error('Error loading subsidy types:', error);
+                }
+                
+                document.getElementById('newApplicationModal').classList.remove('hidden');
+            }
+            
+            function closeNewApplicationModal() {
+                document.getElementById('newApplicationModal').classList.add('hidden');
+                document.getElementById('newApplicationForm').reset();
+            }
+            
+            async function submitNewApplication() {
+                const form = document.getElementById('newApplicationForm');
+                const formData = new FormData(form);
+                
+                const subsidyTypeId = formData.get('subsidy_type_id');
+                const notes = formData.get('notes');
+                const privacyAgreed = form.querySelector('[name="privacy_agreed"]').checked;
+                
+                if (!subsidyTypeId) {
+                    showMessage('error', '補助金・助成金を選択してください');
+                    return;
+                }
+                
+                if (!privacyAgreed) {
+                    showMessage('error', 'プライバシーポリシーに同意してください');
+                    return;
+                }
+                
+                try {
+                    // 新規申込として通信を送信
+                    await axios.post(\`/api/clients/\${CLIENT_ID}/communications\`, {
+                        message: \`【新規申込希望】補助金ID: \${subsidyTypeId}\\n相談内容: \${notes || 'なし'}\\nプライバシーポリシー同意: 済\`,
+                        sender_type: 'client',
+                        sender_name: '${client.name}'
+                    });
+                    
+                    showMessage('success', '新規申込を送信しました。担当者からご連絡いたします。');
+                    closeNewApplicationModal();
+                    loadCommunications();
+                } catch (error) {
+                    console.error('Error submitting application:', error);
+                    showMessage('error', '申込の送信に失敗しました。');
+                }
+            }
+            
+            // ===============================
             // 初期化
             // ===============================
             
             loadStatus();
+            loadAnnouncements();
+            loadPipelineProgress();
+            loadDepositInfo();
             loadHearingQuestions();
             loadChecklist();
             loadDocuments();
@@ -8076,7 +9837,7 @@ app.post('/api/clients/:clientId/ai-suggest', async (c) => {
     FROM clients c
     LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
     WHERE c.id = ?
-  `).bind(clientId).first()
+  `).bind(clientId).first() as any
   
   const answers = await DB.prepare(`
     SELECT hq.question_text, ha.answer_text
@@ -8085,22 +9846,70 @@ app.post('/api/clients/:clientId/ai-suggest', async (c) => {
     WHERE ha.client_id = ?
   `).bind(clientId).all()
   
+  // 提出書類から抽出したデータを取得
+  const profile = await DB.prepare(`
+    SELECT * FROM client_profiles WHERE client_id = ?
+  `).bind(clientId).first() as any
+  
+  // 財務データを取得
+  const financialData = await DB.prepare(`
+    SELECT * FROM client_financial_data WHERE client_id = ? ORDER BY fiscal_year DESC LIMIT 2
+  `).bind(clientId).all()
+  
+  // プロファイル情報を整形
+  let profileInfo = ''
+  if (profile) {
+    const profileItems = []
+    if (profile.company_name) profileItems.push(`会社名: ${profile.company_name}`)
+    if (profile.representative_name) profileItems.push(`代表者名: ${profile.representative_name}`)
+    if (profile.establishment_date) profileItems.push(`設立日: ${profile.establishment_date}`)
+    if (profile.capital_amount) profileItems.push(`資本金: ${Number(profile.capital_amount).toLocaleString()}円`)
+    if (profile.employee_count) profileItems.push(`従業員数: ${profile.employee_count}名`)
+    if (profile.business_description) profileItems.push(`事業内容: ${profile.business_description}`)
+    if (profile.main_products) profileItems.push(`主要製品・サービス: ${profile.main_products}`)
+    if (profile.address) profileItems.push(`所在地: ${profile.address}`)
+    if (profileItems.length > 0) {
+      profileInfo = `\n【登記簿・会社情報（書類から抽出）】\n${profileItems.join('\n')}`
+    }
+  }
+  
+  // 財務情報を整形
+  let financialInfo = ''
+  if (financialData.results && financialData.results.length > 0) {
+    const financialItems = (financialData.results as any[]).map(fd => {
+      const items = []
+      if (fd.fiscal_year) items.push(`会計年度: ${fd.fiscal_year}`)
+      if (fd.revenue) items.push(`売上高: ${Number(fd.revenue).toLocaleString()}円`)
+      if (fd.operating_income) items.push(`営業利益: ${Number(fd.operating_income).toLocaleString()}円`)
+      if (fd.ordinary_income) items.push(`経常利益: ${Number(fd.ordinary_income).toLocaleString()}円`)
+      if (fd.net_income) items.push(`当期純利益: ${Number(fd.net_income).toLocaleString()}円`)
+      if (fd.total_assets) items.push(`総資産: ${Number(fd.total_assets).toLocaleString()}円`)
+      return items.join(', ')
+    }).filter(s => s)
+    if (financialItems.length > 0) {
+      financialInfo = `\n【財務情報（決算書から抽出）】\n${financialItems.join('\n')}`
+    }
+  }
+  
   const prompt = `あなたは補助金申請の回答作成を支援するアシスタントです。
 
 【重要なルール】
 - マークダウン記法は使わないでください
 - 自然な日本語の文章で回答してください
 - 補助金申請に適した具体的で説得力のある文章を書いてください
+- 提出書類から抽出した情報（会社情報、財務データ）を積極的に活用してください
 - 200〜300字程度で簡潔に回答してください
 
-【顧客情報】
+【顧客基本情報】
 会社名: ${client?.company_name || '未設定'}
 申請予定の補助金: ${client?.subsidy_name || '未設定'}
+${profileInfo}
+${financialInfo}
 
 【既存の回答】
 ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text || '未回答'}`).join('\n')}
 
-以下の質問に対する回答例を作成してください。〇〇や△△などの箇所は、ユーザーが後で具体的な内容に置き換えられるようにしてください。
+以下の質問に対する回答例を作成してください。上記の会社情報や財務データを参考に、具体的な数字や事実を盛り込んでください。〇〇や△△などの箇所は、ユーザーが後で具体的な内容に置き換えられるようにしてください。
 
 質問: ${data.question_text}`
 
@@ -9910,6 +11719,678 @@ app.post('/api/backup/import', async (c) => {
   }
 })
 
+// ===============================
+// 書類解析・財務データ抽出API
+// ===============================
+
+// 書類タイプに基づく解析種別の判定
+function getDocumentAnalysisType(documentType: string): string | null {
+  const type = documentType.toLowerCase();
+  if (type.includes('登記') || type.includes('謄本') || type.includes('履歴事項')) {
+    return 'registry';
+  }
+  if (type.includes('決算') || type.includes('財務') || type.includes('貸借') || type.includes('損益') || type.includes('bs') || type.includes('pl')) {
+    return 'financial_statement';
+  }
+  if (type.includes('確定申告') || type.includes('申告書')) {
+    return 'tax_return';
+  }
+  return null;
+}
+
+// 書類解析をトリガー
+app.post('/api/documents/:id/analyze', async (c) => {
+  const { DB } = c.env;
+  const documentId = c.req.param('id');
+  
+  try {
+    // 書類情報を取得
+    const document = await DB.prepare(`
+      SELECT d.*, c.name as client_name 
+      FROM documents d
+      JOIN clients c ON d.client_id = c.id
+      WHERE d.id = ?
+    `).bind(documentId).first();
+    
+    if (!document) {
+      return c.json({ error: '書類が見つかりません' }, 404);
+    }
+    
+    const analysisType = getDocumentAnalysisType(document.document_type as string);
+    if (!analysisType) {
+      return c.json({ error: 'この書類タイプは自動解析に対応していません' }, 400);
+    }
+    
+    // 解析ログを作成
+    await DB.prepare(`
+      INSERT INTO document_analysis_logs (client_id, document_id, document_type, analysis_status)
+      VALUES (?, ?, ?, 'processing')
+    `).bind(document.client_id, documentId, analysisType).run();
+    
+    // ここでは模擬データを返す（実際はAI APIを呼び出す）
+    // 本番環境ではOCR + AI解析を実装
+    let extractedData: any = {};
+    let warnings: string[] = [];
+    
+    if (analysisType === 'registry') {
+      extractedData = {
+        company_name: '',
+        company_name_kana: '',
+        corporate_number: '',
+        head_office_address: '',
+        establishment_date: '',
+        capital_amount: null,
+        business_purpose: [],
+        representative_name: '',
+        representative_title: '代表取締役',
+        directors: [],
+        total_shares: null,
+        issued_shares: null
+      };
+      warnings.push('登記簿謄本の解析にはAI連携が必要です。手動で入力してください。');
+    } else if (analysisType === 'financial_statement') {
+      extractedData = {
+        fiscal_year: '',
+        revenue: null,
+        cost_of_sales: null,
+        gross_profit: null,
+        selling_admin_expenses: null,
+        operating_income: null,
+        ordinary_income: null,
+        net_income: null,
+        personnel_expenses: null,
+        depreciation: null,
+        total_assets: null,
+        total_liabilities: null,
+        total_net_assets: null,
+        employee_count: null
+      };
+      warnings.push('財務諸表の解析にはAI連携が必要です。主要項目を手動で入力してください。');
+    } else if (analysisType === 'tax_return') {
+      extractedData = {
+        tax_year: '',
+        business_income: null,
+        total_income: null,
+        total_expenses: null,
+        salary_wages: null,
+        depreciation_expense: null,
+        taxable_income: null,
+        income_tax: null,
+        employee_count: null
+      };
+      warnings.push('確定申告書の解析にはAI連携が必要です。手動で入力してください。');
+    }
+    
+    // 解析ログを更新
+    await DB.prepare(`
+      UPDATE document_analysis_logs 
+      SET analysis_status = 'completed',
+          extracted_data = ?,
+          warnings = ?,
+          completed_at = CURRENT_TIMESTAMP
+      WHERE document_id = ? AND analysis_status = 'processing'
+    `).bind(
+      JSON.stringify(extractedData),
+      JSON.stringify(warnings),
+      documentId
+    ).run();
+    
+    return c.json({
+      success: true,
+      document_id: documentId,
+      analysis_type: analysisType,
+      extracted_data: extractedData,
+      warnings,
+      message: '書類の解析準備が完了しました。データを確認・入力してください。',
+      requires_verification: true
+    });
+  } catch (error: any) {
+    console.error('Document analysis error:', error);
+    return c.json({ error: '書類の解析に失敗しました', details: error.message }, 500);
+  }
+});
+
+// 登記簿データの保存・更新
+app.post('/api/clients/:id/registry-data', async (c) => {
+  const { DB } = c.env;
+  const clientId = c.req.param('id');
+  const data = await c.req.json();
+  
+  try {
+    // 既存データをチェック
+    const existing = await DB.prepare(`
+      SELECT id FROM company_registry_data WHERE client_id = ?
+    `).bind(clientId).first();
+    
+    if (existing) {
+      // 更新
+      await DB.prepare(`
+        UPDATE company_registry_data SET
+          company_name = ?,
+          company_name_kana = ?,
+          corporate_number = ?,
+          head_office_address = ?,
+          establishment_date = ?,
+          capital_amount = ?,
+          business_purpose = ?,
+          representative_name = ?,
+          representative_title = ?,
+          representative_address = ?,
+          directors = ?,
+          total_shares = ?,
+          issued_shares = ?,
+          share_transfer_restriction = ?,
+          document_id = ?,
+          verified = ?,
+          verified_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE verified_at END,
+          manual_corrections = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE client_id = ?
+      `).bind(
+        data.company_name,
+        data.company_name_kana,
+        data.corporate_number,
+        data.head_office_address,
+        data.establishment_date,
+        data.capital_amount,
+        JSON.stringify(data.business_purpose || []),
+        data.representative_name,
+        data.representative_title,
+        data.representative_address,
+        JSON.stringify(data.directors || []),
+        data.total_shares,
+        data.issued_shares,
+        data.share_transfer_restriction,
+        data.document_id,
+        data.verified ? 1 : 0,
+        data.verified ? 1 : 0,
+        data.manual_corrections ? JSON.stringify(data.manual_corrections) : null,
+        clientId
+      ).run();
+    } else {
+      // 新規作成
+      await DB.prepare(`
+        INSERT INTO company_registry_data (
+          client_id, company_name, company_name_kana, corporate_number,
+          head_office_address, establishment_date, capital_amount, business_purpose,
+          representative_name, representative_title, representative_address,
+          directors, total_shares, issued_shares, share_transfer_restriction,
+          document_id, verified, verified_at, extraction_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).bind(
+        clientId,
+        data.company_name,
+        data.company_name_kana,
+        data.corporate_number,
+        data.head_office_address,
+        data.establishment_date,
+        data.capital_amount,
+        JSON.stringify(data.business_purpose || []),
+        data.representative_name,
+        data.representative_title,
+        data.representative_address,
+        JSON.stringify(data.directors || []),
+        data.total_shares,
+        data.issued_shares,
+        data.share_transfer_restriction,
+        data.document_id,
+        data.verified ? 1 : 0,
+        data.verified ? new Date().toISOString() : null
+      ).run();
+    }
+    
+    return c.json({ success: true, message: '登記簿データを保存しました' });
+  } catch (error: any) {
+    console.error('Registry data save error:', error);
+    return c.json({ error: '登記簿データの保存に失敗しました', details: error.message }, 500);
+  }
+});
+
+// 登記簿データの取得
+app.get('/api/clients/:id/registry-data', async (c) => {
+  const { DB } = c.env;
+  const clientId = c.req.param('id');
+  
+  try {
+    const data = await DB.prepare(`
+      SELECT * FROM company_registry_data WHERE client_id = ?
+    `).bind(clientId).first();
+    
+    if (!data) {
+      return c.json(null);
+    }
+    
+    // JSONフィールドをパース
+    return c.json({
+      ...data,
+      business_purpose: data.business_purpose ? JSON.parse(data.business_purpose as string) : [],
+      directors: data.directors ? JSON.parse(data.directors as string) : [],
+      manual_corrections: data.manual_corrections ? JSON.parse(data.manual_corrections as string) : null
+    });
+  } catch (error: any) {
+    return c.json({ error: '登記簿データの取得に失敗しました' }, 500);
+  }
+});
+
+// 財務諸表データの保存・更新
+app.post('/api/clients/:id/financial-statements', async (c) => {
+  const { DB } = c.env;
+  const clientId = c.req.param('id');
+  const data = await c.req.json();
+  
+  try {
+    // 既存データをチェック（同じ決算期）
+    const existing = await DB.prepare(`
+      SELECT id FROM financial_statements WHERE client_id = ? AND fiscal_year = ?
+    `).bind(clientId, data.fiscal_year).first();
+    
+    if (existing) {
+      // 更新
+      await DB.prepare(`
+        UPDATE financial_statements SET
+          fiscal_period = ?, document_id = ?,
+          revenue = ?, cost_of_sales = ?, gross_profit = ?,
+          selling_admin_expenses = ?, operating_income = ?,
+          non_operating_income = ?, non_operating_expenses = ?,
+          ordinary_income = ?, extraordinary_income = ?, extraordinary_loss = ?,
+          income_before_tax = ?, corporate_tax = ?, net_income = ?,
+          personnel_expenses = ?, depreciation = ?, rent_expenses = ?,
+          advertising_expenses = ?, rd_expenses = ?, other_expenses = ?,
+          current_assets = ?, cash_and_deposits = ?, accounts_receivable = ?,
+          inventory = ?, fixed_assets = ?, tangible_assets = ?,
+          intangible_assets = ?, investments = ?, total_assets = ?,
+          current_liabilities = ?, accounts_payable = ?, short_term_loans = ?,
+          fixed_liabilities = ?, long_term_loans = ?, total_liabilities = ?,
+          capital_stock = ?, capital_surplus = ?, retained_earnings = ?,
+          total_net_assets = ?, employee_count = ?, average_salary = ?,
+          verified = ?, verified_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE verified_at END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        data.fiscal_period, data.document_id,
+        data.revenue, data.cost_of_sales, data.gross_profit,
+        data.selling_admin_expenses, data.operating_income,
+        data.non_operating_income, data.non_operating_expenses,
+        data.ordinary_income, data.extraordinary_income, data.extraordinary_loss,
+        data.income_before_tax, data.corporate_tax, data.net_income,
+        data.personnel_expenses, data.depreciation, data.rent_expenses,
+        data.advertising_expenses, data.rd_expenses, data.other_expenses,
+        data.current_assets, data.cash_and_deposits, data.accounts_receivable,
+        data.inventory, data.fixed_assets, data.tangible_assets,
+        data.intangible_assets, data.investments, data.total_assets,
+        data.current_liabilities, data.accounts_payable, data.short_term_loans,
+        data.fixed_liabilities, data.long_term_loans, data.total_liabilities,
+        data.capital_stock, data.capital_surplus, data.retained_earnings,
+        data.total_net_assets, data.employee_count, data.average_salary,
+        data.verified ? 1 : 0, data.verified ? 1 : 0,
+        existing.id
+      ).run();
+    } else {
+      // 新規作成
+      await DB.prepare(`
+        INSERT INTO financial_statements (
+          client_id, fiscal_year, fiscal_period, document_id,
+          revenue, cost_of_sales, gross_profit,
+          selling_admin_expenses, operating_income,
+          non_operating_income, non_operating_expenses,
+          ordinary_income, extraordinary_income, extraordinary_loss,
+          income_before_tax, corporate_tax, net_income,
+          personnel_expenses, depreciation, rent_expenses,
+          advertising_expenses, rd_expenses, other_expenses,
+          current_assets, cash_and_deposits, accounts_receivable,
+          inventory, fixed_assets, tangible_assets,
+          intangible_assets, investments, total_assets,
+          current_liabilities, accounts_payable, short_term_loans,
+          fixed_liabilities, long_term_loans, total_liabilities,
+          capital_stock, capital_surplus, retained_earnings,
+          total_net_assets, employee_count, average_salary,
+          verified, verified_at, extraction_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).bind(
+        clientId, data.fiscal_year, data.fiscal_period, data.document_id,
+        data.revenue, data.cost_of_sales, data.gross_profit,
+        data.selling_admin_expenses, data.operating_income,
+        data.non_operating_income, data.non_operating_expenses,
+        data.ordinary_income, data.extraordinary_income, data.extraordinary_loss,
+        data.income_before_tax, data.corporate_tax, data.net_income,
+        data.personnel_expenses, data.depreciation, data.rent_expenses,
+        data.advertising_expenses, data.rd_expenses, data.other_expenses,
+        data.current_assets, data.cash_and_deposits, data.accounts_receivable,
+        data.inventory, data.fixed_assets, data.tangible_assets,
+        data.intangible_assets, data.investments, data.total_assets,
+        data.current_liabilities, data.accounts_payable, data.short_term_loans,
+        data.fixed_liabilities, data.long_term_loans, data.total_liabilities,
+        data.capital_stock, data.capital_surplus, data.retained_earnings,
+        data.total_net_assets, data.employee_count, data.average_salary,
+        data.verified ? 1 : 0, data.verified ? new Date().toISOString() : null
+      ).run();
+    }
+    
+    // 財務指標を自動計算
+    await calculateFinancialIndicators(DB, clientId, data.fiscal_year, 'financial_statement', data);
+    
+    return c.json({ success: true, message: '財務諸表データを保存しました' });
+  } catch (error: any) {
+    console.error('Financial statement save error:', error);
+    return c.json({ error: '財務諸表データの保存に失敗しました', details: error.message }, 500);
+  }
+});
+
+// 財務諸表データの取得
+app.get('/api/clients/:id/financial-statements', async (c) => {
+  const { DB } = c.env;
+  const clientId = c.req.param('id');
+  
+  try {
+    const data = await DB.prepare(`
+      SELECT * FROM financial_statements 
+      WHERE client_id = ? 
+      ORDER BY fiscal_year DESC
+    `).bind(clientId).all();
+    
+    return c.json(data.results || []);
+  } catch (error: any) {
+    return c.json({ error: '財務諸表データの取得に失敗しました' }, 500);
+  }
+});
+
+// 財務指標の自動計算関数
+async function calculateFinancialIndicators(
+  DB: D1Database, 
+  clientId: string, 
+  fiscalYear: string, 
+  sourceType: string,
+  data: any
+) {
+  try {
+    // 付加価値額の計算（中小企業庁方式）
+    // 付加価値額 = 営業利益 + 人件費 + 減価償却費
+    const addedValue = (data.operating_income || 0) + (data.personnel_expenses || 0) + (data.depreciation || 0);
+    
+    // 労働生産性 = 付加価値額 / 従業員数
+    const laborProductivity = data.employee_count ? Math.round(addedValue / data.employee_count) : null;
+    
+    // 付加価値率 = 付加価値額 / 売上高
+    const addedValueRate = data.revenue ? addedValue / data.revenue : null;
+    
+    // 一人当たり売上高
+    const perCapitaSales = data.employee_count && data.revenue ? Math.round(data.revenue / data.employee_count) : null;
+    
+    // 収益性指標
+    const grossProfitMargin = data.revenue ? (data.gross_profit || 0) / data.revenue : null;
+    const operatingProfitMargin = data.revenue ? (data.operating_income || 0) / data.revenue : null;
+    const ordinaryProfitMargin = data.revenue ? (data.ordinary_income || 0) / data.revenue : null;
+    const netProfitMargin = data.revenue ? (data.net_income || 0) / data.revenue : null;
+    
+    // 安全性指標
+    const equityRatio = data.total_assets ? (data.total_net_assets || 0) / data.total_assets : null;
+    const currentRatio = data.current_liabilities ? (data.current_assets || 0) / data.current_liabilities : null;
+    const debtRatio = data.total_net_assets ? (data.total_liabilities || 0) / data.total_net_assets : null;
+    
+    // ROE = 当期純利益 / 自己資本
+    const roe = data.total_net_assets ? (data.net_income || 0) / data.total_net_assets : null;
+    
+    // ROA = 当期純利益 / 総資産
+    const roa = data.total_assets ? (data.net_income || 0) / data.total_assets : null;
+    
+    // 既存データをチェック
+    const existing = await DB.prepare(`
+      SELECT id FROM financial_indicators 
+      WHERE client_id = ? AND fiscal_year = ? AND source_type = ?
+    `).bind(clientId, fiscalYear, sourceType).first();
+    
+    if (existing) {
+      await DB.prepare(`
+        UPDATE financial_indicators SET
+          labor_productivity = ?,
+          added_value = ?,
+          added_value_rate = ?,
+          per_capita_sales = ?,
+          gross_profit_margin = ?,
+          operating_profit_margin = ?,
+          ordinary_profit_margin = ?,
+          net_profit_margin = ?,
+          equity_ratio = ?,
+          current_ratio = ?,
+          debt_ratio = ?,
+          roe = ?,
+          roa = ?,
+          calculation_date = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        laborProductivity, addedValue, addedValueRate, perCapitaSales,
+        grossProfitMargin, operatingProfitMargin, ordinaryProfitMargin, netProfitMargin,
+        equityRatio, currentRatio, debtRatio, roe, roa,
+        existing.id
+      ).run();
+    } else {
+      await DB.prepare(`
+        INSERT INTO financial_indicators (
+          client_id, fiscal_year, source_type,
+          labor_productivity, added_value, added_value_rate, per_capita_sales,
+          gross_profit_margin, operating_profit_margin, ordinary_profit_margin, net_profit_margin,
+          equity_ratio, current_ratio, debt_ratio, roe, roa
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        clientId, fiscalYear, sourceType,
+        laborProductivity, addedValue, addedValueRate, perCapitaSales,
+        grossProfitMargin, operatingProfitMargin, ordinaryProfitMargin, netProfitMargin,
+        equityRatio, currentRatio, debtRatio, roe, roa
+      ).run();
+    }
+  } catch (error) {
+    console.error('Financial indicators calculation error:', error);
+  }
+}
+
+// 財務指標の取得
+app.get('/api/clients/:id/financial-indicators', async (c) => {
+  const { DB } = c.env;
+  const clientId = c.req.param('id');
+  
+  try {
+    const indicators = await DB.prepare(`
+      SELECT * FROM financial_indicators 
+      WHERE client_id = ? 
+      ORDER BY fiscal_year DESC
+    `).bind(clientId).all();
+    
+    return c.json(indicators.results || []);
+  } catch (error: any) {
+    return c.json({ error: '財務指標の取得に失敗しました' }, 500);
+  }
+});
+
+// 確定申告書データの保存・更新
+app.post('/api/clients/:id/tax-return', async (c) => {
+  const { DB } = c.env;
+  const clientId = c.req.param('id');
+  const data = await c.req.json();
+  
+  try {
+    const existing = await DB.prepare(`
+      SELECT id FROM tax_return_data WHERE client_id = ? AND tax_year = ?
+    `).bind(clientId, data.tax_year).first();
+    
+    if (existing) {
+      await DB.prepare(`
+        UPDATE tax_return_data SET
+          document_id = ?,
+          business_income = ?, agricultural_income = ?,
+          real_estate_income = ?, salary_income = ?,
+          miscellaneous_income = ?, total_income = ?,
+          total_expenses = ?, salary_wages = ?,
+          outsourcing_cost = ?, depreciation_expense = ?,
+          interest_discount = ?, rent_cost = ?,
+          utility_cost = ?, communication_cost = ?,
+          advertising_cost = ?, consumables_cost = ?,
+          taxable_income = ?, income_tax = ?,
+          blue_return_deduction = ?,
+          employee_count = ?, family_employee_count = ?,
+          verified = ?, verified_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE verified_at END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        data.document_id,
+        data.business_income, data.agricultural_income,
+        data.real_estate_income, data.salary_income,
+        data.miscellaneous_income, data.total_income,
+        data.total_expenses, data.salary_wages,
+        data.outsourcing_cost, data.depreciation_expense,
+        data.interest_discount, data.rent_cost,
+        data.utility_cost, data.communication_cost,
+        data.advertising_cost, data.consumables_cost,
+        data.taxable_income, data.income_tax,
+        data.blue_return_deduction,
+        data.employee_count, data.family_employee_count,
+        data.verified ? 1 : 0, data.verified ? 1 : 0,
+        existing.id
+      ).run();
+    } else {
+      await DB.prepare(`
+        INSERT INTO tax_return_data (
+          client_id, tax_year, document_id,
+          business_income, agricultural_income,
+          real_estate_income, salary_income,
+          miscellaneous_income, total_income,
+          total_expenses, salary_wages,
+          outsourcing_cost, depreciation_expense,
+          interest_discount, rent_cost,
+          utility_cost, communication_cost,
+          advertising_cost, consumables_cost,
+          taxable_income, income_tax,
+          blue_return_deduction,
+          employee_count, family_employee_count,
+          verified, verified_at, extraction_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).bind(
+        clientId, data.tax_year, data.document_id,
+        data.business_income, data.agricultural_income,
+        data.real_estate_income, data.salary_income,
+        data.miscellaneous_income, data.total_income,
+        data.total_expenses, data.salary_wages,
+        data.outsourcing_cost, data.depreciation_expense,
+        data.interest_discount, data.rent_cost,
+        data.utility_cost, data.communication_cost,
+        data.advertising_cost, data.consumables_cost,
+        data.taxable_income, data.income_tax,
+        data.blue_return_deduction,
+        data.employee_count, data.family_employee_count,
+        data.verified ? 1 : 0, data.verified ? new Date().toISOString() : null
+      ).run();
+    }
+    
+    return c.json({ success: true, message: '確定申告書データを保存しました' });
+  } catch (error: any) {
+    console.error('Tax return save error:', error);
+    return c.json({ error: '確定申告書データの保存に失敗しました', details: error.message }, 500);
+  }
+});
+
+// 確定申告書データの取得
+app.get('/api/clients/:id/tax-return', async (c) => {
+  const { DB } = c.env;
+  const clientId = c.req.param('id');
+  
+  try {
+    const data = await DB.prepare(`
+      SELECT * FROM tax_return_data 
+      WHERE client_id = ? 
+      ORDER BY tax_year DESC
+    `).bind(clientId).all();
+    
+    return c.json(data.results || []);
+  } catch (error: any) {
+    return c.json({ error: '確定申告書データの取得に失敗しました' }, 500);
+  }
+});
+
+// 事業計画テンプレート取得
+app.get('/api/business-plan-templates/:subsidyTypeId', async (c) => {
+  const { DB } = c.env;
+  const subsidyTypeId = c.req.param('subsidyTypeId');
+  
+  try {
+    const templates = await DB.prepare(`
+      SELECT * FROM business_plan_templates 
+      WHERE subsidy_type_id = ?
+      ORDER BY section_order ASC
+    `).bind(subsidyTypeId).all();
+    
+    // JSONフィールドをパース
+    const result = (templates.results || []).map((t: any) => ({
+      ...t,
+      key_points: t.key_points ? JSON.parse(t.key_points) : [],
+      common_mistakes: t.common_mistakes ? JSON.parse(t.common_mistakes) : [],
+      successful_patterns: t.successful_patterns ? JSON.parse(t.successful_patterns) : null,
+      keyword_suggestions: t.keyword_suggestions ? JSON.parse(t.keyword_suggestions) : []
+    }));
+    
+    return c.json(result);
+  } catch (error: any) {
+    return c.json({ error: 'テンプレートの取得に失敗しました' }, 500);
+  }
+});
+
+// 顧客の抽出データサマリー取得（基本情報フィールド埋め用）
+app.get('/api/clients/:id/extracted-data-summary', async (c) => {
+  const { DB } = c.env;
+  const clientId = c.req.param('id');
+  
+  try {
+    // 登記簿データ
+    const registry = await DB.prepare(`
+      SELECT * FROM company_registry_data WHERE client_id = ?
+    `).bind(clientId).first();
+    
+    // 最新の財務諸表
+    const financial = await DB.prepare(`
+      SELECT * FROM financial_statements 
+      WHERE client_id = ? 
+      ORDER BY fiscal_year DESC LIMIT 1
+    `).bind(clientId).first();
+    
+    // 最新の確定申告書
+    const taxReturn = await DB.prepare(`
+      SELECT * FROM tax_return_data 
+      WHERE client_id = ? 
+      ORDER BY tax_year DESC LIMIT 1
+    `).bind(clientId).first();
+    
+    // 財務指標
+    const indicators = await DB.prepare(`
+      SELECT * FROM financial_indicators 
+      WHERE client_id = ? 
+      ORDER BY fiscal_year DESC LIMIT 1
+    `).bind(clientId).first();
+    
+    return c.json({
+      registry: registry ? {
+        ...registry,
+        business_purpose: registry.business_purpose ? JSON.parse(registry.business_purpose as string) : [],
+        directors: registry.directors ? JSON.parse(registry.directors as string) : []
+      } : null,
+      financial_statement: financial,
+      tax_return: taxReturn,
+      financial_indicators: indicators,
+      summary: {
+        company_name: registry?.company_name || null,
+        address: registry?.head_office_address || null,
+        establishment_date: registry?.establishment_date || null,
+        capital_amount: registry?.capital_amount || null,
+        representative_name: registry?.representative_name || null,
+        employee_count: financial?.employee_count || taxReturn?.employee_count || null,
+        annual_revenue: financial?.revenue || taxReturn?.business_income || null,
+        operating_income: financial?.operating_income || null,
+        labor_productivity: indicators?.labor_productivity || null,
+        added_value: indicators?.added_value || null
+      }
+    });
+  } catch (error: any) {
+    return c.json({ error: 'データサマリーの取得に失敗しました' }, 500);
+  }
+});
+
 // 選択的インポート（特定テーブルのみ）
 app.post('/api/backup/import-selective', async (c) => {
   const { DB } = c.env
@@ -9985,6 +12466,1835 @@ app.post('/api/backup/import-selective', async (c) => {
   } catch (error: any) {
     return c.json({ error: '選択的インポートに失敗しました', details: error.message }, 500)
   }
+})
+
+// ===============================
+// パイプライン管理API
+// ===============================
+
+// パイプラインテンプレート一覧取得
+app.get('/api/pipeline-templates', async (c) => {
+  const { DB } = c.env
+  const category = c.req.query('category')
+  
+  let query = `
+    SELECT pt.*, 
+           (SELECT COUNT(*) FROM pipeline_template_tasks WHERE template_id = pt.id) as task_count
+    FROM pipeline_templates pt
+    WHERE pt.is_active = 1
+  `
+  
+  if (category) {
+    query += ` AND pt.category = ?`
+    const templates = await DB.prepare(query).bind(category).all()
+    return c.json(templates.results || [])
+  }
+  
+  const templates = await DB.prepare(query).all()
+  return c.json(templates.results || [])
+})
+
+// パイプラインテンプレート詳細取得
+app.get('/api/pipeline-templates/:id', async (c) => {
+  const { DB } = c.env
+  const templateId = c.req.param('id')
+  
+  const template = await DB.prepare(`
+    SELECT * FROM pipeline_templates WHERE id = ?
+  `).bind(templateId).first()
+  
+  if (!template) {
+    return c.json({ error: 'テンプレートが見つかりません' }, 404)
+  }
+  
+  const tasks = await DB.prepare(`
+    SELECT * FROM pipeline_template_tasks 
+    WHERE template_id = ? 
+    ORDER BY sort_order ASC
+  `).bind(templateId).all()
+  
+  return c.json({
+    ...template,
+    tasks: tasks.results || []
+  })
+})
+
+// パイプラインテンプレート作成
+app.post('/api/pipeline-templates', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  const result = await DB.prepare(`
+    INSERT INTO pipeline_templates 
+    (name, description, category, service_start_offset, service_end_offset, 
+     requires_approval, allow_external_tasks, progress_reflection, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.name,
+    data.description || '',
+    data.category || 'general',
+    data.service_start_offset || 0,
+    data.service_end_offset || 30,
+    data.requires_approval ? 1 : 0,
+    data.allow_external_tasks ? 1 : 0,
+    data.progress_reflection !== false ? 1 : 0,
+    data.created_by || null
+  ).run()
+  
+  const templateId = result.meta.last_row_id
+  
+  // タスクがある場合は追加
+  if (data.tasks && Array.isArray(data.tasks)) {
+    for (let i = 0; i < data.tasks.length; i++) {
+      const task = data.tasks[i]
+      await DB.prepare(`
+        INSERT INTO pipeline_template_tasks 
+        (template_id, task_name, task_type, description, sort_order, 
+         days_offset_start, days_offset_end, is_required, default_assignee_role)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        templateId,
+        task.task_name,
+        task.task_type || 'internal',
+        task.description || '',
+        i + 1,
+        task.days_offset_start || 0,
+        task.days_offset_end || 7,
+        task.is_required !== false ? 1 : 0,
+        task.default_assignee_role || null
+      ).run()
+    }
+  }
+  
+  return c.json({ 
+    success: true, 
+    id: templateId,
+    message: 'パイプラインテンプレートを作成しました' 
+  })
+})
+
+// パイプラインテンプレート更新
+app.put('/api/pipeline-templates/:id', async (c) => {
+  const { DB } = c.env
+  const templateId = c.req.param('id')
+  const data = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE pipeline_templates SET
+    name = ?, description = ?, category = ?, 
+    service_start_offset = ?, service_end_offset = ?,
+    requires_approval = ?, allow_external_tasks = ?, progress_reflection = ?,
+    updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    data.name,
+    data.description || '',
+    data.category || 'general',
+    data.service_start_offset || 0,
+    data.service_end_offset || 30,
+    data.requires_approval ? 1 : 0,
+    data.allow_external_tasks ? 1 : 0,
+    data.progress_reflection !== false ? 1 : 0,
+    templateId
+  ).run()
+  
+  // タスクを更新（一旦削除して再作成）
+  if (data.tasks && Array.isArray(data.tasks)) {
+    await DB.prepare(`DELETE FROM pipeline_template_tasks WHERE template_id = ?`).bind(templateId).run()
+    
+    for (let i = 0; i < data.tasks.length; i++) {
+      const task = data.tasks[i]
+      await DB.prepare(`
+        INSERT INTO pipeline_template_tasks 
+        (template_id, task_name, task_type, description, sort_order, 
+         days_offset_start, days_offset_end, is_required, default_assignee_role)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        templateId,
+        task.task_name,
+        task.task_type || 'internal',
+        task.description || '',
+        i + 1,
+        task.days_offset_start || 0,
+        task.days_offset_end || 7,
+        task.is_required !== false ? 1 : 0,
+        task.default_assignee_role || null
+      ).run()
+    }
+  }
+  
+  return c.json({ 
+    success: true,
+    message: 'パイプラインテンプレートを更新しました' 
+  })
+})
+
+// パイプラインテンプレート削除
+app.delete('/api/pipeline-templates/:id', async (c) => {
+  const { DB } = c.env
+  const templateId = c.req.param('id')
+  
+  await DB.prepare(`
+    UPDATE pipeline_templates SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).bind(templateId).run()
+  
+  return c.json({ 
+    success: true,
+    message: 'パイプラインテンプレートを削除しました' 
+  })
+})
+
+// クライアントにパイプラインを適用
+app.post('/api/clients/:clientId/apply-pipeline', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId')
+  const { template_id, service_start_date } = await c.req.json()
+  
+  // テンプレート取得
+  const template = await DB.prepare(`
+    SELECT * FROM pipeline_templates WHERE id = ? AND is_active = 1
+  `).bind(template_id).first()
+  
+  if (!template) {
+    return c.json({ error: 'テンプレートが見つかりません' }, 404)
+  }
+  
+  // 開始日を設定
+  const startDate = service_start_date ? new Date(service_start_date) : new Date()
+  const endDate = new Date(startDate)
+  endDate.setDate(endDate.getDate() + (template.service_end_offset || 30))
+  
+  // パイプライン作成
+  const pipelineResult = await DB.prepare(`
+    INSERT INTO client_pipelines 
+    (client_id, template_id, pipeline_name, service_start_date, service_end_date, status)
+    VALUES (?, ?, ?, ?, ?, 'active')
+  `).bind(
+    clientId,
+    template_id,
+    template.name,
+    startDate.toISOString().split('T')[0],
+    endDate.toISOString().split('T')[0]
+  ).run()
+  
+  const pipelineId = pipelineResult.meta.last_row_id
+  
+  // テンプレートタスクを取得してクライアントタスクを作成
+  const templateTasks = await DB.prepare(`
+    SELECT * FROM pipeline_template_tasks 
+    WHERE template_id = ? 
+    ORDER BY sort_order ASC
+  `).bind(template_id).all()
+  
+  for (const task of (templateTasks.results || [])) {
+    const taskStart = new Date(startDate)
+    taskStart.setDate(taskStart.getDate() + (task.days_offset_start || 0))
+    
+    const taskEnd = new Date(startDate)
+    taskEnd.setDate(taskEnd.getDate() + (task.days_offset_end || 7))
+    
+    await DB.prepare(`
+      INSERT INTO client_pipeline_tasks 
+      (pipeline_id, template_task_id, task_name, task_type, description, 
+       sort_order, start_date, end_date, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    `).bind(
+      pipelineId,
+      task.id,
+      task.task_name,
+      task.task_type,
+      task.description,
+      task.sort_order,
+      taskStart.toISOString().split('T')[0],
+      taskEnd.toISOString().split('T')[0]
+    ).run()
+  }
+  
+  return c.json({ 
+    success: true,
+    pipeline_id: pipelineId,
+    message: 'パイプラインを適用しました' 
+  })
+})
+
+// クライアントのパイプライン一覧取得
+app.get('/api/clients/:clientId/pipelines', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId')
+  
+  const pipelines = await DB.prepare(`
+    SELECT cp.*, pt.name as template_name,
+           (SELECT COUNT(*) FROM client_pipeline_tasks WHERE pipeline_id = cp.id) as total_tasks,
+           (SELECT COUNT(*) FROM client_pipeline_tasks WHERE pipeline_id = cp.id AND status = 'completed') as completed_tasks
+    FROM client_pipelines cp
+    LEFT JOIN pipeline_templates pt ON cp.template_id = pt.id
+    WHERE cp.client_id = ?
+    ORDER BY cp.created_at DESC
+  `).bind(clientId).all()
+  
+  return c.json(pipelines.results || [])
+})
+
+// パイプラインタスク一覧取得
+app.get('/api/pipelines/:pipelineId/tasks', async (c) => {
+  const { DB } = c.env
+  const pipelineId = c.req.param('pipelineId')
+  
+  const tasks = await DB.prepare(`
+    SELECT cpt.*, au.name as assignee_name
+    FROM client_pipeline_tasks cpt
+    LEFT JOIN admin_users au ON cpt.assigned_to = au.id
+    WHERE cpt.pipeline_id = ?
+    ORDER BY cpt.sort_order ASC
+  `).bind(pipelineId).all()
+  
+  return c.json(tasks.results || [])
+})
+
+// タスク更新
+app.put('/api/pipeline-tasks/:taskId', async (c) => {
+  const { DB } = c.env
+  const taskId = c.req.param('taskId')
+  const data = await c.req.json()
+  
+  // 現在の状態を取得
+  const currentTask = await DB.prepare(`
+    SELECT * FROM client_pipeline_tasks WHERE id = ?
+  `).bind(taskId).first()
+  
+  if (!currentTask) {
+    return c.json({ error: 'タスクが見つかりません' }, 404)
+  }
+  
+  // 更新
+  await DB.prepare(`
+    UPDATE client_pipeline_tasks SET
+    status = COALESCE(?, status),
+    progress_percentage = COALESCE(?, progress_percentage),
+    assigned_to = ?,
+    notes = COALESCE(?, notes),
+    completed_at = CASE WHEN ? = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_at END,
+    updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    data.status || null,
+    data.progress_percentage !== undefined ? data.progress_percentage : null,
+    data.assigned_to || null,
+    data.notes || null,
+    data.status || null,
+    taskId
+  ).run()
+  
+  // 履歴を記録
+  if (data.status !== currentTask.status || data.progress_percentage !== currentTask.progress_percentage) {
+    await DB.prepare(`
+      INSERT INTO task_history 
+      (task_id, old_status, new_status, old_progress, new_progress, changed_by, change_note)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      taskId,
+      currentTask.status,
+      data.status || currentTask.status,
+      currentTask.progress_percentage,
+      data.progress_percentage || currentTask.progress_percentage,
+      data.changed_by || null,
+      data.change_note || null
+    ).run()
+  }
+  
+  // パイプラインの進捗を更新
+  const pipelineTasks = await DB.prepare(`
+    SELECT status FROM client_pipeline_tasks WHERE pipeline_id = ?
+  `).bind(currentTask.pipeline_id).all()
+  
+  const totalTasks = pipelineTasks.results?.length || 1
+  const completedTasks = pipelineTasks.results?.filter((t: any) => t.status === 'completed').length || 0
+  const progressPercentage = Math.round((completedTasks / totalTasks) * 100)
+  
+  await DB.prepare(`
+    UPDATE client_pipelines SET 
+    progress_percentage = ?,
+    status = CASE WHEN ? = 100 THEN 'completed' ELSE status END,
+    updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(progressPercentage, progressPercentage, currentTask.pipeline_id).run()
+  
+  return c.json({ 
+    success: true,
+    message: 'タスクを更新しました',
+    pipeline_progress: progressPercentage
+  })
+})
+
+// ===============================
+// お知らせ管理API
+// ===============================
+
+// お知らせ一覧取得（管理者用）
+app.get('/api/announcements', async (c) => {
+  const { DB } = c.env
+  const includeInactive = c.req.query('include_inactive') === 'true'
+  
+  let query = `SELECT * FROM announcements`
+  if (!includeInactive) {
+    query += ` WHERE is_active = 1`
+  }
+  query += ` ORDER BY created_at DESC`
+  
+  const announcements = await DB.prepare(query).all()
+  return c.json(announcements.results || [])
+})
+
+// 顧客向けお知らせ取得
+app.get('/api/clients/:clientId/announcements', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId')
+  
+  const now = new Date().toISOString()
+  
+  const announcements = await DB.prepare(`
+    SELECT a.*, 
+           CASE WHEN ar.id IS NOT NULL THEN 1 ELSE 0 END as is_read
+    FROM announcements a
+    LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.client_id = ?
+    WHERE a.is_active = 1
+    AND (a.target_type = 'all' OR a.target_type = 'client' 
+         OR (a.target_type = 'specific' AND a.target_ids LIKE ?))
+    AND (a.start_date IS NULL OR a.start_date <= ?)
+    AND (a.end_date IS NULL OR a.end_date >= ?)
+    ORDER BY a.created_at DESC
+  `).bind(clientId, `%${clientId}%`, now, now).all()
+  
+  return c.json(announcements.results || [])
+})
+
+// お知らせ作成
+app.post('/api/announcements', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  const result = await DB.prepare(`
+    INSERT INTO announcements 
+    (title, content, type, target_type, target_ids, start_date, end_date, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.title,
+    data.content,
+    data.type || 'info',
+    data.target_type || 'all',
+    data.target_ids || null,
+    data.start_date || null,
+    data.end_date || null,
+    data.created_by || null
+  ).run()
+  
+  return c.json({ 
+    success: true,
+    id: result.meta.last_row_id,
+    message: 'お知らせを作成しました' 
+  })
+})
+
+// お知らせ既読
+app.post('/api/announcements/:id/read', async (c) => {
+  const { DB } = c.env
+  const announcementId = c.req.param('id')
+  const { client_id, admin_user_id } = await c.req.json()
+  
+  await DB.prepare(`
+    INSERT OR IGNORE INTO announcement_reads (announcement_id, client_id, admin_user_id)
+    VALUES (?, ?, ?)
+  `).bind(announcementId, client_id || null, admin_user_id || null).run()
+  
+  return c.json({ success: true })
+})
+
+// ===============================
+// パイプライン管理ページ
+// ===============================
+
+app.get('/admin/pipelines', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>パイプライン管理 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            .sidebar-link { transition: all 0.2s; }
+            .sidebar-link:hover { background-color: rgba(255,255,255,0.1); }
+            .sidebar-link.active { background-color: rgba(255,255,255,0.2); border-left: 3px solid white; }
+            .task-card { transition: all 0.2s; }
+            .task-card:hover { transform: translateX(4px); }
+        </style>
+    </head>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            <!-- 左サイドバー -->
+            <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50">
+                <div class="p-4 border-b border-blue-700">
+                    <h1 class="text-xl font-bold flex items-center gap-2">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>助成金管理</span>
+                    </h1>
+                    <p class="text-xs text-blue-300 mt-1">Subsidy Manager</p>
+                </div>
+                
+                <nav class="p-4 space-y-1">
+                    <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-home w-5"></i>
+                        <span>ダッシュボード</span>
+                    </a>
+                    
+                    <div class="pt-4 pb-2">
+                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">顧客管理</p>
+                    </div>
+                    <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-users w-5"></i>
+                        <span>顧客一覧</span>
+                    </a>
+                    
+                    <div class="pt-4 pb-2">
+                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
+                    </div>
+                    <a href="/subsidy-types" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-building w-5"></i>
+                        <span>補助金一覧</span>
+                        <span class="ml-auto text-xs bg-blue-700 px-2 py-0.5 rounded">行政書士</span>
+                    </a>
+                    <a href="/subsidy-types?category=employment" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-hand-holding-usd w-5"></i>
+                        <span>助成金一覧</span>
+                        <span class="ml-auto text-xs bg-green-700 px-2 py-0.5 rounded">社労士</span>
+                    </a>
+                    <a href="/admin/pipelines" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-project-diagram w-5"></i>
+                        <span>パイプライン管理</span>
+                    </a>
+                    
+                    <div class="pt-4 pb-2">
+                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">設定</p>
+                    </div>
+                    <a href="/admin/guidelines" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-book-open w-5"></i>
+                        <span>公募要領管理</span>
+                    </a>
+                </nav>
+            </aside>
+            
+            <!-- サイドバーオーバーレイ -->
+            <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden"></div>
+            
+            <!-- メインコンテンツ -->
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">パイプライン管理</h2>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="openNewTemplateModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-plus mr-2"></i>新規テンプレート
+                            </button>
+                        </div>
+                    </div>
+                </header>
+                
+                <div class="p-4 lg:p-6">
+                    <!-- テンプレート一覧 -->
+                    <div class="bg-white rounded-xl shadow-sm">
+                        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                            <h3 class="text-base font-bold text-gray-800">パイプラインテンプレート</h3>
+                            <select id="filterCategory" onchange="loadTemplates()" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm">
+                                <option value="">すべてのカテゴリ</option>
+                                <option value="subsidy">補助金</option>
+                                <option value="grant">助成金</option>
+                                <option value="general">一般</option>
+                            </select>
+                        </div>
+                        <div id="templatesList" class="divide-y divide-gray-100">
+                            <div class="text-center py-12 text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                                <div>読み込み中...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+        
+        <!-- 新規テンプレートモーダル -->
+        <div id="newTemplateModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b sticky top-0 bg-white z-10">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold">新規パイプラインテンプレート作成</h3>
+                        <button onclick="closeNewTemplateModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <form id="newTemplateForm" class="p-6 space-y-6">
+                    <!-- 基本情報 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium mb-1">パイプライン名 *</label>
+                            <input type="text" name="name" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium mb-1">説明</label>
+                            <textarea name="description" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">カテゴリ *</label>
+                            <select name="category" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="subsidy">補助金</option>
+                                <option value="grant">助成金</option>
+                                <option value="general">一般</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">担当者</label>
+                            <select name="created_by" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">選択してください</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 期間設定 -->
+                    <div class="border rounded-lg p-4 bg-gray-50">
+                        <h4 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fas fa-calendar-alt text-blue-600"></i>サービス期間設定
+                        </h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">開始日オフセット（日）</label>
+                                <input type="number" name="service_start_offset" value="0" class="w-full px-3 py-2 border rounded-lg">
+                                <p class="text-xs text-gray-500 mt-1">申請日からの日数</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">終了日オフセット（日）</label>
+                                <input type="number" name="service_end_offset" value="30" class="w-full px-3 py-2 border rounded-lg">
+                                <p class="text-xs text-gray-500 mt-1">申請日からの日数</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- オプション -->
+                    <div class="border rounded-lg p-4 bg-gray-50">
+                        <h4 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fas fa-cog text-blue-600"></i>オプション
+                        </h4>
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-3">
+                                <input type="checkbox" name="progress_reflection" checked class="rounded text-blue-600">
+                                <span class="text-sm">進捗反映</span>
+                            </label>
+                            <label class="flex items-center gap-3">
+                                <input type="checkbox" name="allow_external_tasks" class="rounded text-blue-600">
+                                <span class="text-sm">外部タスクを許可</span>
+                            </label>
+                            <label class="flex items-center gap-3">
+                                <input type="checkbox" name="requires_approval" class="rounded text-blue-600">
+                                <span class="text-sm">承認が必要</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- サービスタスク -->
+                    <div class="border rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-medium flex items-center gap-2">
+                                <i class="fas fa-tasks text-blue-600"></i>サービスタスク
+                            </h4>
+                            <button type="button" onclick="addTaskRow()" class="text-blue-600 hover:text-blue-700 text-sm">
+                                <i class="fas fa-plus mr-1"></i>タスク追加
+                            </button>
+                        </div>
+                        <div id="tasksList" class="space-y-3">
+                            <!-- タスク行がここに追加される -->
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium">
+                            <i class="fas fa-save mr-2"></i>保存
+                        </button>
+                        <button type="button" onclick="closeNewTemplateModal()" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 font-medium">
+                            キャンセル
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- テンプレート詳細モーダル -->
+        <div id="templateDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b sticky top-0 bg-white z-10">
+                    <div class="flex items-center justify-between">
+                        <h3 id="templateDetailTitle" class="text-xl font-bold">テンプレート詳細</h3>
+                        <button onclick="closeTemplateDetailModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="templateDetailContent" class="p-6">
+                    <!-- 詳細がここに表示される -->
+                </div>
+            </div>
+        </div>
+        
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            // 認証チェック
+            function checkAuth() {
+                const token = localStorage.getItem('admin_token');
+                if (!token) {
+                    window.location.href = '/login';
+                    return false;
+                }
+                return true;
+            }
+            
+            if (!checkAuth()) {
+                // リダイレクト
+            }
+            
+            // Axios設定
+            axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
+            
+            // サイドバートグル
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                sidebar.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
+            
+            // タスク行テンプレート
+            let taskCounter = 0;
+            
+            function addTaskRow(task = null) {
+                taskCounter++;
+                const container = document.getElementById('tasksList');
+                const row = document.createElement('div');
+                row.className = 'task-card bg-white border rounded-lg p-4 relative';
+                row.id = 'task-row-' + taskCounter;
+                
+                row.innerHTML = \`
+                    <button type="button" onclick="removeTaskRow(\${taskCounter})" class="absolute top-2 right-2 text-red-500 hover:text-red-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium mb-1">タスク名 *</label>
+                            <input type="text" name="tasks[\${taskCounter}][task_name]" required value="\${task?.task_name || ''}" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">タスクタイプ</label>
+                            <select name="tasks[\${taskCounter}][task_type]" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                <option value="internal" \${task?.task_type === 'internal' ? 'selected' : ''}>自社タスク</option>
+                                <option value="external" \${task?.task_type === 'external' ? 'selected' : ''}>顧客タスク</option>
+                                <option value="both" \${task?.task_type === 'both' ? 'selected' : ''}>両方</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">必須</label>
+                            <select name="tasks[\${taskCounter}][is_required]" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                <option value="1" \${task?.is_required !== 0 ? 'selected' : ''}>必須</option>
+                                <option value="0" \${task?.is_required === 0 ? 'selected' : ''}>任意</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">開始日オフセット（日）</label>
+                            <input type="number" name="tasks[\${taskCounter}][days_offset_start]" value="\${task?.days_offset_start || 0}" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">終了日オフセット（日）</label>
+                            <input type="number" name="tasks[\${taskCounter}][days_offset_end]" value="\${task?.days_offset_end || 7}" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium mb-1">説明</label>
+                            <input type="text" name="tasks[\${taskCounter}][description]" value="\${task?.description || ''}" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        </div>
+                    </div>
+                \`;
+                
+                container.appendChild(row);
+            }
+            
+            function removeTaskRow(id) {
+                const row = document.getElementById('task-row-' + id);
+                if (row) row.remove();
+            }
+            
+            // テンプレート一覧読み込み
+            async function loadTemplates() {
+                try {
+                    const category = document.getElementById('filterCategory').value;
+                    let url = '/api/pipeline-templates';
+                    if (category) {
+                        url += '?category=' + category;
+                    }
+                    
+                    const response = await axios.get(url);
+                    const templates = response.data;
+                    
+                    const container = document.getElementById('templatesList');
+                    
+                    if (templates.length === 0) {
+                        container.innerHTML = \`
+                            <div class="text-center py-12 text-gray-500">
+                                <i class="fas fa-folder-open text-4xl mb-3 text-gray-300"></i>
+                                <p>パイプラインテンプレートがありません</p>
+                                <button onclick="openNewTemplateModal()" class="mt-3 text-blue-600 hover:text-blue-700">
+                                    <i class="fas fa-plus mr-1"></i>新規作成
+                                </button>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    const categoryLabels = {
+                        'subsidy': { label: '補助金', color: 'bg-blue-100 text-blue-800' },
+                        'grant': { label: '助成金', color: 'bg-green-100 text-green-800' },
+                        'general': { label: '一般', color: 'bg-gray-100 text-gray-800' }
+                    };
+                    
+                    container.innerHTML = templates.map(t => {
+                        const cat = categoryLabels[t.category] || categoryLabels.general;
+                        return \`
+                            <div class="p-4 hover:bg-gray-50 cursor-pointer" onclick="showTemplateDetail(\${t.id})">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                                            <i class="fas fa-project-diagram"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-gray-900">\${t.name}</div>
+                                            <div class="text-sm text-gray-500">\${t.description || '説明なし'}</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium \${cat.color}">\${cat.label}</span>
+                                        <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
+                                        <i class="fas fa-chevron-right text-gray-400"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading templates:', error);
+                    document.getElementById('templatesList').innerHTML = \`
+                        <div class="text-center py-12 text-red-500">
+                            <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                            <p>読み込みエラー</p>
+                        </div>
+                    \`;
+                }
+            }
+            
+            // テンプレート詳細表示
+            async function showTemplateDetail(id) {
+                try {
+                    const response = await axios.get('/api/pipeline-templates/' + id);
+                    const template = response.data;
+                    
+                    document.getElementById('templateDetailTitle').textContent = template.name;
+                    
+                    const categoryLabels = {
+                        'subsidy': { label: '補助金', color: 'bg-blue-100 text-blue-800' },
+                        'grant': { label: '助成金', color: 'bg-green-100 text-green-800' },
+                        'general': { label: '一般', color: 'bg-gray-100 text-gray-800' }
+                    };
+                    const cat = categoryLabels[template.category] || categoryLabels.general;
+                    
+                    const taskTypeLabels = {
+                        'internal': { label: '自社', color: 'bg-purple-100 text-purple-800' },
+                        'external': { label: '顧客', color: 'bg-orange-100 text-orange-800' },
+                        'both': { label: '両方', color: 'bg-gray-100 text-gray-800' }
+                    };
+                    
+                    let content = \`
+                        <div class="space-y-6">
+                            <!-- 基本情報 -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="text-sm text-gray-500">カテゴリ</span>
+                                    <p class="mt-1"><span class="px-2 py-1 rounded-full text-xs font-medium \${cat.color}">\${cat.label}</span></p>
+                                </div>
+                                <div>
+                                    <span class="text-sm text-gray-500">サービス期間</span>
+                                    <p class="mt-1 font-medium">\${template.service_start_offset}日 〜 \${template.service_end_offset}日</p>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <span class="text-sm text-gray-500">説明</span>
+                                <p class="mt-1">\${template.description || '説明なし'}</p>
+                            </div>
+                            
+                            <!-- オプション -->
+                            <div class="flex gap-4">
+                                <span class="text-sm \${template.progress_reflection ? 'text-green-600' : 'text-gray-400'}">
+                                    <i class="fas fa-\${template.progress_reflection ? 'check' : 'times'} mr-1"></i>進捗反映
+                                </span>
+                                <span class="text-sm \${template.allow_external_tasks ? 'text-green-600' : 'text-gray-400'}">
+                                    <i class="fas fa-\${template.allow_external_tasks ? 'check' : 'times'} mr-1"></i>外部タスク
+                                </span>
+                                <span class="text-sm \${template.requires_approval ? 'text-green-600' : 'text-gray-400'}">
+                                    <i class="fas fa-\${template.requires_approval ? 'check' : 'times'} mr-1"></i>承認必要
+                                </span>
+                            </div>
+                            
+                            <!-- タスク一覧 -->
+                            <div>
+                                <h4 class="font-medium mb-3 flex items-center gap-2">
+                                    <i class="fas fa-tasks text-blue-600"></i>タスク一覧（\${template.tasks?.length || 0}件）
+                                </h4>
+                                <div class="space-y-2">
+                    \`;
+                    
+                    if (template.tasks && template.tasks.length > 0) {
+                        template.tasks.forEach((task, index) => {
+                            const tt = taskTypeLabels[task.task_type] || taskTypeLabels.internal;
+                            content += \`
+                                <div class="border rounded-lg p-3 bg-gray-50">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">\${index + 1}</span>
+                                            <span class="font-medium">\${task.task_name}</span>
+                                            <span class="px-2 py-0.5 rounded text-xs \${tt.color}">\${tt.label}</span>
+                                            \${task.is_required ? '<span class="text-red-500 text-xs">*必須</span>' : ''}
+                                        </div>
+                                        <span class="text-sm text-gray-500">\${task.days_offset_start}日 〜 \${task.days_offset_end}日</span>
+                                    </div>
+                                    \${task.description ? '<p class="text-sm text-gray-600 mt-1 ml-8">' + task.description + '</p>' : ''}
+                                </div>
+                            \`;
+                        });
+                    } else {
+                        content += '<p class="text-gray-500 text-center py-4">タスクがありません</p>';
+                    }
+                    
+                    content += \`
+                                </div>
+                            </div>
+                            
+                            <!-- アクション -->
+                            <div class="flex gap-3 pt-4 border-t">
+                                <button onclick="editTemplate(\${template.id})" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                                    <i class="fas fa-edit mr-2"></i>編集
+                                </button>
+                                <button onclick="deleteTemplate(\${template.id})" class="flex-1 bg-red-100 text-red-600 py-2 rounded-lg hover:bg-red-200">
+                                    <i class="fas fa-trash mr-2"></i>削除
+                                </button>
+                            </div>
+                        </div>
+                    \`;
+                    
+                    document.getElementById('templateDetailContent').innerHTML = content;
+                    document.getElementById('templateDetailModal').classList.remove('hidden');
+                    
+                } catch (error) {
+                    console.error('Error loading template detail:', error);
+                    alert('テンプレート詳細の読み込みに失敗しました');
+                }
+            }
+            
+            // モーダル操作
+            function openNewTemplateModal() {
+                document.getElementById('newTemplateForm').reset();
+                document.getElementById('tasksList').innerHTML = '';
+                taskCounter = 0;
+                addTaskRow(); // 最初の1行を追加
+                document.getElementById('newTemplateModal').classList.remove('hidden');
+                loadUsers();
+            }
+            
+            function closeNewTemplateModal() {
+                document.getElementById('newTemplateModal').classList.add('hidden');
+            }
+            
+            function closeTemplateDetailModal() {
+                document.getElementById('templateDetailModal').classList.add('hidden');
+            }
+            
+            // ユーザー読み込み
+            async function loadUsers() {
+                try {
+                    const response = await axios.get('/api/admin/users');
+                    const users = response.data;
+                    const select = document.querySelector('select[name="created_by"]');
+                    select.innerHTML = '<option value="">選択してください</option>';
+                    users.forEach(u => {
+                        select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
+                    });
+                } catch (error) {
+                    console.error('Error loading users:', error);
+                }
+            }
+            
+            // テンプレート削除
+            async function deleteTemplate(id) {
+                if (!confirm('このテンプレートを削除しますか？')) return;
+                
+                try {
+                    await axios.delete('/api/pipeline-templates/' + id);
+                    alert('テンプレートを削除しました');
+                    closeTemplateDetailModal();
+                    loadTemplates();
+                } catch (error) {
+                    console.error('Error deleting template:', error);
+                    alert('削除に失敗しました');
+                }
+            }
+            
+            // フォーム送信
+            document.getElementById('newTemplateForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(e.target);
+                const data = {
+                    name: formData.get('name'),
+                    description: formData.get('description'),
+                    category: formData.get('category'),
+                    service_start_offset: parseInt(formData.get('service_start_offset')) || 0,
+                    service_end_offset: parseInt(formData.get('service_end_offset')) || 30,
+                    progress_reflection: formData.get('progress_reflection') === 'on',
+                    allow_external_tasks: formData.get('allow_external_tasks') === 'on',
+                    requires_approval: formData.get('requires_approval') === 'on',
+                    created_by: formData.get('created_by'),
+                    tasks: []
+                };
+                
+                // タスクを収集
+                const taskRows = document.querySelectorAll('[id^="task-row-"]');
+                taskRows.forEach(row => {
+                    const taskName = row.querySelector('input[name*="[task_name]"]')?.value;
+                    if (taskName) {
+                        data.tasks.push({
+                            task_name: taskName,
+                            task_type: row.querySelector('select[name*="[task_type]"]')?.value || 'internal',
+                            is_required: row.querySelector('select[name*="[is_required]"]')?.value === '1',
+                            days_offset_start: parseInt(row.querySelector('input[name*="[days_offset_start]"]')?.value) || 0,
+                            days_offset_end: parseInt(row.querySelector('input[name*="[days_offset_end]"]')?.value) || 7,
+                            description: row.querySelector('input[name*="[description]"]')?.value || ''
+                        });
+                    }
+                });
+                
+                try {
+                    await axios.post('/api/pipeline-templates', data);
+                    alert('テンプレートを作成しました');
+                    closeNewTemplateModal();
+                    loadTemplates();
+                } catch (error) {
+                    console.error('Error creating template:', error);
+                    alert('作成に失敗しました');
+                }
+            });
+            
+            // 初期読み込み
+            loadTemplates();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// ===============================
+// プライバシーポリシーページ
+// ===============================
+
+app.get('/privacy-policy', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>プライバシーポリシー - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div class="min-h-screen">
+            <header class="bg-blue-600 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-4">
+                    <h1 class="text-2xl font-bold">
+                        <i class="fas fa-shield-alt mr-2"></i>
+                        プライバシーポリシー
+                    </h1>
+                </div>
+            </header>
+            
+            <div class="container mx-auto px-4 py-8 max-w-4xl">
+                <div class="bg-white rounded-lg shadow p-6 md:p-8 prose max-w-none">
+                    <p class="text-gray-600 mb-6">最終更新日: 2024年1月1日</p>
+                    
+                    <section class="mb-8">
+                        <h2 class="text-xl font-bold mb-4 text-gray-800">1. 個人情報の収集について</h2>
+                        <p class="text-gray-700 mb-4">
+                            当社は、補助金・助成金申請支援サービスの提供にあたり、以下の個人情報を収集させていただく場合があります。
+                        </p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                            <li>氏名、会社名、住所</li>
+                            <li>電話番号、メールアドレス</li>
+                            <li>財務情報（決算書、確定申告書等に記載の情報）</li>
+                            <li>登記情報（登記簿謄本に記載の情報）</li>
+                            <li>その他、申請に必要な情報</li>
+                        </ul>
+                    </section>
+                    
+                    <section class="mb-8">
+                        <h2 class="text-xl font-bold mb-4 text-gray-800">2. 個人情報の利用目的</h2>
+                        <p class="text-gray-700 mb-4">収集した個人情報は、以下の目的で利用いたします。</p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                            <li>補助金・助成金の申請書類の作成支援</li>
+                            <li>お客様へのご連絡・ご案内</li>
+                            <li>サービス品質の向上</li>
+                            <li>法令に基づく対応</li>
+                        </ul>
+                    </section>
+                    
+                    <section class="mb-8">
+                        <h2 class="text-xl font-bold mb-4 text-gray-800">3. 個人情報の第三者提供</h2>
+                        <p class="text-gray-700">
+                            当社は、法令に基づく場合を除き、お客様の同意なく個人情報を第三者に提供することはありません。
+                            ただし、補助金・助成金申請のため、行政機関等への提出が必要な場合は、事前にお客様の同意を得た上で提供いたします。
+                        </p>
+                    </section>
+                    
+                    <section class="mb-8">
+                        <h2 class="text-xl font-bold mb-4 text-gray-800">4. 個人情報の管理</h2>
+                        <p class="text-gray-700">
+                            当社は、個人情報の漏洩、滅失、毀損を防止するため、適切なセキュリティ対策を講じます。
+                            また、従業員に対して個人情報保護に関する教育・啓発を行います。
+                        </p>
+                    </section>
+                    
+                    <section class="mb-8">
+                        <h2 class="text-xl font-bold mb-4 text-gray-800">5. お問い合わせ</h2>
+                        <p class="text-gray-700">
+                            個人情報の取り扱いに関するお問い合わせは、当社までご連絡ください。
+                        </p>
+                    </section>
+                </div>
+                
+                <div class="mt-6 text-center">
+                    <a href="javascript:history.back()" class="text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-arrow-left mr-1"></i>戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `)
+})
+
+// ===============================
+// 特定商取引法に基づく表記
+// ===============================
+
+app.get('/legal', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>特定商取引法に基づく表記 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div class="min-h-screen">
+            <header class="bg-blue-600 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-4">
+                    <h1 class="text-2xl font-bold">
+                        <i class="fas fa-balance-scale mr-2"></i>
+                        特定商取引法に基づく表記
+                    </h1>
+                </div>
+            </header>
+            
+            <div class="container mx-auto px-4 py-8 max-w-4xl">
+                <div class="bg-white rounded-lg shadow p-6 md:p-8">
+                    <table class="w-full">
+                        <tbody class="divide-y">
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700 w-1/3">販売業者</td>
+                                <td class="py-4 text-gray-600">株式会社〇〇〇〇</td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">代表者名</td>
+                                <td class="py-4 text-gray-600">代表取締役 〇〇 〇〇</td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">所在地</td>
+                                <td class="py-4 text-gray-600">〒000-0000 東京都〇〇区〇〇 0-0-0</td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">電話番号</td>
+                                <td class="py-4 text-gray-600">03-0000-0000</td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">メールアドレス</td>
+                                <td class="py-4 text-gray-600">info@example.com</td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">サービス料金</td>
+                                <td class="py-4 text-gray-600">
+                                    各サービスページに表示される価格に準じます。<br>
+                                    表示価格は税込価格です。
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">支払方法</td>
+                                <td class="py-4 text-gray-600">
+                                    クレジットカード決済<br>
+                                    銀行振込
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">支払時期</td>
+                                <td class="py-4 text-gray-600">
+                                    クレジットカード: 即時決済<br>
+                                    銀行振込: 請求書発行後14日以内
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">サービス提供時期</td>
+                                <td class="py-4 text-gray-600">お申込み確認後、速やかにサービスを開始します。</td>
+                            </tr>
+                            <tr>
+                                <td class="py-4 pr-4 font-medium text-gray-700">キャンセル・返金</td>
+                                <td class="py-4 text-gray-600">
+                                    サービス開始前のキャンセル: 手付金を除き返金いたします。<br>
+                                    サービス開始後のキャンセル: 進捗状況に応じて精算いたします。
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-6 text-center">
+                    <a href="javascript:history.back()" class="text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-arrow-left mr-1"></i>戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `)
+})
+
+// ===============================
+// API: システム設定（銀行振込先など）
+// ===============================
+
+// システム設定取得
+app.get('/api/settings', async (c) => {
+  const { DB } = c.env
+  
+  const settings = await DB.prepare(`
+    SELECT setting_key, setting_value, setting_type, description
+    FROM system_settings
+  `).all()
+  
+  // キー・バリュー形式に変換
+  const result: Record<string, any> = {}
+  for (const row of (settings.results || []) as any[]) {
+    let value = row.setting_value
+    if (row.setting_type === 'boolean') {
+      value = value === 'true'
+    } else if (row.setting_type === 'number') {
+      value = Number(value)
+    } else if (row.setting_type === 'json') {
+      try { value = JSON.parse(value) } catch {}
+    }
+    result[row.setting_key] = value
+  }
+  
+  return c.json(result)
+})
+
+// システム設定更新
+app.put('/api/settings', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  for (const [key, value] of Object.entries(data)) {
+    const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+    await DB.prepare(`
+      UPDATE system_settings 
+      SET setting_value = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE setting_key = ?
+    `).bind(stringValue, key).run()
+  }
+  
+  return c.json({ success: true, message: '設定を保存しました' })
+})
+
+// 銀行振込先情報取得（公開API - 顧客ポータル用）
+app.get('/api/bank-info', async (c) => {
+  const { DB } = c.env
+  
+  const settings = await DB.prepare(`
+    SELECT setting_key, setting_value
+    FROM system_settings
+    WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name')
+  `).all()
+  
+  const result: Record<string, string> = {}
+  for (const row of (settings.results || []) as any[]) {
+    result[row.setting_key] = row.setting_value || ''
+  }
+  
+  return c.json(result)
+})
+
+// ===============================
+// API: 支払い管理
+// ===============================
+
+// 顧客の支払い履歴取得
+app.get('/api/clients/:clientId/payments', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId')
+  
+  const payments = await DB.prepare(`
+    SELECT ph.*, au.name as confirmed_by_name
+    FROM payment_history ph
+    LEFT JOIN admin_users au ON ph.confirmed_by = au.id
+    WHERE ph.client_id = ?
+    ORDER BY ph.created_at DESC
+  `).bind(clientId).all()
+  
+  return c.json(payments.results || [])
+})
+
+// 振込完了報告（顧客用）
+app.post('/api/clients/:clientId/report-transfer', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId')
+  const data = await c.req.json()
+  
+  // 支払い履歴を作成
+  await DB.prepare(`
+    INSERT INTO payment_history (client_id, payment_type, amount, payment_method, status, bank_transfer_reported_at, notes)
+    VALUES (?, ?, ?, 'bank_transfer', 'reported', CURRENT_TIMESTAMP, ?)
+  `).bind(clientId, data.payment_type || 'deposit', data.amount, data.notes || null).run()
+  
+  // クライアントの振込報告フラグを更新
+  await DB.prepare(`
+    UPDATE clients 
+    SET deposit_transfer_reported = 1, 
+        deposit_transfer_reported_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(clientId).run()
+  
+  return c.json({ success: true, message: '振込完了報告を送信しました。確認まで少々お待ちください。' })
+})
+
+// 支払い確認（管理者用）
+app.put('/api/payments/:paymentId/confirm', async (c) => {
+  const { DB } = c.env
+  const paymentId = c.req.param('paymentId')
+  const user = await getCurrentUser(c)
+  
+  if (!user) {
+    return c.json({ error: '認証が必要です' }, 401)
+  }
+  
+  // 支払い情報を取得
+  const payment = await DB.prepare(`
+    SELECT * FROM payment_history WHERE id = ?
+  `).bind(paymentId).first() as any
+  
+  if (!payment) {
+    return c.json({ error: '支払い情報が見つかりません' }, 404)
+  }
+  
+  // 支払いを確認済みに更新
+  await DB.prepare(`
+    UPDATE payment_history 
+    SET status = 'confirmed', 
+        bank_transfer_confirmed_at = CURRENT_TIMESTAMP,
+        confirmed_by = ?,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(user.id, paymentId).run()
+  
+  // クライアントの支払いステータスを更新
+  if (payment.payment_type === 'deposit') {
+    await DB.prepare(`
+      UPDATE clients 
+      SET deposit_paid = 1, 
+          deposit_paid_at = CURRENT_TIMESTAMP,
+          deposit_payment_method = 'bank_transfer',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(payment.client_id).run()
+  }
+  
+  return c.json({ success: true, message: '支払いを確認しました' })
+})
+
+// 支払い待ち一覧（管理者用）
+app.get('/api/payments/pending', async (c) => {
+  const { DB } = c.env
+  
+  const payments = await DB.prepare(`
+    SELECT ph.*, c.name as client_name, c.company_name
+    FROM payment_history ph
+    JOIN clients c ON ph.client_id = c.id
+    WHERE ph.status = 'reported'
+    ORDER BY ph.bank_transfer_reported_at ASC
+  `).all()
+  
+  return c.json(payments.results || [])
+})
+
+// ===============================
+// API: Stripe決済
+// ===============================
+
+// Stripe決済セッション作成
+app.post('/api/clients/:clientId/create-checkout-session', async (c) => {
+  const { DB, STRIPE_SECRET_KEY } = c.env as any
+  const clientId = c.req.param('clientId')
+  const data = await c.req.json()
+  
+  if (!STRIPE_SECRET_KEY) {
+    return c.json({ error: 'Stripe決済は現在設定されていません' }, 400)
+  }
+  
+  // クライアント情報を取得
+  const client = await DB.prepare(`
+    SELECT * FROM clients WHERE id = ?
+  `).bind(clientId).first() as any
+  
+  if (!client) {
+    return c.json({ error: '顧客が見つかりません' }, 404)
+  }
+  
+  const amount = data.amount || client.deposit_amount
+  if (!amount || amount <= 0) {
+    return c.json({ error: '支払い金額が設定されていません' }, 400)
+  }
+  
+  try {
+    // Stripe APIを呼び出し
+    const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        'payment_method_types[]': 'card',
+        'line_items[0][price_data][currency]': 'jpy',
+        'line_items[0][price_data][product_data][name]': `${client.name}様 - 手付金`,
+        'line_items[0][price_data][unit_amount]': String(amount),
+        'line_items[0][quantity]': '1',
+        'mode': 'payment',
+        'success_url': `${data.success_url || c.req.url.replace(/\/api\/.*/, '')}/portal/${client.access_token}?payment=success`,
+        'cancel_url': `${data.cancel_url || c.req.url.replace(/\/api\/.*/, '')}/portal/${client.access_token}?payment=cancelled`,
+        'metadata[client_id]': clientId,
+        'metadata[payment_type]': 'deposit',
+      }).toString(),
+    })
+    
+    const session = await response.json() as any
+    
+    if (session.error) {
+      console.error('Stripe error:', session.error)
+      return c.json({ error: session.error.message }, 400)
+    }
+    
+    // 支払い履歴を作成
+    await DB.prepare(`
+      INSERT INTO payment_history (client_id, payment_type, amount, payment_method, status, stripe_session_id)
+      VALUES (?, 'deposit', ?, 'credit_card', 'pending', ?)
+    `).bind(clientId, amount, session.id).run()
+    
+    return c.json({ 
+      success: true, 
+      checkout_url: session.url,
+      session_id: session.id
+    })
+  } catch (error: any) {
+    console.error('Stripe session creation error:', error)
+    return c.json({ error: '決済セッションの作成に失敗しました' }, 500)
+  }
+})
+
+// Stripe Webhook受信
+app.post('/api/stripe/webhook', async (c) => {
+  const { DB, STRIPE_WEBHOOK_SECRET } = c.env as any
+  
+  const payload = await c.req.text()
+  const sig = c.req.header('stripe-signature')
+  
+  // Webhook署名検証（本番環境では必須）
+  // 簡易的な実装のため、署名検証は省略（本番では必ず実装してください）
+  
+  let event: any
+  try {
+    event = JSON.parse(payload)
+  } catch {
+    return c.json({ error: 'Invalid payload' }, 400)
+  }
+  
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object
+    const clientId = session.metadata?.client_id
+    
+    if (clientId) {
+      // 支払い履歴を更新
+      await DB.prepare(`
+        UPDATE payment_history 
+        SET status = 'completed', 
+            stripe_payment_intent_id = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE stripe_session_id = ?
+      `).bind(session.payment_intent, session.id).run()
+      
+      // クライアントの支払いステータスを更新
+      await DB.prepare(`
+        UPDATE clients 
+        SET deposit_paid = 1, 
+            deposit_paid_at = CURRENT_TIMESTAMP,
+            deposit_payment_method = 'credit_card',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(clientId).run()
+    }
+  }
+  
+  return c.json({ received: true })
+})
+
+// ===============================
+// 管理画面: システム設定
+// ===============================
+
+app.get('/admin/settings', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>システム設定 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen">
+        <nav class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <a href="/" class="text-gray-600 hover:text-gray-900">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <h1 class="text-xl font-bold text-gray-800">システム設定</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="adminName" class="text-sm text-gray-600"></span>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="max-w-4xl mx-auto p-6">
+            <!-- 銀行振込先設定 -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="p-4 border-b">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fas fa-university text-green-600"></i>
+                        銀行振込先情報
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">顧客ポータルで表示される振込先情報を設定します</p>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">銀行名</label>
+                            <input type="text" id="bank_name" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 三菱UFJ銀行">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">支店名</label>
+                            <input type="text" id="bank_branch" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 渋谷支店">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">口座種別</label>
+                            <select id="bank_account_type" class="w-full px-3 py-2 border rounded-lg">
+                                <option value="普通">普通</option>
+                                <option value="当座">当座</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">口座番号</label>
+                            <input type="text" id="bank_account_number" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 1234567">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">口座名義</label>
+                            <input type="text" id="bank_account_holder" class="w-full px-3 py-2 border rounded-lg" placeholder="例: カ）サンプルシャ">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 会社情報 -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="p-4 border-b">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fas fa-building text-blue-600"></i>
+                        会社情報
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">請求書などに表示される会社情報を設定します</p>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">会社名</label>
+                        <input type="text" id="company_name" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 株式会社サンプル">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">住所</label>
+                        <input type="text" id="company_address" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 東京都渋谷区...">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                        <input type="text" id="company_phone" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 03-1234-5678">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stripe設定 -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="p-4 border-b">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fab fa-stripe text-purple-600"></i>
+                        Stripe決済設定
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">クレジットカード決済を利用する場合に設定します</p>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="stripe_enabled" class="rounded text-purple-600">
+                        <label class="text-sm font-medium text-gray-700">Stripe決済を有効にする</label>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-info-circle text-yellow-600 mt-0.5"></i>
+                            <div class="text-sm text-yellow-800">
+                                <p class="font-medium">APIキーの設定について</p>
+                                <p class="mt-1">Stripe APIキーは環境変数（wrangler.toml）で設定してください：</p>
+                                <code class="block mt-2 bg-yellow-100 p-2 rounded text-xs">
+                                    [vars]<br>
+                                    STRIPE_SECRET_KEY = "sk_..."<br>
+                                    STRIPE_WEBHOOK_SECRET = "whsec_..."
+                                </code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 保存ボタン -->
+            <div class="flex justify-end gap-3">
+                <a href="/" class="px-6 py-2 border rounded-lg hover:bg-gray-50">キャンセル</a>
+                <button onclick="saveSettings()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <i class="fas fa-save mr-2"></i>保存
+                </button>
+            </div>
+        </div>
+        
+        <script>
+            // 認証チェック
+            const token = localStorage.getItem('admin_token');
+            if (!token) {
+                window.location.href = '/login';
+            }
+            document.getElementById('adminName').textContent = localStorage.getItem('admin_name') || '';
+            
+            axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+            
+            // 設定を読み込み
+            async function loadSettings() {
+                try {
+                    const response = await axios.get('/api/settings');
+                    const settings = response.data;
+                    
+                    document.getElementById('bank_name').value = settings.bank_name || '';
+                    document.getElementById('bank_branch').value = settings.bank_branch || '';
+                    document.getElementById('bank_account_type').value = settings.bank_account_type || '普通';
+                    document.getElementById('bank_account_number').value = settings.bank_account_number || '';
+                    document.getElementById('bank_account_holder').value = settings.bank_account_holder || '';
+                    document.getElementById('company_name').value = settings.company_name || '';
+                    document.getElementById('company_address').value = settings.company_address || '';
+                    document.getElementById('company_phone').value = settings.company_phone || '';
+                    document.getElementById('stripe_enabled').checked = settings.stripe_enabled === true;
+                } catch (error) {
+                    console.error('Error loading settings:', error);
+                }
+            }
+            
+            // 設定を保存
+            async function saveSettings() {
+                try {
+                    const settings = {
+                        bank_name: document.getElementById('bank_name').value,
+                        bank_branch: document.getElementById('bank_branch').value,
+                        bank_account_type: document.getElementById('bank_account_type').value,
+                        bank_account_number: document.getElementById('bank_account_number').value,
+                        bank_account_holder: document.getElementById('bank_account_holder').value,
+                        company_name: document.getElementById('company_name').value,
+                        company_address: document.getElementById('company_address').value,
+                        company_phone: document.getElementById('company_phone').value,
+                        stripe_enabled: document.getElementById('stripe_enabled').checked ? 'true' : 'false'
+                    };
+                    
+                    await axios.put('/api/settings', settings);
+                    alert('設定を保存しました');
+                } catch (error) {
+                    console.error('Error saving settings:', error);
+                    alert('設定の保存に失敗しました');
+                }
+            }
+            
+            loadSettings();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// 支払い確認待ち一覧画面
+app.get('/admin/payments', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>支払い確認 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen">
+        <nav class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <a href="/" class="text-gray-600 hover:text-gray-900">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <h1 class="text-xl font-bold text-gray-800">支払い確認</h1>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="max-w-6xl mx-auto p-6">
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-4 border-b flex justify-between items-center">
+                    <h2 class="text-lg font-bold">振込確認待ち</h2>
+                    <button onclick="loadPayments()" class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-sync-alt"></i> 更新
+                    </button>
+                </div>
+                <div id="paymentsList" class="divide-y">
+                    <div class="p-8 text-center text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>読み込み中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            const token = localStorage.getItem('admin_token');
+            if (!token) window.location.href = '/login';
+            axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+            
+            async function loadPayments() {
+                try {
+                    const response = await axios.get('/api/payments/pending');
+                    const payments = response.data;
+                    
+                    if (payments.length === 0) {
+                        document.getElementById('paymentsList').innerHTML = \`
+                            <div class="p-8 text-center text-gray-500">
+                                <i class="fas fa-check-circle text-4xl text-green-500 mb-3"></i>
+                                <p>確認待ちの支払いはありません</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    document.getElementById('paymentsList').innerHTML = payments.map(p => \`
+                        <div class="p-4 flex items-center justify-between hover:bg-gray-50">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                                    <i class="fas fa-university text-yellow-600"></i>
+                                </div>
+                                <div>
+                                    <div class="font-medium">\${p.client_name}</div>
+                                    <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
+                                    <div class="text-xs text-gray-400">
+                                        報告日時: \${new Date(p.bank_transfer_reported_at).toLocaleString('ja-JP')}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <div class="text-right">
+                                    <div class="font-bold text-lg">¥\${p.amount.toLocaleString()}</div>
+                                    <div class="text-xs text-gray-500">\${p.payment_type === 'deposit' ? '手付金' : 'その他'}</div>
+                                </div>
+                                <button onclick="confirmPayment(\${p.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                    <i class="fas fa-check mr-1"></i>確認
+                                </button>
+                            </div>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }
+            
+            async function confirmPayment(paymentId) {
+                if (!confirm('この支払いを確認済みにしますか？')) return;
+                
+                try {
+                    await axios.put(\`/api/payments/\${paymentId}/confirm\`);
+                    alert('支払いを確認しました');
+                    loadPayments();
+                } catch (error) {
+                    alert('エラーが発生しました');
+                }
+            }
+            
+            loadPayments();
+        </script>
+    </body>
+    </html>
+  `)
 })
 
 export default app
