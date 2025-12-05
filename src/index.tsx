@@ -298,30 +298,47 @@ app.get('/', (c) => {
                         <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">顧客管理</p>
                     </div>
                     <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-users w-5"></i>
-                        <span>顧客一覧</span>
+                        <i class="fas fa-tachometer-alt w-5"></i>
+                        <span>ダッシュボード</span>
                     </a>
-                    <a href="#" onclick="openNewClientModal(); return false;" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-user-plus w-5"></i>
-                        <span>新規顧客登録</span>
+                    <a href="/clients" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-users w-5"></i>
+                        <span>顧客管理</span>
+                    </a>
+                    <a href="/cases" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-folder-open w-5"></i>
+                        <span>案件一覧</span>
+                    </a>
+                    <a href="#" onclick="openNewCaseModal(); return false;" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-plus-circle w-5"></i>
+                        <span>新規案件登録</span>
                     </a>
                     
                     <div class="pt-4 pb-2">
                         <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
                     </div>
-                    <a href="/subsidy-types" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=行政書士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-building w-5"></i>
                         <span>補助金一覧</span>
                         <span class="ml-auto text-xs bg-blue-700 px-2 py-0.5 rounded">行政書士</span>
                     </a>
-                    <a href="/subsidy-types?category=employment" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=社労士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-hand-holding-usd w-5"></i>
                         <span>助成金一覧</span>
                         <span class="ml-auto text-xs bg-green-700 px-2 py-0.5 rounded">社労士</span>
                     </a>
+                    <a href="/subsidy-types?category=許認可" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-stamp w-5"></i>
+                        <span>許認可申請</span>
+                        <span class="ml-auto text-xs bg-purple-700 px-2 py-0.5 rounded">許認可</span>
+                    </a>
                     <a href="/admin/pipelines" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-project-diagram w-5"></i>
                         <span>パイプライン管理</span>
+                    </a>
+                    <a href="/admin/statistics" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-chart-line w-5"></i>
+                        <span>統計情報</span>
                     </a>
                     
                     <div class="pt-4 pb-2">
@@ -395,8 +412,8 @@ app.get('/', (c) => {
                 
                 <div class="p-4 lg:p-6">
                     <!-- ステータスカード -->
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 lg:gap-4 mb-6" id="statusCards">
-                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-yellow-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('inquiry')">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-4 mb-6" id="statusCards">
+                        <a href="/cases?status=inquiry" class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-yellow-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs lg:text-sm mb-1">見込み</div>
@@ -404,17 +421,8 @@ app.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-search text-yellow-200 text-2xl lg:text-3xl"></i>
                             </div>
-                        </div>
-                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-blue-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('consulting')">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">相談中</div>
-                                    <div class="text-2xl lg:text-3xl font-bold text-blue-500" id="count-consulting">-</div>
-                                </div>
-                                <i class="fas fa-comments text-blue-200 text-2xl lg:text-3xl"></i>
-                            </div>
-                        </div>
-                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('preparing')">
+                        </a>
+                        <a href="/cases?status=preparing" class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs lg:text-sm mb-1">書類準備</div>
@@ -422,8 +430,8 @@ app.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-folder-open text-orange-200 text-2xl lg:text-3xl"></i>
                             </div>
-                        </div>
-                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-purple-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('applying')">
+                        </a>
+                        <a href="/cases?status=applying" class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-purple-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs lg:text-sm mb-1">申請中</div>
@@ -431,8 +439,8 @@ app.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-paper-plane text-purple-200 text-2xl lg:text-3xl"></i>
                             </div>
-                        </div>
-                        <div class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer" onclick="filterByStatus('completed')">
+                        </a>
+                        <a href="/cases?status=completed" class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs lg:text-sm mb-1">完了</div>
@@ -440,7 +448,7 @@ app.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-check-circle text-green-200 text-2xl lg:text-3xl"></i>
                             </div>
-                        </div>
+                        </a>
                     </div>
 
                     <!-- 検索・フィルター -->
@@ -449,7 +457,6 @@ app.get('/', (c) => {
                             <select id="filterStatus" class="px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                 <option value="">全ステータス</option>
                                 <option value="inquiry">見込み</option>
-                                <option value="consulting">相談中</option>
                                 <option value="preparing">書類準備中</option>
                                 <option value="applying">申請中</option>
                                 <option value="completed">完了</option>
@@ -459,9 +466,9 @@ app.get('/', (c) => {
                                 <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
                                        class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             </div>
-                            <button onclick="openNewClientModal()" 
+                            <button onclick="openNewCaseModal()" 
                                     class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 text-sm font-medium whitespace-nowrap">
-                                <i class="fas fa-plus mr-2"></i>新規登録
+                                <i class="fas fa-plus mr-2"></i>新規案件登録
                             </button>
                         </div>
                     </div>
@@ -492,29 +499,8 @@ app.get('/', (c) => {
                             </div>
                         </div>
                         
-                        <!-- 右側：統計・お知らせ -->
+                        <!-- 右側：お知らせ・クイックアクション -->
                         <div class="space-y-6">
-                            <!-- 統計情報 -->
-                            <div class="bg-white rounded-xl shadow-sm p-4">
-                                <h2 class="text-base font-bold mb-4 flex items-center gap-2">
-                                    <i class="fas fa-chart-bar text-blue-600"></i>統計情報
-                                </h2>
-                                <div class="space-y-3">
-                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <span class="text-sm text-gray-600">総顧客数</span>
-                                        <span class="text-xl font-bold" id="stat-total">-</span>
-                                    </div>
-                                    <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                                        <span class="text-sm text-blue-600">今月の新規</span>
-                                        <span class="text-xl font-bold text-blue-600" id="stat-new-month">-</span>
-                                    </div>
-                                    <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                                        <span class="text-sm text-green-600">今月の完了</span>
-                                        <span class="text-xl font-bold text-green-600" id="stat-completed-month">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
                             <!-- 最近の活動 -->
                             <div class="bg-white rounded-xl shadow-sm p-4">
                                 <h2 class="text-base font-bold mb-4 flex items-center gap-2">
@@ -531,14 +517,17 @@ app.get('/', (c) => {
                                     <i class="fas fa-bolt"></i>クイックアクション
                                 </h2>
                                 <div class="space-y-2">
-                                    <button onclick="openNewClientModal()" class="w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm text-left flex items-center gap-2">
-                                        <i class="fas fa-user-plus w-5"></i>新規顧客登録
+                                    <button onclick="openNewCaseModal()" class="w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm text-left flex items-center gap-2">
+                                        <i class="fas fa-plus-circle w-5"></i>新規案件登録
                                     </button>
-                                    <a href="/subsidy-types" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                                        <i class="fas fa-list w-5"></i>補助金・助成金一覧
+                                    <a href="/clients" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                                        <i class="fas fa-users w-5"></i>顧客管理
                                     </a>
-                                    <a href="/admin/guidelines" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                                        <i class="fas fa-book w-5"></i>公募要領を確認
+                                    <a href="/subsidy-types" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                                        <i class="fas fa-list w-5"></i>申請種別一覧
+                                    </a>
+                                    <a href="/admin/statistics" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                                        <i class="fas fa-chart-line w-5"></i>統計情報
                                     </a>
                                 </div>
                             </div>
@@ -548,35 +537,66 @@ app.get('/', (c) => {
             </main>
         </div>
 
-        <!-- 新規顧客登録モーダル -->
-        <div id="newClientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <!-- 新規案件登録モーダル -->
+        <div id="newCaseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div class="bg-white rounded-lg p-4 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <h3 class="text-xl font-bold mb-4">新規顧客登録</h3>
-                <form id="newClientForm" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">顧客名 *</label>
-                            <input type="text" name="name" required class="w-full px-3 py-2 border rounded-lg">
+                <h3 class="text-xl font-bold mb-4">
+                    <i class="fas fa-plus-circle text-blue-600 mr-2"></i>新規案件登録
+                </h3>
+                <form id="newCaseForm" class="space-y-4">
+                    <!-- 顧客選択セクション -->
+                    <div class="border rounded-lg p-4 bg-blue-50 space-y-3">
+                        <h4 class="font-medium text-sm text-blue-800 flex items-center gap-2">
+                            <i class="fas fa-user"></i>顧客情報
+                        </h4>
+                        <div class="flex gap-3">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="customer_type" value="existing" checked onchange="toggleCustomerType()" class="text-blue-600">
+                                <span class="text-sm">既存顧客から選択</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="customer_type" value="new" onchange="toggleCustomerType()" class="text-blue-600">
+                                <span class="text-sm">新規顧客として登録</span>
+                            </label>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">会社名</label>
-                            <input type="text" name="company_name" class="w-full px-3 py-2 border rounded-lg">
+                        
+                        <!-- 既存顧客選択 -->
+                        <div id="existingCustomerSection">
+                            <label class="block text-sm font-medium mb-1">顧客を選択 *</label>
+                            <select name="existing_client_id" id="existingClientSelect" class="w-full px-3 py-2 border rounded-lg">
+                                <option value="">顧客を選択してください</option>
+                            </select>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">メールアドレス</label>
-                            <input type="email" name="email" class="w-full px-3 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">電話番号</label>
-                            <input type="tel" name="phone" class="w-full px-3 py-2 border rounded-lg">
+                        
+                        <!-- 新規顧客入力 -->
+                        <div id="newCustomerSection" class="hidden space-y-3">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">顧客名 *</label>
+                                    <input type="text" name="name" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">会社名</label>
+                                    <input type="text" name="company_name" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">メールアドレス</label>
+                                    <input type="email" name="email" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">電話番号</label>
+                                    <input type="tel" name="phone" class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
+                    <!-- 申請種別選択 -->
                     <div>
-                        <label class="block text-sm font-medium mb-1">申請する助成金 *</label>
+                        <label class="block text-sm font-medium mb-1">申請種別 *</label>
                         <div class="relative">
                             <input type="text" id="subsidySearchInput" 
-                                   placeholder="🔍 補助金名で検索..." 
+                                   placeholder="🔍 補助金・助成金・許認可名で検索..." 
                                    class="w-full px-3 py-2 border rounded-lg mb-1"
                                    oninput="filterSubsidyOptions()">
                             <select name="subsidy_type_id" id="newClientSubsidyType" required 
@@ -596,13 +616,14 @@ app.get('/', (c) => {
                         </select>
                     </div>
                     
-                    <!-- 契約・支払い設定 -->
+                    <!-- 契約・報酬設定 -->
                     <div class="border rounded-lg p-4 bg-gray-50 space-y-4">
                         <h4 class="font-medium text-sm text-gray-700 flex items-center gap-2">
-                            <i class="fas fa-file-contract text-blue-600"></i>契約・支払い設定
+                            <i class="fas fa-file-contract text-blue-600"></i>契約・報酬設定
                         </h4>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- 手付金設定 -->
                             <div>
                                 <label class="flex items-center gap-2 mb-2">
                                     <input type="checkbox" name="deposit_required" id="depositRequired" class="rounded text-blue-600" onchange="toggleDepositFields()">
@@ -616,12 +637,33 @@ app.get('/', (c) => {
                                 </div>
                             </div>
                             
+                            <!-- 成果報酬設定 -->
+                            <div>
+                                <label class="flex items-center gap-2 mb-2">
+                                    <input type="checkbox" name="success_fee_enabled" id="successFeeEnabled" class="rounded text-blue-600" onchange="toggleSuccessFeeFields()">
+                                    <span class="text-sm font-medium">成果報酬あり</span>
+                                </label>
+                                <div id="successFeeFields" class="hidden space-y-2">
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">成果報酬率（%）</label>
+                                        <input type="number" name="success_fee_percentage" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 10" min="0" max="100" step="0.1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="flex items-center gap-2 mb-2">
                                     <input type="checkbox" name="withholding_tax" class="rounded text-blue-600">
                                     <span class="text-sm font-medium">源泉徴収あり</span>
                                 </label>
                                 <p class="text-xs text-gray-500">報酬から源泉徴収を行う場合</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-1">申請期限</label>
+                                <input type="date" name="application_deadline" class="w-full px-3 py-2 border rounded-lg text-sm">
                             </div>
                         </div>
                         
@@ -639,9 +681,9 @@ app.get('/', (c) => {
                     
                     <div class="flex gap-2 pt-4">
                         <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 text-base">
-                            登録
+                            <i class="fas fa-save mr-2"></i>案件を登録
                         </button>
-                        <button type="button" onclick="closeNewClientModal()" 
+                        <button type="button" onclick="closeNewCaseModal()" 
                                 class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 text-base">
                             キャンセル
                         </button>
@@ -670,6 +712,70 @@ app.get('/', (c) => {
                     fields.classList.add('hidden');
                 }
             }
+            
+            // 成果報酬フィールドのトグル
+            function toggleSuccessFeeFields() {
+                const checkbox = document.getElementById('successFeeEnabled');
+                const fields = document.getElementById('successFeeFields');
+                if (checkbox.checked) {
+                    fields.classList.remove('hidden');
+                } else {
+                    fields.classList.add('hidden');
+                }
+            }
+            
+            // 顧客タイプの切り替え（既存/新規）
+            function toggleCustomerType() {
+                const type = document.querySelector('input[name="customer_type"]:checked').value;
+                const existingSection = document.getElementById('existingCustomerSection');
+                const newSection = document.getElementById('newCustomerSection');
+                
+                if (type === 'existing') {
+                    existingSection.classList.remove('hidden');
+                    newSection.classList.add('hidden');
+                } else {
+                    existingSection.classList.add('hidden');
+                    newSection.classList.remove('hidden');
+                }
+            }
+            
+            // 新規案件登録モーダル
+            function openNewCaseModal() {
+                document.getElementById('newCaseModal').classList.remove('hidden');
+                loadExistingClients();
+                loadSubsidyTypes();
+                loadAdminUsers();
+            }
+            
+            function closeNewCaseModal() {
+                document.getElementById('newCaseModal').classList.add('hidden');
+                document.getElementById('newCaseForm').reset();
+                document.getElementById('existingCustomerSection').classList.remove('hidden');
+                document.getElementById('newCustomerSection').classList.add('hidden');
+                document.getElementById('depositFields').classList.add('hidden');
+                document.getElementById('successFeeFields').classList.add('hidden');
+            }
+            
+            // 既存顧客リストを読み込み
+            async function loadExistingClients() {
+                try {
+                    const response = await axios.get('/api/clients');
+                    const select = document.getElementById('existingClientSelect');
+                    select.innerHTML = '<option value="">顧客を選択してください</option>';
+                    response.data.forEach(client => {
+                        const option = document.createElement('option');
+                        option.value = client.id;
+                        option.textContent = client.company_name ? \`\${client.name}（\${client.company_name}）\` : client.name;
+                        select.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error loading clients:', error);
+                }
+            }
+            
+            // 互換性のため古い関数名も維持
+            function openNewClientModal() { openNewCaseModal(); }
+            function closeNewClientModal() { closeNewCaseModal(); }
             
             // ステータスでフィルター
             function filterByStatus(status) {
@@ -1790,7 +1896,7 @@ app.get('/api/clients/:id/document-checklist', async (c) => {
 })
 
 // ===============================
-// API: 助成金種別管理
+// API: 申請種別管理
 // ===============================
 
 // 助成金種別一覧取得
@@ -1925,7 +2031,7 @@ app.delete('/api/subsidy-types/:id', async (c) => {
 })
 
 // ===============================
-// 助成金種別管理画面
+// 申請種別管理画面
 // ===============================
 
 app.get('/subsidy-types', async (c) => {
@@ -1942,7 +2048,7 @@ app.get('/subsidy-types', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>助成金種別管理</title>
+        <title>申請種別管理</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
@@ -1957,7 +2063,7 @@ app.get('/subsidy-types', async (c) => {
                             </a>
                             <h1 class="text-2xl font-bold">
                                 <i class="fas fa-file-contract mr-2"></i>
-                                助成金種別管理
+                                申請種別管理
                             </h1>
                         </div>
                         <button onclick="logout()" class="text-sm hover:underline">
@@ -2003,6 +2109,7 @@ app.get('/subsidy-types', async (c) => {
                         <select name="category" class="w-full px-3 py-2 border rounded-lg">
                             <option value="行政書士管轄">行政書士管轄（補助金）</option>
                             <option value="社労士管轄">社労士管轄（助成金）</option>
+                            <option value="許認可">許認可申請</option>
                             <option value="事業転換系">事業転換系</option>
                             <option value="その他">その他</option>
                         </select>
@@ -2112,6 +2219,13 @@ app.get('/subsidy-types', async (c) => {
                     header: 'bg-purple-600',
                     icon: 'fa-exchange-alt'
                 },
+                '許認可': { 
+                    bg: 'bg-indigo-50', 
+                    border: 'border-indigo-500', 
+                    badge: 'bg-indigo-100 text-indigo-800',
+                    header: 'bg-indigo-600',
+                    icon: 'fa-stamp'
+                },
                 'その他': { 
                     bg: 'bg-gray-50', 
                     border: 'border-gray-400', 
@@ -2121,12 +2235,12 @@ app.get('/subsidy-types', async (c) => {
                 }
             };
             
-            // 助成金種別表示
+            // 申請種別表示
             function renderSubsidyTypes() {
                 const container = document.getElementById('subsidyTypesList');
                 
                 if (subsidyTypes.length === 0) {
-                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">まだ助成金種別が登録されていません</div>';
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">まだ申請種別が登録されていません</div>';
                     return;
                 }
 
@@ -2139,7 +2253,7 @@ app.get('/subsidy-types', async (c) => {
                 });
                 
                 // カテゴリの表示順序（存在するカテゴリをすべて表示）
-                const knownCategories = ['行政書士管轄', '社労士管轄', '事業転換系', 'その他'];
+                const knownCategories = ['行政書士管轄', '社労士管轄', '許認可', '事業転換系', 'その他'];
                 // DBに存在するが上記にないカテゴリも追加
                 const allCategories = [...new Set([...knownCategories, ...Object.keys(grouped)])];
                 const categoryOrder = allCategories.filter(cat => grouped[cat]);
@@ -4272,6 +4386,27 @@ app.get('/portal/:token', async (c) => {
                             <span class="hidden sm:inline">新規申込</span>
                         </button>
                     </div>
+                    <!-- ポータルメニュー -->
+                    <nav class="flex gap-2 mt-3 overflow-x-auto pb-1">
+                        <a href="#status" onclick="scrollToSection('statusSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
+                            <i class="fas fa-home mr-1"></i>申請状況
+                        </a>
+                        <a href="#documents" onclick="switchPortalTab('documents'); scrollToSection('documentSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
+                            <i class="fas fa-file-upload mr-1"></i>書類提出
+                        </a>
+                        <a href="#hearing" onclick="scrollToSection('hearingSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
+                            <i class="fas fa-clipboard-list mr-1"></i>ヒアリング
+                        </a>
+                        <a href="#communications" onclick="switchPortalTab('communications'); scrollToSection('documentSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
+                            <i class="fas fa-comments mr-1"></i>やり取り
+                        </a>
+                        <a href="/privacy-policy" target="_blank" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
+                            <i class="fas fa-shield-alt mr-1"></i>プライバシーポリシー
+                        </a>
+                        <a href="/legal" target="_blank" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
+                            <i class="fas fa-gavel mr-1"></i>特定商取引法
+                        </a>
+                    </nav>
                 </div>
             </header>
 
@@ -4287,7 +4422,7 @@ app.get('/portal/:token', async (c) => {
                     <!-- 左カラム: ステータス + パイプライン進捗 + ヒアリング質問 -->
                     <div class="lg:col-span-8 space-y-4 lg:space-y-6">
                         <!-- 現在のステータスとパイプライン進捗 -->
-                        <div class="bg-white rounded-lg shadow p-4">
+                        <div id="statusSection" class="bg-white rounded-lg shadow p-4">
                             <div class="flex items-center justify-between mb-4">
                                 <div class="flex items-center gap-3">
                                     <div class="text-2xl" id="statusIcon"></div>
@@ -4337,7 +4472,7 @@ app.get('/portal/:token', async (c) => {
                         </div>
 
                         <!-- ヒアリング質問セクション -->
-                        <div class="bg-white rounded-lg shadow p-4 lg:p-6">
+                        <div id="hearingSection" class="bg-white rounded-lg shadow p-4 lg:p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <h2 class="text-lg font-bold">
                                     <i class="fas fa-clipboard-list mr-2 text-indigo-600"></i>ヒアリング質問
@@ -4366,7 +4501,7 @@ app.get('/portal/:token', async (c) => {
                     </div>
 
                     <!-- 右カラム: 書類 + やり取り -->
-                    <div class="lg:col-span-4 mt-4 lg:mt-0">
+                    <div id="documentSection" class="lg:col-span-4 mt-4 lg:mt-0">
                         <div class="lg:sticky lg:top-4 space-y-4">
                             <!-- タブで切り替え: 書類 / やり取り -->
                             <div class="bg-white rounded-lg shadow">
@@ -4679,6 +4814,15 @@ app.get('/portal/:token', async (c) => {
                     panelDocs.classList.add('hidden');
                     panelComms.classList.remove('hidden');
                 }
+            }
+            
+            // セクションへスクロール
+            function scrollToSection(sectionId) {
+                const section = document.getElementById(sectionId);
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                return false;
             }
             
             // AIレスポンスを読みやすく整形する関数
@@ -5144,7 +5288,10 @@ app.get('/portal/:token', async (c) => {
                     reportSuccess = true;
                 } catch (error) {
                     console.error('Error reporting transfer:', error);
-                    alert('報告の送信に失敗しました。お手数ですが、担当者に直接ご連絡ください。');
+                    const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message || '不明なエラー';
+                    const statusCode = error.response?.status || 'N/A';
+                    console.error('Error details:', { statusCode, errorMsg, fullError: error.response?.data });
+                    alert(\`報告の送信に失敗しました。\\n\\nエラー: \${errorMsg}\\nステータス: \${statusCode}\\n\\nお手数ですが、担当者に直接ご連絡ください。\`);
                     
                     // エラー時はボタンを復活
                     if (btn) {
@@ -14327,6 +14474,444 @@ app.get('/admin/payments', async (c) => {
             
             loadPayments();
         </script>
+    </body>
+    </html>
+  `)
+})
+
+// =============================================
+// 顧客管理ページ
+// =============================================
+app.get('/clients', async (c) => {
+  const { DB } = c.env
+  const clients = await DB.prepare(`
+    SELECT c.*, 
+           COUNT(DISTINCT cl2.id) as case_count,
+           st.name as subsidy_type_name
+    FROM clients c
+    LEFT JOIN clients cl2 ON c.id = cl2.id
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    GROUP BY c.id
+    ORDER BY c.created_at DESC
+  `).all()
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>顧客管理 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div class="min-h-screen">
+            <header class="bg-blue-600 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <a href="/" class="text-sm hover:underline mb-2 block">
+                                <i class="fas fa-arrow-left mr-1"></i>ダッシュボードに戻る
+                            </a>
+                            <h1 class="text-2xl font-bold">
+                                <i class="fas fa-users mr-2"></i>顧客管理
+                            </h1>
+                        </div>
+                        <button onclick="openNewCustomerModal()" class="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50">
+                            <i class="fas fa-user-plus mr-2"></i>新規顧客追加
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="container mx-auto px-4 py-8">
+                <!-- 検索・フィルター -->
+                <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <div class="flex-1 relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
+                                   class="w-full pl-10 pr-4 py-2 border rounded-lg" onkeyup="filterCustomers()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 顧客一覧 -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">顧客名</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">会社名</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">連絡先</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">案件数</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">登録日</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customerList" class="divide-y divide-gray-200">
+                            ${(clients.results || []).map((client: any) => `
+                                <tr class="hover:bg-gray-50 customer-row" data-name="${client.name}" data-company="${client.company_name || ''}">
+                                    <td class="px-4 py-3">
+                                        <div class="font-medium text-gray-900">${client.name}</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-600">${client.company_name || '-'}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-600">
+                                        ${client.email ? `<div><i class="fas fa-envelope mr-1"></i>${client.email}</div>` : ''}
+                                        ${client.phone ? `<div><i class="fas fa-phone mr-1"></i>${client.phone}</div>` : ''}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">${client.case_count || 1}件</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-600">${client.created_at?.split(' ')[0] || '-'}</td>
+                                    <td class="px-4 py-3">
+                                        <a href="/client/${client.id}" class="text-blue-600 hover:text-blue-800 mr-3">
+                                            <i class="fas fa-eye"></i> 詳細
+                                        </a>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function filterCustomers() {
+                const query = document.getElementById('searchQuery').value.toLowerCase();
+                document.querySelectorAll('.customer-row').forEach(row => {
+                    const name = row.dataset.name.toLowerCase();
+                    const company = row.dataset.company.toLowerCase();
+                    row.style.display = (name.includes(query) || company.includes(query)) ? '' : 'none';
+                });
+            }
+            
+            function openNewCustomerModal() {
+                // 新規顧客追加のモーダルを開く（簡易版はダッシュボードへリダイレクト）
+                window.location.href = '/?action=new_customer';
+            }
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// =============================================
+// 案件一覧ページ
+// =============================================
+app.get('/cases', async (c) => {
+  const { DB } = c.env
+  const statusFilter = c.req.query('status') || ''
+  
+  let query = `
+    SELECT c.*, st.name as subsidy_type_name, st.category as subsidy_category
+    FROM clients c
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    WHERE 1=1
+  `
+  
+  if (statusFilter) {
+    query += ` AND c.status = '${statusFilter}'`
+  }
+  
+  query += ` ORDER BY 
+    CASE WHEN c.application_deadline IS NOT NULL AND c.application_deadline != '' 
+         THEN c.application_deadline 
+         ELSE '9999-12-31' END ASC,
+    c.created_at DESC
+  `
+  
+  const cases = await DB.prepare(query).all()
+  
+  const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+    inquiry: { label: '見込み', color: 'yellow' },
+    preparing: { label: '書類準備中', color: 'orange' },
+    applying: { label: '申請中', color: 'purple' },
+    completed: { label: '完了', color: 'green' }
+  }
+
+  // Build case items HTML
+  const caseItemsHtml = (cases.results || []).map((item: any) => {
+    const statusInfo = STATUS_LABELS[item.status] || { label: item.status, color: 'gray' }
+    const isDeadlineNear = item.application_deadline && new Date(item.application_deadline) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const subsidyBadge = item.subsidy_type_name ? '<span class="text-sm text-gray-500">' + item.subsidy_type_name + '</span>' : ''
+    const deadlineBadge = isDeadlineNear ? '<span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs"><i class="fas fa-exclamation-triangle mr-1"></i>期限間近</span>' : ''
+    const deadlineText = item.application_deadline ? '<p class="text-sm text-gray-500 mt-1"><i class="fas fa-calendar mr-1"></i>申請期限: ' + item.application_deadline + '</p>' : ''
+    
+    return '<div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition border-l-4 border-' + statusInfo.color + '-400">' +
+      '<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">' +
+        '<div class="flex-1">' +
+          '<div class="flex items-center gap-3 mb-2">' +
+            '<span class="bg-' + statusInfo.color + '-100 text-' + statusInfo.color + '-800 px-2 py-1 rounded text-sm font-medium">' + statusInfo.label + '</span>' +
+            subsidyBadge +
+            deadlineBadge +
+          '</div>' +
+          '<h3 class="text-lg font-bold text-gray-900">' + item.name + '</h3>' +
+          '<p class="text-gray-600">' + (item.company_name || '') + '</p>' +
+          deadlineText +
+        '</div>' +
+        '<div class="flex gap-2">' +
+          '<a href="/client/' + item.id + '" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">' +
+            '<i class="fas fa-eye mr-1"></i>詳細' +
+          '</a>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  }).join('')
+  
+  const emptyMessage = (cases.results || []).length === 0 ? '<div class="text-center py-12 text-gray-500">案件がありません</div>' : ''
+  const statusTitle = statusFilter && STATUS_LABELS[statusFilter] ? '<span class="text-lg font-normal">（' + STATUS_LABELS[statusFilter].label + '）</span>' : ''
+
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>案件一覧 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div class="min-h-screen">
+            <header class="bg-blue-600 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <a href="/" class="text-sm hover:underline mb-2 block">
+                                <i class="fas fa-arrow-left mr-1"></i>ダッシュボードに戻る
+                            </a>
+                            <h1 class="text-2xl font-bold">
+                                <i class="fas fa-folder-open mr-2"></i>案件一覧
+                                ${statusTitle}
+                            </h1>
+                        </div>
+                        <a href="/?action=new_case" class="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50">
+                            <i class="fas fa-plus mr-2"></i>新規案件登録
+                        </a>
+                    </div>
+                </div>
+            </header>
+
+            <div class="container mx-auto px-4 py-8">
+                <!-- フィルター -->
+                <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                    <div class="flex flex-wrap gap-2">
+                        <a href="/cases" class="px-4 py-2 rounded-lg ${!statusFilter ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">すべて</a>
+                        <a href="/cases?status=inquiry" class="px-4 py-2 rounded-lg ${statusFilter === 'inquiry' ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">見込み</a>
+                        <a href="/cases?status=preparing" class="px-4 py-2 rounded-lg ${statusFilter === 'preparing' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">書類準備中</a>
+                        <a href="/cases?status=applying" class="px-4 py-2 rounded-lg ${statusFilter === 'applying' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">申請中</a>
+                        <a href="/cases?status=completed" class="px-4 py-2 rounded-lg ${statusFilter === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">完了</a>
+                    </div>
+                </div>
+
+                <!-- 案件一覧 -->
+                <div class="space-y-4">
+                    ${caseItemsHtml}
+                    ${emptyMessage}
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `)
+})
+
+// =============================================
+// 統計ページ
+// =============================================
+app.get('/admin/statistics', async (c) => {
+  const { DB } = c.env
+  
+  // 統計データを取得
+  const totalClients = await DB.prepare('SELECT COUNT(*) as count FROM clients').first() as any
+  const newThisMonth = await DB.prepare(`
+    SELECT COUNT(*) as count FROM clients 
+    WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+  `).first() as any
+  const completedThisMonth = await DB.prepare(`
+    SELECT COUNT(*) as count FROM clients 
+    WHERE status = 'completed' AND strftime('%Y-%m', updated_at) = strftime('%Y-%m', 'now')
+  `).first() as any
+  
+  const byStatus = await DB.prepare(`
+    SELECT status, COUNT(*) as count FROM clients GROUP BY status
+  `).all()
+  
+  const bySubsidyType = await DB.prepare(`
+    SELECT st.name, st.category, COUNT(c.id) as count
+    FROM clients c
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    GROUP BY c.subsidy_type_id
+    ORDER BY count DESC
+    LIMIT 10
+  `).all()
+  
+  const monthlyStats = await DB.prepare(`
+    SELECT 
+      strftime('%Y-%m', created_at) as month,
+      COUNT(*) as new_count,
+      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count
+    FROM clients
+    WHERE created_at >= date('now', '-6 months')
+    GROUP BY strftime('%Y-%m', created_at)
+    ORDER BY month DESC
+  `).all()
+
+  // Build HTML for status cards
+  const labels: Record<string, string> = {
+    inquiry: '見込み',
+    consulting: '相談中',
+    preparing: '書類準備中',
+    applying: '申請中',
+    completed: '完了'
+  }
+  const colors: Record<string, string> = {
+    inquiry: 'yellow',
+    consulting: 'blue',
+    preparing: 'orange',
+    applying: 'purple',
+    completed: 'green'
+  }
+  
+  const statusItemsHtml = (byStatus.results || []).map((item: any) => {
+    const color = colors[item.status] || 'gray'
+    const label = labels[item.status] || item.status
+    return '<div class="flex items-center justify-between p-3 bg-' + color + '-50 rounded-lg">' +
+      '<span class="text-sm font-medium text-' + color + '-800">' + label + '</span>' +
+      '<span class="text-lg font-bold text-' + color + '-600">' + item.count + '</span>' +
+    '</div>'
+  }).join('')
+  
+  const subsidyTypeHtml = (bySubsidyType.results || []).map((item: any, index: number) => {
+    return '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
+      '<div class="flex items-center gap-3">' +
+        '<span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">' + (index + 1) + '</span>' +
+        '<span class="text-sm">' + (item.name || '未設定') + '</span>' +
+      '</div>' +
+      '<span class="text-lg font-bold text-gray-700">' + item.count + '</span>' +
+    '</div>'
+  }).join('')
+  
+  const monthlyStatsHtml = (monthlyStats.results || []).map((item: any) => {
+    return '<tr class="border-b">' +
+      '<td class="py-3 text-sm">' + item.month + '</td>' +
+      '<td class="py-3 text-right"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">' + item.new_count + '</span></td>' +
+      '<td class="py-3 text-right"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">' + item.completed_count + '</span></td>' +
+    '</tr>'
+  }).join('')
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>統計情報 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div class="min-h-screen">
+            <header class="bg-blue-600 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <a href="/" class="text-sm hover:underline mb-2 block">
+                                <i class="fas fa-arrow-left mr-1"></i>ダッシュボードに戻る
+                            </a>
+                            <h1 class="text-2xl font-bold">
+                                <i class="fas fa-chart-line mr-2"></i>統計情報
+                            </h1>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="container mx-auto px-4 py-8">
+                <!-- サマリーカード -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">総顧客数</p>
+                                <p class="text-3xl font-bold text-gray-900">${totalClients?.count || 0}</p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-users text-blue-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">今月の新規</p>
+                                <p class="text-3xl font-bold text-blue-600">${newThisMonth?.count || 0}</p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user-plus text-blue-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">今月の完了</p>
+                                <p class="text-3xl font-bold text-green-600">${completedThisMonth?.count || 0}</p>
+                            </div>
+                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- ステータス別 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-chart-pie text-purple-600"></i>ステータス別
+                        </h2>
+                        <div class="space-y-3">
+                            ${statusItemsHtml}
+                        </div>
+                    </div>
+
+                    <!-- 申請種別ランキング -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-ranking-star text-orange-600"></i>申請種別ランキング
+                        </h2>
+                        <div class="space-y-3">
+                            ${subsidyTypeHtml}
+                        </div>
+                    </div>
+
+                    <!-- 月別推移 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6 lg:col-span-2">
+                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-chart-bar text-blue-600"></i>月別推移（過去6ヶ月）
+                        </h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b">
+                                        <th class="py-2 text-left text-sm font-medium text-gray-500">月</th>
+                                        <th class="py-2 text-right text-sm font-medium text-gray-500">新規</th>
+                                        <th class="py-2 text-right text-sm font-medium text-gray-500">完了</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${monthlyStatsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </body>
     </html>
   `)
