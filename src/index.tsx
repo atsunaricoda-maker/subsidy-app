@@ -663,7 +663,7 @@ app.get('/', (c) => {
                             
                             <div>
                                 <label class="block text-sm font-medium mb-1">申請期限</label>
-                                <input type="date" name="application_deadline" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                <input type="date" name="application_end_date" class="w-full px-3 py-2 border rounded-lg text-sm">
                             </div>
                         </div>
                         
@@ -14602,28 +14602,31 @@ app.get('/clients', async (c) => {
 // 案件一覧ページ
 // =============================================
 app.get('/cases', async (c) => {
-  const { DB } = c.env
-  const statusFilter = c.req.query('status') || ''
-  
-  let query = `
-    SELECT c.*, st.name as subsidy_type_name, st.category as subsidy_category
-    FROM clients c
-    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-    WHERE 1=1
-  `
-  
-  if (statusFilter) {
-    query += ` AND c.status = '${statusFilter}'`
-  }
-  
-  query += ` ORDER BY 
-    CASE WHEN c.application_deadline IS NOT NULL AND c.application_deadline != '' 
-         THEN c.application_deadline 
-         ELSE '9999-12-31' END ASC,
-    c.created_at DESC
-  `
-  
-  const cases = await DB.prepare(query).all()
+  try {
+    const { DB } = c.env
+    const statusFilter = c.req.query('status') || ''
+    
+    let query = `
+      SELECT c.*, st.name as subsidy_type_name, st.category as subsidy_category,
+             sg.application_end_date
+      FROM clients c
+      LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+      LEFT JOIN subsidy_guidelines sg ON st.id = sg.subsidy_type_id
+      WHERE 1=1
+    `
+    
+    if (statusFilter) {
+      query += ` AND c.status = '${statusFilter}'`
+    }
+    
+    query += ` ORDER BY 
+      CASE WHEN sg.application_end_date IS NOT NULL AND sg.application_end_date != '' 
+           THEN sg.application_end_date 
+           ELSE '9999-12-31' END ASC,
+      c.created_at DESC
+    `
+    
+    const cases = await DB.prepare(query).all()
   
   const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     inquiry: { label: '見込み', color: 'yellow' },
@@ -14635,10 +14638,10 @@ app.get('/cases', async (c) => {
   // Build case items HTML
   const caseItemsHtml = (cases.results || []).map((item: any) => {
     const statusInfo = STATUS_LABELS[item.status] || { label: item.status, color: 'gray' }
-    const isDeadlineNear = item.application_deadline && new Date(item.application_deadline) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const isDeadlineNear = item.application_end_date && new Date(item.application_end_date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     const subsidyBadge = item.subsidy_type_name ? '<span class="text-sm text-gray-500">' + item.subsidy_type_name + '</span>' : ''
     const deadlineBadge = isDeadlineNear ? '<span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs"><i class="fas fa-exclamation-triangle mr-1"></i>期限間近</span>' : ''
-    const deadlineText = item.application_deadline ? '<p class="text-sm text-gray-500 mt-1"><i class="fas fa-calendar mr-1"></i>申請期限: ' + item.application_deadline + '</p>' : ''
+    const deadlineText = item.application_end_date ? '<p class="text-sm text-gray-500 mt-1"><i class="fas fa-calendar mr-1"></i>申請期限: ' + item.application_end_date + '</p>' : ''
     
     return '<div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition border-l-4 border-' + statusInfo.color + '-400">' +
       '<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">' +
@@ -14717,6 +14720,10 @@ app.get('/cases', async (c) => {
     </body>
     </html>
   `)
+  } catch (error: any) {
+    console.error('Cases page error:', error)
+    return c.text('Error: ' + (error.message || 'Unknown error'), 500)
+  }
 })
 
 // =============================================
