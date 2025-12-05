@@ -13790,24 +13790,37 @@ app.get('/api/clients/:clientId/payments', async (c) => {
 app.post('/api/clients/:clientId/report-transfer', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
-  const data = await c.req.json()
   
-  // 支払い履歴を作成
-  await DB.prepare(`
-    INSERT INTO payment_history (client_id, payment_type, amount, payment_method, status, bank_transfer_reported_at, notes)
-    VALUES (?, ?, ?, 'bank_transfer', 'reported', CURRENT_TIMESTAMP, ?)
-  `).bind(clientId, data.payment_type || 'deposit', data.amount, data.notes || null).run()
-  
-  // クライアントの振込報告フラグを更新
-  await DB.prepare(`
-    UPDATE clients 
-    SET deposit_transfer_reported = 1, 
-        deposit_transfer_reported_at = CURRENT_TIMESTAMP,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).bind(clientId).run()
-  
-  return c.json({ success: true, message: '振込完了報告を送信しました。確認まで少々お待ちください。' })
+  try {
+    const data = await c.req.json()
+    
+    // クライアント情報を取得して金額を確認
+    const client = await DB.prepare(`
+      SELECT deposit_amount FROM clients WHERE id = ?
+    `).bind(clientId).first() as any
+    
+    const amount = data.amount || client?.deposit_amount || 0
+    
+    // 支払い履歴を作成
+    await DB.prepare(`
+      INSERT INTO payment_history (client_id, payment_type, amount, payment_method, status, bank_transfer_reported_at, notes)
+      VALUES (?, ?, ?, 'bank_transfer', 'reported', CURRENT_TIMESTAMP, ?)
+    `).bind(clientId, data.payment_type || 'deposit', amount, data.notes || '').run()
+    
+    // クライアントの振込報告フラグを更新
+    await DB.prepare(`
+      UPDATE clients 
+      SET deposit_transfer_reported = 1, 
+          deposit_transfer_reported_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(clientId).run()
+    
+    return c.json({ success: true, message: '振込完了報告を送信しました。確認まで少々お待ちください。' })
+  } catch (error: any) {
+    console.error('Report transfer error:', error)
+    return c.json({ error: '振込報告の処理中にエラーが発生しました', details: error.message }, 500)
+  }
 })
 
 // 支払い確認（管理者用）
