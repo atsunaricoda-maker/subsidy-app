@@ -5120,19 +5120,26 @@ app.get('/portal/:token', async (c) => {
                     const clientRes = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
                     const amount = clientRes.data.deposit_amount || 0;
                     
-                    await axios.post(\`/api/clients/\${CLIENT_ID}/report-transfer\`, {
+                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/report-transfer\`, {
                         payment_type: 'deposit',
                         amount: amount,
                         notes: '顧客ポータルから報告'
                     });
                     
+                    console.log('Transfer report response:', response.data);
+                    
                     closeBankTransferModal();
                     showMessage('振込完了報告を送信しました。確認までしばらくお待ちください。', 'success');
                     
-                    // 手付金セクションを即座に更新
-                    loadDepositInfo();
+                    // 手付金セクションを即座に更新（エラーは無視）
+                    try {
+                        await loadDepositInfo();
+                    } catch (e) {
+                        console.warn('loadDepositInfo error (ignored):', e);
+                    }
                 } catch (error) {
                     console.error('Error reporting transfer:', error);
+                    console.error('Error details:', error.response?.data || error.message);
                     alert('報告の送信に失敗しました。お手数ですが、担当者に直接ご連絡ください。');
                     
                     // エラー時はボタンを復活
