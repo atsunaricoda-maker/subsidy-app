@@ -851,6 +851,74 @@ app.get('/', (c) => {
                     console.error('Error loading pending payments count:', error);
                 }
             }
+            
+            // 新規案件登録フォームのサブミットハンドラ
+            const newCaseFormEl = document.getElementById('newCaseForm');
+            if (newCaseFormEl) {
+                newCaseFormEl.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const customerType = formData.get('customer_type');
+                    
+                    try {
+                        let clientId;
+                        
+                        if (customerType === 'existing') {
+                            // 既存顧客を選択した場合
+                            clientId = formData.get('existing_client_id');
+                            if (!clientId) {
+                                alert('顧客を選択してください');
+                                return;
+                            }
+                            
+                            // 既存顧客の情報を更新
+                            const updateData = {
+                                subsidy_type_id: formData.get('subsidy_type_id') || null,
+                                assigned_to: formData.get('assigned_to') || null,
+                                notes: formData.get('notes') || null,
+                                deposit_required: document.getElementById('depositRequired')?.checked ? 1 : 0,
+                                deposit_amount: parseInt(formData.get('deposit_amount')) || 0,
+                                withholding_tax: document.getElementById('withholdingTax')?.checked ? 1 : 0,
+                                success_fee_enabled: document.getElementById('successFeeEnabled')?.checked ? 1 : 0,
+                                success_fee_rate: parseFloat(formData.get('success_fee_rate')) || 0,
+                                success_fee_amount: parseInt(formData.get('success_fee_amount')) || 0
+                            };
+                            
+                            await axios.patch('/api/clients/' + clientId, updateData);
+                        } else {
+                            // 新規顧客として登録
+                            const name = formData.get('name');
+                            if (!name) {
+                                alert('顧客名を入力してください');
+                                return;
+                            }
+                            
+                            const newClientData = {
+                                name: name,
+                                company_name: formData.get('company_name') || null,
+                                email: formData.get('email') || null,
+                                phone: formData.get('phone') || null,
+                                subsidy_type_id: formData.get('subsidy_type_id') || null,
+                                assigned_to: formData.get('assigned_to') || null,
+                                notes: formData.get('notes') || null,
+                                deposit_required: document.getElementById('depositRequired')?.checked ? 1 : 0,
+                                deposit_amount: parseInt(formData.get('deposit_amount')) || 0,
+                                withholding_tax: document.getElementById('withholdingTax')?.checked ? 1 : 0
+                            };
+                            
+                            const response = await axios.post('/api/clients', newClientData);
+                            clientId = response.data.id;
+                        }
+                        
+                        closeNewCaseModal();
+                        loadData();
+                        alert('案件を登録しました');
+                    } catch (error) {
+                        alert('登録に失敗しました: ' + (error.response?.data?.error || error.message));
+                        console.error('Error creating case:', error);
+                    }
+                });
+            }
         
             const STATUS_LABELS = {
                 inquiry: '見込み',
