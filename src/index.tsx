@@ -779,7 +779,8 @@ app.get('/', (c) => {
             
             // ステータスでフィルター
             function filterByStatus(status) {
-                document.getElementById('filterStatus').value = status;
+                const filterEl = document.getElementById('filterStatus');
+                if (filterEl) filterEl.value = status;
                 filterClients();
             }
             
@@ -794,10 +795,13 @@ app.get('/', (c) => {
                 }
                 
                 if (adminName) {
-                    document.getElementById('adminName').innerHTML = \`
-                        <i class="fas fa-user-shield mr-1"></i>
-                        \${adminName}
-                    \`;
+                    const adminNameEl = document.getElementById('adminName');
+                    if (adminNameEl) {
+                        adminNameEl.innerHTML = \`
+                            <i class="fas fa-user-shield mr-1"></i>
+                            \${adminName}
+                        \`;
+                    }
                     const sidebarName = document.getElementById('sidebarAdminName');
                     if (sidebarName) sidebarName.textContent = adminName;
                 }
@@ -1114,14 +1118,16 @@ app.get('/', (c) => {
                 
                 // 総顧客数
                 const total = allClients.length;
-                document.getElementById('stat-total').textContent = total;
+                const statTotal = document.getElementById('stat-total');
+                if (statTotal) statTotal.textContent = total;
                 
                 // 今月の新規顧客
                 const newThisMonth = allClients.filter(c => {
                     const created = c.created_at.substring(0, 7);
                     return created === thisMonth;
                 }).length;
-                document.getElementById('stat-new-month').textContent = newThisMonth;
+                const statNewMonth = document.getElementById('stat-new-month');
+                if (statNewMonth) statNewMonth.textContent = newThisMonth;
                 
                 // 今月の完了件数
                 const completedThisMonth = allClients.filter(c => {
@@ -1129,7 +1135,8 @@ app.get('/', (c) => {
                     const updated = c.updated_at.substring(0, 7);
                     return updated === thisMonth;
                 }).length;
-                document.getElementById('stat-completed-month').textContent = completedThisMonth;
+                const statCompleted = document.getElementById('stat-completed-month');
+                if (statCompleted) statCompleted.textContent = completedThisMonth;
             }
 
             // ステータスカード更新
@@ -1330,8 +1337,10 @@ app.get('/', (c) => {
 
             // フィルター・検索
             function filterClients() {
-                const status = document.getElementById('filterStatus').value;
-                const query = document.getElementById('searchQuery').value.toLowerCase();
+                const filterStatusEl = document.getElementById('filterStatus');
+                const searchQueryEl = document.getElementById('searchQuery');
+                const status = filterStatusEl ? filterStatusEl.value : '';
+                const query = searchQueryEl ? searchQueryEl.value.toLowerCase() : '';
                 
                 let filtered = allClients;
                 
@@ -1349,8 +1358,10 @@ app.get('/', (c) => {
                 renderClients(filtered);
             }
 
-            document.getElementById('filterStatus').addEventListener('change', filterClients);
-            document.getElementById('searchQuery').addEventListener('input', filterClients);
+            const filterStatusEl = document.getElementById('filterStatus');
+            const searchQueryEl = document.getElementById('searchQuery');
+            if (filterStatusEl) filterStatusEl.addEventListener('change', filterClients);
+            if (searchQueryEl) searchQueryEl.addEventListener('input', filterClients);
 
             // 新規顧客登録
             function openNewClientModal() {
@@ -1362,7 +1373,8 @@ app.get('/', (c) => {
                 document.getElementById('newClientForm').reset();
             }
 
-            document.getElementById('newClientForm').addEventListener('submit', async (e) => {
+            const newClientFormEl = document.getElementById('newClientForm');
+            if (newClientFormEl) newClientFormEl.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData);
