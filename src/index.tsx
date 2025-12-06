@@ -1422,11 +1422,12 @@ app.get('/', (c) => {
                     }
                 }
 
-                // 顧客ごとの案件数をカウント
+                // 顧客ごとの案件数をカウント（フィルタ前の全案件からカウント）
                 const caseCountByClient = {};
-                cases.forEach(c => {
+                allCases.forEach(c => {
                     caseCountByClient[c.client_id] = (caseCountByClient[c.client_id] || 0) + 1;
                 });
+                console.log('Case counts by client:', caseCountByClient);
                 
                 container.innerHTML = cases.map(caseItem => {
                     const portalUrl = \`\${window.location.origin}/portal/\${caseItem.access_token}\`;
@@ -1440,7 +1441,7 @@ app.get('/', (c) => {
                             <div class="flex-1">
                                 <div class="flex items-center gap-3 mb-2 flex-wrap">
                                     <h3 class="text-lg font-bold">\${caseItem.client_name || '未設定'}</h3>
-                                    \${clientCaseCount > 1 ? \`<span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800 font-medium"><i class="fas fa-folder-open mr-1"></i>\${clientCaseCount}件の案件</span>\` : ''}
+                                    <span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800 font-medium"><i class="fas fa-folder-open mr-1"></i>この顧客: \${clientCaseCount}件</span>
                                     <span class="px-3 py-1 rounded-full text-xs font-medium \${STATUS_COLORS[caseItem.status]}">
                                         \${STATUS_LABELS[caseItem.status]}
                                     </span>
@@ -1489,7 +1490,7 @@ app.get('/', (c) => {
                                     <span class="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap \${STATUS_COLORS[caseItem.status]}">
                                         \${STATUS_LABELS[caseItem.status]}
                                     </span>
-                                    \${clientCaseCount > 1 ? \`<span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800">\${clientCaseCount}件</span>\` : ''}
+                                    <span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800">\${clientCaseCount}件</span>
                                     \${deadlineInfo ? \`<span class="px-2 py-1 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
                                 </div>
                             </div>
