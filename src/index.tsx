@@ -4252,20 +4252,49 @@ app.get('/client/:id', async (c) => {
                     currentClient = response.data;
                     console.log('Client loaded:', currentClient);
                     
-                    const subsidyType = subsidyTypes.find(s => s.id === currentClient.subsidy_type_id);
-                    const assignedUser = allUsers.find(u => u.username === currentClient.assigned_to);
-                    const portalUrl = \`\${window.location.origin}/portal/\${currentClient.access_token}\`;
+                    // 案件情報を取得（casesテーブルから）
+                    const cases = currentClient.cases || [];
+                    const latestCase = cases[0]; // 最新の案件
+                    
+                    // 案件ベースで補助金種別と担当者を取得
+                    const subsidyType = latestCase ? subsidyTypes.find(s => s.id === latestCase.subsidy_type_id) : null;
+                    const assignedUser = latestCase ? allUsers.find(u => u.username === latestCase.assigned_to) : null;
+                    const portalUrl = latestCase ? \`\${window.location.origin}/portal/\${latestCase.access_token}\` : '';
+                    
+                    // 案件一覧HTML
+                    const casesHtml = cases.length > 0 ? cases.map(c => {
+                        const caseSubsidy = subsidyTypes.find(s => s.id === c.subsidy_type_id);
+                        const caseAssignee = allUsers.find(u => u.username === c.assigned_to);
+                        return \`
+                            <div class="p-3 bg-gray-50 rounded-lg border mb-2">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="text-xs text-gray-500">\${c.case_number || '案件'}</span>
+                                        <div class="font-medium text-sm">\${caseSubsidy ? caseSubsidy.name : '未設定'}</div>
+                                    </div>
+                                    <span class="text-xs px-2 py-1 rounded \${STATUS_COLORS[c.status] || 'bg-gray-100'}">\${STATUS_LABELS[c.status] || c.status}</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">担当: \${caseAssignee ? caseAssignee.name : '未割り当て'}</div>
+                                <a href="/portal/\${c.access_token}" target="_blank" class="text-xs text-blue-600 hover:underline">
+                                    <i class="fas fa-external-link-alt mr-1"></i>ポータル
+                                </a>
+                            </div>
+                        \`;
+                    }).join('') : '<div class="text-gray-500 text-sm">案件がありません</div>';
                     
                     document.getElementById('clientInfo').innerHTML = \`
                         <div><strong>会社名:</strong> \${currentClient.company_name || '-'}</div>
                         <div><strong>メール:</strong> \${currentClient.email || '-'}</div>
                         <div><strong>電話:</strong> \${currentClient.phone || '-'}</div>
-                        <div><strong>申請助成金:</strong> \${subsidyType ? subsidyType.name : '-'}</div>
-                        <div><strong>ステータス:</strong> \${STATUS_LABELS[currentClient.status]}</div>
-                        <div><strong>担当者:</strong> \${assignedUser ? assignedUser.name : '未割り当て'}</div>
-                        <div><strong>メモ:</strong> \${currentClient.notes || '-'}</div>
+                        
+                        <div class="mt-4 pt-4 border-t">
+                            <strong class="block mb-2">案件一覧 (\${cases.length}件)</strong>
+                            \${casesHtml}
+                        </div>
+                        
+                        \${portalUrl ? \`
                         <div class="mt-3 pt-3 border-t">
-                            <strong class="block mb-2">顧客ポータルURL:</strong>
+                            <strong class="block mb-2">最新案件のポータルURL:</strong>
                             <div class="flex gap-2">
                                 <input type="text" 
                                        value="\${portalUrl}" 
@@ -4276,11 +4305,12 @@ app.get('/client/:id', async (c) => {
                                     <i class="fas fa-copy mr-1"></i>コピー
                                 </button>
                             </div>
-                            <a href="/portal/\${currentClient.access_token}" target="_blank" 
+                            <a href="\${portalUrl}" target="_blank" 
                                class="text-blue-600 hover:underline text-sm mt-1 inline-block">
                                 <i class="fas fa-external-link-alt mr-1"></i>ポータルを開く
                             </a>
                         </div>
+                        \` : ''}
                     \`;
                     
                     // adminのみ削除ボタン表示
