@@ -2698,15 +2698,10 @@ app.get('/api/cases/:id/document-checklist', async (c) => {
 // 助成金種別一覧取得
 app.get('/api/subsidy-types', async (c) => {
   const { DB } = c.env
-  const includeHidden = c.req.query('include_hidden') === 'true'
   
   // id = 0 は共通質問用の内部レコードなので除外
-  // is_hidden = 1 のものは include_hidden=true の場合のみ表示
-  let query = `SELECT * FROM subsidy_types WHERE id > 0`
-  if (!includeHidden) {
-    query += ` AND (is_hidden IS NULL OR is_hidden = 0)`
-  }
-  query += ` ORDER BY category, name`
+  // 全てのカテゴリ（行政書士管轄・社労士管轄・許認可）を表示
+  const query = `SELECT * FROM subsidy_types WHERE id > 0 ORDER BY category, name`
   
   const result = await DB.prepare(query).all()
   
