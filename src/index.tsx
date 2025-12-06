@@ -1238,7 +1238,7 @@ app.get('/', (c) => {
             // 担当者リストを読み込み
             async function loadAdminUsers() {
                 try {
-                    const response = await axios.get('/api/admin-users');
+                    const response = await axios.get('/api/admin/users');
                     allUsers = response.data;
                     
                     const select = document.getElementById('newClientAssignedTo');
