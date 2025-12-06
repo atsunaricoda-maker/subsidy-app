@@ -7877,11 +7877,20 @@ app.get('/portal/:token', async (c) => {
             
             async function loadHearingQuestions() {
                 try {
-                    // 顧客の助成金種別を取得
-                    const clientRes = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                    const client = clientRes.data;
+                    // 案件の助成金種別を取得（CASE_IDがある場合はcasesテーブルから）
+                    let subsidyTypeId = null;
                     
-                    if (!client.subsidy_type_id) {
+                    if (CASE_ID) {
+                        // 案件から補助金種別を取得
+                        const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                        subsidyTypeId = caseRes.data?.subsidy_type_id;
+                    } else {
+                        // 後方互換: 顧客から補助金種別を取得
+                        const clientRes = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
+                        subsidyTypeId = clientRes.data?.subsidy_type_id;
+                    }
+                    
+                    if (!subsidyTypeId) {
                         document.getElementById('hearingQuestionsList').innerHTML = \`
                             <div class="text-center py-8 text-gray-500">
                                 <i class="fas fa-info-circle text-2xl mb-2"></i>
@@ -7892,8 +7901,8 @@ app.get('/portal/:token', async (c) => {
                         return;
                     }
                     
-                    // ヒアリング質問を取得
-                    const questionsRes = await axios.get(\`/api/hearing-questions/\${client.subsidy_type_id}\`);
+                    // ヒアリング質問を取得（共通質問 + 補助金種別固有の質問）
+                    const questionsRes = await axios.get(\`/api/hearing-questions/\${subsidyTypeId}\`);
                     hearingQuestions = questionsRes.data;
                     
                     // 既存の回答を取得
