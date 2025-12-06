@@ -2548,11 +2548,19 @@ app.put('/api/documents/:id/status', async (c) => {
   const id = c.req.param('id')
   const { status } = await c.req.json()
   
-  await DB.prepare(`
+  console.log(`Updating document ${id} status to ${status}`)
+  
+  const result = await DB.prepare(`
     UPDATE documents SET status = ? WHERE id = ?
   `).bind(status, id).run()
   
-  return c.json({ success: true })
+  console.log('Update result:', JSON.stringify(result))
+  
+  // 更新後のデータを確認
+  const updated = await DB.prepare(`SELECT id, status FROM documents WHERE id = ?`).bind(id).first()
+  console.log('Updated document:', JSON.stringify(updated))
+  
+  return c.json({ success: true, updated })
 })
 
 // ===============================
@@ -4486,14 +4494,16 @@ app.get('/client/:id', async (c) => {
             }
 
             async function loadDocuments() {
+                console.log('loadDocuments called for CLIENT_ID:', CLIENT_ID);
                 // 必要書類チェックリストと既にアップロードされた書類を取得
                 const [checklistRes, docsRes] = await Promise.all([
                     axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`),
-                    axios.get(\`/api/clients/\${CLIENT_ID}/documents\`)
+                    axios.get(\`/api/clients/\${CLIENT_ID}/documents?t=\${Date.now()}\`)
                 ]);
                 
                 const checklist = checklistRes.data;
                 const docs = docsRes.data;
+                console.log('Documents loaded:', docs.map(d => ({id: d.id, type: d.document_type, status: d.status})));
                 const uploadedTypes = new Set(docs.map(d => d.document_type));
                 
                 // 必須書類のカウント
@@ -4566,13 +4576,13 @@ app.get('/client/:id', async (c) => {
                                 <i class="fas fa-download mr-1"></i>DL
                             </a>
                             \${doc.status !== 'approved' ? \`
-                                <button onclick="updateDocumentStatus(\${doc.id}, 'approved')" 
+                                <button onclick="console.log('Approve clicked', \${doc.id}); updateDocumentStatus(\${doc.id}, 'approved')" 
                                         class="text-xs text-green-600 hover:text-green-800">
                                     <i class="fas fa-check mr-1"></i>承認
                                 </button>
                             \` : ''}
                             \${doc.status !== 'rejected' ? \`
-                                <button onclick="updateDocumentStatus(\${doc.id}, 'rejected')" 
+                                <button onclick="console.log('Reject clicked', \${doc.id}); updateDocumentStatus(\${doc.id}, 'rejected')" 
                                         class="text-xs text-red-600 hover:text-red-800">
                                     <i class="fas fa-times mr-1"></i>差戻
                                 </button>
@@ -4582,13 +4592,17 @@ app.get('/client/:id', async (c) => {
                 \`).join('');
             }
             
-            async function updateDocumentStatus(docId, status) {
+            window.updateDocumentStatus = async function(docId, status) {
                 try {
+                    console.log('updateDocumentStatus called:', docId, status);
                     const response = await axios.put(\`/api/documents/\${docId}/status\`, { status });
+                    console.log('API response:', response.data);
                     if (response.data && response.data.success) {
                         const statusText = status === 'approved' ? '承認' : status === 'rejected' ? '差し戻し' : '更新';
                         showToast(\`書類を\${statusText}しました\`, 'success');
+                        console.log('Reloading documents...');
                         await loadDocuments();
+                        console.log('Documents reloaded');
                     } else {
                         throw new Error('ステータス更新に失敗しました');
                     }
@@ -4596,7 +4610,7 @@ app.get('/client/:id', async (c) => {
                     showToast('ステータス更新に失敗しました', 'error');
                     console.error('Document status update error:', error);
                 }
-            }
+            };
 
             async function loadCommunications() {
                 const response = await axios.get(\`/api/clients/\${CLIENT_ID}/communications\`);
