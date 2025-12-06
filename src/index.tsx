@@ -1235,6 +1235,27 @@ app.get('/', (c) => {
                 }
             }
             
+            // 担当者リストを読み込み
+            async function loadAdminUsers() {
+                try {
+                    const response = await axios.get('/api/admin-users');
+                    allUsers = response.data;
+                    
+                    const select = document.getElementById('newClientAssignedTo');
+                    if (select) {
+                        select.innerHTML = '<option value="">担当者を選択</option>';
+                        allUsers.forEach(user => {
+                            const option = document.createElement('option');
+                            option.value = user.username;
+                            option.textContent = user.name || user.username;
+                            select.appendChild(option);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error loading admin users:', error);
+                }
+            }
+            
             // 補助金オプションをカテゴリ別にレンダリング
             function renderSubsidyOptions(filter = '') {
                 const select = document.getElementById('newClientSubsidyType');
@@ -6333,7 +6354,7 @@ app.get('/portal/:token', async (c) => {
                 return result.trim();
             }
             
-            const CLIENT_ID = ${client.id || client.client_id};
+            const CLIENT_ID = ${caseData ? caseData.client_id : client.id};
             const CASE_ID = ${caseId || 'null'};
             const STATUS_INFO = {
                 inquiry: { icon: '🔍', text: '見込み', desc: 'まずはお話を聞かせてください' },
