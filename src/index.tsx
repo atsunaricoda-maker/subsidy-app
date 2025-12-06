@@ -1975,17 +1975,21 @@ app.post('/api/clients', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
+  // 顧客用のアクセストークンを生成（レガシー互換用、実際の案件アクセスはcasesテーブルのトークンを使用）
+  const accessToken = crypto.randomUUID().replace(/-/g, '').substring(0, 20)
+  
   // 顧客基本情報のみ登録（案件情報は別途casesテーブルに登録）
   const result = await DB.prepare(`
-    INSERT INTO clients (name, company_name, email, phone, assigned_staff, assigned_to)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (name, company_name, email, phone, assigned_staff, assigned_to, access_token)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
     data.company_name || null,
     data.email || null,
     data.phone || null,
     data.assigned_staff || null,
-    data.assigned_to || null
+    data.assigned_to || null,
+    accessToken
   ).run()
   
   return c.json({ 
@@ -2272,8 +2276,35 @@ app.post('/api/cases', async (c) => {
     accessToken
   ).run()
   
+  const caseId = result.meta.last_row_id
+  
+  // 補助金種別に必要書類が設定されていない場合、デフォルト書類を自動追加
+  if (data.subsidy_type_id) {
+    const existingDocs = await DB.prepare(`
+      SELECT COUNT(*) as count FROM subsidy_type_documents WHERE subsidy_type_id = ?
+    `).bind(data.subsidy_type_id).first()
+    
+    if (existingDocs?.count === 0) {
+      // デフォルトの基本書類を追加
+      const defaultDocs = [
+        { document_type: '登記簿謄本', description: '3ヶ月以内に発行されたもの', is_required: 1, display_order: 1 },
+        { document_type: '決算書', description: '直近2期分', is_required: 1, display_order: 2 },
+        { document_type: '確定申告書', description: '直近のもの', is_required: 1, display_order: 3 },
+        { document_type: '事業計画書', description: '申請用', is_required: 1, display_order: 4 },
+        { document_type: '見積書', description: '対象経費の見積書', is_required: 0, display_order: 5 }
+      ]
+      
+      for (const doc of defaultDocs) {
+        await DB.prepare(`
+          INSERT INTO subsidy_type_documents (subsidy_type_id, document_type, description, is_required, display_order)
+          VALUES (?, ?, ?, ?, ?)
+        `).bind(data.subsidy_type_id, doc.document_type, doc.description, doc.is_required, doc.display_order).run()
+      }
+    }
+  }
+  
   return c.json({ 
-    id: result.meta.last_row_id,
+    id: caseId,
     case_number: caseNumber,
     access_token: accessToken
   })
