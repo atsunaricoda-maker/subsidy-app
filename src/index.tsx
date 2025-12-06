@@ -848,12 +848,43 @@ app.get('/', (c) => {
                     const response = await axios.get('/api/clients');
                     const select = document.getElementById('existingClientSelect');
                     select.innerHTML = '<option value="">顧客を選択してください</option>';
-                    response.data.forEach(client => {
-                        const option = document.createElement('option');
-                        option.value = client.id;
-                        option.textContent = client.company_name ? \`\${client.name}（\${client.company_name}）\` : client.name;
-                        select.appendChild(option);
-                    });
+                    
+                    // 案件なし（リセット済み）の顧客を優先表示
+                    const noCase = response.data.filter(c => !c.subsidy_type_id);
+                    const hasCase = response.data.filter(c => c.subsidy_type_id);
+                    
+                    if (noCase.length > 0) {
+                        const optGroup1 = document.createElement('optgroup');
+                        optGroup1.label = '📋 新規案件を登録可能';
+                        noCase.forEach(client => {
+                            const option = document.createElement('option');
+                            option.value = client.id;
+                            option.textContent = client.company_name ? \`\${client.name}（\${client.company_name}）\` : client.name;
+                            optGroup1.appendChild(option);
+                        });
+                        select.appendChild(optGroup1);
+                    }
+                    
+                    if (hasCase.length > 0) {
+                        const optGroup2 = document.createElement('optgroup');
+                        optGroup2.label = '📁 案件進行中（情報更新）';
+                        hasCase.forEach(client => {
+                            const option = document.createElement('option');
+                            option.value = client.id;
+                            const statusLabel = {
+                                inquiry: '見込み',
+                                consulting: '相談中',
+                                preparing: '書類準備',
+                                applying: '申請中',
+                                completed: '完了'
+                            }[client.status] || client.status;
+                            option.textContent = client.company_name 
+                                ? \`\${client.name}（\${client.company_name}）- \${statusLabel}\`
+                                : \`\${client.name} - \${statusLabel}\`;
+                            optGroup2.appendChild(option);
+                        });
+                        select.appendChild(optGroup2);
+                    }
                 } catch (error) {
                     console.error('Error loading clients:', error);
                 }
@@ -1456,18 +1487,72 @@ app.get('/', (c) => {
             
             // 顧客削除
             async function deleteClient(clientId, clientName) {
-                if (!confirm(\`\${clientName}様の情報を削除してもよろしいですか？\n\nこの操作は取り消せません。\n関連する書類やコミュニケーション履歴もすべて削除されます。\`)) {
-                    return;
-                }
+                // 選択ダイアログを表示
+                const choice = await showDeleteChoiceDialog(clientName);
+                if (!choice) return;
                 
                 try {
-                    await axios.delete(\`/api/clients/\${clientId}\`);
-                    showToast(\`\${clientName}様の情報を削除しました\`);
-                    loadData(); // リロード
+                    if (choice === 'reset') {
+                        await axios.delete(\`/api/clients/\${clientId}?keep_customer=true\`);
+                        showToast(\`\${clientName}様の案件情報をリセットしました\`);
+                    } else {
+                        await axios.delete(\`/api/clients/\${clientId}\`);
+                        showToast(\`\${clientName}様の情報を削除しました\`);
+                    }
+                    loadData();
                 } catch (error) {
                     alert('削除に失敗しました: ' + (error.response?.data?.error || error.message));
                     console.error('Delete error:', error);
                 }
+            }
+            
+            // 削除選択ダイアログ
+            function showDeleteChoiceDialog(clientName) {
+                return new Promise((resolve) => {
+                    const modal = document.createElement('div');
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                    modal.innerHTML = \`
+                        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                            <div class="p-4 border-b bg-red-600 text-white rounded-t-lg">
+                                <h3 class="font-bold"><i class="fas fa-exclamation-triangle mr-2"></i>削除オプション</h3>
+                            </div>
+                            <div class="p-4">
+                                <p class="mb-4 text-gray-700"><strong>\${clientName}</strong>様の情報をどのように処理しますか？</p>
+                                <div class="space-y-3">
+                                    <button id="dashResetBtn" class="w-full p-3 border-2 border-blue-500 rounded-lg text-left hover:bg-blue-50">
+                                        <div class="flex items-start gap-3">
+                                            <i class="fas fa-redo text-blue-600 mt-1"></i>
+                                            <div>
+                                                <div class="font-bold text-blue-700">案件情報のみリセット</div>
+                                                <div class="text-xs text-gray-600">顧客情報は保持、案件データを削除</div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                    <button id="dashDeleteBtn" class="w-full p-3 border-2 border-red-500 rounded-lg text-left hover:bg-red-50">
+                                        <div class="flex items-start gap-3">
+                                            <i class="fas fa-trash text-red-600 mt-1"></i>
+                                            <div>
+                                                <div class="font-bold text-red-700">完全に削除</div>
+                                                <div class="text-xs text-gray-600">すべてのデータを削除（取り消し不可）</div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="p-4 border-t bg-gray-50 rounded-b-lg">
+                                <button id="dashCancelBtn" class="w-full py-2 border rounded-lg hover:bg-gray-100">キャンセル</button>
+                            </div>
+                        </div>
+                    \`;
+                    document.body.appendChild(modal);
+                    
+                    document.getElementById('dashResetBtn').onclick = () => { modal.remove(); resolve('reset'); };
+                    document.getElementById('dashDeleteBtn').onclick = () => {
+                        if (confirm('本当に完全削除しますか？')) { modal.remove(); resolve('delete'); }
+                    };
+                    document.getElementById('dashCancelBtn').onclick = () => { modal.remove(); resolve(null); };
+                    modal.onclick = (e) => { if (e.target === modal) { modal.remove(); resolve(null); } };
+                });
             }
             
             // トースト通知表示
@@ -1853,21 +1938,53 @@ app.delete('/api/clients/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const user = await getCurrentUser(c)
+  const keepCustomer = c.req.query('keep_customer') === 'true'
   
   // adminのみ削除可能
   if (!user || user.role !== 'admin') {
     return c.json({ error: '顧客の削除は管理者のみ実行できます' }, 403)
   }
   
-  // 関連データも削除される（ON DELETE CASCADE）
-  await DB.prepare(`
-    DELETE FROM clients WHERE id = ?
-  `).bind(id).run()
-  
-  return c.json({ 
-    success: true,
-    message: '顧客を削除しました'
-  })
+  if (keepCustomer) {
+    // 案件情報のみリセット（顧客情報は保持）
+    // 関連する案件データを削除
+    await DB.prepare(`DELETE FROM client_documents WHERE client_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM communications WHERE client_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM hearing_answers WHERE client_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM client_pipelines WHERE client_id = ?`).bind(id).run()
+    
+    // 顧客の案件情報をリセット
+    await DB.prepare(`
+      UPDATE clients SET
+        subsidy_type_id = NULL,
+        status = 'inquiry',
+        deposit_required = 0,
+        deposit_amount = NULL,
+        deposit_paid = 0,
+        deposit_paid_at = NULL,
+        deposit_payment_method = NULL,
+        deposit_transfer_reported = 0,
+        deposit_transfer_reported_at = NULL,
+        notes = NULL,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ 
+      success: true,
+      message: '案件情報をリセットしました（顧客情報は保持）'
+    })
+  } else {
+    // 顧客を完全削除（関連データも削除される：ON DELETE CASCADE）
+    await DB.prepare(`
+      DELETE FROM clients WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ 
+      success: true,
+      message: '顧客を削除しました'
+    })
+  }
 })
 
 // ===============================
@@ -3691,18 +3808,101 @@ app.get('/client/:id', async (c) => {
             async function deleteCurrentClient() {
                 if (!currentClient) return;
                 
-                if (!confirm(\`\${currentClient.name}様の情報を削除してもよろしいですか？\n\nこの操作は取り消せません。\n関連する書類やコミュニケーション履歴もすべて削除されます。\`)) {
-                    return;
-                }
+                // 選択ダイアログを表示
+                const choice = await showDeleteChoiceDialog(currentClient.name);
+                if (!choice) return;
                 
                 try {
-                    await axios.delete(\`/api/clients/\${CLIENT_ID}\`);
-                    alert(\`\${currentClient.name}様の情報を削除しました\`);
-                    window.location.href = '/'; // トップページに戻る
+                    if (choice === 'reset') {
+                        // 案件情報のみリセット
+                        await axios.delete(\`/api/clients/\${CLIENT_ID}?keep_customer=true\`);
+                        alert(\`\${currentClient.name}様の案件情報をリセットしました。\n顧客情報は保持されています。\`);
+                        window.location.reload();
+                    } else {
+                        // 完全削除
+                        await axios.delete(\`/api/clients/\${CLIENT_ID}\`);
+                        alert(\`\${currentClient.name}様の情報を削除しました\`);
+                        window.location.href = '/';
+                    }
                 } catch (error) {
                     alert('削除に失敗しました: ' + (error.response?.data?.error || error.message));
                     console.error('Delete error:', error);
                 }
+            }
+            
+            // 削除選択ダイアログを表示
+            function showDeleteChoiceDialog(clientName) {
+                return new Promise((resolve) => {
+                    const modal = document.createElement('div');
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                    modal.innerHTML = \`
+                        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                            <div class="p-4 border-b bg-red-600 text-white rounded-t-lg">
+                                <h3 class="font-bold"><i class="fas fa-exclamation-triangle mr-2"></i>削除オプション</h3>
+                            </div>
+                            <div class="p-4">
+                                <p class="mb-4 text-gray-700">
+                                    <strong>\${clientName}</strong>様の情報をどのように処理しますか？
+                                </p>
+                                
+                                <div class="space-y-3">
+                                    <button id="resetCaseBtn" class="w-full p-3 border-2 border-blue-500 rounded-lg text-left hover:bg-blue-50 transition">
+                                        <div class="flex items-start gap-3">
+                                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                <i class="fas fa-redo text-blue-600"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-bold text-blue-700">案件情報のみリセット</div>
+                                                <div class="text-sm text-gray-600">顧客情報（名前・会社名・連絡先）は保持し、<br>案件データ（書類・やり取り・進捗）を削除</div>
+                                                <div class="text-xs text-blue-600 mt-1"><i class="fas fa-check mr-1"></i>同じ顧客で新規案件を作成可能</div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                    
+                                    <button id="fullDeleteBtn" class="w-full p-3 border-2 border-red-500 rounded-lg text-left hover:bg-red-50 transition">
+                                        <div class="flex items-start gap-3">
+                                            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                                                <i class="fas fa-trash text-red-600"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-bold text-red-700">完全に削除</div>
+                                                <div class="text-sm text-gray-600">顧客情報と案件データをすべて削除</div>
+                                                <div class="text-xs text-red-600 mt-1"><i class="fas fa-exclamation-circle mr-1"></i>この操作は取り消せません</div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="p-4 border-t bg-gray-50 rounded-b-lg">
+                                <button id="cancelDeleteBtn" class="w-full py-2 border rounded-lg hover:bg-gray-100">
+                                    キャンセル
+                                </button>
+                            </div>
+                        </div>
+                    \`;
+                    document.body.appendChild(modal);
+                    
+                    document.getElementById('resetCaseBtn').onclick = () => {
+                        modal.remove();
+                        resolve('reset');
+                    };
+                    document.getElementById('fullDeleteBtn').onclick = () => {
+                        if (confirm('本当に完全削除しますか？\\nこの操作は取り消せません。')) {
+                            modal.remove();
+                            resolve('delete');
+                        }
+                    };
+                    document.getElementById('cancelDeleteBtn').onclick = () => {
+                        modal.remove();
+                        resolve(null);
+                    };
+                    modal.onclick = (e) => {
+                        if (e.target === modal) {
+                            modal.remove();
+                            resolve(null);
+                        }
+                    };
+                });
             }
             
             // AIレスポンスを読みやすく整形する関数
