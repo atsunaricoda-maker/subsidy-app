@@ -3152,23 +3152,18 @@ app.get('/subsidy-types', async (c) => {
                 const allCategories = [...new Set([...knownCategories, ...Object.keys(grouped)])];
                 const categoryOrder = allCategories.filter(cat => grouped[cat]);
                 
-                // 非表示カテゴリ（顧客向けには表示しない）
-                const hiddenCategories = ['社労士管轄'];
-                
                 let html = '';
                 categoryOrder.forEach(category => {
                     if (!grouped[category]) return;
                     
                     const colors = CATEGORY_COLORS[category] || CATEGORY_COLORS['その他'];
                     const items = grouped[category];
-                    const isHidden = hiddenCategories.includes(category);
                     
                     html += \`
-                        <div class="mb-8 \${isHidden ? 'opacity-60' : ''}">
+                        <div class="mb-8">
                             <div class="\${colors.header} text-white px-4 py-3 rounded-t-lg flex items-center gap-2">
                                 <i class="fas \${colors.icon}"></i>
                                 <h2 class="text-lg font-bold">\${category}</h2>
-                                \${isHidden ? '<span class="bg-yellow-400 text-yellow-900 px-2 py-1 rounded text-xs font-bold"><i class="fas fa-eye-slash mr-1"></i>非表示中</span>' : ''}
                                 <span class="ml-auto bg-white/20 px-2 py-1 rounded text-sm">\${items.length}件</span>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 \${colors.bg} rounded-b-lg border-2 \${colors.border} border-t-0">
