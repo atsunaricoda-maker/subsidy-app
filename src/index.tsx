@@ -679,19 +679,45 @@ app.get('/', (c) => {
                     
                     <!-- 申請種別選択 -->
                     <div>
-                        <label class="block text-sm font-medium mb-1">申請種別 *</label>
-                        <div class="relative">
+                        <label class="block text-sm font-medium mb-2">申請種別 *</label>
+                        
+                        <!-- 検索ボックス -->
+                        <div class="relative mb-2">
                             <input type="text" id="subsidySearchInput" 
-                                   placeholder="🔍 補助金・助成金・許認可名で検索..." 
-                                   class="w-full px-3 py-2 border rounded-lg mb-1"
+                                   placeholder="🔍 補助金・助成金名で検索..." 
+                                   class="w-full px-3 py-2 border rounded-lg text-sm"
                                    oninput="filterSubsidyOptions()">
-                            <select name="subsidy_type_id" id="newClientSubsidyType" required 
-                                    class="w-full px-3 py-2 border rounded-lg" size="6">
-                                <option value="">選択してください</option>
-                            </select>
-                            <div id="selectedSubsidyName" class="text-xs text-green-600 mt-1 hidden">
-                                <i class="fas fa-check-circle mr-1"></i><span></span>
-                            </div>
+                        </div>
+                        
+                        <!-- カテゴリタブ -->
+                        <div id="categoryTabs" class="flex flex-wrap gap-1 mb-2">
+                            <button type="button" onclick="selectSubsidyCategory('all')" 
+                                    class="category-tab active px-3 py-1 text-xs rounded-full bg-gray-600 text-white" data-category="all">
+                                すべて
+                            </button>
+                            <button type="button" onclick="selectSubsidyCategory('行政書士管轄')" 
+                                    class="category-tab px-3 py-1 text-xs rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200" data-category="行政書士管轄">
+                                <i class="fas fa-file-signature mr-1"></i>行政書士管轄
+                            </button>
+                            <button type="button" onclick="selectSubsidyCategory('社労士管轄')" 
+                                    class="category-tab px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200" data-category="社労士管轄">
+                                <i class="fas fa-users mr-1"></i>社労士管轄
+                            </button>
+                            <button type="button" onclick="selectSubsidyCategory('許認可')" 
+                                    class="category-tab px-3 py-1 text-xs rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200" data-category="許認可">
+                                <i class="fas fa-stamp mr-1"></i>許認可
+                            </button>
+                        </div>
+                        
+                        <!-- 補助金リスト -->
+                        <input type="hidden" name="subsidy_type_id" id="newClientSubsidyType" required>
+                        <div id="subsidyOptionsList" class="border rounded-lg max-h-48 overflow-y-auto bg-white">
+                            <!-- 補助金オプションがここに表示される -->
+                        </div>
+                        
+                        <!-- 選択中の表示 -->
+                        <div id="selectedSubsidyName" class="text-sm text-green-600 mt-2 hidden font-medium">
+                            <i class="fas fa-check-circle mr-1"></i>選択中: <span></span>
                         </div>
                     </div>
                     
@@ -1281,10 +1307,48 @@ app.get('/', (c) => {
                 }
             }
             
+            // 現在選択中のカテゴリ
+            let currentSubsidyCategory = 'all';
+            let selectedSubsidyId = null;
+            
+            // カテゴリ色設定
+            const SUBSIDY_CATEGORY_STYLES = {
+                '行政書士管轄': { bg: 'bg-emerald-50', border: 'border-emerald-300', hover: 'hover:bg-emerald-100', selected: 'bg-emerald-500 text-white' },
+                '社労士管轄': { bg: 'bg-blue-50', border: 'border-blue-300', hover: 'hover:bg-blue-100', selected: 'bg-blue-500 text-white' },
+                '許認可': { bg: 'bg-indigo-50', border: 'border-indigo-300', hover: 'hover:bg-indigo-100', selected: 'bg-indigo-500 text-white' },
+                'その他': { bg: 'bg-gray-50', border: 'border-gray-300', hover: 'hover:bg-gray-100', selected: 'bg-gray-500 text-white' }
+            };
+            
+            // カテゴリ選択
+            function selectSubsidyCategory(category) {
+                currentSubsidyCategory = category;
+                
+                // タブのアクティブ状態を更新
+                document.querySelectorAll('.category-tab').forEach(tab => {
+                    const tabCat = tab.dataset.category;
+                    if (tabCat === category) {
+                        tab.classList.remove('bg-emerald-100', 'bg-blue-100', 'bg-indigo-100', 'bg-gray-100', 'text-emerald-700', 'text-blue-700', 'text-indigo-700', 'text-gray-700');
+                        tab.classList.add('bg-gray-600', 'text-white');
+                    } else {
+                        tab.classList.remove('bg-gray-600', 'text-white');
+                        if (tabCat === '行政書士管轄') tab.classList.add('bg-emerald-100', 'text-emerald-700');
+                        else if (tabCat === '社労士管轄') tab.classList.add('bg-blue-100', 'text-blue-700');
+                        else if (tabCat === '許認可') tab.classList.add('bg-indigo-100', 'text-indigo-700');
+                        else tab.classList.add('bg-gray-100', 'text-gray-700');
+                    }
+                });
+                
+                renderSubsidyOptions();
+            }
+            
             // 補助金オプションをカテゴリ別にレンダリング
             function renderSubsidyOptions(filter = '') {
-                const select = document.getElementById('newClientSubsidyType');
-                if (!select) return;
+                const container = document.getElementById('subsidyOptionsList');
+                if (!container) return;
+                
+                const searchInput = document.getElementById('subsidySearchInput');
+                const searchFilter = filter || (searchInput ? searchInput.value : '');
+                const filterLower = searchFilter.toLowerCase();
                 
                 // カテゴリでグループ化
                 const grouped = {};
@@ -1294,45 +1358,72 @@ app.get('/', (c) => {
                     grouped[cat].push(type);
                 });
                 
-                // フィルタリング
-                const filterLower = filter.toLowerCase();
-                let html = '<option value="">選択してください</option>';
+                let html = '';
+                const categoriesToShow = currentSubsidyCategory === 'all' 
+                    ? Object.keys(grouped) 
+                    : [currentSubsidyCategory];
                 
-                Object.entries(grouped).forEach(([category, types]) => {
+                categoriesToShow.forEach(category => {
+                    if (!grouped[category]) return;
+                    
+                    const types = grouped[category];
                     const filteredTypes = types.filter(t => 
-                        !filter || 
+                        !searchFilter || 
                         t.name.toLowerCase().includes(filterLower) || 
-                        category.toLowerCase().includes(filterLower)
+                        (t.description && t.description.toLowerCase().includes(filterLower))
                     );
                     
-                    if (filteredTypes.length > 0) {
-                        html += \`<optgroup label="📁 \${category}">\`;
-                        filteredTypes.forEach(type => {
-                            html += \`<option value="\${type.id}">\${type.name}</option>\`;
-                        });
-                        html += '</optgroup>';
+                    if (filteredTypes.length === 0) return;
+                    
+                    const style = SUBSIDY_CATEGORY_STYLES[category] || SUBSIDY_CATEGORY_STYLES['その他'];
+                    
+                    // カテゴリヘッダー（「すべて」表示時のみ）
+                    if (currentSubsidyCategory === 'all') {
+                        html += \`<div class="px-3 py-1 text-xs font-bold text-gray-500 bg-gray-100 sticky top-0">\${category}（\${filteredTypes.length}件）</div>\`;
                     }
+                    
+                    filteredTypes.forEach(type => {
+                        const isSelected = selectedSubsidyId === type.id;
+                        html += \`
+                            <div class="subsidy-option px-3 py-2 cursor-pointer border-b border-gray-100 \${isSelected ? style.selected : style.hover}"
+                                 data-id="\${type.id}" data-name="\${type.name}" data-category="\${category}"
+                                 onclick="selectSubsidy(\${type.id}, '\${type.name.replace(/'/g, "\\\\'")}', '\${category}')">
+                                <div class="font-medium text-sm \${isSelected ? '' : 'text-gray-800'}">\${type.name}</div>
+                                \${type.description ? \`<div class="text-xs \${isSelected ? 'text-white/80' : 'text-gray-500'} truncate">\${type.description}</div>\` : ''}
+                            </div>
+                        \`;
+                    });
                 });
                 
-                select.innerHTML = html;
+                if (!html) {
+                    html = '<div class="px-3 py-4 text-center text-gray-400 text-sm">該当する項目がありません</div>';
+                }
                 
-                // 選択時に表示を更新
-                select.onchange = function() {
-                    const selectedOption = this.options[this.selectedIndex];
-                    const display = document.getElementById('selectedSubsidyName');
-                    if (this.value && selectedOption) {
-                        display.classList.remove('hidden');
-                        display.querySelector('span').textContent = selectedOption.text;
-                    } else {
-                        display.classList.add('hidden');
-                    }
-                };
+                container.innerHTML = html;
+            }
+            
+            // 補助金を選択
+            function selectSubsidy(id, name, category) {
+                selectedSubsidyId = id;
+                
+                // hidden inputに値をセット
+                const hiddenInput = document.getElementById('newClientSubsidyType');
+                if (hiddenInput) hiddenInput.value = id;
+                
+                // 選択表示を更新
+                const display = document.getElementById('selectedSubsidyName');
+                if (display) {
+                    display.classList.remove('hidden');
+                    display.querySelector('span').textContent = name + '（' + category + '）';
+                }
+                
+                // リストの選択状態を更新
+                renderSubsidyOptions();
             }
             
             // 補助金検索フィルター
             function filterSubsidyOptions() {
-                const input = document.getElementById('subsidySearchInput');
-                renderSubsidyOptions(input.value);
+                renderSubsidyOptions();
             }
             
             // 従業員一覧読み込み
@@ -1746,6 +1837,8 @@ app.get('/', (c) => {
             window.toggleCustomerType = toggleCustomerType;
             window.filterSubsidyOptions = filterSubsidyOptions;
             window.renderSubsidyOptions = renderSubsidyOptions;
+            window.selectSubsidyCategory = selectSubsidyCategory;
+            window.selectSubsidy = selectSubsidy;
 
             // 初期読み込み
             loadSubsidyTypes();
