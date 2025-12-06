@@ -3421,20 +3421,24 @@ app.get('/client/:id', async (c) => {
                 <form id="taskDetailForm" class="space-y-4">
                     <input type="hidden" id="taskDetailId">
                     <div>
-                        <label class="block text-sm font-medium mb-1">ステータス</label>
-                        <select id="taskDetailStatus" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="pending">未着手</option>
-                            <option value="in_progress">進行中</option>
-                            <option value="completed">完了</option>
-                        </select>
-                    </div>
-                    <div>
                         <label class="block text-sm font-medium mb-1">進捗率</label>
                         <div class="flex items-center gap-3">
                             <input type="range" id="taskDetailProgress" min="0" max="100" step="10" class="flex-1" 
-                                   oninput="document.getElementById('taskProgressValue').textContent = this.value + '%'">
+                                   oninput="updateTaskStatusFromProgress(this.value)">
                             <span id="taskProgressValue" class="text-sm font-medium w-12 text-right">0%</span>
                         </div>
+                        <div id="autoStatusHint" class="text-xs text-gray-500 mt-1">
+                            <!-- 自動設定されるステータスのヒントを表示 -->
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">ステータス <span class="text-xs text-blue-600">（進捗率で自動設定）</span></label>
+                        <div id="taskStatusDisplay" class="flex gap-2">
+                            <span id="statusPending" class="flex-1 py-2 text-center rounded-lg border-2 cursor-pointer transition">未着手</span>
+                            <span id="statusInProgress" class="flex-1 py-2 text-center rounded-lg border-2 cursor-pointer transition">進行中</span>
+                            <span id="statusCompleted" class="flex-1 py-2 text-center rounded-lg border-2 cursor-pointer transition">完了</span>
+                        </div>
+                        <input type="hidden" id="taskDetailStatus" value="pending">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">メモ</label>
@@ -4422,10 +4426,51 @@ app.get('/client/:id', async (c) => {
                 document.getElementById('taskDetailModal').classList.remove('hidden');
                 document.getElementById('taskDetailTitle').innerHTML = '<i class="fas fa-clipboard-check mr-2 text-blue-600"></i>' + taskName;
                 document.getElementById('taskDetailId').value = taskId;
-                document.getElementById('taskDetailStatus').value = status;
                 document.getElementById('taskDetailProgress').value = progress;
                 document.getElementById('taskProgressValue').textContent = progress + '%';
                 document.getElementById('taskDetailNotes').value = notes || '';
+                updateTaskStatusFromProgress(progress);
+            }
+            
+            // 進捗率からステータスを自動設定
+            function updateTaskStatusFromProgress(progress) {
+                const p = parseInt(progress);
+                let status = 'pending';
+                let hint = '';
+                
+                if (p === 0) {
+                    status = 'pending';
+                    hint = '0% → 未着手';
+                } else if (p >= 100) {
+                    status = 'completed';
+                    hint = '100% → 完了';
+                } else {
+                    status = 'in_progress';
+                    hint = p + '% → 進行中';
+                }
+                
+                document.getElementById('taskDetailStatus').value = status;
+                document.getElementById('taskProgressValue').textContent = p + '%';
+                document.getElementById('autoStatusHint').textContent = hint;
+                
+                // ステータス表示を更新
+                const pending = document.getElementById('statusPending');
+                const inProgress = document.getElementById('statusInProgress');
+                const completed = document.getElementById('statusCompleted');
+                
+                // リセット
+                [pending, inProgress, completed].forEach(el => {
+                    el.className = 'flex-1 py-2 text-center rounded-lg border-2 cursor-pointer transition border-gray-200 text-gray-500';
+                });
+                
+                // アクティブ状態を設定
+                if (status === 'pending') {
+                    pending.className = 'flex-1 py-2 text-center rounded-lg border-2 cursor-pointer transition border-gray-500 bg-gray-100 text-gray-700 font-medium';
+                } else if (status === 'in_progress') {
+                    inProgress.className = 'flex-1 py-2 text-center rounded-lg border-2 cursor-pointer transition border-blue-500 bg-blue-100 text-blue-700 font-medium';
+                } else if (status === 'completed') {
+                    completed.className = 'flex-1 py-2 text-center rounded-lg border-2 cursor-pointer transition border-green-500 bg-green-100 text-green-700 font-medium';
+                }
             }
             
             function closeTaskDetailModal() {
@@ -4438,13 +4483,12 @@ app.get('/client/:id', async (c) => {
                 taskDetailFormEl.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const taskId = document.getElementById('taskDetailId').value;
-                    const status = document.getElementById('taskDetailStatus').value;
                     const progress = parseInt(document.getElementById('taskDetailProgress').value);
                     const notes = document.getElementById('taskDetailNotes').value;
                     
                     try {
+                        // 進捗率だけ送信すれば、サーバー側でステータスを自動設定
                         await axios.put(\`/api/pipeline-tasks/\${taskId}\`, {
-                            status: status,
                             progress_percentage: progress,
                             notes: notes
                         });
@@ -14414,6 +14458,19 @@ app.put('/api/pipeline-tasks/:taskId', async (c) => {
     return c.json({ error: 'タスクが見つかりません' }, 404)
   }
   
+  // 進捗率に応じてステータスを自動設定
+  let autoStatus = data.status
+  if (data.progress_percentage !== undefined) {
+    const progress = parseInt(data.progress_percentage, 10)
+    if (progress === 0) {
+      autoStatus = 'pending'  // 0% → 未着手
+    } else if (progress >= 100) {
+      autoStatus = 'completed'  // 100% → 完了
+    } else {
+      autoStatus = 'in_progress'  // 1-99% → 進行中
+    }
+  }
+  
   // 更新
   await DB.prepare(`
     UPDATE client_pipeline_tasks SET
@@ -14425,11 +14482,11 @@ app.put('/api/pipeline-tasks/:taskId', async (c) => {
     updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).bind(
-    data.status || null,
+    autoStatus || null,
     data.progress_percentage !== undefined ? data.progress_percentage : null,
     data.assigned_to || null,
     data.notes || null,
-    data.status || null,
+    autoStatus || null,
     taskId
   ).run()
   
