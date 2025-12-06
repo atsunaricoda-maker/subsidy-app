@@ -987,29 +987,37 @@ app.get('/', (c) => {
                     
                     try {
                         let clientId;
+                        let caseId;
+                        
+                        // 案件データ
+                        const caseData = {
+                            subsidy_type_id: formData.get('subsidy_type_id') || null,
+                            assigned_to: formData.get('assigned_to') || null,
+                            notes: formData.get('notes') || null,
+                            deposit_required: document.getElementById('depositRequired')?.checked ? 1 : 0,
+                            deposit_amount: parseInt(formData.get('deposit_amount')) || 0,
+                            withholding_tax: document.getElementById('withholdingTax')?.checked ? 1 : 0,
+                            success_fee_enabled: document.getElementById('successFeeEnabled')?.checked ? 1 : 0,
+                            success_fee_rate: parseFloat(formData.get('success_fee_rate')) || 0,
+                            success_fee_amount: parseInt(formData.get('success_fee_amount')) || 0
+                        };
                         
                         if (customerType === 'existing') {
-                            // 既存顧客を選択した場合
+                            // 既存顧客を選択した場合 → 新しい案件を作成
                             clientId = formData.get('existing_client_id');
                             if (!clientId) {
                                 alert('顧客を選択してください');
                                 return;
                             }
                             
-                            // 既存顧客の情報を更新
-                            const updateData = {
-                                subsidy_type_id: formData.get('subsidy_type_id') || null,
-                                assigned_to: formData.get('assigned_to') || null,
-                                notes: formData.get('notes') || null,
-                                deposit_required: document.getElementById('depositRequired')?.checked ? 1 : 0,
-                                deposit_amount: parseInt(formData.get('deposit_amount')) || 0,
-                                withholding_tax: document.getElementById('withholdingTax')?.checked ? 1 : 0,
-                                success_fee_enabled: document.getElementById('successFeeEnabled')?.checked ? 1 : 0,
-                                success_fee_rate: parseFloat(formData.get('success_fee_rate')) || 0,
-                                success_fee_amount: parseInt(formData.get('success_fee_amount')) || 0
-                            };
+                            // 新しい案件を作成
+                            const caseResponse = await axios.post('/api/cases', {
+                                client_id: clientId,
+                                ...caseData
+                            });
+                            caseId = caseResponse.data.id;
                             
-                            await axios.patch('/api/clients/' + clientId, updateData);
+                            alert(\`案件を登録しました（案件番号: \${caseResponse.data.case_number}）\\nポータルURL: /portal/\${caseResponse.data.access_token}\`);
                         } else {
                             // 新規顧客として登録
                             const name = formData.get('name');
@@ -1018,26 +1026,29 @@ app.get('/', (c) => {
                                 return;
                             }
                             
+                            // まず顧客を作成
                             const newClientData = {
                                 name: name,
                                 company_name: formData.get('company_name') || null,
                                 email: formData.get('email') || null,
-                                phone: formData.get('phone') || null,
-                                subsidy_type_id: formData.get('subsidy_type_id') || null,
-                                assigned_to: formData.get('assigned_to') || null,
-                                notes: formData.get('notes') || null,
-                                deposit_required: document.getElementById('depositRequired')?.checked ? 1 : 0,
-                                deposit_amount: parseInt(formData.get('deposit_amount')) || 0,
-                                withholding_tax: document.getElementById('withholdingTax')?.checked ? 1 : 0
+                                phone: formData.get('phone') || null
                             };
                             
-                            const response = await axios.post('/api/clients', newClientData);
-                            clientId = response.data.id;
+                            const clientResponse = await axios.post('/api/clients', newClientData);
+                            clientId = clientResponse.data.id;
+                            
+                            // 次に案件を作成
+                            const caseResponse = await axios.post('/api/cases', {
+                                client_id: clientId,
+                                ...caseData
+                            });
+                            caseId = caseResponse.data.id;
+                            
+                            alert(\`顧客と案件を登録しました（案件番号: \${caseResponse.data.case_number}）\\nポータルURL: /portal/\${caseResponse.data.access_token}\`);
                         }
                         
                         closeNewCaseModal();
                         loadData();
-                        alert('案件を登録しました');
                     } catch (error) {
                         alert('登録に失敗しました: ' + (error.response?.data?.error || error.message));
                         console.error('Error creating case:', error);
@@ -1721,10 +1732,11 @@ app.get('/api/recent-activity', async (c) => {
   }
 })
 
-// 顧客一覧取得
+// 顧客一覧取得（案件情報も含む）
 app.get('/api/clients', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
+  const includeCases = c.req.query('include_cases') === 'true'
   
   // 補助金の公募要領情報もJOINして取得
   let query = `
@@ -1745,6 +1757,76 @@ app.get('/api/clients', async (c) => {
   }
   
   query += ` ORDER BY c.created_at DESC`
+  
+  const result = params.length > 0 
+    ? await DB.prepare(query).bind(...params).all()
+    : await DB.prepare(query).all()
+  
+  // 案件情報を含める場合
+  if (includeCases && result.results) {
+    const clientsWithCases = await Promise.all(result.results.map(async (client: any) => {
+      const casesResult = await DB.prepare(`
+        SELECT cases.*, subsidy_types.name as subsidy_type_name
+        FROM cases
+        LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+        WHERE cases.client_id = ?
+        ORDER BY cases.created_at DESC
+      `).bind(client.id).all()
+      return {
+        ...client,
+        cases: casesResult.results || []
+      }
+    }))
+    return c.json(clientsWithCases)
+  }
+  
+  return c.json(result.results)
+})
+
+// 案件一覧として表示（従来のクライアント一覧の代替）
+app.get('/api/clients-with-cases', async (c) => {
+  const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 案件ベースで一覧取得
+  let query = `
+    SELECT 
+      cases.id as case_id,
+      cases.case_number,
+      cases.status,
+      cases.subsidy_type_id,
+      cases.assigned_to,
+      cases.notes,
+      cases.deposit_required,
+      cases.deposit_amount,
+      cases.deposit_paid,
+      cases.access_token,
+      cases.created_at,
+      cases.updated_at,
+      clients.id as client_id,
+      clients.name,
+      clients.company_name,
+      clients.email,
+      clients.phone,
+      subsidy_types.name as subsidy_type_name,
+      sg.application_end_date,
+      sg.max_amount,
+      sg.subsidy_rate,
+      sg.fiscal_year
+    FROM cases
+    LEFT JOIN clients ON cases.client_id = clients.id
+    LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+    LEFT JOIN subsidy_guidelines sg ON cases.subsidy_type_id = sg.subsidy_type_id AND sg.status = 'active'
+  `
+  let params: string[] = []
+  
+  // adminロール以外は自分が担当の案件のみ表示
+  if (user && user.role !== 'admin') {
+    query += ` WHERE cases.assigned_to = ?`
+    params.push(user.username)
+  }
+  
+  query += ` ORDER BY cases.created_at DESC`
   
   const result = params.length > 0 
     ? await DB.prepare(query).bind(...params).all()
@@ -1788,7 +1870,7 @@ app.get('/api/stats', async (c) => {
   })
 })
 
-// 顧客詳細取得
+// 顧客詳細取得（案件一覧も含む）
 app.get('/api/clients/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
@@ -1807,39 +1889,41 @@ app.get('/api/clients/:id', async (c) => {
     return c.json({ error: 'Access denied' }, 403)
   }
   
-  return c.json(client)
+  // 案件一覧も取得
+  const casesResult = await DB.prepare(`
+    SELECT cases.*, subsidy_types.name as subsidy_type_name
+    FROM cases
+    LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+    WHERE cases.client_id = ?
+    ORDER BY cases.created_at DESC
+  `).bind(id).all()
+  
+  return c.json({
+    ...client,
+    cases: casesResult.results || []
+  })
 })
 
-// 顧客新規登録
+// 顧客新規登録（基本情報のみ。案件は別途 /api/cases で登録）
 app.post('/api/clients', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
-  // ランダムなアクセストークン生成
-  const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
-  
+  // 顧客基本情報のみ登録（案件情報は別途casesテーブルに登録）
   const result = await DB.prepare(`
-    INSERT INTO clients (name, company_name, email, phone, access_token, assigned_staff, assigned_to, notes, subsidy_type_id, deposit_required, deposit_amount, withholding_tax, contract_url)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (name, company_name, email, phone, assigned_staff, assigned_to)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
     data.company_name || null,
     data.email || null,
     data.phone || null,
-    token,
     data.assigned_staff || null,
-    data.assigned_to || null,
-    data.notes || null,
-    data.subsidy_type_id || null,
-    data.deposit_required ? 1 : 0,
-    data.deposit_amount || 0,
-    data.withholding_tax ? 1 : 0,
-    data.contract_url || null
+    data.assigned_to || null
   ).run()
   
   return c.json({ 
-    id: result.meta.last_row_id,
-    access_token: token
+    id: result.meta.last_row_id
   })
 })
 
@@ -1988,14 +2072,257 @@ app.delete('/api/clients/:id', async (c) => {
 })
 
 // ===============================
+// API: 案件管理（Cases）
+// ===============================
+
+// 案件一覧取得（顧客IDで絞り込み可能）
+app.get('/api/cases', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.query('client_id')
+  
+  let query = `
+    SELECT 
+      cases.*,
+      clients.name as client_name,
+      clients.company_name,
+      clients.email,
+      clients.phone,
+      subsidy_types.name as subsidy_type_name,
+      admin_users.name as assigned_to_name
+    FROM cases
+    LEFT JOIN clients ON cases.client_id = clients.id
+    LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+  `
+  
+  if (clientId) {
+    query += ` WHERE cases.client_id = ? ORDER BY cases.created_at DESC`
+    const result = await DB.prepare(query).bind(clientId).all()
+    return c.json(result.results)
+  } else {
+    query += ` ORDER BY cases.created_at DESC`
+    const result = await DB.prepare(query).all()
+    return c.json(result.results)
+  }
+})
+
+// 案件詳細取得
+app.get('/api/cases/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const result = await DB.prepare(`
+    SELECT 
+      cases.*,
+      clients.name as client_name,
+      clients.company_name,
+      clients.email,
+      clients.phone,
+      subsidy_types.name as subsidy_type_name,
+      admin_users.name as assigned_to_name
+    FROM cases
+    LEFT JOIN clients ON cases.client_id = clients.id
+    LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+    WHERE cases.id = ?
+  `).bind(id).first()
+  
+  if (!result) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  return c.json(result)
+})
+
+// アクセストークンで案件取得（顧客ポータル用）
+app.get('/api/cases/token/:token', async (c) => {
+  const { DB } = c.env
+  const token = c.req.param('token')
+  
+  const result = await DB.prepare(`
+    SELECT 
+      cases.*,
+      clients.id as client_id,
+      clients.name as client_name,
+      clients.company_name,
+      clients.email,
+      clients.phone,
+      subsidy_types.name as subsidy_type_name
+    FROM cases
+    LEFT JOIN clients ON cases.client_id = clients.id
+    LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+    WHERE cases.access_token = ?
+  `).bind(token).first()
+  
+  if (!result) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  return c.json(result)
+})
+
+// 新規案件作成
+app.post('/api/cases', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  // アクセストークンを生成
+  const accessToken = crypto.randomUUID().replace(/-/g, '').substring(0, 20)
+  
+  // 案件番号を生成（CASE-YYYY-NNNN形式）
+  const year = new Date().getFullYear()
+  const countResult = await DB.prepare(`
+    SELECT COUNT(*) as count FROM cases WHERE case_number LIKE ?
+  `).bind(`CASE-${year}-%`).first()
+  const caseNumber = `CASE-${year}-${String((countResult?.count || 0) + 1).padStart(4, '0')}`
+  
+  const result = await DB.prepare(`
+    INSERT INTO cases (
+      client_id, case_number, subsidy_type_id, status, assigned_to, notes,
+      deposit_required, deposit_amount, withholding_tax,
+      success_fee_enabled, success_fee_rate, success_fee_amount,
+      contract_url, access_token
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.client_id,
+    caseNumber,
+    data.subsidy_type_id || null,
+    data.status || 'inquiry',
+    data.assigned_to || null,
+    data.notes || null,
+    data.deposit_required ? 1 : 0,
+    data.deposit_amount || 0,
+    data.withholding_tax ? 1 : 0,
+    data.success_fee_enabled ? 1 : 0,
+    data.success_fee_rate || 0,
+    data.success_fee_amount || 0,
+    data.contract_url || null,
+    accessToken
+  ).run()
+  
+  return c.json({ 
+    id: result.meta.last_row_id,
+    case_number: caseNumber,
+    access_token: accessToken
+  })
+})
+
+// 案件更新
+app.put('/api/cases/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE cases SET
+      subsidy_type_id = COALESCE(?, subsidy_type_id),
+      status = COALESCE(?, status),
+      assigned_to = ?,
+      notes = ?,
+      deposit_required = COALESCE(?, deposit_required),
+      deposit_amount = COALESCE(?, deposit_amount),
+      deposit_paid = COALESCE(?, deposit_paid),
+      withholding_tax = COALESCE(?, withholding_tax),
+      success_fee_enabled = COALESCE(?, success_fee_enabled),
+      success_fee_rate = COALESCE(?, success_fee_rate),
+      success_fee_amount = COALESCE(?, success_fee_amount),
+      contract_url = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    data.subsidy_type_id,
+    data.status,
+    data.assigned_to || null,
+    data.notes || null,
+    data.deposit_required !== undefined ? (data.deposit_required ? 1 : 0) : null,
+    data.deposit_amount,
+    data.deposit_paid !== undefined ? (data.deposit_paid ? 1 : 0) : null,
+    data.withholding_tax !== undefined ? (data.withholding_tax ? 1 : 0) : null,
+    data.success_fee_enabled !== undefined ? (data.success_fee_enabled ? 1 : 0) : null,
+    data.success_fee_rate,
+    data.success_fee_amount,
+    data.contract_url || null,
+    id
+  ).run()
+  
+  return c.json({ success: true })
+})
+
+// 案件削除
+app.delete('/api/cases/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  
+  // adminのみ削除可能
+  if (!user || user.role !== 'admin') {
+    return c.json({ error: '案件の削除は管理者のみ実行できます' }, 403)
+  }
+  
+  // 関連データも削除される（ON DELETE CASCADE）
+  await DB.prepare(`DELETE FROM cases WHERE id = ?`).bind(id).run()
+  
+  return c.json({ success: true })
+})
+
+// 案件の書類一覧取得
+app.get('/api/cases/:id/documents', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const result = await DB.prepare(`
+    SELECT * FROM documents WHERE case_id = ? ORDER BY uploaded_at DESC
+  `).bind(id).all()
+  
+  return c.json(result.results)
+})
+
+// 案件のヒアリング回答一覧取得
+app.get('/api/cases/:id/hearing-answers', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const result = await DB.prepare(`
+    SELECT * FROM hearing_answers WHERE case_id = ? ORDER BY created_at DESC
+  `).bind(id).all()
+  
+  return c.json(result.results)
+})
+
+// 案件のパイプライン取得
+app.get('/api/cases/:id/pipelines', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const result = await DB.prepare(`
+    SELECT * FROM client_pipelines WHERE case_id = ? ORDER BY created_at DESC
+  `).bind(id).all()
+  
+  return c.json(result.results)
+})
+
+// ===============================
 // API: 書類管理
 // ===============================
 
-// 顧客の書類一覧取得
+// 顧客の書類一覧取得（後方互換性のため残す）
 app.get('/api/clients/:id/documents', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   
+  // まず案件テーブルから取得を試みる
+  const caseResult = await DB.prepare(`
+    SELECT d.* FROM documents d
+    INNER JOIN cases c ON d.case_id = c.id
+    WHERE c.client_id = ?
+    ORDER BY d.uploaded_at DESC
+  `).bind(id).all()
+  
+  if (caseResult.results && caseResult.results.length > 0) {
+    return c.json(caseResult.results)
+  }
+  
+  // フォールバック: 直接client_idで検索
   const result = await DB.prepare(`
     SELECT * FROM documents WHERE client_id = ? ORDER BY uploaded_at DESC
   `).bind(id).all()
@@ -5444,13 +5771,29 @@ app.get('/portal/:token', async (c) => {
   const { DB } = c.env
   const token = c.req.param('token')
   
-  const client = await DB.prepare(`
-    SELECT * FROM clients WHERE access_token = ?
+  // まず案件テーブルから検索
+  let caseData = await DB.prepare(`
+    SELECT cases.*, clients.name, clients.company_name, clients.email, clients.phone,
+           clients.id as client_id
+    FROM cases
+    LEFT JOIN clients ON cases.client_id = clients.id
+    WHERE cases.access_token = ?
   `).bind(token).first()
+  
+  // フォールバック: 旧形式（clientsテーブルのトークン）
+  let client = caseData
+  if (!caseData) {
+    client = await DB.prepare(`
+      SELECT * FROM clients WHERE access_token = ?
+    `).bind(token).first()
+  }
   
   if (!client) {
     return c.text('Invalid access token', 403)
   }
+  
+  // 案件データがある場合はそれを使用
+  const caseId = caseData?.id || null
   
   return c.html(`
     <!DOCTYPE html>
@@ -5990,7 +6333,8 @@ app.get('/portal/:token', async (c) => {
                 return result.trim();
             }
             
-            const CLIENT_ID = ${client.id};
+            const CLIENT_ID = ${client.id || client.client_id};
+            const CASE_ID = ${caseId || 'null'};
             const STATUS_INFO = {
                 inquiry: { icon: '🔍', text: '見込み', desc: 'まずはお話を聞かせてください' },
                 consulting: { icon: '💬', text: '相談中', desc: '詳細をヒアリングしています' },
