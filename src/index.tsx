@@ -2589,6 +2589,34 @@ app.get('/api/clients/:id/document-checklist', async (c) => {
   return c.json(result.results)
 })
 
+// 案件の助成金種別に基づくチェックリスト（案件ID指定）
+app.get('/api/cases/:id/document-checklist', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  // 案件の助成金種別を取得
+  const caseData = await DB.prepare(`
+    SELECT subsidy_type_id FROM cases WHERE id = ?
+  `).bind(id).first()
+  
+  if (!caseData || !caseData.subsidy_type_id) {
+    // 助成金種別が設定されていない場合は旧チェックリストを返す
+    const result = await DB.prepare(`
+      SELECT * FROM document_checklist ORDER BY display_order
+    `).all()
+    return c.json(result.results)
+  }
+  
+  // 助成金種別の必要書類を取得
+  const result = await DB.prepare(`
+    SELECT * FROM subsidy_type_documents 
+    WHERE subsidy_type_id = ? 
+    ORDER BY display_order
+  `).bind(caseData.subsidy_type_id).all()
+  
+  return c.json(result.results)
+})
+
 // ===============================
 // API: 申請種別管理
 // ===============================
@@ -6525,9 +6553,10 @@ app.get('/portal/:token', async (c) => {
                     
                     // 4. 未アップロード書類チェック
                     try {
-                        // チェックリストとアップロード済み書類を取得
+                        // チェックリストとアップロード済み書類を取得（案件ベースで取得）
+                        const checklistUrl = CASE_ID ? \`/api/cases/\${CASE_ID}/document-checklist\` : \`/api/clients/\${CLIENT_ID}/document-checklist\`;
                         const [checklistRes, uploadedRes] = await Promise.all([
-                            axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`),
+                            axios.get(checklistUrl),
                             axios.get(\`/api/clients/\${CLIENT_ID}/documents\`)
                         ]);
                         const checklist = checklistRes.data;
@@ -7161,8 +7190,9 @@ app.get('/portal/:token', async (c) => {
             }
 
             async function loadChecklist() {
-                // 顧客の助成金種別に基づくチェックリストを取得
-                const response = await axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`);
+                // 案件の助成金種別に基づくチェックリストを取得
+                const checklistUrl = CASE_ID ? \`/api/cases/\${CASE_ID}/document-checklist\` : \`/api/clients/\${CLIENT_ID}/document-checklist\`;
+                const response = await axios.get(checklistUrl);
                 const items = response.data;
                 
                 const docsResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/documents\`);
