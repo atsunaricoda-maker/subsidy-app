@@ -1727,6 +1727,26 @@ app.get('/', (c) => {
                 }
             });
 
+            // グローバルスコープに関数を公開（onclick対応）
+            window.toggleSidebar = toggleSidebar;
+            window.openNewCaseModal = openNewCaseModal;
+            window.closeNewCaseModal = closeNewCaseModal;
+            window.openNewClientModal = openNewClientModal;
+            window.closeNewClientModal = closeNewClientModal;
+            window.filterByStatus = filterByStatus;
+            window.logout = logout;
+            window.copyPortalUrl = copyPortalUrl;
+            window.deleteCase = deleteCase;
+            window.deleteClient = deleteClient;
+            window.showDeleteChoiceDialog = showDeleteChoiceDialog;
+            window.showToast = showToast;
+            window.filterClients = filterClients;
+            window.toggleDepositFields = toggleDepositFields;
+            window.toggleSuccessFeeFields = toggleSuccessFeeFields;
+            window.toggleCustomerType = toggleCustomerType;
+            window.filterSubsidyOptions = filterSubsidyOptions;
+            window.renderSubsidyOptions = renderSubsidyOptions;
+
             // 初期読み込み
             loadSubsidyTypes();
             loadUsers();
@@ -3633,6 +3653,25 @@ app.get('/subsidy-types', async (c) => {
                     console.error(error);
                 }
             }
+
+            // グローバルスコープに関数を公開（onclick対応）
+            window.logout = logout;
+            window.openNewSubsidyModal = openNewSubsidyModal;
+            window.closeNewSubsidyModal = closeNewSubsidyModal;
+            window.addDocumentField = addDocumentField;
+            window.removeDocumentField = removeDocumentField;
+            window.viewSubsidyDetail = viewSubsidyDetail;
+            window.closeEditSubsidyModal = closeEditSubsidyModal;
+            window.addNewDocument = addNewDocument;
+            window.deleteDocument = deleteDocument;
+            window.deleteSubsidyType = deleteSubsidyType;
+            window.openHearingEditor = openHearingEditor;
+            window.closeHearingEditor = closeHearingEditor;
+            window.showSpecificQuestions = showSpecificQuestions;
+            window.showCommonQuestions = showCommonQuestions;
+            window.addHearingQuestion = addHearingQuestion;
+            window.editHearingQuestion = editHearingQuestion;
+            window.deleteHearingQuestion = deleteHearingQuestion;
 
             // 初期読み込み
             loadSubsidyTypes();
@@ -5960,6 +5999,40 @@ app.get('/client/:id', async (c) => {
                     container.innerHTML = '<span class="text-red-500">再生成に失敗しました</span>';
                 }
             }
+
+            // グローバルスコープに関数を公開（onclick対応）
+            window.logout = logout;
+            window.switchClientTab = switchClientTab;
+            window.editClient = editClient;
+            window.deleteCurrentClient = deleteCurrentClient;
+            window.runAdoptionPrediction = runAdoptionPrediction;
+            window.runComprehensiveMatching = runComprehensiveMatching;
+            window.runSubsidyMatching = runSubsidyMatching;
+            window.openGenerateDocumentModal = openGenerateDocumentModal;
+            window.closeGenerateDocumentModal = closeGenerateDocumentModal;
+            window.openAssignPipelineModal = openAssignPipelineModal;
+            window.closeAssignPipelineModal = closeAssignPipelineModal;
+            window.closeTaskDetailModal = closeTaskDetailModal;
+            window.closeDocumentDetailModal = closeDocumentDetailModal;
+            window.closeEditModal = closeEditModal;
+            window.copyPortalUrl = copyPortalUrl;
+            window.updateDocumentStatus = updateDocumentStatus;
+            window.openTaskDetail = openTaskDetail;
+            window.viewDocument = viewDocument;
+            window.deleteGeneratedDocument = deleteGeneratedDocument;
+            window.showSuccessCaseComparison = showSuccessCaseComparison;
+            window.hideSuccessCaseComparison = hideSuccessCaseComparison;
+            window.showEditHistory = showEditHistory;
+            window.hideEditHistory = hideEditHistory;
+            window.compareWithSuccessCase = compareWithSuccessCase;
+            window.regenerateSection = regenerateSection;
+            window.editSection = editSection;
+            window.saveSection = saveSection;
+            window.cancelEditSection = cancelEditSection;
+            window.exportDocument = exportDocument;
+            window.deleteGeneratedDocumentFromDetail = deleteGeneratedDocumentFromDetail;
+            window.showToast = showToast;
+            window.loadDocuments = loadDocuments;
 
             Promise.all([loadSubsidyTypes(), loadUsers()]).then(() => {
                 loadClient();
@@ -8908,6 +8981,39 @@ app.get('/portal/:token', async (c) => {
             }
             
             // ===============================
+            // グローバルスコープに関数を公開（onclick対応）
+            // ===============================
+            window.openNewApplicationModal = openNewApplicationModal;
+            window.closeNewApplicationModal = closeNewApplicationModal;
+            window.submitNewApplication = submitNewApplication;
+            window.scrollToSection = scrollToSection;
+            window.switchPortalTab = switchPortalTab;
+            window.openAiModal = openAiModal;
+            window.closeAiModal = closeAiModal;
+            window.saveAllHearingAnswers = saveAllHearingAnswers;
+            window.closeUploadModal = closeUploadModal;
+            window.openUploadModal = openUploadModal;
+            window.openAiSuggestModal = openAiSuggestModal;
+            window.closeAiSuggestModal = closeAiSuggestModal;
+            window.applySuggestion = applySuggestion;
+            window.regenerateSuggestion = regenerateSuggestion;
+            window.closeTemplateModal = closeTemplateModal;
+            window.openTemplateModal = openTemplateModal;
+            window.closeDataInputModal = closeDataInputModal;
+            window.saveDataInput = saveDataInput;
+            window.closeFinancialIndicatorsModal = closeFinancialIndicatorsModal;
+            window.completeTask = completeTask;
+            window.markAnnouncementRead = markAnnouncementRead;
+            window.showPaymentModal = showPaymentModal;
+            window.closeBankTransferModal = closeBankTransferModal;
+            window.reportBankTransfer = reportBankTransfer;
+            window.switchHearingCategory = switchHearingCategory;
+            window.useExampleById = useExampleById;
+            window.showWritingGuide = showWritingGuide;
+            window.applyTemplate = applyTemplate;
+            window.showMessage = showMessage;
+            
+            // ===============================
             // 初期化
             // ===============================
             
@@ -9230,6 +9336,15 @@ app.get('/admin/users', (c) => {
                     showToast(error.response?.data?.error || '従業員の削除に失敗しました', 'error');
                 }
             }
+
+            // グローバルスコープに関数を公開（onclick対応）
+            window.logout = logout;
+            window.openAddUserModal = openAddUserModal;
+            window.closeAddUserModal = closeAddUserModal;
+            window.openEditUserModal = openEditUserModal;
+            window.closeEditUserModal = closeEditUserModal;
+            window.deleteUser = deleteUser;
+            window.showToast = showToast;
 
             // 初期読み込み
             loadUsers();
@@ -10987,6 +11102,29 @@ app.get('/admin/guidelines', (c) => {
                 }
             }
 
+            // グローバルスコープに関数を公開（onclick対応）
+            window.logout = logout;
+            window.switchTab = switchTab;
+            window.showNotifications = showNotifications;
+            window.closeNotificationsModal = closeNotificationsModal;
+            window.markAsRead = markAsRead;
+            window.checkUpdatesNow = checkUpdatesNow;
+            window.openAddUrlModal = openAddUrlModal;
+            window.closeAddUrlModal = closeAddUrlModal;
+            window.deleteWatchUrl = deleteWatchUrl;
+            window.openAddGuidelineModal = openAddGuidelineModal;
+            window.openAddGuidelineModalFor = openAddGuidelineModalFor;
+            window.closeAddGuidelineModal = closeAddGuidelineModal;
+            window.openEditGuidelineModal = openEditGuidelineModal;
+            window.closeEditGuidelineModal = closeEditGuidelineModal;
+            window.toggleGuidelineStatus = toggleGuidelineStatus;
+            window.deleteGuideline = deleteGuideline;
+            window.openAiExtractModal = openAiExtractModal;
+            window.closeAiExtractModal = closeAiExtractModal;
+            window.closeAiResultModal = closeAiResultModal;
+            window.applyAiResult = applyAiResult;
+            window.showToast = showToast;
+
             // 初期読み込み
             loadSubsidyTypes();
             loadWatchUrls();
@@ -11573,6 +11711,18 @@ app.get('/admin/backup', (c) => {
                     toast.classList.add('translate-x-full');
                 }, 3000);
             }
+
+            // グローバルスコープに関数を公開（onclick対応）
+            window.logout = logout;
+            window.exportAllData = exportAllData;
+            window.importData = importData;
+            window.clearSelectedFile = clearSelectedFile;
+            window.openSelectiveImportModal = openSelectiveImportModal;
+            window.closeSelectiveImportModal = closeSelectiveImportModal;
+            window.selectAllTables = selectAllTables;
+            window.deselectAllTables = deselectAllTables;
+            window.executeSelectiveImport = executeSelectiveImport;
+            window.showToast = showToast;
 
             // 初期読み込み
             loadDataOverview();
@@ -15927,6 +16077,17 @@ app.get('/admin/pipelines', (c) => {
                 originalCloseNewTemplateModal();
             };
             
+            // グローバルスコープに関数を公開（onclick対応）
+            window.toggleSidebar = toggleSidebar;
+            window.openNewTemplateModal = openNewTemplateModal;
+            window.closeNewTemplateModal = closeNewTemplateModal;
+            window.addTaskRow = addTaskRow;
+            window.removeTaskRow = removeTaskRow;
+            window.closeTemplateDetailModal = closeTemplateDetailModal;
+            window.showTemplateDetail = showTemplateDetail;
+            window.editTemplate = editTemplate;
+            window.deleteTemplate = deleteTemplate;
+            
             // 初期読み込み
             loadTemplates();
         </script>
@@ -16743,6 +16904,12 @@ app.get('/admin/settings', async (c) => {
                 document.getElementById('previewModal').classList.add('hidden');
             }
             
+            // グローバルスコープに関数を公開（onclick対応）
+            window.previewPrivacyPolicy = previewPrivacyPolicy;
+            window.previewLegalNotice = previewLegalNotice;
+            window.closePreview = closePreview;
+            window.saveSettings = saveSettings;
+            
             loadSettings();
         </script>
     </body>
@@ -16853,6 +17020,10 @@ app.get('/admin/payments', async (c) => {
                     alert('エラーが発生しました');
                 }
             }
+            
+            // グローバルスコープに関数を公開（onclick対応）
+            window.loadPayments = loadPayments;
+            window.confirmPayment = confirmPayment;
             
             loadPayments();
         </script>
