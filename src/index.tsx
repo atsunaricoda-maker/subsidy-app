@@ -5850,19 +5850,19 @@ app.get('/portal/:token', async (c) => {
                         const checklist = checklistRes.data;
                         const uploaded = uploadedRes.data;
                         
-                        // アップロード済みの書類タイプを取得
+                        // アップロード済みの書類タイプを取得（document_typeで照合）
                         const uploadedTypes = new Set(uploaded.map(d => d.document_type));
                         
-                        // 必須で未提出の書類をカウント
+                        // 未提出の書類をカウント（document_typeフィールドで照合）
                         const missingDocs = checklist.filter(item => 
-                            item.is_required && !uploadedTypes.has(item.document_name || item.name)
+                            !uploadedTypes.has(item.document_type) && !uploadedTypes.has(item.document_name)
                         ).length;
                         
                         if (missingDocs > 0) {
                             nextActions.push({
                                 icon: 'fa-upload',
                                 text: '書類のアップロード',
-                                description: '必須書類があと ' + missingDocs + ' 件未提出です',
+                                description: '未提出の書類が ' + missingDocs + ' 件あります',
                                 action: "switchPortalTab('documents'); scrollToSection('documentSection')",
                                 priority: 4
                             });
