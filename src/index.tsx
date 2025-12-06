@@ -3481,6 +3481,40 @@ app.get('/client/:id', async (c) => {
                         <label class="block text-sm font-medium mb-1">メモ</label>
                         <textarea name="notes" id="edit_notes" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
                     </div>
+                    
+                    <div class="border-t pt-4 mt-4">
+                        <h4 class="font-medium text-gray-700 mb-3">
+                            <i class="fas fa-file-signature mr-1 text-blue-600"></i>契約・決済
+                        </h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">電子契約URL</label>
+                                <input type="url" name="contract_url" id="edit_contract_url" 
+                                       placeholder="https://..." 
+                                       class="w-full px-3 py-2 border rounded-lg">
+                                <p class="text-xs text-gray-500 mt-1">CloudSign, DocuSign等のURL</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">手付金額</label>
+                                <input type="number" name="deposit_amount" id="edit_deposit_amount" 
+                                       placeholder="50000" min="0"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="deposit_required" id="edit_deposit_required" 
+                                           class="rounded text-blue-600">
+                                    <span class="text-sm">手付金必要</span>
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="deposit_paid" id="edit_deposit_paid" 
+                                           class="rounded text-green-600">
+                                    <span class="text-sm">支払済</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="flex gap-2 pt-4">
                         <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 text-base">
                             更新
@@ -3884,6 +3918,12 @@ app.get('/client/:id', async (c) => {
                 document.getElementById('editClientAssignedTo').value = currentClient.assigned_to || '';
                 document.getElementById('edit_notes').value = currentClient.notes || '';
                 
+                // 契約・決済情報
+                document.getElementById('edit_contract_url').value = currentClient.contract_url || '';
+                document.getElementById('edit_deposit_amount').value = currentClient.deposit_amount || '';
+                document.getElementById('edit_deposit_required').checked = !!currentClient.deposit_required;
+                document.getElementById('edit_deposit_paid').checked = !!currentClient.deposit_paid;
+                
                 // 非adminは完了ステータスを選択できない
                 const statusSelect = document.getElementById('edit_status');
                 const completedOption = statusSelect.querySelector('option[value="completed"]');
@@ -3918,6 +3958,15 @@ app.get('/client/:id', async (c) => {
                     
                     const formData = new FormData(e.target);
                     const data = Object.fromEntries(formData);
+                    
+                    // チェックボックスの値を正しく処理（チェックなし＝0, あり＝1）
+                    data.deposit_required = document.getElementById('edit_deposit_required').checked ? 1 : 0;
+                    data.deposit_paid = document.getElementById('edit_deposit_paid').checked ? 1 : 0;
+                    
+                    // 数値を整数に変換
+                    if (data.deposit_amount) {
+                        data.deposit_amount = parseInt(data.deposit_amount, 10) || 0;
+                    }
                     
                     console.log('=== 更新前の状態 ===');
                     console.log('現在のステータス:', currentClient.status);
@@ -5209,6 +5258,43 @@ app.get('/portal/:token', async (c) => {
                     <!-- お知らせが動的に挿入される -->
                 </div>
                 
+                <!-- 次にやるべきこと（顧客タスク）セクション -->
+                <div id="nextActionsSection" class="hidden mb-4">
+                    <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg shadow-lg p-4 text-white">
+                        <div class="flex items-center gap-2 mb-3">
+                            <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-bell"></i>
+                            </div>
+                            <h2 class="text-lg font-bold">次にやるべきこと</h2>
+                        </div>
+                        <div id="nextActionsList" class="space-y-2">
+                            <!-- 動的に挿入される -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 電子契約セクション -->
+                <div id="contractSection" class="hidden mb-4">
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <i class="fas fa-file-signature text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-gray-800">電子契約書</h3>
+                                    <p class="text-sm text-gray-500">契約内容をご確認いただけます</p>
+                                </div>
+                            </div>
+                            <a id="contractLink" href="#" target="_blank" 
+                               class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-external-link-alt"></i>
+                                契約書を開く
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- PC: 2カラムレイアウト / モバイル: 縦並び -->
                 <div class="lg:grid lg:grid-cols-12 lg:gap-6">
                     
@@ -5657,6 +5743,127 @@ app.get('/portal/:token', async (c) => {
                 document.getElementById('statusIcon').textContent = info.icon;
                 document.getElementById('statusText').textContent = info.text;
                 document.getElementById('statusDescription').textContent = info.desc;
+                
+                // 電子契約URLがあれば表示
+                if (client.contract_url) {
+                    const contractSection = document.getElementById('contractSection');
+                    const contractLink = document.getElementById('contractLink');
+                    if (contractSection && contractLink) {
+                        contractSection.classList.remove('hidden');
+                        contractLink.href = client.contract_url;
+                    }
+                }
+            }
+            
+            // 次にやるべきことを読み込む
+            async function loadNextActions() {
+                try {
+                    const nextActions = [];
+                    
+                    // 1. 手付金未払いチェック
+                    const clientRes = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
+                    const client = clientRes.data;
+                    
+                    if (client.deposit_required && !client.deposit_paid && !client.deposit_transfer_reported) {
+                        nextActions.push({
+                            icon: 'fa-yen-sign',
+                            text: '手付金のお支払い',
+                            description: '¥' + (client.deposit_amount || 0).toLocaleString() + ' のお支払いをお願いします',
+                            action: "scrollToSection('statusSection')",
+                            priority: 1
+                        });
+                    }
+                    
+                    // 2. 未回答のヒアリング質問チェック
+                    try {
+                        const hearingRes = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing-questions\`);
+                        const questions = hearingRes.data;
+                        const requiredUnanswered = questions.filter(q => q.is_required && !q.answer_text).length;
+                        if (requiredUnanswered > 0) {
+                            nextActions.push({
+                                icon: 'fa-clipboard-list',
+                                text: 'ヒアリング質問への回答',
+                                description: '必須質問があと ' + requiredUnanswered + ' 問残っています',
+                                action: "scrollToSection('hearingSection')",
+                                priority: 2
+                            });
+                        }
+                    } catch (e) { console.log('No hearing questions'); }
+                    
+                    // 3. 顧客対応タスクチェック
+                    try {
+                        const pipelinesRes = await axios.get(\`/api/clients/\${CLIENT_ID}/pipelines\`);
+                        const pipelines = pipelinesRes.data;
+                        if (pipelines.length > 0) {
+                            const activePipeline = pipelines.find(p => p.status === 'active') || pipelines[0];
+                            const tasksRes = await axios.get(\`/api/pipelines/\${activePipeline.id}/tasks\`);
+                            const customerTasks = tasksRes.data.filter(t => 
+                                (t.task_type === 'external' || t.task_type === 'both') && 
+                                (t.status === 'pending' || t.status === 'in_progress')
+                            );
+                            customerTasks.forEach(task => {
+                                nextActions.push({
+                                    icon: 'fa-tasks',
+                                    text: task.task_name,
+                                    description: task.end_date ? '期限: ' + task.end_date : '対応をお願いします',
+                                    action: "scrollToSection('statusSection')",
+                                    priority: 3
+                                });
+                            });
+                        }
+                    } catch (e) { console.log('No pipeline tasks'); }
+                    
+                    // 4. 未アップロード書類チェック
+                    try {
+                        const docsRes = await axios.get(\`/api/clients/\${CLIENT_ID}/required-documents\`);
+                        const missingDocs = docsRes.data.filter(d => !d.uploaded).length;
+                        if (missingDocs > 0) {
+                            nextActions.push({
+                                icon: 'fa-upload',
+                                text: '書類のアップロード',
+                                description: '未提出の書類が ' + missingDocs + ' 件あります',
+                                action: "switchPortalTab('documents'); scrollToSection('documentSection')",
+                                priority: 4
+                            });
+                        }
+                    } catch (e) { console.log('No document requirements'); }
+                    
+                    // 表示
+                    const section = document.getElementById('nextActionsSection');
+                    const listContainer = document.getElementById('nextActionsList');
+                    
+                    if (nextActions.length === 0) {
+                        section.classList.add('hidden');
+                        return;
+                    }
+                    
+                    section.classList.remove('hidden');
+                    nextActions.sort((a, b) => a.priority - b.priority);
+                    
+                    listContainer.innerHTML = nextActions.slice(0, 3).map((action, index) => \`
+                        <div class="flex items-center gap-3 p-3 bg-white/10 rounded-lg cursor-pointer hover:bg-white/20 transition"
+                             onclick="\${action.action}">
+                            <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm">
+                                <i class="fas \${action.icon}"></i>
+                            </div>
+                            <div class="flex-1">
+                                <div class="font-medium">\${action.text}</div>
+                                <div class="text-xs opacity-80">\${action.description}</div>
+                            </div>
+                            <i class="fas fa-chevron-right opacity-60"></i>
+                        </div>
+                    \`).join('');
+                    
+                    if (nextActions.length > 3) {
+                        listContainer.innerHTML += \`
+                            <div class="text-center text-xs opacity-70 mt-2">
+                                他 \${nextActions.length - 3} 件のアクションがあります
+                            </div>
+                        \`;
+                    }
+                } catch (error) {
+                    console.error('Error loading next actions:', error);
+                }
             }
             
             // お知らせを読み込む
@@ -7725,6 +7932,7 @@ app.get('/portal/:token', async (c) => {
             
             loadStatus();
             loadAnnouncements();
+            loadNextActions();
             loadPipelineProgress();
             loadDepositInfo();
             loadHearingQuestions();
