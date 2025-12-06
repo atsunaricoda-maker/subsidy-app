@@ -5776,19 +5776,34 @@ app.get('/portal/:token', async (c) => {
                     
                     // 2. 未回答のヒアリング質問チェック
                     try {
-                        const hearingRes = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing-questions\`);
-                        const questions = hearingRes.data;
-                        const requiredUnanswered = questions.filter(q => q.is_required && !q.answer_text).length;
-                        if (requiredUnanswered > 0) {
-                            nextActions.push({
-                                icon: 'fa-clipboard-list',
-                                text: 'ヒアリング質問への回答',
-                                description: '必須質問があと ' + requiredUnanswered + ' 問残っています',
-                                action: "scrollToSection('hearingSection')",
-                                priority: 2
-                            });
+                        if (client.subsidy_type_id) {
+                            // 質問と回答を両方取得
+                            const [questionsRes, answersRes] = await Promise.all([
+                                axios.get(\`/api/hearing-questions/\${client.subsidy_type_id}\`),
+                                axios.get(\`/api/clients/\${CLIENT_ID}/hearing-answers\`)
+                            ]);
+                            const questions = questionsRes.data;
+                            const answers = answersRes.data;
+                            
+                            // 回答済み質問IDのセット
+                            const answeredIds = new Set(answers.map(a => a.question_id));
+                            
+                            // 必須かつ未回答の質問をカウント
+                            const requiredUnanswered = questions.filter(q => 
+                                q.is_required && !answeredIds.has(q.id)
+                            ).length;
+                            
+                            if (requiredUnanswered > 0) {
+                                nextActions.push({
+                                    icon: 'fa-clipboard-list',
+                                    text: 'ヒアリング質問への回答',
+                                    description: '必須質問があと ' + requiredUnanswered + ' 問残っています',
+                                    action: "scrollToSection('hearingSection')",
+                                    priority: 2
+                                });
+                            }
                         }
-                    } catch (e) { console.log('No hearing questions'); }
+                    } catch (e) { console.log('No hearing questions', e); }
                     
                     // 3. 顧客対応タスクチェック
                     try {
@@ -5815,18 +5830,32 @@ app.get('/portal/:token', async (c) => {
                     
                     // 4. 未アップロード書類チェック
                     try {
-                        const docsRes = await axios.get(\`/api/clients/\${CLIENT_ID}/required-documents\`);
-                        const missingDocs = docsRes.data.filter(d => !d.uploaded).length;
+                        // チェックリストとアップロード済み書類を取得
+                        const [checklistRes, uploadedRes] = await Promise.all([
+                            axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`),
+                            axios.get(\`/api/clients/\${CLIENT_ID}/documents\`)
+                        ]);
+                        const checklist = checklistRes.data;
+                        const uploaded = uploadedRes.data;
+                        
+                        // アップロード済みの書類タイプを取得
+                        const uploadedTypes = new Set(uploaded.map(d => d.document_type));
+                        
+                        // 必須で未提出の書類をカウント
+                        const missingDocs = checklist.filter(item => 
+                            item.is_required && !uploadedTypes.has(item.document_name || item.name)
+                        ).length;
+                        
                         if (missingDocs > 0) {
                             nextActions.push({
                                 icon: 'fa-upload',
                                 text: '書類のアップロード',
-                                description: '未提出の書類が ' + missingDocs + ' 件あります',
+                                description: '必須書類があと ' + missingDocs + ' 件未提出です',
                                 action: "switchPortalTab('documents'); scrollToSection('documentSection')",
                                 priority: 4
                             });
                         }
-                    } catch (e) { console.log('No document requirements'); }
+                    } catch (e) { console.log('No document requirements', e); }
                     
                     // 表示
                     const section = document.getElementById('nextActionsSection');
