@@ -3943,12 +3943,14 @@ app.get('/client/:id', async (c) => {
             }
             
             // トースト通知表示
-            function showToast(message) {
+            function showToast(message, type = 'success') {
                 const toast = document.createElement('div');
-                toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                const bgColor = type === 'error' ? 'bg-red-600' : type === 'warning' ? 'bg-yellow-600' : 'bg-green-600';
+                const icon = type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-check-circle';
+                toast.className = \`fixed bottom-4 right-4 \${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50\`;
                 toast.innerHTML = \`
                     <div class="flex items-center gap-2">
-                        <i class="fas fa-check-circle"></i>
+                        <i class="fas \${icon}"></i>
                         <span>\${message}</span>
                     </div>
                 \`;
@@ -4060,11 +4062,17 @@ app.get('/client/:id', async (c) => {
             
             async function updateDocumentStatus(docId, status) {
                 try {
-                    await axios.put(\`/api/documents/\${docId}/status\`, { status });
-                    loadDocuments();
+                    const response = await axios.put(\`/api/documents/\${docId}/status\`, { status });
+                    if (response.data && response.data.success) {
+                        const statusText = status === 'approved' ? '承認' : status === 'rejected' ? '差し戻し' : '更新';
+                        showToast(\`書類を\${statusText}しました\`, 'success');
+                        await loadDocuments();
+                    } else {
+                        throw new Error('ステータス更新に失敗しました');
+                    }
                 } catch (error) {
-                    alert('ステータス更新に失敗しました');
-                    console.error(error);
+                    showToast('ステータス更新に失敗しました', 'error');
+                    console.error('Document status update error:', error);
                 }
             }
 
@@ -6771,26 +6779,33 @@ app.get('/portal/:token', async (c) => {
                     return;
                 }
                 
-                container.innerHTML = docs.map(doc => \`
-                    <div class="border rounded p-2 mb-1.5 flex items-center justify-between">
-                        <div class="flex-1 min-w-0">
-                            <div class="font-medium text-xs truncate">\${doc.document_type}</div>
-                            <div class="text-xs text-gray-400 truncate">\${doc.file_name}</div>
+                container.innerHTML = docs.map(doc => {
+                    const statusConfig = {
+                        approved: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', icon: 'fa-check-circle', label: '承認済み' },
+                        rejected: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', icon: 'fa-times-circle', label: '差し戻し' },
+                        pending: { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300', icon: 'fa-clock', label: '確認中' }
+                    };
+                    const status = statusConfig[doc.status] || statusConfig.pending;
+                    return \`
+                    <div class="border rounded p-2 mb-1.5 \${status.border} \${status.bg}">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium text-xs truncate">\${doc.document_type}</div>
+                                <div class="text-xs text-gray-500 truncate">\${doc.file_name}</div>
+                            </div>
+                            <div class="flex items-center gap-1.5 ml-2">
+                                <span class="text-xs px-2 py-0.5 rounded-full flex items-center gap-1 \${status.bg} \${status.text} font-medium">
+                                    <i class="fas \${status.icon} text-xs"></i>
+                                    \${status.label}
+                                </span>
+                                <a href="/api/documents/\${doc.id}/download" class="text-blue-600 hover:text-blue-800 text-xs">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-1.5 ml-2">
-                            <span class="text-xs px-1.5 py-0.5 rounded \${
-                                doc.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                doc.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
-                            }">
-                                \${doc.status === 'approved' ? '✓' : doc.status === 'rejected' ? '✗' : '...'}
-                            </span>
-                            <a href="/api/documents/\${doc.id}/download" class="text-green-600 hover:text-green-800 text-xs">
-                                <i class="fas fa-download"></i>
-                            </a>
-                        </div>
+                        \${doc.status === 'rejected' ? '<div class="text-xs text-red-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>書類を再提出してください</div>' : ''}
                     </div>
-                \`).join('');
+                \`}).join('');
             }
 
             async function loadCommunications() {
