@@ -16737,12 +16737,8 @@ app.get('/clients', async (c) => {
   const { DB } = c.env
   const clients = await DB.prepare(`
     SELECT c.*, 
-           COUNT(DISTINCT cl2.id) as case_count,
-           st.name as subsidy_type_name
+           (SELECT COUNT(*) FROM cases WHERE cases.client_id = c.id) as case_count
     FROM clients c
-    LEFT JOIN clients cl2 ON c.id = cl2.id
-    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-    GROUP BY c.id
     ORDER BY c.created_at DESC
   `).all()
   
@@ -16813,7 +16809,7 @@ app.get('/clients', async (c) => {
                                         ${client.phone ? `<div><i class="fas fa-phone mr-1"></i>${client.phone}</div>` : ''}
                                     </td>
                                     <td class="px-4 py-3">
-                                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">${client.case_count || 1}件</span>
+                                        <span class="${client.case_count > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-sm">${client.case_count || 0}件</span>
                                     </td>
                                     <td class="px-4 py-3 text-sm text-gray-600">${client.created_at?.split(' ')[0] || '-'}</td>
                                     <td class="px-4 py-3">
