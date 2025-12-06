@@ -404,19 +404,19 @@ app.get('/', (c) => {
                         <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
                     </div>
                     <a href="/subsidy-types?category=行政書士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-building w-5"></i>
+                        <i class="fas fa-file-signature w-5"></i>
                         <span>補助金一覧</span>
-                        <span class="ml-auto text-xs bg-blue-700 px-2 py-0.5 rounded">行政書士</span>
+                        <span class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
                     </a>
                     <a href="/subsidy-types?category=社労士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-hand-holding-usd w-5"></i>
+                        <i class="fas fa-users w-5"></i>
                         <span>助成金一覧</span>
-                        <span class="ml-auto text-xs bg-green-700 px-2 py-0.5 rounded">社労士</span>
+                        <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
                     </a>
                     <a href="/subsidy-types?category=許認可" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-stamp w-5"></i>
                         <span>許認可申請</span>
-                        <span class="ml-auto text-xs bg-purple-700 px-2 py-0.5 rounded">許認可</span>
+                        <span class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
                     </a>
                     <a href="/admin/pipelines" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-project-diagram w-5"></i>
@@ -10504,10 +10504,11 @@ app.get('/admin/guidelines', (c) => {
                     grouped[key].push(g);
                 });
                 
-                // カテゴリ色の定義
+                // カテゴリ色の定義（サイドバー・一覧で統一）
                 const getCategoryColor = (category) => {
-                    if (category === '行政書士管轄') return { bg: 'bg-emerald-50', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-800', icon: 'fas fa-stamp' };
-                    if (category === '社労士管轄') return { bg: 'bg-blue-50', border: 'border-blue-500', badge: 'bg-blue-100 text-blue-800', icon: 'fas fa-user-tie' };
+                    if (category === '行政書士管轄') return { bg: 'bg-emerald-50', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-800', icon: 'fas fa-file-signature' };
+                    if (category === '社労士管轄') return { bg: 'bg-blue-50', border: 'border-blue-500', badge: 'bg-blue-100 text-blue-800', icon: 'fas fa-users' };
+                    if (category === '許認可') return { bg: 'bg-indigo-50', border: 'border-indigo-500', badge: 'bg-indigo-100 text-indigo-800', icon: 'fas fa-stamp' };
                     return { bg: 'bg-gray-50', border: 'border-gray-500', badge: 'bg-gray-100 text-gray-800', icon: 'fas fa-folder' };
                 };
                 
@@ -15186,14 +15187,14 @@ app.get('/admin/pipelines', (c) => {
                         <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
                     </div>
                     <a href="/subsidy-types?category=行政書士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-building w-5"></i>
+                        <i class="fas fa-file-signature w-5"></i>
                         <span>補助金一覧</span>
-                        <span class="ml-auto text-xs bg-blue-700 px-2 py-0.5 rounded">行政書士</span>
+                        <span class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
                     </a>
                     <a href="/subsidy-types?category=社労士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-hand-holding-usd w-5"></i>
+                        <i class="fas fa-users w-5"></i>
                         <span>助成金一覧</span>
-                        <span class="ml-auto text-xs bg-green-700 px-2 py-0.5 rounded">社労士</span>
+                        <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
                     </a>
                     <a href="/admin/pipelines" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-project-diagram w-5"></i>
