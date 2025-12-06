@@ -5921,6 +5921,9 @@ app.get('/portal/:token', async (c) => {
                         <a href="#communications" onclick="switchPortalTab('communications'); scrollToSection('documentSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
                             <i class="fas fa-comments mr-1"></i>やり取り
                         </a>
+                        <a href="#ai-support" onclick="openAiModal(); return false;" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
+                            <i class="fas fa-robot mr-1"></i>AIサポート
+                        </a>
                         <a href="/privacy-policy" target="_blank" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
                             <i class="fas fa-shield-alt mr-1"></i>プライバシーポリシー
                         </a>
