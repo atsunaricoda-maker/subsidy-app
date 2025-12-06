@@ -4170,6 +4170,13 @@ app.get('/client/:id', async (c) => {
                 applying: '申請中',
                 completed: '完了'
             };
+            const STATUS_COLORS = {
+                inquiry: 'bg-yellow-100 text-yellow-800',
+                consulting: 'bg-blue-100 text-blue-800',
+                preparing: 'bg-orange-100 text-orange-800',
+                applying: 'bg-purple-100 text-purple-800',
+                completed: 'bg-green-100 text-green-800'
+            };
             
             let currentClient = null;
             let subsidyTypes = [];
