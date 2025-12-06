@@ -368,6 +368,58 @@ app.get('/', (c) => {
             .sidebar-link { transition: all 0.2s; }
             .sidebar-link:hover { background-color: rgba(255,255,255,0.1); }
             .sidebar-link.active { background-color: rgba(255,255,255,0.2); border-left: 3px solid white; }
+            
+            /* ボタンの押下効果 */
+            button, a.bg-blue-600, a.bg-green-600, a.bg-purple-600, a.bg-red-600 {
+                transition: all 0.15s ease;
+            }
+            button:active, a.bg-blue-600:active, a.bg-green-600:active, a.bg-purple-600:active, a.bg-red-600:active {
+                transform: scale(0.97);
+            }
+            
+            /* カードのホバー効果 */
+            .hover-lift { transition: all 0.2s ease; }
+            .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+            
+            /* スケルトンローダーのアニメーション */
+            @keyframes shimmer {
+                0% { background-position: -200% 0; }
+                100% { background-position: 200% 0; }
+            }
+            .skeleton-shimmer {
+                background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+                background-size: 200% 100%;
+                animation: shimmer 1.5s infinite;
+            }
+            
+            /* 入力フォーカス時のハイライト */
+            input:focus, select:focus, textarea:focus {
+                outline: none;
+                ring: 2px;
+                ring-color: #3b82f6;
+            }
+            
+            /* ステータスカードのホバー */
+            #statusCards a { transition: all 0.2s ease; }
+            #statusCards a:hover { transform: translateY(-3px); }
+            
+            /* トーストアニメーション */
+            @keyframes fadeInUp {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in { animation: fadeInUp 0.3s ease; }
+            
+            /* モーダルのフェード */
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .modal-backdrop { animation: fadeIn 0.2s ease; }
+            
+            /* 選択リストのアイテム */
+            .subsidy-option { transition: all 0.15s ease; }
+            .subsidy-option:hover { background-color: #f3f4f6; }
         </style>
     </head>
     <body class="bg-gray-100">
@@ -577,9 +629,55 @@ app.get('/', (c) => {
                                     <span id="clientCount" class="text-sm text-gray-500">-件</span>
                                 </div>
                                 <div id="clientsList" class="divide-y divide-gray-100">
-                                    <div class="text-center py-12 text-gray-500">
-                                        <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
-                                        <div>読み込み中...</div>
+                                    <!-- スケルトンローダー -->
+                                    <div class="skeleton-loader">
+                                        <div class="p-4 animate-pulse">
+                                            <div class="flex items-start justify-between">
+                                                <div class="flex-1 space-y-3">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="h-5 bg-gray-200 rounded w-32"></div>
+                                                        <div class="h-5 bg-gray-200 rounded w-16"></div>
+                                                        <div class="h-5 bg-gray-200 rounded w-24"></div>
+                                                    </div>
+                                                    <div class="h-4 bg-gray-200 rounded w-48"></div>
+                                                    <div class="h-4 bg-gray-200 rounded w-36"></div>
+                                                </div>
+                                                <div class="flex gap-2">
+                                                    <div class="h-9 bg-gray-200 rounded w-20"></div>
+                                                    <div class="h-9 bg-gray-200 rounded w-16"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="p-4 animate-pulse border-t">
+                                            <div class="flex items-start justify-between">
+                                                <div class="flex-1 space-y-3">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="h-5 bg-gray-200 rounded w-28"></div>
+                                                        <div class="h-5 bg-gray-200 rounded w-20"></div>
+                                                    </div>
+                                                    <div class="h-4 bg-gray-200 rounded w-40"></div>
+                                                </div>
+                                                <div class="flex gap-2">
+                                                    <div class="h-9 bg-gray-200 rounded w-20"></div>
+                                                    <div class="h-9 bg-gray-200 rounded w-16"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="p-4 animate-pulse border-t">
+                                            <div class="flex items-start justify-between">
+                                                <div class="flex-1 space-y-3">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="h-5 bg-gray-200 rounded w-36"></div>
+                                                        <div class="h-5 bg-gray-200 rounded w-16"></div>
+                                                    </div>
+                                                    <div class="h-4 bg-gray-200 rounded w-32"></div>
+                                                </div>
+                                                <div class="flex gap-2">
+                                                    <div class="h-9 bg-gray-200 rounded w-20"></div>
+                                                    <div class="h-9 bg-gray-200 rounded w-16"></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -593,7 +691,30 @@ app.get('/', (c) => {
                                     <i class="fas fa-history text-purple-600"></i>最近の活動
                                 </h2>
                                 <div id="recentActivity" class="space-y-3 text-sm">
-                                    <div class="text-gray-500 text-center py-4">読み込み中...</div>
+                                    <!-- スケルトンローダー -->
+                                    <div class="animate-pulse space-y-3">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
+                                            <div class="flex-1 space-y-2">
+                                                <div class="h-3 bg-gray-200 rounded w-3/4"></div>
+                                                <div class="h-2 bg-gray-200 rounded w-1/2"></div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
+                                            <div class="flex-1 space-y-2">
+                                                <div class="h-3 bg-gray-200 rounded w-2/3"></div>
+                                                <div class="h-2 bg-gray-200 rounded w-1/3"></div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
+                                            <div class="flex-1 space-y-2">
+                                                <div class="h-3 bg-gray-200 rounded w-4/5"></div>
+                                                <div class="h-2 bg-gray-200 rounded w-2/5"></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -1500,7 +1621,18 @@ app.get('/', (c) => {
                 const container = document.getElementById('clientsList');
                 
                 if (cases.length === 0) {
-                    container.innerHTML = '<div class="text-center py-8 text-gray-500">案件が登録されていません</div>';
+                    container.innerHTML = \`
+                        <div class="text-center py-12">
+                            <div class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-folder-open text-4xl text-gray-300"></i>
+                            </div>
+                            <h3 class="text-lg font-medium text-gray-600 mb-2">案件がありません</h3>
+                            <p class="text-sm text-gray-400 mb-4">新規案件を登録して始めましょう</p>
+                            <button onclick="openNewCaseModal()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-plus mr-2"></i>新規案件登録
+                            </button>
+                        </div>
+                    \`;
                     return;
                 }
 
