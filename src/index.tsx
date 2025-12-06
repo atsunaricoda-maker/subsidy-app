@@ -2050,45 +2050,51 @@ app.delete('/api/clients/:id', async (c) => {
     return c.json({ error: '顧客の削除は管理者のみ実行できます' }, 403)
   }
   
-  if (keepCustomer) {
-    // 案件情報のみリセット（顧客情報は保持）
-    // 関連する案件データを削除
-    await DB.prepare(`DELETE FROM client_documents WHERE client_id = ?`).bind(id).run()
-    await DB.prepare(`DELETE FROM communications WHERE client_id = ?`).bind(id).run()
-    await DB.prepare(`DELETE FROM hearing_answers WHERE client_id = ?`).bind(id).run()
-    await DB.prepare(`DELETE FROM client_pipelines WHERE client_id = ?`).bind(id).run()
-    
-    // 顧客の案件情報をリセット
-    await DB.prepare(`
-      UPDATE clients SET
-        subsidy_type_id = NULL,
-        status = 'inquiry',
-        deposit_required = 0,
-        deposit_amount = NULL,
-        deposit_paid = 0,
-        deposit_paid_at = NULL,
-        deposit_payment_method = NULL,
-        deposit_transfer_reported = 0,
-        deposit_transfer_reported_at = NULL,
-        notes = NULL,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(id).run()
-    
-    return c.json({ 
-      success: true,
-      message: '案件情報をリセットしました（顧客情報は保持）'
-    })
-  } else {
-    // 顧客を完全削除（関連データも削除される：ON DELETE CASCADE）
-    await DB.prepare(`
-      DELETE FROM clients WHERE id = ?
-    `).bind(id).run()
-    
-    return c.json({ 
-      success: true,
-      message: '顧客を削除しました'
-    })
+  try {
+    if (keepCustomer) {
+      // 案件情報のみリセット（顧客情報は保持）
+      // casesテーブルの案件を削除（案件に紐づくデータはCASCADEで削除される）
+      await DB.prepare(`DELETE FROM cases WHERE client_id = ?`).bind(id).run()
+      
+      // 旧形式のデータも削除（client_idで直接紐づいているもの）
+      await DB.prepare(`DELETE FROM documents WHERE client_id = ?`).bind(id).run()
+      await DB.prepare(`DELETE FROM communications WHERE client_id = ?`).bind(id).run()
+      await DB.prepare(`DELETE FROM hearing_answers WHERE client_id = ?`).bind(id).run()
+      await DB.prepare(`DELETE FROM client_pipelines WHERE client_id = ?`).bind(id).run()
+      await DB.prepare(`DELETE FROM generated_documents WHERE client_id = ?`).bind(id).run()
+      
+      // 顧客の案件情報をリセット（旧形式の互換性のため）
+      await DB.prepare(`
+        UPDATE clients SET
+          subsidy_type_id = NULL,
+          status = 'inquiry',
+          deposit_required = 0,
+          deposit_amount = 0,
+          deposit_paid = 0,
+          deposit_paid_at = NULL,
+          deposit_transfer_reported = 0,
+          deposit_transfer_reported_at = NULL,
+          notes = NULL,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(id).run()
+      
+      return c.json({ 
+        success: true,
+        message: '案件情報をリセットしました（顧客情報は保持）'
+      })
+    } else {
+      // 顧客を完全削除（関連データも削除される：ON DELETE CASCADE）
+      await DB.prepare(`DELETE FROM clients WHERE id = ?`).bind(id).run()
+      
+      return c.json({ 
+        success: true,
+        message: '顧客を削除しました'
+      })
+    }
+  } catch (error: any) {
+    console.error('Delete client error:', error)
+    return c.json({ error: error.message || '削除に失敗しました' }, 500)
   }
 })
 
