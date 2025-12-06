@@ -2701,10 +2701,10 @@ app.get('/api/subsidy-types', async (c) => {
   const includeHidden = c.req.query('include_hidden') === 'true'
   
   // id = 0 は共通質問用の内部レコードなので除外
-  // 社労士管轄は一旦非表示（include_hidden=trueで表示可能）
+  // is_hidden = 1 のものは include_hidden=true の場合のみ表示
   let query = `SELECT * FROM subsidy_types WHERE id > 0`
   if (!includeHidden) {
-    query += ` AND (category IS NULL OR category != '社労士管轄')`
+    query += ` AND (is_hidden IS NULL OR is_hidden = 0)`
   }
   query += ` ORDER BY category, name`
   
