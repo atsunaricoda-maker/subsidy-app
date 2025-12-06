@@ -15372,9 +15372,9 @@ app.get('/privacy-policy', async (c) => {
                 </div>
                 
                 <div class="mt-6 text-center">
-                    <a href="javascript:history.back()" class="text-blue-600 hover:text-blue-700">
-                        <i class="fas fa-arrow-left mr-1"></i>戻る
-                    </a>
+                    <button onclick="window.close()" class="text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-times mr-1"></i>このタブを閉じる
+                    </button>
                 </div>
             </div>
             
@@ -15457,9 +15457,9 @@ app.get('/legal', async (c) => {
                 </div>
                 
                 <div class="mt-6 text-center">
-                    <a href="javascript:history.back()" class="text-blue-600 hover:text-blue-700">
-                        <i class="fas fa-arrow-left mr-1"></i>戻る
-                    </a>
+                    <button onclick="window.close()" class="text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-times mr-1"></i>このタブを閉じる
+                    </button>
                 </div>
             </div>
             
