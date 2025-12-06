@@ -5295,6 +5295,18 @@ app.get('/portal/:token', async (c) => {
                     </div>
                 </div>
                 
+                <!-- サービス進捗状況（横型バー表示）要件15 -->
+                <div id="serviceProgressSection" class="hidden mb-4">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h2 class="text-lg font-bold mb-4">
+                            <i class="fas fa-tasks mr-2 text-blue-600"></i>サービス進捗状況
+                        </h2>
+                        <div id="serviceProgressList" class="space-y-6">
+                            <!-- 動的に挿入される -->
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- PC: 2カラムレイアウト / モバイル: 縦並び -->
                 <div class="lg:grid lg:grid-cols-12 lg:gap-6">
                     
@@ -5319,19 +5331,19 @@ app.get('/portal/:token', async (c) => {
                                 <div id="hearingProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all" style="width: 0%"></div>
                             </div>
                             
-                            <!-- パイプライン進捗 -->
+                            <!-- パイプライン進捗（STEP形式・完了ボタン付き）要件13 -->
                             <div id="pipelineProgressSection" class="mt-4 pt-4 border-t hidden">
-                                <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center justify-between mb-3">
                                     <h3 class="text-sm font-medium text-gray-700">
-                                        <i class="fas fa-tasks mr-1 text-green-600"></i>サービス進捗状況
+                                        <i class="fas fa-list-ol mr-1 text-blue-600"></i>パイプライン進捗状況
                                     </h3>
-                                    <span id="pipelineProgressText" class="text-sm font-bold text-green-600">0%</span>
+                                    <span id="pipelineProgressText" class="text-sm font-bold text-blue-600">0%</span>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-3">
-                                    <div id="pipelineProgressBar" class="bg-gradient-to-r from-green-500 to-teal-500 h-3 rounded-full transition-all" style="width: 0%"></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                                    <div id="pipelineProgressBar" class="bg-blue-500 h-2 rounded-full transition-all" style="width: 0%"></div>
                                 </div>
-                                <div id="pipelineTasksList" class="mt-3 space-y-2 text-sm">
-                                    <!-- タスク一覧が表示される -->
+                                <div id="pipelineTasksList" class="space-y-3">
+                                    <!-- STEP形式のタスク一覧が表示される -->
                                 </div>
                             </div>
                             
@@ -5997,38 +6009,161 @@ app.get('/portal/:token', async (c) => {
                         both: '共同'
                     };
                     
-                    tasksContainer.innerHTML = tasks.slice(0, 5).map((task, index) => {
+                    // STEP形式で表示（参考画像③）
+                    tasksContainer.innerHTML = tasks.map((task, index) => {
                         const style = statusStyles[task.status] || statusStyles.pending;
                         const isCustomerTask = task.task_type === 'external' || task.task_type === 'both';
+                        const stepNum = index + 1;
+                        const isCompleted = task.status === 'completed';
+                        const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
                         
                         return \`
-                            <div class="flex items-center gap-2 p-2 rounded \${style.bg}">
-                                <div class="w-6 h-6 rounded-full flex items-center justify-center \${task.status === 'completed' ? 'bg-green-500' : 'bg-gray-300'} text-white text-xs">
-                                    <i class="fas \${style.icon}"></i>
-                                </div>
-                                <div class="flex-1">
-                                    <div class="font-medium \${style.text}">\${task.task_name}</div>
-                                    <div class="text-xs text-gray-500">
-                                        \${isCustomerTask ? '<span class="text-orange-600"><i class="fas fa-user mr-1"></i>顧客対応</span> · ' : ''}
-                                        \${task.end_date ? '期限: ' + task.end_date : ''}
+                            <div class="border rounded-lg p-3 \${isCompleted ? 'bg-green-50 border-green-200' : (isCustomerTask ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200')}">
+                                <div class="flex items-start gap-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm \${isCompleted ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}">
+                                            \${isCompleted ? '<i class="fas fa-check"></i>' : stepNum}
+                                        </div>
                                     </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="font-medium text-sm \${style.text}">\${task.task_name}</span>
+                                            \${isCustomerTask ? '<span class="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">顧客</span>' : ''}
+                                            \${isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-600 rounded">完了</span>' : ''}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            \${task.description || ''}
+                                            \${task.end_date ? '<span class="ml-1">期限: ' + task.end_date + '</span>' : ''}
+                                        </div>
+                                    </div>
+                                    \${canComplete ? \`
+                                        <button onclick="completeTask(\${task.id})" 
+                                                class="flex-shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
+                                            <i class="fas fa-check mr-1"></i>完了
+                                        </button>
+                                    \` : ''}
                                 </div>
-                                \${task.status === 'pending' && isCustomerTask ? \`
-                                    <span class="text-xs px-2 py-1 bg-orange-100 text-orange-600 rounded">対応待ち</span>
-                                \` : ''}
                             </div>
                         \`;
                     }).join('');
+                } catch (error) {
+                    console.error('Error loading pipeline progress:', error);
+                }
+            }
+            
+            // タスク完了（顧客用）
+            async function completeTask(taskId) {
+                if (!confirm('このタスクを完了にしますか？')) {
+                    return;
+                }
+                
+                try {
+                    const response = await axios.post(\`/api/portal/tasks/\${taskId}/complete\`, {
+                        client_id: CLIENT_ID
+                    });
                     
-                    if (tasks.length > 5) {
-                        tasksContainer.innerHTML += \`
-                            <div class="text-center text-xs text-gray-500 mt-2">
-                                他 \${tasks.length - 5} 件のタスクがあります
+                    if (response.data.success) {
+                        showMessage('タスクを完了しました！', 'success');
+                        // 画面を更新
+                        loadPipelineProgress();
+                        loadServiceProgress();
+                        loadNextActions();
+                    }
+                } catch (error) {
+                    console.error('Error completing task:', error);
+                    alert('タスクの完了に失敗しました: ' + (error.response?.data?.error || error.message));
+                }
+            }
+            
+            // メッセージ表示
+            function showMessage(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = \`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-white \${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'}\`;
+                toast.innerHTML = \`<i class="fas \${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2"></i>\${message}\`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+            
+            // サービス進捗状況を読み込む（横型バー表示・要件15）
+            async function loadServiceProgress() {
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/pipelines\`);
+                    const pipelines = response.data;
+                    
+                    const section = document.getElementById('serviceProgressSection');
+                    const listContainer = document.getElementById('serviceProgressList');
+                    
+                    if (pipelines.length === 0) {
+                        section.classList.add('hidden');
+                        return;
+                    }
+                    
+                    section.classList.remove('hidden');
+                    
+                    // 各パイプラインのサービス進捗を表示
+                    let html = '';
+                    
+                    for (const pipeline of pipelines) {
+                        // タスク一覧を取得
+                        const tasksResponse = await axios.get(\`/api/pipelines/\${pipeline.id}/tasks\`);
+                        const tasks = tasksResponse.data;
+                        
+                        if (tasks.length === 0) continue;
+                        
+                        // サービス名（パイプライン名 or 補助金名）
+                        const serviceName = pipeline.subsidy_name || pipeline.template_name || 'サービス';
+                        const expectedDate = pipeline.expected_completion_date 
+                            ? new Date(pipeline.expected_completion_date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
+                            : '';
+                        
+                        html += \`
+                            <div class="border rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div>
+                                        <h3 class="font-bold text-gray-800">\${serviceName}</h3>
+                                        \${expectedDate ? \`<p class="text-xs text-gray-500">予定日: \${expectedDate}</p>\` : ''}
+                                    </div>
+                                    <span class="text-sm font-bold \${pipeline.progress_percentage >= 100 ? 'text-green-600' : 'text-blue-600'}">
+                                        \${pipeline.progress_percentage || 0}%
+                                    </span>
+                                </div>
+                                
+                                <!-- 横型進捗バー（ステップ表示） -->
+                                <div class="relative">
+                                    <!-- 背景バー -->
+                                    <div class="absolute top-4 left-0 right-0 h-1 bg-gray-200 rounded"></div>
+                                    <!-- 進捗バー -->
+                                    <div class="absolute top-4 left-0 h-1 bg-orange-500 rounded transition-all" style="width: \${pipeline.progress_percentage || 0}%"></div>
+                                    
+                                    <!-- ステップポイント -->
+                                    <div class="relative flex justify-between">
+                                        \${tasks.map((task, index) => {
+                                            const isCompleted = task.status === 'completed';
+                                            const isInProgress = task.status === 'in_progress';
+                                            const posPercent = tasks.length > 1 ? (index / (tasks.length - 1)) * 100 : 50;
+                                            
+                                            return \`
+                                                <div class="flex flex-col items-center" style="width: \${100 / tasks.length}%;">
+                                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold z-10
+                                                        \${isCompleted ? 'bg-orange-500 text-white' : isInProgress ? 'bg-orange-300 text-white' : 'bg-gray-300 text-gray-600'}">
+                                                        \${isCompleted ? '<i class="fas fa-check"></i>' : (index + 1)}
+                                                    </div>
+                                                    <div class="text-xs text-center mt-1 \${isCompleted ? 'text-orange-600 font-medium' : 'text-gray-500'}" style="max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                        \${task.task_name.length > 8 ? task.task_name.substring(0, 8) + '...' : task.task_name}
+                                                    </div>
+                                                </div>
+                                            \`;
+                                        }).join('')}
+                                    </div>
+                                </div>
                             </div>
                         \`;
                     }
+                    
+                    listContainer.innerHTML = html || '<div class="text-gray-500 text-center py-4">サービス進捗情報がありません</div>';
+                    
                 } catch (error) {
-                    console.error('Error loading pipeline progress:', error);
+                    console.error('Error loading service progress:', error);
                 }
             }
             
@@ -7963,6 +8098,7 @@ app.get('/portal/:token', async (c) => {
             loadAnnouncements();
             loadNextActions();
             loadPipelineProgress();
+            loadServiceProgress();
             loadDepositInfo();
             loadHearingQuestions();
             loadChecklist();
@@ -14134,6 +14270,83 @@ app.put('/api/pipeline-tasks/:taskId', async (c) => {
   return c.json({ 
     success: true,
     message: 'タスクを更新しました',
+    pipeline_progress: progressPercentage
+  })
+})
+
+// 顧客がタスクを完了する（顧客ポータル用）
+app.post('/api/portal/tasks/:taskId/complete', async (c) => {
+  const { DB } = c.env
+  const taskId = c.req.param('taskId')
+  const data = await c.req.json()
+  const clientId = data.client_id
+  
+  if (!clientId) {
+    return c.json({ error: 'client_id is required' }, 400)
+  }
+  
+  // タスクを取得し、顧客対応タスクかつ該当顧客のものか確認
+  const task = await DB.prepare(`
+    SELECT t.*, p.client_id 
+    FROM client_pipeline_tasks t
+    JOIN client_pipelines p ON t.pipeline_id = p.id
+    WHERE t.id = ?
+  `).bind(taskId).first()
+  
+  if (!task) {
+    return c.json({ error: 'タスクが見つかりません' }, 404)
+  }
+  
+  if (task.client_id != clientId) {
+    return c.json({ error: '権限がありません' }, 403)
+  }
+  
+  // 顧客対応タスク（external または both）のみ完了可能
+  if (task.task_type !== 'external' && task.task_type !== 'both') {
+    return c.json({ error: 'このタスクは顧客側で完了できません' }, 400)
+  }
+  
+  // ステータスを完了に更新
+  await DB.prepare(`
+    UPDATE client_pipeline_tasks SET
+    status = 'completed',
+    completed_at = CURRENT_TIMESTAMP,
+    updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(taskId).run()
+  
+  // 履歴を記録
+  await DB.prepare(`
+    INSERT INTO task_history 
+    (task_id, old_status, new_status, old_progress, new_progress, changed_by, change_note)
+    VALUES (?, ?, 'completed', ?, 100, ?, '顧客ポータルから完了')
+  `).bind(
+    taskId,
+    task.status,
+    task.progress_percentage || 0,
+    '顧客'
+  ).run()
+  
+  // パイプラインの進捗を更新
+  const pipelineTasks = await DB.prepare(`
+    SELECT status FROM client_pipeline_tasks WHERE pipeline_id = ?
+  `).bind(task.pipeline_id).all()
+  
+  const totalTasks = pipelineTasks.results?.length || 1
+  const completedTasks = pipelineTasks.results?.filter((t: any) => t.status === 'completed').length || 0
+  const progressPercentage = Math.round((completedTasks / totalTasks) * 100)
+  
+  await DB.prepare(`
+    UPDATE client_pipelines SET 
+    progress_percentage = ?,
+    status = CASE WHEN ? = 100 THEN 'completed' ELSE status END,
+    updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(progressPercentage, progressPercentage, task.pipeline_id).run()
+  
+  return c.json({ 
+    success: true,
+    message: 'タスクを完了しました',
     pipeline_progress: progressPercentage
   })
 })
