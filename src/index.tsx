@@ -990,8 +990,20 @@ app.get('/', (c) => {
                         let caseId;
                         
                         // 案件データ
+                        // formDataからの取得とselect要素から直接取得の両方を試す
+                        const subsidySelect = document.getElementById('newClientSubsidyType');
+                        const subsidyTypeIdFromForm = formData.get('subsidy_type_id');
+                        const subsidyTypeIdFromSelect = subsidySelect ? subsidySelect.value : null;
+                        const subsidyTypeId = subsidyTypeIdFromSelect || subsidyTypeIdFromForm;
+                        console.log('subsidy_type_id - fromForm:', subsidyTypeIdFromForm, 'fromSelect:', subsidyTypeIdFromSelect, 'final:', subsidyTypeId);
+                        
+                        if (!subsidyTypeId) {
+                            alert('補助金・助成金を選択してください');
+                            return;
+                        }
+                        
                         const caseData = {
-                            subsidy_type_id: formData.get('subsidy_type_id') || null,
+                            subsidy_type_id: parseInt(subsidyTypeId),
                             assigned_to: formData.get('assigned_to') || null,
                             notes: formData.get('notes') || null,
                             deposit_required: document.getElementById('depositRequired')?.checked ? 1 : 0,
@@ -1001,6 +1013,7 @@ app.get('/', (c) => {
                             success_fee_rate: parseFloat(formData.get('success_fee_rate')) || 0,
                             success_fee_amount: parseInt(formData.get('success_fee_amount')) || 0
                         };
+                        console.log('caseData:', caseData);
                         
                         if (customerType === 'existing') {
                             // 既存顧客を選択した場合 → 新しい案件を作成
@@ -2241,6 +2254,8 @@ app.get('/api/cases/token/:token', async (c) => {
 app.post('/api/cases', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
+  
+  console.log('Creating case with data:', JSON.stringify(data))
   
   // アクセストークンを生成
   const accessToken = crypto.randomUUID().replace(/-/g, '').substring(0, 20)
