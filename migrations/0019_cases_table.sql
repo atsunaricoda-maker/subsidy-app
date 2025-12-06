@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS cases (
   case_number TEXT,  -- 案件番号（自動生成: CASE-2024-0001 形式）
   subsidy_type_id INTEGER,  -- 申請する助成金種別
   status TEXT NOT NULL DEFAULT 'inquiry',  -- inquiry, consulting, preparing, applying, completed, cancelled
-  assigned_to INTEGER,  -- 担当者ID
+  assigned_to TEXT,  -- 担当者（テキスト形式で保持）
   notes TEXT,  -- メモ
   -- 手付金・決済関連
   deposit_required INTEGER DEFAULT 0,
@@ -29,9 +29,7 @@ CREATE TABLE IF NOT EXISTS cases (
   -- タイムスタンプ
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
-  FOREIGN KEY (subsidy_type_id) REFERENCES subsidy_types(id),
-  FOREIGN KEY (assigned_to) REFERENCES admin_users(id)
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
 
 -- インデックス
@@ -41,6 +39,7 @@ CREATE INDEX IF NOT EXISTS idx_cases_access_token ON cases(access_token);
 CREATE INDEX IF NOT EXISTS idx_cases_subsidy_type_id ON cases(subsidy_type_id);
 
 -- 既存データの移行: clientsテーブルから案件情報をcasesテーブルにコピー
+-- （success_fee系カラムはclientsテーブルにないため0で初期化）
 INSERT INTO cases (
   client_id, subsidy_type_id, status, assigned_to, notes,
   deposit_required, deposit_amount, deposit_paid, deposit_paid_at,
@@ -54,8 +53,7 @@ SELECT
   COALESCE(deposit_required, 0), COALESCE(deposit_amount, 0), 
   COALESCE(deposit_paid, 0), deposit_paid_at,
   COALESCE(deposit_transfer_reported, 0), deposit_transfer_reported_at,
-  COALESCE(success_fee_enabled, 0), COALESCE(success_fee_rate, 0), 
-  COALESCE(success_fee_amount, 0), COALESCE(withholding_tax, 0),
+  0, 0, 0, COALESCE(withholding_tax, 0),
   contract_url, access_token, 
   COALESCE(privacy_policy_agreed, 0), privacy_policy_agreed_at,
   created_at, updated_at
