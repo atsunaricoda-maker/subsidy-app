@@ -570,10 +570,10 @@ app.get('/', (c) => {
                                 <div id="deadlineAlertList" class="space-y-2"></div>
                             </div>
 
-                            <!-- 顧客一覧 -->
+                            <!-- 案件一覧 -->
                             <div class="bg-white rounded-xl shadow-sm">
                                 <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-                                    <h2 class="text-base font-bold text-gray-800">顧客一覧</h2>
+                                    <h2 class="text-base font-bold text-gray-800">案件一覧</h2>
                                     <span id="clientCount" class="text-sm text-gray-500">-件</span>
                                 </div>
                                 <div id="clientsList" class="divide-y divide-gray-100">
@@ -1081,15 +1081,27 @@ app.get('/', (c) => {
             // Axios設定：認証ヘッダーを自動付与
             axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
 
-            // データ読み込み
+            // データ読み込み（案件ベース）
+            let allCases = [];
             async function loadData() {
                 try {
-                    const response = await axios.get('/api/clients');
-                    allClients = response.data;
+                    // 案件ベースのデータを取得
+                    const response = await axios.get('/api/cases');
+                    allCases = response.data;
+                    
+                    // 後方互換性のためallClientsも更新（案件を顧客形式に変換）
+                    allClients = allCases.map(c => ({
+                        ...c,
+                        id: c.client_id,
+                        case_id: c.id,
+                        name: c.client_name,
+                        company_name: c.company_name
+                    }));
+                    
                     updateStatusCards();
                     updateStatistics();
-                    renderClients(allClients);
-                    renderDeadlineAlerts(allClients);
+                    renderCases(allCases);
+                    renderDeadlineAlerts(allCases);
                     loadRecentActivity();
                 } catch (error) {
                     console.error('Error loading data:', error);
@@ -1328,18 +1340,19 @@ app.get('/', (c) => {
                 }
             }
             
-            // 統計情報更新
+            // 統計情報更新（案件ベース）
             function updateStatistics() {
                 const now = new Date();
                 const thisMonth = \`\${now.getFullYear()}-\${String(now.getMonth() + 1).padStart(2, '0')}\`;
                 
-                // 総顧客数
-                const total = allClients.length;
+                // 総案件数
+                const total = allCases.length;
                 const statTotal = document.getElementById('stat-total');
                 if (statTotal) statTotal.textContent = total;
                 
-                // 今月の新規顧客
-                const newThisMonth = allClients.filter(c => {
+                // 今月の新規案件
+                const newThisMonth = allCases.filter(c => {
+                    if (!c.created_at) return false;
                     const created = c.created_at.substring(0, 7);
                     return created === thisMonth;
                 }).length;
@@ -1347,8 +1360,9 @@ app.get('/', (c) => {
                 if (statNewMonth) statNewMonth.textContent = newThisMonth;
                 
                 // 今月の完了件数
-                const completedThisMonth = allClients.filter(c => {
+                const completedThisMonth = allCases.filter(c => {
                     if (c.status !== 'completed') return false;
+                    if (!c.updated_at) return false;
                     const updated = c.updated_at.substring(0, 7);
                     return updated === thisMonth;
                 }).length;
@@ -1356,7 +1370,7 @@ app.get('/', (c) => {
                 if (statCompleted) statCompleted.textContent = completedThisMonth;
             }
 
-            // ステータスカード更新
+            // ステータスカード更新（案件ベース）
             function updateStatusCards() {
                 const counts = {
                     inquiry: 0,
@@ -1366,9 +1380,9 @@ app.get('/', (c) => {
                     completed: 0
                 };
                 
-                allClients.forEach(client => {
-                    if (counts[client.status] !== undefined) {
-                        counts[client.status]++;
+                allCases.forEach(caseItem => {
+                    if (counts[caseItem.status] !== undefined) {
+                        counts[caseItem.status]++;
                     }
                 });
 
@@ -1377,13 +1391,12 @@ app.get('/', (c) => {
                     if (el) el.textContent = counts[status];
                 });
             }
-
-            // 顧客一覧表示
-            function renderClients(clients) {
+            // 案件一覧表示（案件ベース）
+            function renderCases(cases) {
                 const container = document.getElementById('clientsList');
                 
-                if (clients.length === 0) {
-                    container.innerHTML = '<div class="text-center py-8 text-gray-500">顧客が登録されていません</div>';
+                if (cases.length === 0) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500">案件が登録されていません</div>';
                     return;
                 }
 
@@ -1408,47 +1421,55 @@ app.get('/', (c) => {
                         return { text: \`残り\${diffDays}日\`, class: 'bg-green-500 text-white', urgent: false };
                     }
                 }
+
+                // 顧客ごとの案件数をカウント
+                const caseCountByClient = {};
+                cases.forEach(c => {
+                    caseCountByClient[c.client_id] = (caseCountByClient[c.client_id] || 0) + 1;
+                });
                 
-                container.innerHTML = clients.map(client => {
-                    const subsidyType = subsidyTypes.find(s => s.id === client.subsidy_type_id);
-                    const portalUrl = \`\${window.location.origin}/portal/\${client.access_token}\`;
-                    const deadlineInfo = getDeadlineInfo(client.application_end_date);
+                container.innerHTML = cases.map(caseItem => {
+                    const portalUrl = \`\${window.location.origin}/portal/\${caseItem.access_token}\`;
+                    const deadlineInfo = getDeadlineInfo(caseItem.application_end_date);
+                    const clientCaseCount = caseCountByClient[caseItem.client_id] || 1;
+                    const caseNumber = caseItem.case_number || \`案件#\${caseItem.id}\`;
                     return \`
                     <div class="border-b last:border-b-0 py-4 hover:bg-gray-50 \${deadlineInfo?.urgent ? 'border-l-4 border-l-red-500 pl-3' : ''}">
                         <!-- PC版表示 -->
                         <div class="hidden md:flex items-start justify-between">
                             <div class="flex-1">
                                 <div class="flex items-center gap-3 mb-2 flex-wrap">
-                                    <h3 class="text-lg font-bold">\${client.name}</h3>
-                                    <span class="px-3 py-1 rounded-full text-xs font-medium \${STATUS_COLORS[client.status]}">
-                                        \${STATUS_LABELS[client.status]}
+                                    <h3 class="text-lg font-bold">\${caseItem.client_name || '未設定'}</h3>
+                                    \${clientCaseCount > 1 ? \`<span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800 font-medium"><i class="fas fa-folder-open mr-1"></i>\${clientCaseCount}件の案件</span>\` : ''}
+                                    <span class="px-3 py-1 rounded-full text-xs font-medium \${STATUS_COLORS[caseItem.status]}">
+                                        \${STATUS_LABELS[caseItem.status]}
                                     </span>
-                                    \${subsidyType ? \`<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${subsidyType.name}</span>\` : ''}
+                                    \${caseItem.subsidy_type_name ? \`<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${caseItem.subsidy_type_name}</span>\` : ''}
                                     \${deadlineInfo ? \`<span class="px-2 py-1 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
                                 </div>
                                 <div class="text-sm text-gray-600 space-y-1">
-                                    \${client.company_name ? \`<div><i class="fas fa-building w-4"></i> \${client.company_name}</div>\` : ''}
-                                    \${client.email ? \`<div><i class="fas fa-envelope w-4"></i> \${client.email}</div>\` : ''}
-                                    \${client.phone ? \`<div><i class="fas fa-phone w-4"></i> \${client.phone}</div>\` : ''}
-                                    \${client.assigned_staff ? \`<div><i class="fas fa-user w-4"></i> 担当: \${client.assigned_staff}</div>\` : ''}
-                                    \${client.application_end_date ? \`<div><i class="fas fa-calendar-alt w-4"></i> 申請期限: \${client.application_end_date}\${client.subsidy_rate ? \` | 補助率: \${client.subsidy_rate}\` : ''}\${client.max_amount ? \` | 上限: \${(client.max_amount / 10000).toLocaleString()}万円\` : ''}</div>\` : ''}
+                                    <div class="text-xs text-gray-400"><i class="fas fa-hashtag w-4"></i> \${caseNumber}</div>
+                                    \${caseItem.company_name ? \`<div><i class="fas fa-building w-4"></i> \${caseItem.company_name}</div>\` : ''}
+                                    \${caseItem.email ? \`<div><i class="fas fa-envelope w-4"></i> \${caseItem.email}</div>\` : ''}
+                                    \${caseItem.assigned_to_name || caseItem.assigned_to ? \`<div><i class="fas fa-user w-4"></i> 担当: \${caseItem.assigned_to_name || caseItem.assigned_to}</div>\` : ''}
+                                    \${caseItem.application_end_date ? \`<div><i class="fas fa-calendar-alt w-4"></i> 申請期限: \${caseItem.application_end_date}\${caseItem.subsidy_rate ? \` | 補助率: \${caseItem.subsidy_rate}\` : ''}\${caseItem.max_amount ? \` | 上限: \${(caseItem.max_amount / 10000).toLocaleString()}万円\` : ''}</div>\` : ''}
                                 </div>
                             </div>
                             <div class="flex gap-2">
-                                <a href="/client/\${client.id}" 
+                                <a href="/client/\${caseItem.client_id}" 
                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
                                     <i class="fas fa-eye mr-1"></i>詳細
                                 </a>
-                                <button onclick="copyPortalUrl('\${portalUrl}', '\${client.name}')"
+                                <button onclick="copyPortalUrl('\${portalUrl}', '\${caseItem.client_name}')"
                                         class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm">
                                     <i class="fas fa-copy mr-1"></i>URL
                                 </button>
-                                <a href="/portal/\${client.access_token}" target="_blank"
+                                <a href="/portal/\${caseItem.access_token}" target="_blank"
                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
                                     <i class="fas fa-external-link-alt mr-1"></i>ポータル
                                 </a>
                                 \${localStorage.getItem('admin_role') === 'admin' ? \`
-                                <button onclick="deleteClient(\${client.id}, '\${client.name}')"
+                                <button onclick="deleteCase(\${caseItem.id}, '\${caseItem.client_name}', '\${caseNumber}')"
                                         class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm">
                                     <i class="fas fa-trash mr-1"></i>削除
                                 </button>
@@ -1460,41 +1481,42 @@ app.get('/', (c) => {
                         <div class="md:hidden space-y-3">
                             <div class="flex items-start justify-between">
                                 <div class="flex-1">
-                                    <h3 class="text-base font-bold mb-1">\${client.name}</h3>
-                                    \${client.company_name ? \`<div class="text-sm text-gray-600">\${client.company_name}</div>\` : ''}
+                                    <h3 class="text-base font-bold mb-1">\${caseItem.client_name || '未設定'}</h3>
+                                    <div class="text-xs text-gray-400">\${caseNumber}</div>
+                                    \${caseItem.company_name ? \`<div class="text-sm text-gray-600">\${caseItem.company_name}</div>\` : ''}
                                 </div>
                                 <div class="flex flex-col items-end gap-1">
-                                    <span class="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap \${STATUS_COLORS[client.status]}">
-                                        \${STATUS_LABELS[client.status]}
+                                    <span class="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap \${STATUS_COLORS[caseItem.status]}">
+                                        \${STATUS_LABELS[caseItem.status]}
                                     </span>
+                                    \${clientCaseCount > 1 ? \`<span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800">\${clientCaseCount}件</span>\` : ''}
                                     \${deadlineInfo ? \`<span class="px-2 py-1 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
                                 </div>
                             </div>
-                            \${subsidyType ? \`<div class="inline-block px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${subsidyType.name}</div>\` : ''}
+                            \${caseItem.subsidy_type_name ? \`<div class="inline-block px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${caseItem.subsidy_type_name}</div>\` : ''}
                             <div class="text-sm text-gray-600 space-y-1">
-                                \${client.email ? \`<div><i class="fas fa-envelope w-4"></i> \${client.email}</div>\` : ''}
-                                \${client.phone ? \`<div><i class="fas fa-phone w-4"></i> \${client.phone}</div>\` : ''}
-                                \${client.assigned_staff ? \`<div><i class="fas fa-user w-4"></i> 担当: \${client.assigned_staff}</div>\` : ''}
-                                \${client.application_end_date ? \`<div><i class="fas fa-calendar-alt w-4"></i> 期限: \${client.application_end_date}</div>\` : ''}
+                                \${caseItem.email ? \`<div><i class="fas fa-envelope w-4"></i> \${caseItem.email}</div>\` : ''}
+                                \${caseItem.assigned_to_name || caseItem.assigned_to ? \`<div><i class="fas fa-user w-4"></i> 担当: \${caseItem.assigned_to_name || caseItem.assigned_to}</div>\` : ''}
+                                \${caseItem.application_end_date ? \`<div><i class="fas fa-calendar-alt w-4"></i> 期限: \${caseItem.application_end_date}</div>\` : ''}
                             </div>
                             <div class="grid \${localStorage.getItem('admin_role') === 'admin' ? 'grid-cols-4' : 'grid-cols-3'} gap-2">
-                                <a href="/client/\${client.id}" 
+                                <a href="/client/\${caseItem.client_id}" 
                                    class="bg-blue-600 text-white px-3 py-3 rounded-lg hover:bg-blue-700 text-sm text-center">
                                     <i class="fas fa-eye block mb-1"></i>
                                     <span class="text-xs">詳細</span>
                                 </a>
-                                <button onclick="copyPortalUrl('\${portalUrl}', '\${client.name}')"
+                                <button onclick="copyPortalUrl('\${portalUrl}', '\${caseItem.client_name}')"
                                         class="bg-purple-600 text-white px-3 py-3 rounded-lg hover:bg-purple-700 text-sm">
                                     <i class="fas fa-copy block mb-1"></i>
                                     <span class="text-xs">URL</span>
                                 </button>
-                                <a href="/portal/\${client.access_token}" target="_blank"
+                                <a href="/portal/\${caseItem.access_token}" target="_blank"
                                    class="bg-green-600 text-white px-3 py-3 rounded-lg hover:bg-green-700 text-sm text-center">
                                     <i class="fas fa-external-link-alt block mb-1"></i>
                                     <span class="text-xs">ポータル</span>
                                 </a>
                                 \${localStorage.getItem('admin_role') === 'admin' ? \`
-                                <button onclick="deleteClient(\${client.id}, '\${client.name}')"
+                                <button onclick="deleteCase(\${caseItem.id}, '\${caseItem.client_name}', '\${caseNumber}')"
                                         class="bg-red-600 text-white px-3 py-3 rounded-lg hover:bg-red-700 text-sm">
                                     <i class="fas fa-trash block mb-1"></i>
                                     <span class="text-xs">削除</span>
@@ -1507,6 +1529,11 @@ app.get('/', (c) => {
                 }).join('');
             }
             
+            // 後方互換性のためrenderClientsもエイリアスとして残す
+            function renderClients(clients) {
+                renderCases(clients);
+            }
+            
             // ポータルURLコピー機能
             function copyPortalUrl(url, clientName) {
                 navigator.clipboard.writeText(url).then(() => {
@@ -1517,7 +1544,23 @@ app.get('/', (c) => {
                 });
             }
             
-            // 顧客削除
+            // 案件削除
+            async function deleteCase(caseId, clientName, caseNumber) {
+                if (!confirm(\`\${clientName}様の案件「\${caseNumber}」を削除してもよろしいですか？\\n\\nこの操作は取り消せません。\`)) {
+                    return;
+                }
+                
+                try {
+                    await axios.delete(\`/api/cases/\${caseId}\`);
+                    showToast(\`案件「\${caseNumber}」を削除しました\`);
+                    loadData();
+                } catch (error) {
+                    alert('削除に失敗しました: ' + (error.response?.data?.error || error.message));
+                    console.error('Delete error:', error);
+                }
+            }
+            
+            // 顧客削除（後方互換性のため残す）
             async function deleteClient(clientId, clientName) {
                 // 選択ダイアログを表示
                 const choice = await showDeleteChoiceDialog(clientName);
@@ -1606,14 +1649,14 @@ app.get('/', (c) => {
                 }, 3000);
             }
 
-            // フィルター・検索
+            // フィルター・検索（案件ベース）
             function filterClients() {
                 const filterStatusEl = document.getElementById('filterStatus');
                 const searchQueryEl = document.getElementById('searchQuery');
                 const status = filterStatusEl ? filterStatusEl.value : '';
                 const query = searchQueryEl ? searchQueryEl.value.toLowerCase() : '';
                 
-                let filtered = allClients;
+                let filtered = allCases;
                 
                 if (status) {
                     filtered = filtered.filter(c => c.status === status);
@@ -1621,12 +1664,13 @@ app.get('/', (c) => {
                 
                 if (query) {
                     filtered = filtered.filter(c => 
-                        c.name.toLowerCase().includes(query) || 
-                        (c.company_name && c.company_name.toLowerCase().includes(query))
+                        (c.client_name && c.client_name.toLowerCase().includes(query)) || 
+                        (c.company_name && c.company_name.toLowerCase().includes(query)) ||
+                        (c.case_number && c.case_number.toLowerCase().includes(query))
                     );
                 }
                 
-                renderClients(filtered);
+                renderCases(filtered);
             }
 
             const filterStatusEl = document.getElementById('filterStatus');
@@ -2286,10 +2330,22 @@ app.delete('/api/cases/:id', async (c) => {
     return c.json({ error: '案件の削除は管理者のみ実行できます' }, 403)
   }
   
-  // 関連データも削除される（ON DELETE CASCADE）
-  await DB.prepare(`DELETE FROM cases WHERE id = ?`).bind(id).run()
-  
-  return c.json({ success: true })
+  try {
+    // 案件に紐づく関連データを明示的に削除
+    await DB.prepare(`DELETE FROM documents WHERE case_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM communications WHERE case_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM hearing_answers WHERE case_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM client_pipelines WHERE case_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM generated_documents WHERE case_id = ?`).bind(id).run()
+    
+    // 案件自体を削除
+    await DB.prepare(`DELETE FROM cases WHERE id = ?`).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete case error:', error)
+    return c.json({ error: error.message || '案件の削除に失敗しました' }, 500)
+  }
 })
 
 // 案件の書類一覧取得
