@@ -22830,19 +22830,44 @@ app.delete('/api/master/organizations/:id', async (c) => {
   const { DB } = c.env
   const orgId = c.req.param('id')
   
-  // 関連データの削除（本番環境では論理削除を推奨）
-  await DB.prepare(`DELETE FROM slot_usage_history WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM slot_balances WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM user_subscriptions WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM communications WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM documents WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM hearing_responses WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM cases WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM clients WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM admin_users WHERE organization_id = ?`).bind(orgId).run()
-  await DB.prepare(`DELETE FROM organizations WHERE id = ?`).bind(orgId).run()
-  
-  return c.json({ success: true })
+  try {
+    // 関連データの削除（本番環境では論理削除を推奨）
+    // organization_idカラムがあるテーブル
+    await DB.prepare(`DELETE FROM slot_usage_history WHERE organization_id = ?`).bind(orgId).run()
+    await DB.prepare(`DELETE FROM slot_balances WHERE organization_id = ?`).bind(orgId).run()
+    await DB.prepare(`DELETE FROM user_subscriptions WHERE organization_id = ?`).bind(orgId).run()
+    
+    // client_id経由で削除（organizationに紐づくclientを取得）
+    const clients = await DB.prepare(`SELECT id FROM clients WHERE organization_id = ?`).bind(orgId).all()
+    const clientIds = clients?.results?.map((c: any) => c.id) || []
+    
+    for (const clientId of clientIds) {
+      await DB.prepare(`DELETE FROM communications WHERE client_id = ?`).bind(clientId).run()
+      await DB.prepare(`DELETE FROM documents WHERE client_id = ?`).bind(clientId).run()
+      await DB.prepare(`DELETE FROM hearing_answers WHERE client_id = ?`).bind(clientId).run()
+    }
+    
+    // case_id経由で削除
+    const cases = await DB.prepare(`SELECT id FROM cases WHERE organization_id = ?`).bind(orgId).all()
+    const caseIds = cases?.results?.map((c: any) => c.id) || []
+    
+    for (const caseId of caseIds) {
+      await DB.prepare(`DELETE FROM document_checklist WHERE case_id = ?`).bind(caseId).run()
+      await DB.prepare(`DELETE FROM client_pipeline_tasks WHERE pipeline_id IN (SELECT id FROM client_pipelines WHERE case_id = ?)`).bind(caseId).run()
+      await DB.prepare(`DELETE FROM client_pipelines WHERE case_id = ?`).bind(caseId).run()
+    }
+    
+    // organization_idカラムがあるテーブル
+    await DB.prepare(`DELETE FROM cases WHERE organization_id = ?`).bind(orgId).run()
+    await DB.prepare(`DELETE FROM clients WHERE organization_id = ?`).bind(orgId).run()
+    await DB.prepare(`DELETE FROM admin_users WHERE organization_id = ?`).bind(orgId).run()
+    await DB.prepare(`DELETE FROM organizations WHERE id = ?`).bind(orgId).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete organization error:', error)
+    return c.json({ error: 'Failed to delete organization: ' + error.message }, 500)
+  }
 })
 
 // 法人としてログイン（なりすまし）API
