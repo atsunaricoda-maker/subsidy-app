@@ -22831,7 +22831,7 @@ app.delete('/api/master/organizations/:id', async (c) => {
   const orgId = c.req.param('id')
   
   try {
-    // 安全な削除ヘルパー（テーブルが存在しない場合やカラムがない場合もエラーにしない）
+    // 安全な削除ヘルパー
     const safeDelete = async (query: string, ...params: any[]) => {
       try {
         await DB.prepare(query).bind(...params).run()
@@ -22840,12 +22840,24 @@ app.delete('/api/master/organizations/:id', async (c) => {
       }
     }
     
-    // organization_idカラムがあるテーブルから削除
+    // 1. まずsubscription_idを取得（外部キー参照の親）
+    const subscriptions = await DB.prepare(`SELECT id FROM user_subscriptions WHERE organization_id = ?`).bind(orgId).all()
+    const subscriptionIds = subscriptions?.results?.map((s: any) => s.id) || []
+    
+    // 2. subscription_idを参照しているテーブルを先に削除
+    for (const subId of subscriptionIds) {
+      await safeDelete(`DELETE FROM slot_usage_history WHERE subscription_id = ?`, subId)
+      await safeDelete(`DELETE FROM slot_balances WHERE subscription_id = ?`, subId)
+    }
+    
+    // 3. organization_idを参照しているテーブルも削除
     await safeDelete(`DELETE FROM slot_usage_history WHERE organization_id = ?`, orgId)
     await safeDelete(`DELETE FROM slot_balances WHERE organization_id = ?`, orgId)
+    
+    // 4. user_subscriptionsを削除（これでorganizationsの外部キー制約がクリア）
     await safeDelete(`DELETE FROM user_subscriptions WHERE organization_id = ?`, orgId)
     
-    // client_id経由で削除（organizationに紐づくclientを取得）
+    // 5. client_id経由で削除
     const clients = await DB.prepare(`SELECT id FROM clients WHERE organization_id = ?`).bind(orgId).all()
     const clientIds = clients?.results?.map((c: any) => c.id) || []
     
@@ -22855,7 +22867,7 @@ app.delete('/api/master/organizations/:id', async (c) => {
       await safeDelete(`DELETE FROM hearing_answers WHERE client_id = ?`, clientId)
     }
     
-    // case_id経由で削除
+    // 6. case_id経由で削除
     const cases = await DB.prepare(`SELECT id FROM cases WHERE organization_id = ?`).bind(orgId).all()
     const caseIds = cases?.results?.map((c: any) => c.id) || []
     
@@ -22864,12 +22876,12 @@ app.delete('/api/master/organizations/:id', async (c) => {
       await safeDelete(`DELETE FROM client_pipelines WHERE case_id = ?`, caseId)
     }
     
-    // メインテーブル削除
+    // 7. メインテーブル削除
     await safeDelete(`DELETE FROM cases WHERE organization_id = ?`, orgId)
     await safeDelete(`DELETE FROM clients WHERE organization_id = ?`, orgId)
     await safeDelete(`DELETE FROM admin_users WHERE organization_id = ?`, orgId)
     
-    // 最後に組織を削除
+    // 8. 最後に組織を削除
     await DB.prepare(`DELETE FROM organizations WHERE id = ?`).bind(orgId).run()
     
     return c.json({ success: true })
