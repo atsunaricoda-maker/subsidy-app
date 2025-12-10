@@ -277,7 +277,14 @@ app.get('/login', (c) => {
                     </button>
                 </form>
                 
-                <div class="mt-6 p-4 bg-blue-50 rounded-lg text-sm">
+                <div class="mt-6 text-center">
+                    <p class="text-gray-600">
+                        アカウントをお持ちでない方は 
+                        <a href="/signup" class="text-blue-600 hover:underline font-medium">新規登録（14日間無料）</a>
+                    </p>
+                </div>
+                
+                <div class="mt-4 p-4 bg-blue-50 rounded-lg text-sm">
                     <p class="font-medium text-blue-800 mb-2">デモ用ログイン情報：</p>
                     <p class="text-blue-700">ユーザー名: <code class="bg-white px-2 py-1 rounded">admin</code></p>
                     <p class="text-blue-700">パスワード: <code class="bg-white px-2 py-1 rounded">admin123</code></p>
@@ -300,10 +307,12 @@ app.get('/login', (c) => {
                     localStorage.setItem('admin_name', response.data.name);
                     localStorage.setItem('admin_username', response.data.username);
                     localStorage.setItem('admin_role', response.data.role);
+                    localStorage.setItem('organization_id', response.data.organization_id);
+                    localStorage.setItem('organization_name', response.data.organization_name || '');
                     window.location.href = '/';
                 } catch (error) {
                     const errorDiv = document.getElementById('errorMessage');
-                    errorDiv.textContent = 'ログインに失敗しました。ユーザー名またはパスワードが正しくありません。';
+                    errorDiv.textContent = error.response?.data?.error || 'ログインに失敗しました。ユーザー名またはパスワードが正しくありません。';
                     errorDiv.classList.remove('hidden');
                 }
             });
@@ -313,27 +322,393 @@ app.get('/login', (c) => {
   `)
 })
 
+// サインアップページ（法人セルフ登録）
+app.get('/signup', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>新規登録 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+        <div class="min-h-screen py-12 px-4">
+            <div class="max-w-2xl mx-auto">
+                <!-- ヘッダー -->
+                <div class="text-center mb-8">
+                    <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
+                    <h1 class="text-3xl font-bold text-gray-800">助成金申請管理システム</h1>
+                    <p class="text-gray-600 mt-2">14日間の無料トライアルで今すぐ始めましょう</p>
+                </div>
+                
+                <!-- 特徴 -->
+                <div class="grid grid-cols-3 gap-4 mb-8">
+                    <div class="bg-white rounded-lg p-4 text-center shadow-sm">
+                        <i class="fas fa-clock text-2xl text-blue-500 mb-2"></i>
+                        <p class="text-sm font-medium">セットアップ不要</p>
+                        <p class="text-xs text-gray-500">すぐに使い始められます</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 text-center shadow-sm">
+                        <i class="fas fa-credit-card text-2xl text-green-500 mb-2"></i>
+                        <p class="text-sm font-medium">14日間無料</p>
+                        <p class="text-xs text-gray-500">クレジットカード不要</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 text-center shadow-sm">
+                        <i class="fas fa-headset text-2xl text-purple-500 mb-2"></i>
+                        <p class="text-sm font-medium">サポート付き</p>
+                        <p class="text-xs text-gray-500">導入をお手伝いします</p>
+                    </div>
+                </div>
+                
+                <!-- 登録フォーム -->
+                <div class="bg-white rounded-xl shadow-lg p-8">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6">アカウント作成</h2>
+                    
+                    <form id="signupForm" class="space-y-6">
+                        <!-- 事務所情報 -->
+                        <div class="border-b pb-6">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-building mr-2 text-blue-500"></i>事務所情報
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">事務所名 / 法人名 <span class="text-red-500">*</span></label>
+                                    <input type="text" name="organization_name" required 
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="例: 田中社労士事務所">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス <span class="text-red-500">*</span></label>
+                                    <input type="email" name="email" required 
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="例: info@example.com">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                                    <input type="tel" name="phone" 
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="例: 03-1234-5678">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 管理者アカウント -->
+                        <div class="border-b pb-6">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-user-shield mr-2 text-green-500"></i>管理者アカウント
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">お名前 <span class="text-red-500">*</span></label>
+                                    <input type="text" name="admin_name" required 
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="例: 田中太郎">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ユーザー名 <span class="text-red-500">*</span></label>
+                                    <input type="text" name="username" required pattern="[a-zA-Z0-9_]+"
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="例: tanaka">
+                                    <p class="text-xs text-gray-500 mt-1">半角英数字とアンダースコアのみ</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">パスワード <span class="text-red-500">*</span></label>
+                                    <input type="password" name="password" required minlength="6"
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="6文字以上">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">パスワード（確認） <span class="text-red-500">*</span></label>
+                                    <input type="password" name="password_confirm" required minlength="6"
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="パスワードを再入力">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- プラン選択 -->
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-tags mr-2 text-purple-500"></i>プラン選択
+                            </h3>
+                            <div id="planOptions" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- プランはJSで動的に読み込み -->
+                                <div class="animate-pulse h-32 bg-gray-200 rounded-lg"></div>
+                                <div class="animate-pulse h-32 bg-gray-200 rounded-lg"></div>
+                                <div class="animate-pulse h-32 bg-gray-200 rounded-lg"></div>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-3">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                14日間の無料トライアル後、選択したプランに自動移行します。
+                            </p>
+                        </div>
+                        
+                        <!-- 利用規約 -->
+                        <div class="flex items-start">
+                            <input type="checkbox" id="terms" name="terms" required class="mt-1 mr-2">
+                            <label for="terms" class="text-sm text-gray-600">
+                                <a href="#" class="text-blue-600 hover:underline">利用規約</a>および
+                                <a href="#" class="text-blue-600 hover:underline">プライバシーポリシー</a>に同意します
+                            </label>
+                        </div>
+                        
+                        <button type="submit" id="submitBtn"
+                                class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium transition-colors">
+                            <i class="fas fa-rocket mr-2"></i>無料トライアルを開始
+                        </button>
+                    </form>
+                    
+                    <div id="errorMessage" class="hidden mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm"></div>
+                    
+                    <p class="text-center text-sm text-gray-600 mt-6">
+                        すでにアカウントをお持ちですか？ 
+                        <a href="/login" class="text-blue-600 hover:underline font-medium">ログイン</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            let selectedPlanId = null;
+            
+            async function loadPlans() {
+                try {
+                    const response = await axios.get('/api/subscription/plans');
+                    const plans = response.data.filter(p => p.monthly_slots > 0); // 要相談プランを除外
+                    
+                    const container = document.getElementById('planOptions');
+                    container.innerHTML = plans.slice(0, 5).map((plan, index) => {
+                        const isPopular = plan.plan_code === 'standard';
+                        return \`
+                            <div class="plan-option relative border-2 rounded-lg p-4 cursor-pointer transition-all hover:border-blue-300 \${index === 1 ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}"
+                                 data-plan-id="\${plan.id}" onclick="selectPlan(\${plan.id}, this)">
+                                \${isPopular ? '<span class="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">人気</span>' : ''}
+                                <h4 class="font-bold text-gray-800">\${plan.plan_name}</h4>
+                                <p class="text-2xl font-bold text-blue-600 my-2">¥\${plan.monthly_price.toLocaleString()}<span class="text-sm font-normal text-gray-500">/月</span></p>
+                                <p class="text-sm text-gray-600">\${plan.monthly_slots}枠/月</p>
+                                <p class="text-xs text-gray-500 mt-1">\${plan.description || ''}</p>
+                                <input type="radio" name="plan_id" value="\${plan.id}" class="hidden" \${index === 1 ? 'checked' : ''}>
+                            </div>
+                        \`;
+                    }).join('');
+                    
+                    // デフォルトでStandardを選択
+                    const standardPlan = plans.find(p => p.plan_code === 'standard');
+                    if (standardPlan) {
+                        selectedPlanId = standardPlan.id;
+                    } else if (plans.length > 0) {
+                        selectedPlanId = plans[0].id;
+                    }
+                    
+                } catch (error) {
+                    console.error('Failed to load plans:', error);
+                }
+            }
+            
+            function selectPlan(planId, element) {
+                selectedPlanId = planId;
+                document.querySelectorAll('.plan-option').forEach(el => {
+                    el.classList.remove('border-blue-500', 'bg-blue-50');
+                    el.classList.add('border-gray-200');
+                });
+                element.classList.remove('border-gray-200');
+                element.classList.add('border-blue-500', 'bg-blue-50');
+                element.querySelector('input[type="radio"]').checked = true;
+            }
+            
+            document.getElementById('signupForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                
+                // バリデーション
+                if (data.password !== data.password_confirm) {
+                    showError('パスワードが一致しません');
+                    return;
+                }
+                
+                if (!selectedPlanId) {
+                    showError('プランを選択してください');
+                    return;
+                }
+                
+                data.plan_id = selectedPlanId;
+                
+                const btn = document.getElementById('submitBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>登録中...';
+                
+                try {
+                    const response = await axios.post('/api/signup', data);
+                    
+                    // 登録成功 - 自動ログイン
+                    localStorage.setItem('admin_token', response.data.token);
+                    localStorage.setItem('admin_name', response.data.admin_name);
+                    localStorage.setItem('admin_username', response.data.username);
+                    localStorage.setItem('admin_role', 'admin');
+                    localStorage.setItem('organization_id', response.data.organization_id);
+                    
+                    // ウェルカムページへリダイレクト（またはダッシュボード）
+                    window.location.href = '/?welcome=true';
+                    
+                } catch (error) {
+                    showError(error.response?.data?.error || '登録に失敗しました。もう一度お試しください。');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-rocket mr-2"></i>無料トライアルを開始';
+                }
+            });
+            
+            function showError(message) {
+                const errorDiv = document.getElementById('errorMessage');
+                errorDiv.textContent = message;
+                errorDiv.classList.remove('hidden');
+                errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            loadPlans();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// サインアップAPI
+app.post('/api/signup', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  // バリデーション
+  if (!data.organization_name || !data.email || !data.username || !data.password || !data.admin_name) {
+    return c.json({ error: '必須項目を入力してください' }, 400)
+  }
+  
+  if (data.password.length < 6) {
+    return c.json({ error: 'パスワードは6文字以上で入力してください' }, 400)
+  }
+  
+  // スラッグ生成（事務所名からURLセーフな文字列を生成）
+  const slug = data.organization_name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'org-' + Date.now()
+  
+  // 重複チェック
+  const existingSlug = await DB.prepare(`SELECT id FROM organizations WHERE slug = ?`).bind(slug).first()
+  const finalSlug = existingSlug ? slug + '-' + Date.now() : slug
+  
+  const existingUsername = await DB.prepare(`SELECT id FROM admin_users WHERE username = ?`).bind(data.username).first()
+  if (existingUsername) {
+    return c.json({ error: 'このユーザー名は既に使用されています' }, 400)
+  }
+  
+  const existingEmail = await DB.prepare(`SELECT id FROM organizations WHERE email = ?`).bind(data.email).first()
+  if (existingEmail) {
+    return c.json({ error: 'このメールアドレスは既に登録されています' }, 400)
+  }
+  
+  try {
+    // トライアル期間（14日間）
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    
+    // 1. 組織を作成
+    const orgResult = await DB.prepare(`
+      INSERT INTO organizations (name, slug, email, phone, status, trial_ends_at)
+      VALUES (?, ?, ?, ?, 'trial', ?)
+    `).bind(
+      data.organization_name,
+      finalSlug,
+      data.email,
+      data.phone || null,
+      trialEndsAt
+    ).run()
+    
+    const orgId = orgResult.meta?.last_row_id
+    
+    // 2. 管理者アカウントを作成
+    await DB.prepare(`
+      INSERT INTO admin_users (username, password_hash, name, role, organization_id)
+      VALUES (?, ?, ?, 'admin', ?)
+    `).bind(data.username, data.password, data.admin_name, orgId).run()
+    
+    // 3. サブスクリプションを作成（トライアル）
+    const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(data.plan_id).first()
+    if (plan) {
+      const periodEnd = new Date()
+      periodEnd.setDate(periodEnd.getDate() + 14) // トライアル期間
+      
+      await DB.prepare(`
+        INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
+        VALUES (?, ?, 'active', date('now'), ?)
+      `).bind(orgId, data.plan_id, periodEnd.toISOString().split('T')[0]).run()
+      
+      // 4. 初期枠を付与（トライアル中はプランの枠数を付与）
+      await DB.prepare(`
+        INSERT INTO slot_balances (organization_id, monthly_slots, purchased_slots)
+        VALUES (?, ?, 0)
+      `).bind(orgId, plan.monthly_slots).run()
+    }
+    
+    // トークン生成
+    const token = btoa(`${orgId}:${data.username}:${Date.now()}`)
+    
+    return c.json({
+      success: true,
+      organization_id: orgId,
+      organization_name: data.organization_name,
+      username: data.username,
+      admin_name: data.admin_name,
+      token,
+      trial_ends_at: trialEndsAt,
+      message: '登録が完了しました！14日間の無料トライアルをお楽しみください。'
+    })
+    
+  } catch (error: any) {
+    console.error('Signup error:', error)
+    return c.json({ error: '登録に失敗しました: ' + error.message }, 500)
+  }
+})
+
 // ログインAPI
 app.post('/api/auth/login', async (c) => {
   const { DB } = c.env
   const { username, password } = await c.req.json()
   
   const user = await DB.prepare(`
-    SELECT * FROM admin_users WHERE username = ? AND password_hash = ?
+    SELECT au.*, o.name as organization_name, o.status as org_status
+    FROM admin_users au
+    LEFT JOIN organizations o ON au.organization_id = o.id
+    WHERE au.username = ? AND au.password_hash = ?
   `).bind(username, password).first()
   
   if (!user) {
     return c.json({ error: 'Invalid credentials' }, 401)
   }
   
+  // 組織が停止中の場合はログインを拒否
+  if (user.org_status === 'suspended') {
+    return c.json({ error: 'このアカウントは停止されています。管理者にお問い合わせください。' }, 403)
+  }
+  
+  if (user.org_status === 'cancelled') {
+    return c.json({ error: 'このアカウントは解約されています。' }, 403)
+  }
+  
   // 簡易的なトークン生成（本番環境ではJWTなどを使用）
-  const token = btoa(`${user.id}:${Date.now()}`)
+  const token = btoa(`${user.id}:${user.organization_id}:${Date.now()}`)
   
   return c.json({
     token,
     name: user.name,
     username: user.username,
-    role: user.role || 'staff'
+    role: user.role || 'staff',
+    organization_id: user.organization_id,
+    organization_name: user.organization_name
   })
 })
 
@@ -342,14 +717,13 @@ app.post('/api/auth/logout', (c) => {
   return c.json({ success: true })
 })
 
-// ユーザー情報取得ヘルパー関数
+// ユーザー情報取得ヘルパー関数（organization_id含む）
 async function getCurrentUser(c: any) {
   const authHeader = c.req.header('Authorization')
   if (!authHeader) return null
   
   try {
     const token = authHeader.replace('Bearer ', '')
-    // トークンはBase64エンコードされている: id:timestamp (例: MToxNzY0OTQ4NDYwOTY3 -> 1:1764948460967)
     let decoded = token
     try {
       decoded = atob(token)
@@ -358,33 +732,31 @@ async function getCurrentUser(c: any) {
     }
     
     const parts = decoded.split(':')
-    if (parts.length === 2) {
+    const { DB } = c.env
+    
+    // 新形式: userId:orgId:timestamp
+    if (parts.length >= 2) {
       const userId = parseInt(parts[0])
       if (!isNaN(userId)) {
-        // DBからユーザー情報を取得
-        const { DB } = c.env
         const user = await DB.prepare(`
-          SELECT id, username, name, role FROM admin_users WHERE id = ?
+          SELECT id, username, name, role, organization_id FROM admin_users WHERE id = ?
         `).bind(userId).first()
         if (user) {
           return { ...user, role: user.role || 'admin' }
         }
       }
     }
+    
     // 古い形式のフォールバック: username:role
-    // この形式はlocalStorage由来: admin_username:admin_role
-    const [username, role] = decoded.split(':')
+    const [username] = decoded.split(':')
     if (username) {
-      // DBからユーザー情報を取得して正確なroleを得る
-      const { DB } = c.env
       const user = await DB.prepare(`
-        SELECT id, username, name, role FROM admin_users WHERE username = ?
+        SELECT id, username, name, role, organization_id FROM admin_users WHERE username = ?
       `).bind(username).first()
       if (user) {
         return { ...user, role: user.role || 'admin' }
       }
-      // DBにない場合はフォールバック
-      return { username, role: role || 'staff' }
+      return { username, role: 'staff', organization_id: 1 } // デフォルト組織
     }
     return null
   } catch {
@@ -2540,6 +2912,9 @@ app.get('/api/clients', async (c) => {
   const user = await getCurrentUser(c)
   const includeCases = c.req.query('include_cases') === 'true'
   
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
+  
   // 補助金の公募要領情報もJOINして取得
   let query = `
     SELECT c.*, 
@@ -2549,20 +2924,19 @@ app.get('/api/clients', async (c) => {
            sg.fiscal_year
     FROM clients c
     LEFT JOIN subsidy_guidelines sg ON c.subsidy_type_id = sg.subsidy_type_id AND sg.status = 'active'
+    WHERE c.organization_id = ?
   `
-  let params: string[] = []
+  let params: any[] = [orgId]
   
   // adminロール以外は自分が担当の案件のみ表示
   if (user && user.role !== 'admin') {
-    query += ` WHERE c.assigned_to = ?`
+    query += ` AND c.assigned_to = ?`
     params.push(user.username)
   }
   
   query += ` ORDER BY c.created_at DESC`
   
-  const result = params.length > 0 
-    ? await DB.prepare(query).bind(...params).all()
-    : await DB.prepare(query).all()
+  const result = await DB.prepare(query).bind(...params).all()
   
   // 案件情報を含める場合
   if (includeCases && result.results) {
@@ -2734,14 +3108,18 @@ app.get('/api/clients/:id', async (c) => {
 app.post('/api/clients', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   // 顧客用のアクセストークンを生成（レガシー互換用、実際の案件アクセスはcasesテーブルのトークンを使用）
   const accessToken = crypto.randomUUID().replace(/-/g, '').substring(0, 20)
   
   // 顧客基本情報のみ登録（案件情報は別途casesテーブルに登録）
   const result = await DB.prepare(`
-    INSERT INTO clients (name, company_name, email, phone, address, assigned_staff, assigned_to, access_token)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (name, company_name, email, phone, address, assigned_staff, assigned_to, access_token, organization_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
     data.company_name || null,
@@ -2750,7 +3128,8 @@ app.post('/api/clients', async (c) => {
     data.address || null,
     data.assigned_staff || null,
     data.assigned_to || null,
-    accessToken
+    accessToken,
+    orgId
   ).run()
   
   return c.json({ 
@@ -2915,7 +3294,11 @@ app.delete('/api/clients/:id', async (c) => {
 // 案件一覧取得（顧客IDで絞り込み可能）
 app.get('/api/cases', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
   const clientId = c.req.query('client_id')
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   let query = `
     SELECT 
@@ -2930,15 +3313,16 @@ app.get('/api/cases', async (c) => {
     LEFT JOIN clients ON cases.client_id = clients.id
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
     LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+    WHERE cases.organization_id = ?
   `
   
   if (clientId) {
-    query += ` WHERE cases.client_id = ? ORDER BY cases.created_at DESC`
-    const result = await DB.prepare(query).bind(clientId).all()
+    query += ` AND cases.client_id = ? ORDER BY cases.created_at DESC`
+    const result = await DB.prepare(query).bind(orgId, clientId).all()
     return c.json(result.results)
   } else {
     query += ` ORDER BY cases.created_at DESC`
-    const result = await DB.prepare(query).all()
+    const result = await DB.prepare(query).bind(orgId).all()
     return c.json(result.results)
   }
 })
@@ -3002,6 +3386,10 @@ app.get('/api/cases/token/:token', async (c) => {
 app.post('/api/cases', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   console.log('Creating case with data:', JSON.stringify(data))
   
@@ -3011,8 +3399,8 @@ app.post('/api/cases', async (c) => {
   // 案件番号を生成（CASE-YYYY-NNNN形式）
   const year = new Date().getFullYear()
   const countResult = await DB.prepare(`
-    SELECT COUNT(*) as count FROM cases WHERE case_number LIKE ?
-  `).bind(`CASE-${year}-%`).first()
+    SELECT COUNT(*) as count FROM cases WHERE case_number LIKE ? AND organization_id = ?
+  `).bind(`CASE-${year}-%`, orgId).first()
   const caseNumber = `CASE-${year}-${String((countResult?.count || 0) + 1).padStart(4, '0')}`
   
   const result = await DB.prepare(`
@@ -3020,8 +3408,8 @@ app.post('/api/cases', async (c) => {
       client_id, case_number, subsidy_type_id, status, assigned_to, notes,
       deposit_required, deposit_amount, withholding_tax,
       success_fee_enabled, success_fee_rate, success_fee_amount,
-      contract_url, access_token
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      contract_url, access_token, organization_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.client_id,
     caseNumber,
@@ -3036,7 +3424,8 @@ app.post('/api/cases', async (c) => {
     data.success_fee_rate || 0,
     data.success_fee_amount || 0,
     data.contract_url || null,
-    accessToken
+    accessToken,
+    orgId
   ).run()
   
   const caseId = result.meta.last_row_id
