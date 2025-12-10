@@ -774,12 +774,17 @@ async function getCurrentUser(c: any) {
 // 従業員一覧取得
 app.get('/api/admin/users', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   const users = await DB.prepare(`
-    SELECT id, username, name, created_at 
+    SELECT id, username, name, role, created_at 
     FROM admin_users 
+    WHERE organization_id = ?
     ORDER BY created_at DESC
-  `).all()
+  `).bind(orgId).all()
   
   return c.json(users.results || [])
 })
@@ -788,21 +793,25 @@ app.get('/api/admin/users', async (c) => {
 app.post('/api/admin/users', async (c) => {
   const { DB } = c.env
   const { username, password, name } = await c.req.json()
+  const user = await getCurrentUser(c)
   
-  // ユーザー名の重複チェック
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
+  
+  // ユーザー名の重複チェック（同じ組織内）
   const existing = await DB.prepare(`
-    SELECT id FROM admin_users WHERE username = ?
-  `).bind(username).first()
+    SELECT id FROM admin_users WHERE username = ? AND organization_id = ?
+  `).bind(username, orgId).first()
   
   if (existing) {
     return c.json({ error: 'このユーザー名は既に使用されています' }, 400)
   }
   
-  // ユーザー追加
+  // ユーザー追加（organization_id付き）
   const result = await DB.prepare(`
-    INSERT INTO admin_users (username, password_hash, name)
-    VALUES (?, ?, ?)
-  `).bind(username, password, name).run()
+    INSERT INTO admin_users (username, password_hash, name, organization_id, role)
+    VALUES (?, ?, ?, ?, 'staff')
+  `).bind(username, password, name, orgId).run()
   
   return c.json({ 
     success: true, 
@@ -2842,6 +2851,10 @@ app.get('/', (c) => {
 // 最近の活動を取得
 app.get('/api/recent-activity', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   try {
     // 最近のコミュニケーション
@@ -2856,9 +2869,10 @@ app.get('/api/recent-activity', async (c) => {
         comm.created_at
       FROM communications comm
       JOIN clients cl ON comm.client_id = cl.id
+      WHERE cl.organization_id = ?
       ORDER BY comm.created_at DESC
       LIMIT 5
-    `).all()
+    `).bind(orgId).all()
     
     // 最近のドキュメントアップロード
     const documents = await DB.prepare(`
@@ -2877,9 +2891,10 @@ app.get('/api/recent-activity', async (c) => {
         d.uploaded_at as created_at
       FROM documents d
       JOIN clients cl ON d.client_id = cl.id
+      WHERE cl.organization_id = ?
       ORDER BY d.uploaded_at DESC
       LIMIT 5
-    `).all()
+    `).bind(orgId).all()
     
     // 最近登録された顧客
     const newClients = await DB.prepare(`
@@ -2889,9 +2904,10 @@ app.get('/api/recent-activity', async (c) => {
         '新規顧客「' || name || '」を登録' as description,
         created_at
       FROM clients
+      WHERE organization_id = ?
       ORDER BY created_at DESC
       LIMIT 5
-    `).all()
+    `).bind(orgId).all()
     
     // 全ての活動をマージしてソート
     const allActivities = [
@@ -3017,29 +3033,33 @@ app.get('/api/clients-with-cases', async (c) => {
 // 統計情報取得
 app.get('/api/stats', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   // 総顧客数
   const totalResult = await DB.prepare(`
-    SELECT COUNT(*) as count FROM clients
-  `).first()
+    SELECT COUNT(*) as count FROM clients WHERE organization_id = ?
+  `).bind(orgId).first()
   
   // ステータス別集計
   const statusResult = await DB.prepare(`
-    SELECT status, COUNT(*) as count FROM clients GROUP BY status
-  `).all()
+    SELECT status, COUNT(*) as count FROM clients WHERE organization_id = ? GROUP BY status
+  `).bind(orgId).all()
   
   // 今月の新規顧客
   const thisMonth = new Date().toISOString().substring(0, 7)
   const newThisMonthResult = await DB.prepare(`
     SELECT COUNT(*) as count FROM clients 
-    WHERE strftime('%Y-%m', created_at) = ?
-  `).bind(thisMonth).first()
+    WHERE organization_id = ? AND strftime('%Y-%m', created_at) = ?
+  `).bind(orgId, thisMonth).first()
   
   // 今月の完了件数
   const completedThisMonthResult = await DB.prepare(`
     SELECT COUNT(*) as count FROM clients 
-    WHERE status = 'completed' AND strftime('%Y-%m', updated_at) = ?
-  `).bind(thisMonth).first()
+    WHERE organization_id = ? AND status = 'completed' AND strftime('%Y-%m', updated_at) = ?
+  `).bind(orgId, thisMonth).first()
   
   return c.json({
     total: totalResult.count,
@@ -20606,42 +20626,45 @@ app.get('/api/subscription/packages', async (c) => {
 // 現在のサブスクリプション・枠情報取得
 app.get('/api/subscription/status', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
   
-  // システム全体のサブスクリプションを取得（user_id = NULL）
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
+  
+  // 組織のサブスクリプションを取得
   let subscription = await DB.prepare(`
     SELECT us.*, sp.plan_code, sp.plan_name, sp.monthly_price, sp.monthly_slots
     FROM user_subscriptions us
     JOIN subscription_plans sp ON us.plan_id = sp.id
-    WHERE us.user_id IS NULL AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status = 'active'
     ORDER BY us.created_at DESC
     LIMIT 1
-  `).first()
+  `).bind(orgId).first()
   
   // サブスクリプションがない場合は初期作成（ベーシックプラン）
   if (!subscription) {
     const basicPlan = await DB.prepare(`
-      SELECT id FROM subscription_plans WHERE plan_code = 'basic'
+      SELECT id, monthly_slots FROM subscription_plans WHERE plan_code = 'basic'
     `).first()
     
     if (basicPlan) {
       const today = new Date()
       const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0) // 月末
       
-      await DB.prepare(`
-        INSERT INTO user_subscriptions (user_id, plan_id, status, current_period_start, current_period_end)
-        VALUES (NULL, ?, 'active', ?, ?)
-      `).bind(basicPlan.id, today.toISOString().split('T')[0], periodEnd.toISOString().split('T')[0]).run()
+      // 組織用サブスクリプションを作成
+      const subResult = await DB.prepare(`
+        INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
+        VALUES (?, ?, 'active', ?, ?)
+      `).bind(orgId, basicPlan.id, today.toISOString().split('T')[0], periodEnd.toISOString().split('T')[0]).run()
       
-      const newSub = await DB.prepare(`
-        SELECT id FROM user_subscriptions WHERE user_id IS NULL ORDER BY id DESC LIMIT 1
-      `).first()
+      const subscriptionId = subResult.meta?.last_row_id
       
-      if (newSub) {
+      if (subscriptionId) {
         // 枠残高を初期化
         await DB.prepare(`
-          INSERT INTO slot_balances (subscription_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
-          VALUES (?, 1, 0, ?)
-        `).bind(newSub.id, today.toISOString().split('T')[0]).run()
+          INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+          VALUES (?, ?, ?, 0, ?)
+        `).bind(subscriptionId, orgId, basicPlan.monthly_slots || 1, today.toISOString().split('T')[0]).run()
       }
       
       subscription = await DB.prepare(`
@@ -20649,7 +20672,7 @@ app.get('/api/subscription/status', async (c) => {
         FROM user_subscriptions us
         JOIN subscription_plans sp ON us.plan_id = sp.id
         WHERE us.id = ?
-      `).bind(newSub?.id).first()
+      `).bind(subscriptionId).first()
     }
   }
   
@@ -20802,6 +20825,10 @@ app.get('/api/subscription/status', async (c) => {
 app.post('/api/subscription/consume-slot', async (c) => {
   const { DB } = c.env
   const { case_id } = await c.req.json()
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   if (!case_id) {
     return c.json({ error: 'case_id is required' }, 400)
@@ -20822,9 +20849,9 @@ app.post('/api/subscription/consume-slot', async (c) => {
     FROM user_subscriptions us
     JOIN slot_balances sb ON us.id = sb.subscription_id
     JOIN subscription_plans sp ON us.plan_id = sp.id
-    WHERE us.user_id IS NULL AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status = 'active'
     LIMIT 1
-  `).first()
+  `).bind(orgId).first()
   
   if (!subscription) {
     return c.json({ error: 'No active subscription' }, 400)
@@ -20899,15 +20926,19 @@ app.get('/api/subscription/check-slot', async (c) => {
     }
   }
   
+  // organization_idでテナント分離
+  const user = await getCurrentUser(c)
+  const orgId = user?.organization_id || 1
+  
   // サブスクリプション取得（プラン情報も含める）
   const subscription = await DB.prepare(`
     SELECT sb.monthly_slots_remaining, sb.purchased_slots_remaining, sp.monthly_slots
     FROM user_subscriptions us
     JOIN slot_balances sb ON us.id = sb.subscription_id
     JOIN subscription_plans sp ON us.plan_id = sp.id
-    WHERE us.user_id IS NULL AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status = 'active'
     LIMIT 1
-  `).first()
+  `).bind(orgId).first()
   
   if (!subscription) {
     return c.json({ available: false, message: 'サブスクリプションがありません' })
@@ -20940,6 +20971,10 @@ app.get('/api/subscription/check-slot', async (c) => {
 // 追加枠購入
 app.post('/api/subscription/purchase-slots', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   const { package_id } = await c.req.json()
   
   if (!package_id) {
@@ -20960,9 +20995,9 @@ app.post('/api/subscription/purchase-slots', async (c) => {
     SELECT us.id, sb.purchased_slots_remaining
     FROM user_subscriptions us
     JOIN slot_balances sb ON us.id = sb.subscription_id
-    WHERE us.user_id IS NULL AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status = 'active'
     LIMIT 1
-  `).first()
+  `).bind(orgId).first()
   
   if (!subscription) {
     return c.json({ error: 'No active subscription' }, 400)
@@ -21001,6 +21036,10 @@ app.post('/api/subscription/purchase-slots', async (c) => {
 app.post('/api/subscription/change-plan', async (c) => {
   const { DB } = c.env
   const { plan_id } = await c.req.json()
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   if (!plan_id) {
     return c.json({ error: 'plan_id is required' }, 400)
@@ -21016,8 +21055,8 @@ app.post('/api/subscription/change-plan', async (c) => {
   
   // 現在のサブスクリプションを取得
   const currentSub = await DB.prepare(`
-    SELECT * FROM user_subscriptions WHERE user_id IS NULL AND status = 'active' LIMIT 1
-  `).first()
+    SELECT * FROM user_subscriptions WHERE organization_id = ? AND status = 'active' LIMIT 1
+  `).bind(orgId).first()
   
   if (!currentSub) {
     return c.json({ error: 'No active subscription' }, 400)
@@ -21038,8 +21077,8 @@ app.post('/api/subscription/change-plan', async (c) => {
   await DB.prepare(`
     UPDATE user_subscriptions 
     SET scheduled_plan_id = ?, scheduled_plan_date = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE user_id IS NULL AND status = 'active'
-  `).bind(plan_id, nextResetDate.toISOString().split('T')[0]).run()
+    WHERE organization_id = ? AND status = 'active'
+  `).bind(plan_id, nextResetDate.toISOString().split('T')[0], orgId).run()
   
   return c.json({ 
     success: true, 
@@ -21052,12 +21091,16 @@ app.post('/api/subscription/change-plan', async (c) => {
 // 予約プランのキャンセル
 app.post('/api/subscription/cancel-scheduled-plan', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   await DB.prepare(`
     UPDATE user_subscriptions 
     SET scheduled_plan_id = NULL, scheduled_plan_date = NULL, updated_at = CURRENT_TIMESTAMP
-    WHERE user_id IS NULL AND status = 'active'
-  `).run()
+    WHERE organization_id = ? AND status = 'active'
+  `).bind(orgId).run()
   
   return c.json({ success: true, message: 'プラン変更の予約をキャンセルしました' })
 })
@@ -21065,10 +21108,14 @@ app.post('/api/subscription/cancel-scheduled-plan', async (c) => {
 // 使用履歴取得
 app.get('/api/subscription/history', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
   
   const subscription = await DB.prepare(`
-    SELECT id FROM user_subscriptions WHERE user_id IS NULL AND status = 'active' LIMIT 1
-  `).first()
+    SELECT id FROM user_subscriptions WHERE organization_id = ? AND status = 'active' LIMIT 1
+  `).bind(orgId).first()
   
   if (!subscription) {
     return c.json([])
