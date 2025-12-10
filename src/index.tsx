@@ -445,6 +445,49 @@ app.get('/signup', (c) => {
                             </div>
                         </div>
                         
+                        <!-- 業務範囲選択 -->
+                        <div class="border-b pb-6">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-briefcase mr-2 text-indigo-500"></i>業務範囲 <span class="text-red-500 ml-1">*</span>
+                            </h3>
+                            <div class="space-y-3">
+                                <label class="scope-option flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-indigo-300 transition-all border-indigo-500 bg-indigo-50" onclick="selectScope('labor', this)">
+                                    <input type="radio" name="business_scope" value="labor" checked class="mt-1">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-medium">社労士業務</span>
+                                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">厚労省管轄</span>
+                                        </div>
+                                        <p class="text-sm text-gray-500 mt-1">助成金申請（キャリアアップ、両立支援、人材開発等）</p>
+                                    </div>
+                                </label>
+                                <label class="scope-option flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-indigo-300 transition-all border-gray-200" onclick="selectScope('administrative', this)">
+                                    <input type="radio" name="business_scope" value="administrative" class="mt-1">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-medium">行政書士業務</span>
+                                            <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">経産省・自治体管轄</span>
+                                        </div>
+                                        <p class="text-sm text-gray-500 mt-1">補助金申請（持続化、IT導入、ものづくり等）+ 許認可申請</p>
+                                    </div>
+                                </label>
+                                <label class="scope-option flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-indigo-300 transition-all border-gray-200" onclick="selectScope('both', this)">
+                                    <input type="radio" name="business_scope" value="both" class="mt-1">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-medium">両方（社労士 + 行政書士）</span>
+                                            <span class="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">+¥2,000/月</span>
+                                        </div>
+                                        <p class="text-sm text-gray-500 mt-1">助成金 + 補助金 + 許認可のすべてに対応</p>
+                                    </div>
+                                </label>
+                            </div>
+                            <div id="scopeAddonNote" class="hidden mt-3 p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                両方選択時は基本プランに月額¥2,000が追加されます。
+                            </div>
+                        </div>
+                        
                         <!-- プラン選択 -->
                         <div>
                             <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
@@ -459,6 +502,9 @@ app.get('/signup', (c) => {
                             <p class="text-sm text-gray-500 mt-3">
                                 <i class="fas fa-info-circle mr-1"></i>
                                 14日間の無料トライアル後、選択したプランに自動移行します。
+                            </p>
+                            <p id="totalPriceDisplay" class="mt-2 text-right font-medium text-lg">
+                                合計: <span id="totalPrice">¥0</span>/月
                             </p>
                         </div>
                         
@@ -490,6 +536,32 @@ app.get('/signup', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             let selectedPlanId = null;
+            let selectedPlanPrice = 0;
+            let selectedBusinessScope = 'labor';
+            const DUAL_SCOPE_ADDON_PRICE = 2000;
+            
+            // 業務範囲選択時の処理
+            document.querySelectorAll('input[name="business_scope"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    selectedBusinessScope = e.target.value;
+                    updatePriceDisplay();
+                });
+            });
+            
+            function updatePriceDisplay() {
+                const priceDisplay = document.getElementById('totalPriceDisplay');
+                if (!priceDisplay || !selectedPlanPrice) return;
+                
+                let totalPrice = selectedPlanPrice;
+                let addon = '';
+                
+                if (selectedBusinessScope === 'both') {
+                    totalPrice += DUAL_SCOPE_ADDON_PRICE;
+                    addon = ' <span class="text-sm text-orange-600">(+¥2,000 両方利用)</span>';
+                }
+                
+                priceDisplay.innerHTML = '月額料金: <span class="font-bold text-blue-600">¥' + totalPrice.toLocaleString() + '</span>' + addon;
+            }
             
             async function loadPlans() {
                 try {
@@ -507,7 +579,7 @@ app.get('/signup', (c) => {
                                 <p class="text-2xl font-bold text-blue-600 my-2">¥\${plan.monthly_price.toLocaleString()}<span class="text-sm font-normal text-gray-500">/月</span></p>
                                 <p class="text-sm text-gray-600">\${plan.monthly_slots}枠/月</p>
                                 <p class="text-xs text-gray-500 mt-1">\${plan.description || ''}</p>
-                                <input type="radio" name="plan_id" value="\${plan.id}" class="hidden" \${index === 1 ? 'checked' : ''}>
+                                <input type="radio" name="plan_id" value="\${plan.id}" data-price="\${plan.monthly_price}" class="hidden" \${index === 1 ? 'checked' : ''}>
                             </div>
                         \`;
                     }).join('');
@@ -516,9 +588,12 @@ app.get('/signup', (c) => {
                     const standardPlan = plans.find(p => p.plan_code === 'standard');
                     if (standardPlan) {
                         selectedPlanId = standardPlan.id;
+                        selectedPlanPrice = standardPlan.monthly_price;
                     } else if (plans.length > 0) {
                         selectedPlanId = plans[0].id;
+                        selectedPlanPrice = plans[0].monthly_price;
                     }
+                    updatePriceDisplay();
                     
                 } catch (error) {
                     console.error('Failed to load plans:', error);
@@ -527,13 +602,17 @@ app.get('/signup', (c) => {
             
             function selectPlan(planId, element) {
                 selectedPlanId = planId;
+                const radioInput = element.querySelector('input[type="radio"]');
+                selectedPlanPrice = parseInt(radioInput.dataset.price) || 0;
+                
                 document.querySelectorAll('.plan-option').forEach(el => {
                     el.classList.remove('border-blue-500', 'bg-blue-50');
                     el.classList.add('border-gray-200');
                 });
                 element.classList.remove('border-gray-200');
                 element.classList.add('border-blue-500', 'bg-blue-50');
-                element.querySelector('input[type="radio"]').checked = true;
+                radioInput.checked = true;
+                updatePriceDisplay();
             }
             
             document.getElementById('signupForm').addEventListener('submit', async (e) => {
@@ -554,6 +633,8 @@ app.get('/signup', (c) => {
                 }
                 
                 data.plan_id = selectedPlanId;
+                data.business_scope = selectedBusinessScope;
+                data.dual_scope_addon = selectedBusinessScope === 'both';
                 
                 const btn = document.getElementById('submitBtn');
                 btn.disabled = true;
@@ -723,16 +804,23 @@ app.post('/api/signup', async (c) => {
     // トライアル期間（14日間）
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
     
+    // 業務範囲のバリデーション
+    const businessScope = data.business_scope || 'labor'
+    if (!['labor', 'administrative', 'both'].includes(businessScope)) {
+      return c.json({ error: '業務範囲の選択が不正です' }, 400)
+    }
+    
     // 1. 組織を作成
     const orgResult = await DB.prepare(`
-      INSERT INTO organizations (name, slug, email, phone, status, trial_ends_at)
-      VALUES (?, ?, ?, ?, 'trial', ?)
+      INSERT INTO organizations (name, slug, email, phone, status, trial_ends_at, business_scope)
+      VALUES (?, ?, ?, ?, 'trial', ?, ?)
     `).bind(
       data.organization_name,
       slug,
       data.email,
       data.phone || null,
-      trialEndsAt
+      trialEndsAt,
+      businessScope
     ).run()
     
     const orgId = orgResult.meta?.last_row_id
@@ -762,6 +850,14 @@ app.post('/api/signup', async (c) => {
         INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining)
         VALUES (?, ?, ?, 0)
       `).bind(subscriptionId, orgId, plan.monthly_slots).run()
+    }
+    
+    // 5. 両方利用の場合はアドオンを追加（+2000円）
+    if (businessScope === 'both') {
+      await DB.prepare(`
+        INSERT INTO organization_addons (organization_id, addon_type, price)
+        VALUES (?, 'dual_scope', 2000)
+      `).bind(orgId).run()
     }
     
     // トークン生成
@@ -4276,13 +4372,40 @@ app.get('/api/cases/:id/document-checklist', async (c) => {
 // API: 申請種別管理
 // ===============================
 
-// 助成金種別一覧取得
+// 助成金種別一覧取得（業務範囲でフィルタリング）
 app.get('/api/subsidy-types', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
   
   // id = 0 は共通質問用の内部レコードなので除外
-  // 全てのカテゴリ（行政書士管轄・社労士管轄・許認可）を表示
-  const query = `SELECT * FROM subsidy_types WHERE id > 0 ORDER BY category, name`
+  let query = `SELECT * FROM subsidy_types WHERE id > 0`
+  const params: string[] = []
+  
+  // 組織の業務範囲を取得してフィルタリング
+  if (user?.organization_id) {
+    const org = await DB.prepare(`SELECT business_scope FROM organizations WHERE id = ?`)
+      .bind(user.organization_id).first()
+    
+    if (org?.business_scope) {
+      const scope = org.business_scope as string
+      
+      // カテゴリマッピング:
+      // - grant (助成金) = 厚労省系 = 社労士管轄 (labor)
+      // - subsidy (補助金) = 経産省系 = 行政書士管轄 (administrative)
+      // - license (許認可) = 行政書士管轄 (administrative)
+      
+      if (scope === 'labor') {
+        // 社労士: 助成金のみ
+        query += ` AND (category IN ('grant', '雇用系', '助成金') OR category IS NULL)`
+      } else if (scope === 'administrative') {
+        // 行政書士: 補助金と許認可
+        query += ` AND (category IN ('subsidy', 'license', 'IT系', '設備投資系', '一般', '補助金', '許認可') OR category IS NULL)`
+      }
+      // 'both' の場合は全て表示
+    }
+  }
+  
+  query += ` ORDER BY category, name`
   
   const result = await DB.prepare(query).all()
   
@@ -22267,6 +22390,15 @@ app.get('/master/organizations/:id', async (c) => {
                         </select>
                     </div>
                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">業務範囲</label>
+                        <select id="edit_business_scope" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="labor">社労士（助成金のみ）</option>
+                            <option value="administrative">行政書士（補助金・許認可のみ）</option>
+                            <option value="both">両方利用（+¥2,000/月）</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500">※変更すると表示される申請種別が変わります</p>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">備考</label>
                         <textarea id="edit_notes" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
@@ -22365,10 +22497,20 @@ app.get('/master/organizations/:id', async (c) => {
                         cancelled: '<span class="px-2 py-1 bg-red-100 text-red-800 rounded">解約済み</span>'
                     };
                     
+                    const scopeLabels = {
+                        labor: '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">社労士（助成金）</span>',
+                        administrative: '<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">行政書士（補助金・許認可）</span>',
+                        both: '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-sm">両方（+¥2,000/月）</span>'
+                    };
+                    
                     document.getElementById('orgDetails').innerHTML = \`
                         <div>
                             <p class="text-sm text-gray-500">ステータス</p>
                             <p class="mt-1">\${statusLabel[org.status] || org.status}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">業務範囲</p>
+                            <p class="mt-1">\${scopeLabels[org.business_scope] || scopeLabels.labor}</p>
                         </div>
                         <div>
                             <p class="text-sm text-gray-500">登録日</p>
@@ -22461,6 +22603,7 @@ app.get('/master/organizations/:id', async (c) => {
                 document.getElementById('edit_representative').value = currentOrg.representative_name || '';
                 document.getElementById('edit_address').value = currentOrg.address || '';
                 document.getElementById('edit_status').value = currentOrg.status || 'active';
+                document.getElementById('edit_business_scope').value = currentOrg.business_scope || 'labor';
                 document.getElementById('edit_notes').value = currentOrg.notes || '';
                 document.getElementById('editModal').classList.remove('hidden');
             }
@@ -22480,6 +22623,7 @@ app.get('/master/organizations/:id', async (c) => {
                         representative_name: document.getElementById('edit_representative').value,
                         address: document.getElementById('edit_address').value,
                         status: document.getElementById('edit_status').value,
+                        business_scope: document.getElementById('edit_business_scope').value,
                         notes: document.getElementById('edit_notes').value
                     }, {
                         headers: { 'Authorization': 'Bearer ' + token }
@@ -22703,6 +22847,34 @@ app.put('/api/master/organizations/:id', async (c) => {
   const orgId = c.req.param('id')
   const data = await c.req.json()
   
+  // 業務範囲の変更時のアドオン管理
+  if (data.business_scope) {
+    const currentOrg = await DB.prepare(`SELECT business_scope FROM organizations WHERE id = ?`).bind(orgId).first()
+    const oldScope = currentOrg?.business_scope
+    const newScope = data.business_scope
+    
+    // bothに変更：アドオンを追加
+    if (newScope === 'both' && oldScope !== 'both') {
+      const existingAddon = await DB.prepare(`
+        SELECT id FROM organization_addons WHERE organization_id = ? AND addon_type = 'dual_scope' AND status = 'active'
+      `).bind(orgId).first()
+      
+      if (!existingAddon) {
+        await DB.prepare(`
+          INSERT INTO organization_addons (organization_id, addon_type, price, status)
+          VALUES (?, 'dual_scope', 2000, 'active')
+        `).bind(orgId).run()
+      }
+    }
+    // bothから変更：アドオンをキャンセル
+    else if (oldScope === 'both' && newScope !== 'both') {
+      await DB.prepare(`
+        UPDATE organization_addons SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP
+        WHERE organization_id = ? AND addon_type = 'dual_scope' AND status = 'active'
+      `).bind(orgId).run()
+    }
+  }
+  
   await DB.prepare(`
     UPDATE organizations SET 
       name = COALESCE(?, name),
@@ -22711,6 +22883,7 @@ app.put('/api/master/organizations/:id', async (c) => {
       representative_name = COALESCE(?, representative_name),
       address = COALESCE(?, address),
       status = COALESCE(?, status),
+      business_scope = COALESCE(?, business_scope),
       notes = COALESCE(?, notes),
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
@@ -22721,6 +22894,7 @@ app.put('/api/master/organizations/:id', async (c) => {
     data.representative_name || null,
     data.address || null,
     data.status || null,
+    data.business_scope || null,
     data.notes || null,
     orgId
   ).run()
