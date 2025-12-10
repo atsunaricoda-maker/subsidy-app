@@ -642,16 +642,19 @@ app.post('/api/signup', async (c) => {
       const periodEnd = new Date()
       periodEnd.setDate(periodEnd.getDate() + 14) // トライアル期間
       
-      await DB.prepare(`
+      const subResult = await DB.prepare(`
         INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
         VALUES (?, ?, 'active', date('now'), ?)
       `).bind(orgId, data.plan_id, periodEnd.toISOString().split('T')[0]).run()
       
+      const subscriptionId = subResult.meta?.last_row_id
+      
       // 4. 初期枠を付与（トライアル中はプランの枠数を付与）
+      // slot_balancesテーブルの正しいカラム名を使用
       await DB.prepare(`
-        INSERT INTO slot_balances (organization_id, monthly_slots, purchased_slots)
-        VALUES (?, ?, 0)
-      `).bind(orgId, plan.monthly_slots).run()
+        INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining)
+        VALUES (?, ?, ?, 0)
+      `).bind(subscriptionId, orgId, plan.monthly_slots).run()
     }
     
     // トークン生成
@@ -21944,16 +21947,18 @@ app.post('/api/master/organizations', async (c) => {
       const periodEnd = new Date()
       periodEnd.setMonth(periodEnd.getMonth() + 1)
       
-      await DB.prepare(`
+      const subResult = await DB.prepare(`
         INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
         VALUES (?, ?, 'active', date('now'), ?)
       `).bind(orgId, data.plan_id, periodEnd.toISOString().split('T')[0]).run()
       
-      // 4. 初期枠を付与
+      const subscriptionId = subResult.meta?.last_row_id
+      
+      // 4. 初期枠を付与（正しいカラム名を使用）
       await DB.prepare(`
-        INSERT INTO slot_balances (organization_id, monthly_slots, purchased_slots)
-        VALUES (?, ?, 0)
-      `).bind(orgId, plan.monthly_slots).run()
+        INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining)
+        VALUES (?, ?, ?, 0)
+      `).bind(subscriptionId, orgId, plan.monthly_slots).run()
     }
     
     return c.json({ success: true, id: orgId })
