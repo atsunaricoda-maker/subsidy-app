@@ -376,9 +376,25 @@ app.get('/signup', (c) => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">事務所名 / 法人名 <span class="text-red-500">*</span></label>
-                                    <input type="text" name="organization_name" required 
+                                    <input type="text" name="organization_name" id="organization_name" required 
                                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                            placeholder="例: 田中社労士事務所">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        サブドメイン（URL識別子） <span class="text-red-500">*</span>
+                                    </label>
+                                    <div class="flex items-center">
+                                        <input type="text" name="slug" id="slug" required pattern="[a-z0-9-]+"
+                                               class="flex-1 px-4 py-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               placeholder="例: tanaka-office">
+                                        <span class="bg-gray-100 px-3 py-2 border border-l-0 rounded-r-lg text-gray-500 text-sm">.subsidy-app.jp</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">半角英数字とハイフンのみ（将来的にこのURLでアクセスできます）</p>
+                                    <div id="slugPreview" class="text-xs text-blue-600 mt-1 hidden">
+                                        <i class="fas fa-globe mr-1"></i>URL: <span id="slugUrl"></span>
+                                    </div>
+                                    <div id="slugError" class="text-xs text-red-500 mt-1 hidden"></div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス <span class="text-red-500">*</span></label>
@@ -571,10 +587,94 @@ app.get('/signup', (c) => {
             }
             
             loadPlans();
+            
+            // slug自動生成・バリデーション
+            const orgNameInput = document.getElementById('organization_name');
+            const slugInput = document.getElementById('slug');
+            const slugPreview = document.getElementById('slugPreview');
+            const slugUrl = document.getElementById('slugUrl');
+            const slugError = document.getElementById('slugError');
+            let slugCheckTimeout = null;
+            
+            // 事務所名からslugを自動生成（初回のみ）
+            let slugManuallyEdited = false;
+            orgNameInput.addEventListener('input', () => {
+                if (!slugManuallyEdited && orgNameInput.value) {
+                    // ローマ字変換は難しいので、シンプルに英数字のみ抽出
+                    const autoSlug = orgNameInput.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]/g, '-')
+                        .replace(/-+/g, '-')
+                        .replace(/^-|-$/g, '');
+                    if (autoSlug) {
+                        slugInput.value = autoSlug;
+                        validateSlug(autoSlug);
+                    }
+                }
+            });
+            
+            slugInput.addEventListener('input', () => {
+                slugManuallyEdited = true;
+                const value = slugInput.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                slugInput.value = value;
+                validateSlug(value);
+            });
+            
+            async function validateSlug(slug) {
+                if (!slug) {
+                    slugPreview.classList.add('hidden');
+                    slugError.classList.add('hidden');
+                    return;
+                }
+                
+                // プレビュー表示
+                slugUrl.textContent = slug + '.subsidy-app.jp';
+                slugPreview.classList.remove('hidden');
+                
+                // 重複チェック（デバウンス）
+                clearTimeout(slugCheckTimeout);
+                slugCheckTimeout = setTimeout(async () => {
+                    try {
+                        const response = await axios.get('/api/check-slug?slug=' + encodeURIComponent(slug));
+                        if (response.data.available) {
+                            slugError.classList.add('hidden');
+                            slugInput.classList.remove('border-red-500');
+                            slugInput.classList.add('border-green-500');
+                        } else {
+                            slugError.textContent = 'このURLは既に使用されています';
+                            slugError.classList.remove('hidden');
+                            slugInput.classList.remove('border-green-500');
+                            slugInput.classList.add('border-red-500');
+                        }
+                    } catch (error) {
+                        console.error('Slug check failed:', error);
+                    }
+                }, 500);
+            }
         </script>
     </body>
     </html>
   `)
+})
+
+// slug重複チェックAPI
+app.get('/api/check-slug', async (c) => {
+  const { DB } = c.env
+  const slug = c.req.query('slug')
+  
+  if (!slug) {
+    return c.json({ available: false, error: 'slugが指定されていません' }, 400)
+  }
+  
+  // 予約語チェック
+  const reservedSlugs = ['admin', 'master', 'api', 'www', 'app', 'login', 'signup', 'default']
+  if (reservedSlugs.includes(slug.toLowerCase())) {
+    return c.json({ available: false, reason: 'reserved' })
+  }
+  
+  const existing = await DB.prepare(`SELECT id FROM organizations WHERE slug = ?`).bind(slug).first()
+  
+  return c.json({ available: !existing })
 })
 
 // サインアップAPI
@@ -583,7 +683,7 @@ app.post('/api/signup', async (c) => {
   const data = await c.req.json()
   
   // バリデーション
-  if (!data.organization_name || !data.email || !data.username || !data.password || !data.admin_name) {
+  if (!data.organization_name || !data.email || !data.username || !data.password || !data.admin_name || !data.slug) {
     return c.json({ error: '必須項目を入力してください' }, 400)
   }
   
@@ -591,16 +691,23 @@ app.post('/api/signup', async (c) => {
     return c.json({ error: 'パスワードは6文字以上で入力してください' }, 400)
   }
   
-  // スラッグ生成（事務所名からURLセーフな文字列を生成）
-  const slug = data.organization_name
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || 'org-' + Date.now()
+  // slugのバリデーション
+  const slug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, '')
+  if (!slug || slug.length < 3) {
+    return c.json({ error: 'サブドメインは3文字以上で入力してください' }, 400)
+  }
   
-  // 重複チェック
+  // 予約語チェック
+  const reservedSlugs = ['admin', 'master', 'api', 'www', 'app', 'login', 'signup', 'default']
+  if (reservedSlugs.includes(slug)) {
+    return c.json({ error: 'このサブドメインは予約されています' }, 400)
+  }
+  
+  // slug重複チェック
   const existingSlug = await DB.prepare(`SELECT id FROM organizations WHERE slug = ?`).bind(slug).first()
-  const finalSlug = existingSlug ? slug + '-' + Date.now() : slug
+  if (existingSlug) {
+    return c.json({ error: 'このサブドメインは既に使用されています' }, 400)
+  }
   
   const existingUsername = await DB.prepare(`SELECT id FROM admin_users WHERE username = ?`).bind(data.username).first()
   if (existingUsername) {
@@ -622,7 +729,7 @@ app.post('/api/signup', async (c) => {
       VALUES (?, ?, ?, ?, 'trial', ?)
     `).bind(
       data.organization_name,
-      finalSlug,
+      slug,
       data.email,
       data.phone || null,
       trialEndsAt
