@@ -52,17 +52,17 @@ function generateSidebar(activePage: string = '') {
             <div class="pt-4 pb-2">
                 <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
             </div>
-            <a href="/subsidy-types?category=行政書士管轄" class="sidebar-link ${isActive('subsidy-gyosei')} flex items-center gap-3 px-4 py-3 rounded-lg">
+            <a href="/subsidy-types?category=subsidy" class="sidebar-link ${isActive('subsidy-gyosei')} flex items-center gap-3 px-4 py-3 rounded-lg">
                 <i class="fas fa-file-signature w-5"></i>
                 <span>補助金一覧</span>
                 <span class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
             </a>
-            <a href="/subsidy-types?category=社労士管轄" class="sidebar-link ${isActive('subsidy-sharoshi')} flex items-center gap-3 px-4 py-3 rounded-lg">
+            <a href="/subsidy-types?category=grant" class="sidebar-link ${isActive('subsidy-sharoshi')} flex items-center gap-3 px-4 py-3 rounded-lg">
                 <i class="fas fa-users w-5"></i>
                 <span>助成金一覧</span>
                 <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
             </a>
-            <a href="/subsidy-types?category=許認可" class="sidebar-link ${isActive('subsidy-kyoninka')} flex items-center gap-3 px-4 py-3 rounded-lg">
+            <a href="/subsidy-types?category=license" class="sidebar-link ${isActive('subsidy-kyoninka')} flex items-center gap-3 px-4 py-3 rounded-lg">
                 <i class="fas fa-stamp w-5"></i>
                 <span>許認可申請</span>
                 <span class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
@@ -4532,13 +4532,32 @@ app.delete('/api/subsidy-types/:id', async (c) => {
 app.get('/subsidy-types', async (c) => {
   const { DB } = c.env
   
-  // id = 0 は共通質問用の内部レコードなので除外
-  const subsidyTypes = await DB.prepare(`
-    SELECT * FROM subsidy_types WHERE id > 0 ORDER BY category, name
-  `).all()
-  
   const category = c.req.query('category') || ''
-  const categoryLabel = category ? `（${category}）` : ''
+  
+  // カテゴリ名のマッピング（英語 → 日本語ラベル）
+  const CATEGORY_MAP: Record<string, { label: string; icon: string; color: string; bgClass: string }> = {
+    'subsidy': { label: '補助金一覧', icon: 'fa-file-signature', color: 'emerald', bgClass: 'bg-emerald-600' },
+    'grant': { label: '助成金一覧', icon: 'fa-users', color: 'blue', bgClass: 'bg-blue-600' },
+    'license': { label: '許認可申請一覧', icon: 'fa-stamp', color: 'indigo', bgClass: 'bg-indigo-600' }
+  }
+  
+  // id = 0 は共通質問用の内部レコードなので除外
+  // カテゴリ指定がある場合はフィルタリング
+  let subsidyTypes;
+  if (category && CATEGORY_MAP[category]) {
+    subsidyTypes = await DB.prepare(`
+      SELECT * FROM subsidy_types WHERE id > 0 AND category = ? ORDER BY name
+    `).bind(category).all()
+  } else {
+    subsidyTypes = await DB.prepare(`
+      SELECT * FROM subsidy_types WHERE id > 0 ORDER BY category, name
+    `).all()
+  }
+  
+  const categoryInfo = CATEGORY_MAP[category] || null
+  const pageTitle = categoryInfo ? categoryInfo.label : '申請種別管理'
+  const pageIcon = categoryInfo ? categoryInfo.icon : 'fa-file-contract'
+  const headerBgClass = categoryInfo ? categoryInfo.bgClass : 'bg-gray-800'
   
   return c.html(`
     <!DOCTYPE html>
@@ -4555,20 +4574,21 @@ app.get('/subsidy-types', async (c) => {
     </head>
     <body class="bg-gray-100">
         <div class="min-h-screen flex">
-            ${generateSidebar(category === '行政書士管轄' ? 'subsidy-gyosei' : category === '社労士管轄' ? 'subsidy-sharoshi' : category === '許認可' ? 'subsidy-kyoninka' : '')}
+            ${generateSidebar(category === 'subsidy' ? 'subsidy-gyosei' : category === 'grant' ? 'subsidy-sharoshi' : category === 'license' ? 'subsidy-kyoninka' : '')}
             
             <main class="flex-1 min-h-screen">
-                <header class="bg-white shadow-sm sticky top-0 z-30">
+                <header class="${headerBgClass} text-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
-                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-white hover:text-gray-200">
                                 <i class="fas fa-bars text-xl"></i>
                             </button>
-                            <h2 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-file-contract mr-2"></i>申請種別管理${categoryLabel}
+                            <h2 class="text-lg font-semibold">
+                                <i class="fas ${pageIcon} mr-2"></i>${pageTitle}
                             </h2>
+                            ${category ? `<span class="text-sm opacity-80">（${subsidyTypes.results?.length || 0}件）</span>` : ''}
                         </div>
-                        <button onclick="openNewSubsidyModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                        <button onclick="openNewSubsidyModal()" class="bg-white text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 text-sm">
                             <i class="fas fa-plus mr-2"></i>新規追加
                         </button>
                     </div>
@@ -4600,11 +4620,9 @@ app.get('/subsidy-types', async (c) => {
                     <div>
                         <label class="block text-sm font-medium mb-1">カテゴリ（管轄）</label>
                         <select name="category" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="行政書士管轄">行政書士管轄（補助金）</option>
-                            <option value="社労士管轄">社労士管轄（助成金）</option>
-                            <option value="許認可">許認可申請</option>
-                            <option value="事業転換系">事業転換系</option>
-                            <option value="その他">その他</option>
+                            <option value="subsidy">📋 補助金（行政書士管轄）</option>
+                            <option value="grant">👥 助成金（社労士管轄）</option>
+                            <option value="license">📜 許認可申請（行政書士管轄）</option>
                         </select>
                     </div>
                     <div>
@@ -4792,42 +4810,47 @@ app.get('/subsidy-types', async (c) => {
                 }
             }
 
-            // カテゴリの色設定
+            // カテゴリの色設定と日本語ラベル
             const CATEGORY_COLORS = {
-                '行政書士管轄': { 
+                'subsidy': { 
                     bg: 'bg-emerald-50', 
                     border: 'border-emerald-500', 
                     badge: 'bg-emerald-100 text-emerald-800',
                     header: 'bg-emerald-600',
-                    icon: 'fa-file-signature'
+                    icon: 'fa-file-signature',
+                    label: '📋 補助金（行政書士管轄）',
+                    shortLabel: '補助金',
+                    description: '経済産業省系の補助金申請'
                 },
-                '社労士管轄': { 
+                'grant': { 
                     bg: 'bg-blue-50', 
                     border: 'border-blue-500', 
                     badge: 'bg-blue-100 text-blue-800',
                     header: 'bg-blue-600',
-                    icon: 'fa-users'
+                    icon: 'fa-users',
+                    label: '👥 助成金（社労士管轄）',
+                    shortLabel: '助成金',
+                    description: '厚生労働省系の助成金申請'
                 },
-                '事業転換系': { 
-                    bg: 'bg-purple-50', 
-                    border: 'border-purple-500', 
-                    badge: 'bg-purple-100 text-purple-800',
-                    header: 'bg-purple-600',
-                    icon: 'fa-exchange-alt'
-                },
-                '許認可': { 
+                'license': { 
                     bg: 'bg-indigo-50', 
                     border: 'border-indigo-500', 
                     badge: 'bg-indigo-100 text-indigo-800',
                     header: 'bg-indigo-600',
-                    icon: 'fa-stamp'
+                    icon: 'fa-stamp',
+                    label: '📜 許認可申請（行政書士管轄）',
+                    shortLabel: '許認可',
+                    description: '各種営業許可・届出申請'
                 },
-                'その他': { 
+                'システム': { 
                     bg: 'bg-gray-50', 
                     border: 'border-gray-400', 
                     badge: 'bg-gray-100 text-gray-800',
                     header: 'bg-gray-600',
-                    icon: 'fa-folder'
+                    icon: 'fa-cog',
+                    label: 'システム',
+                    shortLabel: 'システム',
+                    description: 'システム用'
                 }
             };
             
@@ -4848,24 +4871,35 @@ app.get('/subsidy-types', async (c) => {
                     grouped[cat].push(subsidy);
                 });
                 
-                // カテゴリの表示順序（存在するカテゴリをすべて表示）
-                const knownCategories = ['行政書士管轄', '社労士管轄', '許認可', '事業転換系', 'その他'];
-                // DBに存在するが上記にないカテゴリも追加
+                // カテゴリの表示順序（英語のみ）
+                const knownCategories = ['subsidy', 'grant', 'license'];
+                // DBに存在するが上記にないカテゴリも追加（システムカテゴリは除外）
                 const allCategories = [...new Set([...knownCategories, ...Object.keys(grouped)])];
-                const categoryOrder = allCategories.filter(cat => grouped[cat]);
+                const categoryOrder = allCategories.filter(cat => grouped[cat] && cat !== 'システム');
                 
                 let html = '';
                 categoryOrder.forEach(category => {
                     if (!grouped[category]) return;
                     
-                    const colors = CATEGORY_COLORS[category] || CATEGORY_COLORS['その他'];
+                    const defaultColors = { 
+                        bg: 'bg-gray-50', 
+                        border: 'border-gray-400', 
+                        badge: 'bg-gray-100 text-gray-800',
+                        header: 'bg-gray-600',
+                        icon: 'fa-folder',
+                        label: category,
+                        shortLabel: category
+                    };
+                    const colors = CATEGORY_COLORS[category] || defaultColors;
                     const items = grouped[category];
+                    
+                    const displayLabel = colors.label || category;
                     
                     html += \`
                         <div class="mb-8">
                             <div class="\${colors.header} text-white px-4 py-3 rounded-t-lg flex items-center gap-2">
                                 <i class="fas \${colors.icon}"></i>
-                                <h2 class="text-lg font-bold">\${category}</h2>
+                                <h2 class="text-lg font-bold">\${displayLabel}</h2>
                                 <span class="ml-auto bg-white/20 px-2 py-1 rounded text-sm">\${items.length}件</span>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 \${colors.bg} rounded-b-lg border-2 \${colors.border} border-t-0">
