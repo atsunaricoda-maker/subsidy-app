@@ -12,6 +12,230 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/api/*', cors())
 
 // ===============================
+// 共通サイドバーテンプレート
+// ===============================
+function generateSidebar(activePage: string = '') {
+  const isActive = (page: string) => activePage === page ? 'active' : '';
+  
+  return `
+    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+        <div class="p-4 border-b border-blue-700 flex-shrink-0">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <span>助成金管理</span>
+            </h1>
+            <p class="text-xs text-blue-300 mt-1">Subsidy Manager</p>
+        </div>
+        
+        <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
+            <a href="/" class="sidebar-link ${isActive('dashboard')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-home w-5"></i>
+                <span>ダッシュボード</span>
+            </a>
+            
+            <div class="pt-4 pb-2">
+                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">案件管理</p>
+            </div>
+            <a href="/cases" class="sidebar-link ${isActive('cases')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-folder-open w-5"></i>
+                <span>案件一覧</span>
+            </a>
+            <a href="/clients" class="sidebar-link ${isActive('clients')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-address-book w-5"></i>
+                <span>顧客一覧</span>
+            </a>
+            <a href="/?openNewCase=true" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-plus-circle w-5"></i>
+                <span>新規案件登録</span>
+            </a>
+            
+            <div class="pt-4 pb-2">
+                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
+            </div>
+            <a href="/subsidy-types?category=行政書士管轄" class="sidebar-link ${isActive('subsidy-gyosei')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-file-signature w-5"></i>
+                <span>補助金一覧</span>
+                <span class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
+            </a>
+            <a href="/subsidy-types?category=社労士管轄" class="sidebar-link ${isActive('subsidy-sharoshi')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-users w-5"></i>
+                <span>助成金一覧</span>
+                <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
+            </a>
+            <a href="/subsidy-types?category=許認可" class="sidebar-link ${isActive('subsidy-kyoninka')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-stamp w-5"></i>
+                <span>許認可申請</span>
+                <span class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
+            </a>
+            <a href="/admin/pipelines" class="sidebar-link ${isActive('pipelines')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-project-diagram w-5"></i>
+                <span>パイプライン管理</span>
+            </a>
+            <a href="/admin/statistics" class="sidebar-link ${isActive('statistics')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-chart-line w-5"></i>
+                <span>統計情報</span>
+            </a>
+            
+            <div class="pt-4 pb-2">
+                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">設定</p>
+            </div>
+            <a href="/admin/guidelines" class="sidebar-link ${isActive('guidelines')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-book-open w-5"></i>
+                <span>公募要領管理</span>
+            </a>
+            <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link ${isActive('users')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-users-cog w-5"></i>
+                <span>従業員管理</span>
+            </a>
+            <a href="/admin/payments" id="sidebarPaymentsLink" class="sidebar-link ${isActive('payments')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-credit-card w-5"></i>
+                <span>支払い確認</span>
+                <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
+            </a>
+            <a href="/admin/subscription" class="sidebar-link ${isActive('subscription')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-ticket-alt w-5"></i>
+                <span>プラン・枠管理</span>
+                <span id="slotsBadge" class="ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full">...</span>
+            </a>
+            <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link ${isActive('settings')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-cog w-5"></i>
+                <span>システム設定</span>
+            </a>
+            <a href="/admin/backup" id="sidebarBackupLink" class="sidebar-link ${isActive('backup')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-database w-5"></i>
+                <span>バックアップ</span>
+            </a>
+        </nav>
+        
+        <!-- ユーザー情報 -->
+        <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-blue-700 bg-blue-900">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p id="sidebarAdminName" class="text-sm font-medium truncate">管理者</p>
+                    <p class="text-xs text-blue-300">管理者モード</p>
+                </div>
+                <button onclick="logout()" class="text-blue-300 hover:text-white" title="ログアウト">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+    
+    <!-- サイドバーオーバーレイ（モバイル用） -->
+    <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden"></div>
+  `;
+}
+
+// 共通のサイドバー用スタイル
+const sidebarStyles = `
+    .sidebar-link { transition: all 0.2s; }
+    .sidebar-link:hover { background-color: rgba(255,255,255,0.1); }
+    .sidebar-link.active { background-color: rgba(255,255,255,0.2); border-left: 3px solid white; }
+`;
+
+// 共通のサイドバー用JavaScript
+const sidebarScripts = `
+    function checkAuth() {
+        const token = localStorage.getItem('admin_token');
+        if (!token) {
+            window.location.href = '/login';
+            return false;
+        }
+        return true;
+    }
+    
+    function logout() {
+        if (confirm('ログアウトしますか？')) {
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_name');
+            localStorage.removeItem('admin_username');
+            localStorage.removeItem('admin_role');
+            window.location.href = '/login';
+        }
+    }
+    
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('hidden');
+    }
+    
+    // 認証確認
+    if (!checkAuth()) {
+        // リダイレクト処理は checkAuth 内で実行
+    }
+    
+    // 管理者名を設定
+    document.getElementById('sidebarAdminName').textContent = localStorage.getItem('admin_name') || '管理者';
+    
+    // adminロールのみの項目を表示
+    if (localStorage.getItem('admin_role') === 'admin') {
+        const employeeLink = document.getElementById('sidebarEmployeeLink');
+        const paymentsLink = document.getElementById('sidebarPaymentsLink');
+        const settingsLink = document.getElementById('sidebarSettingsLink');
+        const backupLink = document.getElementById('sidebarBackupLink');
+        if (employeeLink) employeeLink.classList.remove('hidden');
+        if (paymentsLink) paymentsLink.classList.remove('hidden');
+        if (settingsLink) settingsLink.classList.remove('hidden');
+        if (backupLink) backupLink.classList.remove('hidden');
+    }
+    
+    // Axios設定：認証ヘッダーを自動付与
+    if (typeof axios !== 'undefined') {
+        axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_username') + ':' + localStorage.getItem('admin_role');
+    }
+    
+    // 枠残数をサイドバーに表示
+    async function loadSidebarSlotBalance() {
+        const badge = document.getElementById('slotsBadge');
+        if (!badge) return;
+        
+        try {
+            const response = await fetch('/api/subscription/status', {
+                headers: {
+                    'Authorization': 'Bearer ' + localStorage.getItem('admin_username') + ':' + localStorage.getItem('admin_role')
+                }
+            });
+            
+            if (!response.ok) {
+                console.error('Slot balance API error:', response.status);
+                badge.textContent = '!';
+                badge.className = 'ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full';
+                return;
+            }
+            
+            const data = await response.json();
+            if (data.is_unlimited) {
+                // 無制限プラン
+                badge.innerHTML = '<i class="fas fa-infinity text-xs"></i>';
+                badge.className = 'ml-auto bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full';
+            } else {
+                const total = data.total_available !== undefined ? data.total_available : 0;
+                badge.textContent = total;
+                badge.className = total > 0 
+                    ? 'ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full'
+                    : 'ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full';
+            }
+        } catch (error) {
+            console.error('Error loading slot balance:', error);
+            badge.textContent = '!';
+            badge.className = 'ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full';
+        }
+    }
+    
+    // DOMContentLoadedを待ってから実行
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadSidebarSlotBalance);
+    } else {
+        loadSidebarSlotBalance();
+    }
+`;
+
+// ===============================
 // 認証機能
 // ===============================
 
@@ -140,16 +364,29 @@ async function getCurrentUser(c: any) {
         // DBからユーザー情報を取得
         const { DB } = c.env
         const user = await DB.prepare(`
-          SELECT id, username, name, 'admin' as role FROM admin_users WHERE id = ?
+          SELECT id, username, name, role FROM admin_users WHERE id = ?
         `).bind(userId).first()
         if (user) {
-          return user
+          return { ...user, role: user.role || 'admin' }
         }
       }
     }
     // 古い形式のフォールバック: username:role
+    // この形式はlocalStorage由来: admin_username:admin_role
     const [username, role] = decoded.split(':')
-    return { username, role: role || 'staff' }
+    if (username) {
+      // DBからユーザー情報を取得して正確なroleを得る
+      const { DB } = c.env
+      const user = await DB.prepare(`
+        SELECT id, username, name, role FROM admin_users WHERE username = ?
+      `).bind(username).first()
+      if (user) {
+        return { ...user, role: user.role || 'admin' }
+      }
+      // DBにない場合はフォールバック
+      return { username, role: role || 'staff' }
+    }
+    return null
   } catch {
     return null
   }
@@ -425,8 +662,8 @@ app.get('/', (c) => {
     <body class="bg-gray-100">
         <div class="min-h-screen flex">
             <!-- 左サイドバー -->
-            <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50">
-                <div class="p-4 border-b border-blue-700">
+            <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+                <div class="p-4 border-b border-blue-700 flex-shrink-0">
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
                         <span>助成金管理</span>
@@ -434,7 +671,7 @@ app.get('/', (c) => {
                     <p class="text-xs text-blue-300 mt-1">Subsidy Manager</p>
                 </div>
                 
-                <nav class="p-4 space-y-1">
+                <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
                     <a href="/" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-home w-5"></i>
                         <span>ダッシュボード</span>
@@ -446,6 +683,10 @@ app.get('/', (c) => {
                     <a href="/cases" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-folder-open w-5"></i>
                         <span>案件一覧</span>
+                    </a>
+                    <a href="/clients" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-address-book w-5"></i>
+                        <span>顧客一覧</span>
                     </a>
                     <a href="#" onclick="openNewCaseModal(); return false;" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-plus-circle w-5"></i>
@@ -494,6 +735,11 @@ app.get('/', (c) => {
                         <i class="fas fa-credit-card w-5"></i>
                         <span>支払い確認</span>
                         <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
+                    </a>
+                    <a href="/admin/subscription" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-ticket-alt w-5"></i>
+                        <span>プラン・枠管理</span>
+                        <span id="slotsBadge" class="ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full">...</span>
                     </a>
                     <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-cog w-5"></i>
@@ -786,6 +1032,11 @@ app.get('/', (c) => {
                                     <label class="block text-sm font-medium mb-1">会社名</label>
                                     <input type="text" name="company_name" class="w-full px-3 py-2 border rounded-lg">
                                 </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">所在地</label>
+                                    <input type="text" name="address" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 東京都渋谷区...">
+                                    <p class="text-xs text-gray-500 mt-1">同名の会社がある場合の識別に使用します</p>
+                                </div>
                                 <div>
                                     <label class="block text-sm font-medium mb-1">メールアドレス</label>
                                     <input type="email" name="email" class="w-full px-3 py-2 border rounded-lg">
@@ -847,6 +1098,16 @@ app.get('/', (c) => {
                         <select name="assigned_to" id="newClientAssignedTo" class="w-full px-3 py-2 border rounded-lg">
                             <option value="">未割り当て</option>
                         </select>
+                    </div>
+                    
+                    <!-- パイプライン選択 -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2">パイプライン選択</label>
+                        <p class="text-xs text-gray-500 mb-2">この案件に適用するパイプラインテンプレートを選択してください（任意）</p>
+                        <select name="pipeline_template_id" id="pipelineTemplateSelect" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="">パイプラインなし</option>
+                        </select>
+                        <div id="pipelineDescription" class="text-xs text-gray-600 mt-1 hidden"></div>
                     </div>
                     
                     <!-- 契約・報酬設定 -->
@@ -978,6 +1239,7 @@ app.get('/', (c) => {
                 loadExistingClients();
                 loadSubsidyTypes();
                 loadAdminUsers();
+                loadPipelineTemplates();
             }
             
             function closeNewCaseModal() {
@@ -987,9 +1249,80 @@ app.get('/', (c) => {
                 document.getElementById('newCustomerSection').classList.add('hidden');
                 document.getElementById('depositFields').classList.add('hidden');
                 document.getElementById('successFeeFields').classList.add('hidden');
+                document.getElementById('pipelineDescription').classList.add('hidden');
+            }
+            
+            // パイプラインテンプレート一覧を読み込み
+            let pipelineTemplates = [];
+            async function loadPipelineTemplates() {
+                try {
+                    const response = await axios.get('/api/pipeline-templates');
+                    pipelineTemplates = response.data;
+                    const select = document.getElementById('pipelineTemplateSelect');
+                    const descDiv = document.getElementById('pipelineDescription');
+                    select.innerHTML = '<option value="">パイプラインなし</option>';
+                    
+                    const categoryGroups = {
+                        '行政書士管轄': [],
+                        '社労士管轄': [],
+                        '許認可': []
+                    };
+                    
+                    pipelineTemplates.forEach(t => {
+                        const cat = t.category || '許認可';
+                        if (!categoryGroups[cat]) categoryGroups[cat] = [];
+                        categoryGroups[cat].push(t);
+                    });
+                    
+                    Object.entries(categoryGroups).forEach(([category, templates]) => {
+                        if (templates.length > 0) {
+                            const optGroup = document.createElement('optgroup');
+                            optGroup.label = category;
+                            templates.forEach(t => {
+                                const option = document.createElement('option');
+                                option.value = t.id;
+                                option.textContent = t.name + (t.task_count ? ' (' + t.task_count + 'タスク)' : '');
+                                optGroup.appendChild(option);
+                            });
+                            select.appendChild(optGroup);
+                        }
+                    });
+                    
+                    // 選択変更時に説明を表示
+                    select.addEventListener('change', function() {
+                        const templateId = this.value;
+                        if (templateId) {
+                            const template = pipelineTemplates.find(t => t.id == templateId);
+                            if (template && template.description) {
+                                descDiv.textContent = template.description;
+                                descDiv.classList.remove('hidden');
+                            } else {
+                                descDiv.classList.add('hidden');
+                            }
+                        } else {
+                            descDiv.classList.add('hidden');
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error loading pipeline templates:', error);
+                }
             }
             
             // 既存顧客リストを読み込み
+            // 顧客名＋所在地で表示（同名会社の識別用）
+            function formatClientName(client) {
+                let name = client.name;
+                // 所在地があれば追加（簡略表示）
+                if (client.address) {
+                    // 所在地が長い場合は都道府県部分のみ表示
+                    const shortAddress = client.address.length > 10 
+                        ? client.address.substring(0, 10) + '...'
+                        : client.address;
+                    name += \` (\${shortAddress})\`;
+                }
+                return name;
+            }
+            
             async function loadExistingClients() {
                 try {
                     const response = await axios.get('/api/clients');
@@ -1006,7 +1339,7 @@ app.get('/', (c) => {
                         noCase.forEach(client => {
                             const option = document.createElement('option');
                             option.value = client.id;
-                            option.textContent = client.company_name ? \`\${client.name}（\${client.company_name}）\` : client.name;
+                            option.textContent = formatClientName(client);
                             optGroup1.appendChild(option);
                         });
                         select.appendChild(optGroup1);
@@ -1020,14 +1353,11 @@ app.get('/', (c) => {
                             option.value = client.id;
                             const statusLabel = {
                                 inquiry: '見込み',
-                                consulting: '相談中',
                                 preparing: '書類準備',
                                 applying: '申請中',
                                 completed: '完了'
                             }[client.status] || client.status;
-                            option.textContent = client.company_name 
-                                ? \`\${client.name}（\${client.company_name}）- \${statusLabel}\`
-                                : \`\${client.name} - \${statusLabel}\`;
+                            option.textContent = \`\${formatClientName(client)} - \${statusLabel}\`;
                             optGroup2.appendChild(option);
                         });
                         select.appendChild(optGroup2);
@@ -1149,6 +1479,7 @@ app.get('/', (c) => {
                             return;
                         }
                         
+                        const pipelineTemplateId = formData.get('pipeline_template_id');
                         const caseData = {
                             subsidy_type_id: parseInt(subsidyTypeId),
                             assigned_to: formData.get('assigned_to') || null,
@@ -1158,7 +1489,8 @@ app.get('/', (c) => {
                             withholding_tax: document.getElementById('withholdingTax')?.checked ? 1 : 0,
                             success_fee_enabled: document.getElementById('successFeeEnabled')?.checked ? 1 : 0,
                             success_fee_rate: parseFloat(formData.get('success_fee_rate')) || 0,
-                            success_fee_amount: parseInt(formData.get('success_fee_amount')) || 0
+                            success_fee_amount: parseInt(formData.get('success_fee_amount')) || 0,
+                            pipeline_template_id: pipelineTemplateId ? parseInt(pipelineTemplateId) : null
                         };
                         console.log('caseData:', caseData);
                         
@@ -1191,7 +1523,8 @@ app.get('/', (c) => {
                                 name: name,
                                 company_name: formData.get('company_name') || null,
                                 email: formData.get('email') || null,
-                                phone: formData.get('phone') || null
+                                phone: formData.get('phone') || null,
+                                address: formData.get('address') || null
                             };
                             
                             const clientResponse = await axios.post('/api/clients', newClientData);
@@ -1218,7 +1551,6 @@ app.get('/', (c) => {
         
             const STATUS_LABELS = {
                 inquiry: '見込み',
-                consulting: '相談中',
                 preparing: '書類準備中',
                 applying: '申請中',
                 completed: '完了',
@@ -1227,7 +1559,6 @@ app.get('/', (c) => {
 
             const STATUS_COLORS = {
                 inquiry: 'bg-yellow-100 text-yellow-800',
-                consulting: 'bg-blue-100 text-blue-800',
                 preparing: 'bg-orange-100 text-orange-800',
                 applying: 'bg-purple-100 text-purple-800',
                 completed: 'bg-green-100 text-green-800',
@@ -1263,10 +1594,34 @@ app.get('/', (c) => {
                     renderCases(allCases);
                     renderDeadlineAlerts(allCases);
                     loadRecentActivity();
+                    loadSlotBalance();
                 } catch (error) {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
                         '<div class="text-center py-8 text-red-500">データの読み込みに失敗しました</div>';
+                }
+            }
+            
+            // 枠残数を読み込む
+            async function loadSlotBalance() {
+                try {
+                    const response = await axios.get('/api/subscription/status');
+                    const data = response.data;
+                    const badge = document.getElementById('slotsBadge');
+                    if (badge) {
+                        if (data.is_unlimited) {
+                            // 無制限プラン
+                            badge.innerHTML = '<i class="fas fa-infinity text-xs"></i>';
+                            badge.className = 'ml-auto bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full';
+                        } else {
+                            badge.textContent = data.total_available || 0;
+                            badge.className = data.total_available > 0 
+                                ? 'ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full'
+                                : 'ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading slot balance:', error);
                 }
             }
             
@@ -1599,7 +1954,6 @@ app.get('/', (c) => {
             function updateStatusCards() {
                 const counts = {
                     inquiry: 0,
-                    consulting: 0,
                     preparing: 0,
                     applying: 0,
                     completed: 0
@@ -1617,8 +1971,23 @@ app.get('/', (c) => {
                 });
             }
             // 案件一覧表示（案件ベース）
+            // 展開状態を管理
+            let expandedClients = new Set();
+            
+            function toggleClientExpand(clientId) {
+                if (expandedClients.has(clientId)) {
+                    expandedClients.delete(clientId);
+                } else {
+                    expandedClients.add(clientId);
+                }
+                renderCases(currentFilteredCases || allCases);
+            }
+            
+            let currentFilteredCases = null;
+            
             function renderCases(cases) {
                 const container = document.getElementById('clientsList');
+                currentFilteredCases = cases;
                 
                 if (cases.length === 0) {
                     container.innerHTML = \`
@@ -1658,112 +2027,221 @@ app.get('/', (c) => {
                     }
                 }
 
-                // 顧客ごとの案件数をカウント（フィルタ前の全案件からカウント）
-                const caseCountByClient = {};
-                allCases.forEach(c => {
-                    caseCountByClient[c.client_id] = (caseCountByClient[c.client_id] || 0) + 1;
+                // 顧客ごとに案件をグループ化
+                const clientsMap = new Map();
+                cases.forEach(caseItem => {
+                    const clientId = caseItem.client_id;
+                    if (!clientsMap.has(clientId)) {
+                        clientsMap.set(clientId, {
+                            clientId: clientId,
+                            clientName: caseItem.client_name || '未設定',
+                            companyName: caseItem.company_name,
+                            email: caseItem.email,
+                            address: caseItem.address,
+                            cases: []
+                        });
+                    }
+                    clientsMap.get(clientId).cases.push(caseItem);
                 });
-                console.log('Case counts by client:', caseCountByClient);
                 
-                container.innerHTML = cases.map(caseItem => {
-                    const portalUrl = \`\${window.location.origin}/portal/\${caseItem.access_token}\`;
-                    const deadlineInfo = getDeadlineInfo(caseItem.application_end_date);
-                    const clientCaseCount = caseCountByClient[caseItem.client_id] || 1;
-                    const caseNumber = caseItem.case_number || \`案件#\${caseItem.id}\`;
+                // 顧客リストに変換
+                const clientsList = Array.from(clientsMap.values());
+                
+                container.innerHTML = clientsList.map(clientData => {
+                    const isExpanded = expandedClients.has(clientData.clientId);
+                    const caseCount = clientData.cases.length;
+                    const hasUrgent = clientData.cases.some(c => {
+                        const info = getDeadlineInfo(c.application_end_date);
+                        return info?.urgent;
+                    });
+                    
+                    // 案件のステータス集計
+                    const statusSummary = {};
+                    clientData.cases.forEach(c => {
+                        statusSummary[c.status] = (statusSummary[c.status] || 0) + 1;
+                    });
+                    
                     return \`
-                    <div class="border-b last:border-b-0 py-4 hover:bg-gray-50 \${deadlineInfo?.urgent ? 'border-l-4 border-l-red-500 pl-3' : ''}">
-                        <!-- PC版表示 -->
-                        <div class="hidden md:flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-3 mb-2 flex-wrap">
-                                    <h3 class="text-lg font-bold">\${caseItem.client_name || '未設定'}</h3>
-                                    <span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800 font-medium"><i class="fas fa-folder-open mr-1"></i>この顧客: \${clientCaseCount}件</span>
-                                    <span class="px-3 py-1 rounded-full text-xs font-medium \${STATUS_COLORS[caseItem.status]}">
-                                        \${STATUS_LABELS[caseItem.status]}
-                                    </span>
-                                    \${caseItem.subsidy_type_name ? \`<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${caseItem.subsidy_type_name}</span>\` : ''}
-                                    \${deadlineInfo ? \`<span class="px-2 py-1 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
+                    <div class="border-b last:border-b-0 \${hasUrgent ? 'border-l-4 border-l-red-500' : ''}">
+                        <!-- 顧客ヘッダー（クリックで展開/折りたたみ） -->
+                        <div class="py-3 px-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between" onclick="toggleClientExpand(\${clientData.clientId})">
+                            <div class="flex items-center gap-3 flex-1">
+                                <i class="fas fa-chevron-\${isExpanded ? 'down' : 'right'} text-gray-400 w-4 transition-transform"></i>
+                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-user text-blue-600"></i>
                                 </div>
-                                <div class="text-sm text-gray-600 space-y-1">
-                                    <div class="text-xs text-gray-400"><i class="fas fa-hashtag w-4"></i> \${caseNumber}</div>
-                                    \${caseItem.company_name ? \`<div><i class="fas fa-building w-4"></i> \${caseItem.company_name}</div>\` : ''}
-                                    \${caseItem.email ? \`<div><i class="fas fa-envelope w-4"></i> \${caseItem.email}</div>\` : ''}
-                                    \${caseItem.assigned_to_name || caseItem.assigned_to ? \`<div><i class="fas fa-user w-4"></i> 担当: \${caseItem.assigned_to_name || caseItem.assigned_to}</div>\` : ''}
-                                    \${caseItem.application_end_date ? \`<div><i class="fas fa-calendar-alt w-4"></i> 申請期限: \${caseItem.application_end_date}\${caseItem.subsidy_rate ? \` | 補助率: \${caseItem.subsidy_rate}\` : ''}\${caseItem.max_amount ? \` | 上限: \${(caseItem.max_amount / 10000).toLocaleString()}万円\` : ''}</div>\` : ''}
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h3 class="font-bold text-gray-900">\${clientData.clientName}</h3>
+                                        <span class="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-800 font-medium">
+                                            <i class="fas fa-folder mr-1"></i>\${caseCount}件
+                                        </span>
+                                        \${Object.entries(statusSummary).map(([status, count]) => \`
+                                            <span class="px-2 py-0.5 rounded-full text-xs \${STATUS_COLORS[status]}">\${STATUS_LABELS[status]}: \${count}</span>
+                                        \`).join('')}
+                                    </div>
+                                    <div class="text-sm text-gray-500 truncate">
+                                        \${clientData.companyName ? clientData.companyName : ''}\${clientData.address ? (clientData.companyName ? ' / ' : '') + clientData.address : ''}
+                                    </div>
                                 </div>
                             </div>
-                            <div class="flex gap-2">
-                                <a href="/client/\${caseItem.client_id}" 
-                                   class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                                    <i class="fas fa-eye mr-1"></i>詳細
+                            <div class="flex gap-2 ml-2" onclick="event.stopPropagation()">
+                                <a href="/client/\${clientData.clientId}" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+                                    <i class="fas fa-eye mr-1"></i>顧客詳細
                                 </a>
-                                <button onclick="copyPortalUrl('\${portalUrl}', '\${caseItem.client_name}')"
-                                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm">
-                                    <i class="fas fa-copy mr-1"></i>URL
-                                </button>
-                                <a href="/portal/\${caseItem.access_token}" target="_blank"
-                                   class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-                                    <i class="fas fa-external-link-alt mr-1"></i>ポータル
-                                </a>
-                                \${localStorage.getItem('admin_role') === 'admin' ? \`
-                                <button onclick="deleteCase(\${caseItem.id}, '\${caseItem.client_name}', '\${caseNumber}')"
-                                        class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm">
-                                    <i class="fas fa-trash mr-1"></i>削除
-                                </button>
-                                \` : ''}
                             </div>
                         </div>
                         
-                        <!-- スマホ版表示（カード形式） -->
-                        <div class="md:hidden space-y-3">
-                            <div class="flex items-start justify-between">
-                                <div class="flex-1">
-                                    <h3 class="text-base font-bold mb-1">\${caseItem.client_name || '未設定'}</h3>
-                                    <div class="text-xs text-gray-400">\${caseNumber}</div>
-                                    \${caseItem.company_name ? \`<div class="text-sm text-gray-600">\${caseItem.company_name}</div>\` : ''}
+                        <!-- 案件リスト（展開時のみ表示） -->
+                        <div class="\${isExpanded ? '' : 'hidden'} bg-gray-50 border-t">
+                            \${clientData.cases.map(caseItem => {
+                                const portalUrl = \`\${window.location.origin}/portal/\${caseItem.access_token}\`;
+                                const deadlineInfo = getDeadlineInfo(caseItem.application_end_date);
+                                const caseNumber = caseItem.case_number || \`案件#\${caseItem.id}\`;
+                                
+                                return \`
+                                <div class="py-2.5 px-4 pl-10 border-b last:border-b-0 hover:bg-blue-50 transition-colors \${deadlineInfo?.urgent ? 'bg-red-50' : ''}">
+                                    <div class="flex items-center gap-3">
+                                        <!-- 左側: 案件情報（クリックで詳細へ） -->
+                                        <a href="/case/\${caseItem.id}" class="flex-1 min-w-0 group">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="text-xs text-gray-400 font-mono group-hover:text-blue-600">\${caseNumber}</span>
+                                                <span class="px-2 py-0.5 rounded-full text-xs font-medium \${STATUS_COLORS[caseItem.status]}">\${STATUS_LABELS[caseItem.status]}</span>
+                                                \${caseItem.subsidy_type_name ? \`<span class="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800">\${caseItem.subsidy_type_name}</span>\` : ''}
+                                                \${deadlineInfo ? \`<span class="px-2 py-0.5 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
+                                            </div>
+                                            <div class="text-xs text-gray-500 mt-0.5 flex items-center gap-3 flex-wrap">
+                                                \${caseItem.assigned_to_name || caseItem.assigned_to ? \`<span><i class="fas fa-user w-3"></i> \${caseItem.assigned_to_name || caseItem.assigned_to}</span>\` : ''}
+                                                \${caseItem.deposit_required ? \`<span class="\${caseItem.deposit_paid ? 'text-green-600' : 'text-yellow-600'}"><i class="fas fa-yen-sign w-3"></i> ¥\${(caseItem.deposit_amount || 0).toLocaleString()} \${caseItem.deposit_paid ? '✓' : '未払'}</span>\` : ''}
+                                            </div>
+                                        </a>
+                                        <!-- 右側: アクションボタン -->
+                                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                                            <select onchange="updateCaseStatus(\${caseItem.id}, this.value, '\${caseItem.status}')" class="text-xs border rounded px-2 py-1 bg-white w-24">
+                                                <option value="inquiry" \${caseItem.status === 'inquiry' ? 'selected' : ''}>見込み</option>
+                                                <option value="preparing" \${caseItem.status === 'preparing' ? 'selected' : ''}>書類準備中</option>
+                                                <option value="applying" \${caseItem.status === 'applying' ? 'selected' : ''}>申請中</option>
+                                                <option value="completed" \${caseItem.status === 'completed' ? 'selected' : ''}>完了</option>
+                                            </select>
+                                            <button onclick="copyPortalUrl('\${portalUrl}', '\${clientData.clientName}')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-purple-100 hover:text-purple-600" title="URLコピー">
+                                                <i class="fas fa-copy text-sm"></i>
+                                            </button>
+                                            <a href="/portal/\${caseItem.access_token}" target="_blank" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-green-100 hover:text-green-600" title="ポータル">
+                                                <i class="fas fa-external-link-alt text-sm"></i>
+                                            </a>
+                                            \${localStorage.getItem('admin_role') === 'admin' ? \`
+                                            <button onclick="deleteCase(\${caseItem.id}, '\${clientData.clientName}', '\${caseNumber}')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-red-100 hover:text-red-600" title="削除">
+                                                <i class="fas fa-trash text-sm"></i>
+                                            </button>
+                                            \` : ''}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex flex-col items-end gap-1">
-                                    <span class="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap \${STATUS_COLORS[caseItem.status]}">
-                                        \${STATUS_LABELS[caseItem.status]}
-                                    </span>
-                                    <span class="px-2 py-1 rounded text-xs bg-indigo-100 text-indigo-800">\${clientCaseCount}件</span>
-                                    \${deadlineInfo ? \`<span class="px-2 py-1 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
-                                </div>
-                            </div>
-                            \${caseItem.subsidy_type_name ? \`<div class="inline-block px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">\${caseItem.subsidy_type_name}</div>\` : ''}
-                            <div class="text-sm text-gray-600 space-y-1">
-                                \${caseItem.email ? \`<div><i class="fas fa-envelope w-4"></i> \${caseItem.email}</div>\` : ''}
-                                \${caseItem.assigned_to_name || caseItem.assigned_to ? \`<div><i class="fas fa-user w-4"></i> 担当: \${caseItem.assigned_to_name || caseItem.assigned_to}</div>\` : ''}
-                                \${caseItem.application_end_date ? \`<div><i class="fas fa-calendar-alt w-4"></i> 期限: \${caseItem.application_end_date}</div>\` : ''}
-                            </div>
-                            <div class="grid \${localStorage.getItem('admin_role') === 'admin' ? 'grid-cols-4' : 'grid-cols-3'} gap-2">
-                                <a href="/client/\${caseItem.client_id}" 
-                                   class="bg-blue-600 text-white px-3 py-3 rounded-lg hover:bg-blue-700 text-sm text-center">
-                                    <i class="fas fa-eye block mb-1"></i>
-                                    <span class="text-xs">詳細</span>
-                                </a>
-                                <button onclick="copyPortalUrl('\${portalUrl}', '\${caseItem.client_name}')"
-                                        class="bg-purple-600 text-white px-3 py-3 rounded-lg hover:bg-purple-700 text-sm">
-                                    <i class="fas fa-copy block mb-1"></i>
-                                    <span class="text-xs">URL</span>
+                                \`;
+                            }).join('')}
+                            
+                            <!-- 新規案件追加ボタン -->
+                            <div class="py-2 px-4 pl-12">
+                                <button onclick="openNewCaseModalForClient(\${clientData.clientId}, '\${clientData.clientName}')" 
+                                        class="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                                    <i class="fas fa-plus-circle"></i>この顧客に新規案件を追加
                                 </button>
-                                <a href="/portal/\${caseItem.access_token}" target="_blank"
-                                   class="bg-green-600 text-white px-3 py-3 rounded-lg hover:bg-green-700 text-sm text-center">
-                                    <i class="fas fa-external-link-alt block mb-1"></i>
-                                    <span class="text-xs">ポータル</span>
-                                </a>
-                                \${localStorage.getItem('admin_role') === 'admin' ? \`
-                                <button onclick="deleteCase(\${caseItem.id}, '\${caseItem.client_name}', '\${caseNumber}')"
-                                        class="bg-red-600 text-white px-3 py-3 rounded-lg hover:bg-red-700 text-sm">
-                                    <i class="fas fa-trash block mb-1"></i>
-                                    <span class="text-xs">削除</span>
-                                </button>
-                                \` : ''}
                             </div>
                         </div>
                     </div>
-                \`;
+                    \`;
                 }).join('');
+            }
+            
+            // 特定顧客に対して新規案件モーダルを開く
+            function openNewCaseModalForClient(clientId, clientName) {
+                openNewCaseModal();
+                // 既存顧客を選択状態にする
+                setTimeout(() => {
+                    document.querySelector('input[name="customer_type"][value="existing"]').checked = true;
+                    toggleCustomerType();
+                    const select = document.getElementById('existingClientSelect');
+                    if (select) {
+                        select.value = clientId;
+                    }
+                }, 100);
+            }
+            
+            // 案件ステータス更新
+            async function updateCaseStatus(caseId, newStatus, currentStatus) {
+                // 見込み → 他ステータスへの変更時は確認ダイアログを表示
+                if (currentStatus === 'inquiry' && newStatus !== 'inquiry') {
+                    const confirmed = await showSlotConfirmDialog();
+                    if (!confirmed) {
+                        loadData(); // キャンセル時は元に戻す
+                        return;
+                    }
+                }
+                
+                try {
+                    await axios.put(\`/api/cases/\${caseId}\`, { status: newStatus });
+                    showToast('ステータスを更新しました');
+                    loadData();
+                } catch (error) {
+                    console.error('Status update error:', error);
+                    const errorMessage = error.response?.data?.error || error.message;
+                    if (errorMessage.includes('枠') || errorMessage.includes('slot')) {
+                        alert('枠が不足しています。\\n\\n管理画面の「プラン・枠管理」から追加枠を購入してください。');
+                    } else {
+                        alert('ステータスの更新に失敗しました: ' + errorMessage);
+                    }
+                    loadData(); // リロードして元に戻す
+                }
+            }
+            
+            // 枠消費確認ダイアログ
+            function showSlotConfirmDialog() {
+                return new Promise((resolve) => {
+                    const modal = document.createElement('div');
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                    modal.innerHTML = \`
+                        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-yellow-400 to-amber-500 p-4 text-white">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                                        <i class="fas fa-ticket-alt text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-lg">案件を開始しますか？</h3>
+                                        <p class="text-sm opacity-90">枠を1つ消費します</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-5">
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                                    <div class="flex items-start gap-3">
+                                        <i class="fas fa-info-circle text-yellow-500 mt-0.5"></i>
+                                        <div class="text-sm text-yellow-800">
+                                            <p class="font-medium mb-1">「見込み」から他のステータスに変更すると：</p>
+                                            <ul class="list-disc list-inside space-y-1 text-yellow-700">
+                                                <li>利用可能な枠を<strong>1枠消費</strong>します</li>
+                                                <li>顧客がヒアリング回答・書類アップロード可能になります</li>
+                                                <li>この操作は取り消せません</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3">
+                                    <button onclick="this.closest('.fixed').remove(); window._slotConfirmResolve(false);" 
+                                            class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700">
+                                        キャンセル
+                                    </button>
+                                    <button onclick="this.closest('.fixed').remove(); window._slotConfirmResolve(true);" 
+                                            class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                                        <i class="fas fa-play-circle mr-1"></i>案件を開始
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    \`;
+                    document.body.appendChild(modal);
+                    window._slotConfirmResolve = resolve;
+                });
             }
             
             // 後方互換性のためrenderClientsもエイリアスとして残す
@@ -2208,11 +2686,6 @@ app.get('/api/clients/:id', async (c) => {
     return c.json({ error: 'Client not found' }, 404)
   }
   
-  // adminロール以外は自分が担当の案件のみアクセス可能
-  if (user && user.role !== 'admin' && client.assigned_to !== user.username) {
-    return c.json({ error: 'Access denied' }, 403)
-  }
-  
   // 案件一覧も取得
   const casesResult = await DB.prepare(`
     SELECT cases.*, subsidy_types.name as subsidy_type_name
@@ -2222,9 +2695,38 @@ app.get('/api/clients/:id', async (c) => {
     ORDER BY cases.created_at DESC
   `).bind(id).all()
   
+  const cases = casesResult.results || []
+  
+  // adminロール以外は、顧客の担当者か、いずれかの案件の担当者である必要がある
+  if (user && user.role !== 'admin') {
+    const isClientAssignee = client.assigned_to === user.username
+    const isCaseAssignee = cases.some((c: any) => c.assigned_to === user.username)
+    
+    // デバッグ用: マッチしない場合の詳細情報
+    console.log('Access check:', {
+      userUsername: user.username,
+      userRole: user.role,
+      clientAssignedTo: client.assigned_to,
+      caseAssignees: cases.map((c: any) => c.assigned_to),
+      isClientAssignee,
+      isCaseAssignee
+    })
+    
+    if (!isClientAssignee && !isCaseAssignee) {
+      return c.json({ 
+        error: 'Access denied',
+        debug: {
+          userUsername: user.username,
+          clientAssignedTo: client.assigned_to,
+          caseAssignees: cases.map((c: any) => c.assigned_to)
+        }
+      }, 403)
+    }
+  }
+  
   return c.json({
     ...client,
-    cases: casesResult.results || []
+    cases: cases
   })
 })
 
@@ -2238,13 +2740,14 @@ app.post('/api/clients', async (c) => {
   
   // 顧客基本情報のみ登録（案件情報は別途casesテーブルに登録）
   const result = await DB.prepare(`
-    INSERT INTO clients (name, company_name, email, phone, assigned_staff, assigned_to, access_token)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (name, company_name, email, phone, address, assigned_staff, assigned_to, access_token)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
     data.company_name || null,
     data.email || null,
     data.phone || null,
+    data.address || null,
     data.assigned_staff || null,
     data.assigned_to || null,
     accessToken
@@ -2563,6 +3066,75 @@ app.post('/api/cases', async (c) => {
     }
   }
   
+  // パイプラインテンプレートが選択された場合、タスクを自動生成
+  if (data.pipeline_template_id) {
+    try {
+      // テンプレート情報を取得
+      const template = await DB.prepare(`
+        SELECT * FROM pipeline_templates WHERE id = ?
+      `).bind(data.pipeline_template_id).first()
+      
+      if (template) {
+        // テンプレートからタスクを取得
+        const templateTasks = await DB.prepare(`
+          SELECT * FROM pipeline_template_tasks 
+          WHERE template_id = ? 
+          ORDER BY sort_order ASC
+        `).bind(data.pipeline_template_id).all()
+        
+        const today = new Date()
+        
+        // 1. まずclient_pipelinesにパイプラインを作成
+        const pipelineResult = await DB.prepare(`
+          INSERT INTO client_pipelines (
+            client_id, case_id, template_id, pipeline_name, service_start_date, service_end_date, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          data.client_id,
+          caseId,
+          data.pipeline_template_id,
+          template.name,
+          today.toISOString().split('T')[0],
+          new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          'active'
+        ).run()
+        
+        const pipelineId = pipelineResult.meta.last_row_id
+        
+        // 2. 各タスクをclient_pipeline_tasksに追加
+        for (const task of templateTasks.results || []) {
+          const startDate = new Date(today)
+          startDate.setDate(startDate.getDate() + (task.days_offset_start || 0))
+          
+          const endDate = new Date(today)
+          endDate.setDate(endDate.getDate() + (task.days_offset_end || 7))
+          
+          await DB.prepare(`
+            INSERT INTO client_pipeline_tasks (
+              pipeline_id, template_task_id, task_name, task_type, description,
+              sort_order, start_date, end_date, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            pipelineId,
+            task.id,
+            task.task_name,
+            task.task_type || 'internal',
+            task.description || '',
+            task.sort_order || 0,
+            startDate.toISOString().split('T')[0],
+            endDate.toISOString().split('T')[0],
+            'pending'
+          ).run()
+        }
+        
+        console.log('Pipeline created for case:', caseId, 'pipeline_id:', pipelineId)
+      }
+    } catch (pipelineError) {
+      console.error('Error creating pipeline:', pipelineError)
+      // パイプライン作成に失敗してもケース作成は続行
+    }
+  }
+  
   return c.json({ 
     id: caseId,
     case_number: caseNumber,
@@ -2574,41 +3146,110 @@ app.post('/api/cases', async (c) => {
 app.put('/api/cases/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
-  const data = await c.req.json()
   
-  await DB.prepare(`
-    UPDATE cases SET
-      subsidy_type_id = COALESCE(?, subsidy_type_id),
-      status = COALESCE(?, status),
-      assigned_to = ?,
-      notes = ?,
-      deposit_required = COALESCE(?, deposit_required),
-      deposit_amount = COALESCE(?, deposit_amount),
-      deposit_paid = COALESCE(?, deposit_paid),
-      withholding_tax = COALESCE(?, withholding_tax),
-      success_fee_enabled = COALESCE(?, success_fee_enabled),
-      success_fee_rate = COALESCE(?, success_fee_rate),
-      success_fee_amount = COALESCE(?, success_fee_amount),
-      contract_url = ?,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).bind(
-    data.subsidy_type_id,
-    data.status,
-    data.assigned_to || null,
-    data.notes || null,
-    data.deposit_required !== undefined ? (data.deposit_required ? 1 : 0) : null,
-    data.deposit_amount,
-    data.deposit_paid !== undefined ? (data.deposit_paid ? 1 : 0) : null,
-    data.withholding_tax !== undefined ? (data.withholding_tax ? 1 : 0) : null,
-    data.success_fee_enabled !== undefined ? (data.success_fee_enabled ? 1 : 0) : null,
-    data.success_fee_rate,
-    data.success_fee_amount,
-    data.contract_url || null,
-    id
-  ).run()
-  
-  return c.json({ success: true })
+  try {
+    const data = await c.req.json()
+    
+    // ステータス変更時の枠消費チェック
+    if (data.status) {
+      // 現在のステータスを取得
+      const currentCase = await DB.prepare(`SELECT status FROM cases WHERE id = ?`).bind(id).first()
+      
+      // 「見込み(inquiry)」から他のステータスに変更する場合、枠を消費
+      if (currentCase && currentCase.status === 'inquiry' && data.status !== 'inquiry') {
+        // 既に枠を消費済みかチェック
+        const alreadyConsumed = await DB.prepare(`
+          SELECT id FROM slot_usage_history WHERE case_id = ? AND action = 'consumed'
+        `).bind(id).first()
+        
+        if (!alreadyConsumed) {
+          // サブスクリプション取得
+          const subscription = await DB.prepare(`
+            SELECT us.id, sb.monthly_slots_remaining, sb.purchased_slots_remaining
+            FROM user_subscriptions us
+            JOIN slot_balances sb ON us.id = sb.subscription_id
+            WHERE us.user_id IS NULL AND us.status = 'active'
+            LIMIT 1
+          `).first()
+          
+          if (subscription) {
+            const totalAvailable = (subscription.monthly_slots_remaining || 0) + (subscription.purchased_slots_remaining || 0)
+            
+            if (totalAvailable <= 0) {
+              return c.json({ 
+                error: '利用可能な枠がありません。追加枠を購入してください。', 
+                need_purchase: true,
+                slot_error: true 
+              }, 400)
+            }
+            
+            // 月次枠から優先消費、なければ購入枠から消費
+            let slotType = 'monthly'
+            let newMonthly = subscription.monthly_slots_remaining
+            let newPurchased = subscription.purchased_slots_remaining
+            
+            if (subscription.monthly_slots_remaining > 0) {
+              newMonthly = subscription.monthly_slots_remaining - 1
+            } else {
+              slotType = 'purchased'
+              newPurchased = subscription.purchased_slots_remaining - 1
+            }
+            
+            // 枠を消費
+            await DB.prepare(`
+              UPDATE slot_balances 
+              SET monthly_slots_remaining = ?, purchased_slots_remaining = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE subscription_id = ?
+            `).bind(newMonthly, newPurchased, subscription.id).run()
+            
+            // 使用履歴を記録
+            await DB.prepare(`
+              INSERT INTO slot_usage_history (subscription_id, case_id, slot_type, action, slots_changed, balance_after, note)
+              VALUES (?, ?, ?, 'consumed', -1, ?, '案件開始による枠消費（見込み→進行中）')
+            `).bind(subscription.id, id, slotType, newMonthly + newPurchased).run()
+          }
+          // サブスクリプションがない場合は枠消費をスキップ（初期状態対応）
+        }
+      }
+    }
+    
+    await DB.prepare(`
+      UPDATE cases SET
+        subsidy_type_id = COALESCE(?, subsidy_type_id),
+        status = COALESCE(?, status),
+        assigned_to = COALESCE(?, assigned_to),
+        notes = COALESCE(?, notes),
+        deposit_required = COALESCE(?, deposit_required),
+        deposit_amount = COALESCE(?, deposit_amount),
+        deposit_paid = COALESCE(?, deposit_paid),
+        withholding_tax = COALESCE(?, withholding_tax),
+        success_fee_enabled = COALESCE(?, success_fee_enabled),
+        success_fee_rate = COALESCE(?, success_fee_rate),
+        success_fee_amount = COALESCE(?, success_fee_amount),
+        contract_url = COALESCE(?, contract_url),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      data.subsidy_type_id !== undefined ? data.subsidy_type_id : null,
+      data.status !== undefined ? data.status : null,
+      data.assigned_to !== undefined ? data.assigned_to : null,
+      data.notes !== undefined ? data.notes : null,
+      data.deposit_required !== undefined ? (data.deposit_required ? 1 : 0) : null,
+      data.deposit_amount !== undefined ? data.deposit_amount : null,
+      data.deposit_paid !== undefined ? (data.deposit_paid ? 1 : 0) : null,
+      data.withholding_tax !== undefined ? (data.withholding_tax ? 1 : 0) : null,
+      data.success_fee_enabled !== undefined ? (data.success_fee_enabled ? 1 : 0) : null,
+      data.success_fee_rate !== undefined ? data.success_fee_rate : null,
+      data.success_fee_amount !== undefined ? data.success_fee_amount : null,
+      data.contract_url !== undefined ? data.contract_url : null,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Error updating case:', error)
+    return c.json({ error: 'ステータスの更新に失敗しました: ' + (error.message || 'Unknown error') }, 500)
+  }
 })
 
 // 案件削除
@@ -2667,13 +3308,207 @@ app.get('/api/cases/:id/hearing-answers', async (c) => {
 // 案件のパイプライン取得
 app.get('/api/cases/:id/pipelines', async (c) => {
   const { DB } = c.env
-  const id = c.req.param('id')
+  const caseId = c.req.param('id')
+  
+  // まず案件に紐づくパイプラインを取得
+  const pipelines = await DB.prepare(`
+    SELECT * FROM client_pipelines WHERE case_id = ?
+  `).bind(caseId).all()
+  
+  if (!pipelines.results || pipelines.results.length === 0) {
+    // パイプラインがない場合は空配列を返す
+    return c.json([])
+  }
+  
+  // パイプラインのタスクを取得
+  const pipelineIds = pipelines.results.map((p: any) => p.id)
+  const tasks = await DB.prepare(`
+    SELECT cpt.*, au.name as assignee_name
+    FROM client_pipeline_tasks cpt
+    LEFT JOIN admin_users au ON cpt.assigned_to = au.id
+    WHERE cpt.pipeline_id IN (${pipelineIds.join(',')})
+    ORDER BY cpt.sort_order ASC, cpt.id ASC
+  `).all()
+  
+  return c.json(tasks.results || [])
+})
+
+// 案件にパイプラインテンプレートを適用
+app.post('/api/cases/:id/apply-pipeline', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('id')
+  const { template_id } = await c.req.json()
+  
+  if (!template_id) {
+    return c.json({ error: 'template_id is required' }, 400)
+  }
+  
+  // テンプレート情報を取得
+  const template = await DB.prepare(`
+    SELECT * FROM pipeline_templates WHERE id = ?
+  `).bind(template_id).first()
+  
+  if (!template) {
+    return c.json({ error: 'Template not found' }, 404)
+  }
+  
+  // テンプレートのタスクを取得
+  const templateTasks = await DB.prepare(`
+    SELECT * FROM pipeline_template_tasks WHERE template_id = ? ORDER BY sort_order ASC
+  `).bind(template_id).all()
+  
+  // 案件情報を取得（client_idが必要）
+  const caseData = await DB.prepare(`SELECT client_id FROM cases WHERE id = ?`).bind(caseId).first()
+  if (!caseData) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  const today = new Date()
+  
+  // 1. まずclient_pipelinesにパイプラインを作成
+  const pipelineResult = await DB.prepare(`
+    INSERT INTO client_pipelines (
+      client_id, case_id, template_id, pipeline_name, service_start_date, service_end_date, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    caseData.client_id,
+    caseId,
+    template_id,
+    template.name,
+    today.toISOString().split('T')[0],
+    new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    'active'
+  ).run()
+  
+  const pipelineId = pipelineResult.meta.last_row_id
+  
+  // 2. 各タスクをclient_pipeline_tasksに追加
+  if (templateTasks.results && templateTasks.results.length > 0) {
+    for (const task of templateTasks.results) {
+      const startDate = new Date(today)
+      startDate.setDate(startDate.getDate() + (task.days_offset_start || 0))
+      
+      const endDate = new Date(today)
+      endDate.setDate(endDate.getDate() + (task.days_offset_end || 7))
+      
+      await DB.prepare(`
+        INSERT INTO client_pipeline_tasks (
+          pipeline_id, template_task_id, task_name, task_type, description,
+          sort_order, start_date, end_date, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        pipelineId,
+        task.id,
+        task.task_name,
+        task.task_type || 'internal',
+        task.description || '',
+        task.sort_order || 0,
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0],
+        'pending'
+      ).run()
+    }
+  }
+  
+  return c.json({ success: true, message: 'Pipeline applied', pipeline_id: pipelineId })
+})
+
+// 案件のコミュニケーション取得
+app.get('/api/cases/:id/communications', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('id')
   
   const result = await DB.prepare(`
-    SELECT * FROM client_pipelines WHERE case_id = ? ORDER BY created_at DESC
-  `).bind(id).all()
+    SELECT * FROM communications WHERE case_id = ? ORDER BY created_at ASC
+  `).bind(caseId).all()
   
   return c.json(result.results)
+})
+
+// 案件のコミュニケーション追加
+app.post('/api/cases/:id/communications', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('id')
+  const { message, sender_type, sender_name } = await c.req.json()
+  
+  // 案件からclient_idを取得
+  const caseData = await DB.prepare(`SELECT client_id FROM cases WHERE id = ?`).bind(caseId).first()
+  if (!caseData) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  const result = await DB.prepare(`
+    INSERT INTO communications (client_id, case_id, message, sender_type, sender_name)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(
+    caseData.client_id,
+    caseId,
+    message,
+    sender_type || 'staff',
+    sender_name || 'スタッフ'
+  ).run()
+  
+  return c.json({ success: true, id: result.meta.last_row_id })
+})
+
+// 案件のヒアリング回答取得
+app.get('/api/cases/:id/hearing-answers', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('id')
+  
+  // 案件からsubsidy_type_idを取得
+  const caseData = await DB.prepare(`SELECT subsidy_type_id, client_id FROM cases WHERE id = ?`).bind(caseId).first()
+  if (!caseData) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  // ヒアリング質問と回答をJOIN
+  const result = await DB.prepare(`
+    SELECT 
+      hq.id as question_id,
+      hq.question_text,
+      hq.is_required,
+      hq.sort_order,
+      ha.answer_text,
+      ha.created_at as answered_at
+    FROM hearing_questions hq
+    LEFT JOIN hearing_answers ha ON hq.id = ha.question_id AND ha.case_id = ?
+    WHERE hq.subsidy_type_id = ? OR hq.is_common = 1
+    ORDER BY hq.sort_order ASC
+  `).bind(caseId, caseData.subsidy_type_id).all()
+  
+  return c.json(result.results)
+})
+
+// 案件の書類チェックリスト取得
+app.get('/api/cases/:id/document-checklist', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('id')
+  
+  // 案件からsubsidy_type_idを取得
+  const caseData = await DB.prepare(`SELECT subsidy_type_id FROM cases WHERE id = ?`).bind(caseId).first()
+  if (!caseData || !caseData.subsidy_type_id) {
+    // デフォルトのチェックリスト
+    const defaultResult = await DB.prepare(`
+      SELECT * FROM document_checklist ORDER BY display_order ASC
+    `).all()
+    return c.json(defaultResult.results)
+  }
+  
+  // 補助金種別に紐づくチェックリスト
+  const result = await DB.prepare(`
+    SELECT * FROM subsidy_type_documents WHERE subsidy_type_id = ? ORDER BY display_order ASC
+  `).bind(caseData.subsidy_type_id).all()
+  
+  if (result.results && result.results.length > 0) {
+    return c.json(result.results)
+  }
+  
+  // フォールバック
+  const defaultResult = await DB.prepare(`
+    SELECT * FROM document_checklist ORDER BY display_order ASC
+  `).all()
+  return c.json(defaultResult.results)
 })
 
 // ===============================
@@ -3058,6 +3893,9 @@ app.get('/subsidy-types', async (c) => {
     SELECT * FROM subsidy_types WHERE id > 0 ORDER BY category, name
   `).all()
   
+  const category = c.req.query('category') || ''
+  const categoryLabel = category ? `（${category}）` : ''
+  
   return c.html(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -3067,46 +3905,41 @@ app.get('/subsidy-types', async (c) => {
         <title>申請種別管理</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            ${sidebarStyles}
+        </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <header class="bg-blue-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <a href="/" class="text-sm hover:underline mb-2 block">
-                                <i class="fas fa-arrow-left mr-1"></i>トップに戻る
-                            </a>
-                            <h1 class="text-2xl font-bold">
-                                <i class="fas fa-file-contract mr-2"></i>
-                                申請種別管理
-                            </h1>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar(category === '行政書士管轄' ? 'subsidy-gyosei' : category === '社労士管轄' ? 'subsidy-sharoshi' : category === '許認可' ? 'subsidy-kyoninka' : '')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-file-contract mr-2"></i>申請種別管理${categoryLabel}
+                            </h2>
                         </div>
-                        <button onclick="logout()" class="text-sm hover:underline">
-                            <i class="fas fa-sign-out-alt mr-1"></i>
-                            ログアウト
+                        <button onclick="openNewSubsidyModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                            <i class="fas fa-plus mr-2"></i>新規追加
                         </button>
                     </div>
-                </div>
-            </header>
+                </header>
 
-            <div class="container mx-auto px-4 py-8">
-                <!-- 新規作成ボタン -->
-                <div class="mb-6">
-                    <button onclick="openNewSubsidyModal()" 
-                            class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
-                        <i class="fas fa-plus mr-2"></i>新しい助成金種別を追加
-                    </button>
-                </div>
-
-                <!-- 助成金種別一覧（カテゴリ別） -->
-                <div id="subsidyTypesList">
-                    <div class="text-center py-8 text-gray-500">
-                        <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
-                        <div>読み込み中...</div>
+                <div class="p-4 lg:p-6">
+                    <!-- 助成金種別一覧（カテゴリ別） -->
+                    <div id="subsidyTypesList">
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                            <div>読み込み中...</div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
 
         <!-- 新規助成金作成モーダル -->
@@ -3949,6 +4782,10 @@ app.get('/client/:id', async (c) => {
                                 class="px-6 py-3 font-medium text-blue-600 border-b-2 border-blue-600 whitespace-nowrap">
                             <i class="fas fa-user mr-2"></i>基本情報
                         </button>
+                        <button onclick="switchClientTab('cases')" id="client-tab-cases" 
+                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-folder-open mr-2"></i>案件一覧
+                        </button>
                         <button onclick="switchClientTab('ai')" id="client-tab-ai" 
                                 class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
                             <i class="fas fa-robot mr-2"></i>AIアシスタント
@@ -4007,6 +4844,24 @@ app.get('/client/:id', async (c) => {
                                     送信
                                 </button>
                             </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 案件一覧タブ -->
+                <div id="client-content-cases" class="hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold">
+                            <i class="fas fa-folder-open mr-2 text-blue-600"></i>案件一覧
+                        </h2>
+                        <button onclick="openNewCaseModalForThisClient()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                            <i class="fas fa-plus mr-2"></i>新規案件登録
+                        </button>
+                    </div>
+                    <div id="clientCasesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                        <div class="col-span-full text-center py-8 text-gray-500">
+                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                            <div>読み込み中...</div>
                         </div>
                     </div>
                 </div>
@@ -4333,7 +5188,6 @@ app.get('/client/:id', async (c) => {
                         <label class="block text-sm font-medium mb-1">ステータス</label>
                         <select name="status" id="edit_status" class="w-full px-3 py-2 border rounded-lg">
                             <option value="inquiry">見込み</option>
-                            <option value="consulting">相談中</option>
                             <option value="preparing">書類準備中</option>
                             <option value="applying">申請中</option>
                             <option value="completed">完了</option>
@@ -4427,14 +5281,12 @@ app.get('/client/:id', async (c) => {
             const CLIENT_ID = ${id};
             const STATUS_LABELS = {
                 inquiry: '見込み',
-                consulting: '相談中',
                 preparing: '書類準備中',
                 applying: '申請中',
                 completed: '完了'
             };
             const STATUS_COLORS = {
                 inquiry: 'bg-yellow-100 text-yellow-800',
-                consulting: 'bg-blue-100 text-blue-800',
                 preparing: 'bg-orange-100 text-orange-800',
                 applying: 'bg-purple-100 text-purple-800',
                 completed: 'bg-green-100 text-green-800'
@@ -4446,12 +5298,15 @@ app.get('/client/:id', async (c) => {
 
             async function loadSubsidyTypes() {
                 try {
+                    console.log('Loading subsidy types...');
                     const response = await axios.get('/api/subsidy-types');
                     subsidyTypes = response.data;
+                    console.log('Subsidy types loaded:', subsidyTypes.length);
                     
                     renderEditSubsidyOptions();
                 } catch (error) {
                     console.error('Error loading subsidy types:', error);
+                    throw error; // エラーを再スローして上位で捕捉
                 }
             }
             
@@ -4502,21 +5357,29 @@ app.get('/client/:id', async (c) => {
             
             async function loadUsers() {
                 try {
+                    console.log('Loading users...');
                     const response = await axios.get('/api/admin/users');
                     allUsers = response.data;
+                    console.log('Users loaded:', allUsers.length);
                     
                     // 編集フォームのセレクトボックスに追加
                     const select = document.getElementById('editClientAssignedTo');
-                    select.innerHTML = '<option value="">未割り当て</option>' +
-                        allUsers.map(user => \`<option value="\${user.username}">\${user.name}</option>\`).join('');
+                    if (select) {
+                        select.innerHTML = '<option value="">未割り当て</option>' +
+                            allUsers.map(user => \`<option value="\${user.username}">\${user.name}</option>\`).join('');
+                    }
                 } catch (error) {
                     console.error('Error loading users:', error);
+                    throw error; // エラーを再スローして上位で捕捉
                 }
             }
 
             async function loadClient() {
                 try {
-                    console.log('Loading client...');
+                    console.log('Loading client... CLIENT_ID:', CLIENT_ID);
+                    console.log('subsidyTypes loaded:', subsidyTypes.length, 'items');
+                    console.log('allUsers loaded:', allUsers.length, 'items');
+                    
                     const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
                     currentClient = response.data;
                     console.log('Client loaded:', currentClient);
@@ -4535,7 +5398,7 @@ app.get('/client/:id', async (c) => {
                         const caseSubsidy = subsidyTypes.find(s => s.id === c.subsidy_type_id);
                         const caseAssignee = allUsers.find(u => u.username === c.assigned_to);
                         return \`
-                            <div class="p-3 bg-gray-50 rounded-lg border mb-2">
+                            <a href="/case/\${c.id}" class="block p-3 bg-gray-50 rounded-lg border mb-2 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer">
                                 <div class="flex justify-between items-start">
                                     <div>
                                         <span class="text-xs text-gray-500">\${c.case_number || '案件'}</span>
@@ -4544,10 +5407,10 @@ app.get('/client/:id', async (c) => {
                                     <span class="text-xs px-2 py-1 rounded \${STATUS_COLORS[c.status] || 'bg-gray-100'}">\${STATUS_LABELS[c.status] || c.status}</span>
                                 </div>
                                 <div class="text-xs text-gray-500 mt-1">担当: \${caseAssignee ? caseAssignee.name : '未割り当て'}</div>
-                                <a href="/portal/\${c.access_token}" target="_blank" class="text-xs text-blue-600 hover:underline">
+                                <span onclick="event.preventDefault(); event.stopPropagation(); window.open('/portal/\${c.access_token}', '_blank');" class="text-xs text-blue-600 hover:underline inline-block mt-1">
                                     <i class="fas fa-external-link-alt mr-1"></i>ポータル
-                                </a>
-                            </div>
+                                </span>
+                            </a>
                         \`;
                     }).join('') : '<div class="text-gray-500 text-sm">案件がありません</div>';
                     
@@ -4584,11 +5447,13 @@ app.get('/client/:id', async (c) => {
                     
                     // adminのみ削除ボタン表示
                     if (localStorage.getItem('admin_role') === 'admin') {
-                        document.getElementById('deleteClientBtn').classList.remove('hidden');
+                        const deleteBtn = document.getElementById('deleteClientBtn');
+                        if (deleteBtn) deleteBtn.classList.remove('hidden');
                     }
                 } catch (error) {
                     console.error('Error loading client:', error);
-                    document.getElementById('clientInfo').innerHTML = '<div class="text-red-600">顧客情報の読み込みに失敗しました</div>';
+                    console.error('Error details:', error.message, error.stack);
+                    document.getElementById('clientInfo').innerHTML = '<div class="text-red-600">顧客情報の読み込みに失敗しました<br><small>' + (error.message || 'Unknown error') + '</small></div>';
                 }
             }
             
@@ -4998,7 +5863,7 @@ app.get('/client/:id', async (c) => {
 
             // タブ切り替え
             function switchClientTab(tab) {
-                ['overview', 'ai', 'documents', 'pipeline'].forEach(t => {
+                ['overview', 'cases', 'ai', 'documents', 'pipeline'].forEach(t => {
                     const content = document.getElementById('client-content-' + t);
                     const tabBtn = document.getElementById('client-tab-' + t);
                     if (content) content.classList.add('hidden');
@@ -5016,7 +5881,9 @@ app.get('/client/:id', async (c) => {
                 }
                 
                 // タブ固有のデータ読み込み
-                if (tab === 'ai') {
+                if (tab === 'cases') {
+                    loadClientCases();
+                } else if (tab === 'ai') {
                     loadHearingQuestions();
                     loadAiChatHistory();
                     loadMatchScores();
@@ -5025,6 +5892,127 @@ app.get('/client/:id', async (c) => {
                 } else if (tab === 'pipeline') {
                     loadClientPipelines();
                 }
+            }
+            
+            // 顧客の案件一覧を読み込み（カンバン形式）
+            async function loadClientCases() {
+                const container = document.getElementById('clientCasesList');
+                if (!container) return;
+                
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/cases\`);
+                    const cases = response.data;
+                    
+                    if (!cases || cases.length === 0) {
+                        container.innerHTML = \`
+                            <div class="col-span-full text-center py-12 text-gray-500 bg-white rounded-lg shadow">
+                                <i class="fas fa-folder-open text-5xl mb-4 text-gray-300"></i>
+                                <p class="text-lg mb-4">この顧客の案件はまだありません</p>
+                                <button onclick="openNewCaseModalForThisClient()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                                    <i class="fas fa-plus mr-2"></i>新規案件登録
+                                </button>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    // ステータス定義
+                    const STATUSES = [
+                        { key: 'inquiry', label: '見込み', color: 'yellow', icon: 'fa-lightbulb' },
+                        { key: 'preparing', label: '書類準備中', color: 'orange', icon: 'fa-file-alt' },
+                        { key: 'applying', label: '申請中', color: 'purple', icon: 'fa-paper-plane' },
+                        { key: 'completed', label: '完了', color: 'green', icon: 'fa-check-circle' }
+                    ];
+                    
+                    // ステータスごとに案件をグループ化
+                    const casesByStatus = {};
+                    STATUSES.forEach(s => casesByStatus[s.key] = []);
+                    cases.forEach(c => {
+                        if (casesByStatus[c.status]) {
+                            casesByStatus[c.status].push(c);
+                        } else {
+                            // 不明なステータスはinquiryに
+                            casesByStatus['inquiry'].push(c);
+                        }
+                    });
+                    
+                    // カンバンカラムを生成
+                    container.innerHTML = STATUSES.map(status => {
+                        const statusCases = casesByStatus[status.key];
+                        const colorClasses = {
+                            yellow: { bg: 'bg-yellow-50', border: 'border-yellow-300', header: 'bg-yellow-100 text-yellow-800', badge: 'bg-yellow-500' },
+                            blue: { bg: 'bg-blue-50', border: 'border-blue-300', header: 'bg-blue-100 text-blue-800', badge: 'bg-blue-500' },
+                            orange: { bg: 'bg-orange-50', border: 'border-orange-300', header: 'bg-orange-100 text-orange-800', badge: 'bg-orange-500' },
+                            purple: { bg: 'bg-purple-50', border: 'border-purple-300', header: 'bg-purple-100 text-purple-800', badge: 'bg-purple-500' },
+                            green: { bg: 'bg-green-50', border: 'border-green-300', header: 'bg-green-100 text-green-800', badge: 'bg-green-500' }
+                        }[status.color];
+                        
+                        return \`
+                            <div class="flex flex-col rounded-lg \${colorClasses.bg} border \${colorClasses.border} overflow-hidden">
+                                <!-- カラムヘッダー -->
+                                <div class="\${colorClasses.header} px-3 py-2 flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas \${status.icon}"></i>
+                                        <span class="font-bold text-sm">\${status.label}</span>
+                                    </div>
+                                    <span class="\${colorClasses.badge} text-white text-xs px-2 py-0.5 rounded-full">\${statusCases.length}</span>
+                                </div>
+                                
+                                <!-- カード一覧 -->
+                                <div class="p-2 space-y-2 flex-1 min-h-[100px] max-h-[500px] overflow-y-auto">
+                                    \${statusCases.length === 0 ? \`
+                                        <div class="text-center py-4 text-gray-400 text-xs">
+                                            案件なし
+                                        </div>
+                                    \` : statusCases.map(c => \`
+                                        <div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer" onclick="window.location.href='/case/\${c.id}'">
+                                            <div class="p-3">
+                                                <div class="flex items-start justify-between gap-2 mb-2">
+                                                    <span class="font-mono text-xs text-gray-500">\${c.case_number || '#' + c.id}</span>
+                                                    \${c.deposit_required && !c.deposit_paid ? '<span class="text-yellow-600 text-xs"><i class="fas fa-yen-sign"></i></span>' : ''}
+                                                </div>
+                                                \${c.subsidy_type_name ? \`
+                                                    <div class="text-sm font-medium text-gray-800 mb-2 line-clamp-2">\${c.subsidy_type_name}</div>
+                                                \` : ''}
+                                                <div class="flex items-center gap-2 text-xs text-gray-500">
+                                                    \${c.assigned_to_name ? \`<span><i class="fas fa-user mr-1"></i>\${c.assigned_to_name}</span>\` : ''}
+                                                </div>
+                                                \${c.deposit_required ? \`
+                                                    <div class="mt-2 text-xs \${c.deposit_paid ? 'text-green-600' : 'text-yellow-600'}">
+                                                        <i class="fas fa-yen-sign mr-1"></i>¥\${(c.deposit_amount || 0).toLocaleString()}
+                                                        \${c.deposit_paid ? '<span class="ml-1">✓</span>' : '<span class="ml-1">未払</span>'}
+                                                    </div>
+                                                \` : ''}
+                                            </div>
+                                            <div class="border-t px-3 py-2 flex gap-2" onclick="event.stopPropagation()">
+                                                <a href="/case/\${c.id}" class="flex-1 text-center text-xs text-blue-600 hover:text-blue-800 py-1">
+                                                    <i class="fas fa-arrow-right mr-1"></i>詳細
+                                                </a>
+                                                <a href="/portal/\${c.access_token}" target="_blank" class="flex-1 text-center text-xs text-green-600 hover:text-green-800 py-1">
+                                                    <i class="fas fa-external-link-alt mr-1"></i>ポータル
+                                                </a>
+                                            </div>
+                                        </div>
+                                    \`).join('')}
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading client cases:', error);
+                    container.innerHTML = \`
+                        <div class="col-span-full text-center py-8 text-red-500 bg-white rounded-lg shadow">
+                            <i class="fas fa-exclamation-circle text-3xl mb-3"></i>
+                            <p>案件一覧の読み込みに失敗しました</p>
+                        </div>
+                    \`;
+                }
+            }
+            
+            // この顧客に新規案件を登録するモーダルを開く
+            function openNewCaseModalForThisClient() {
+                window.location.href = '/?openNewCase=' + CLIENT_ID;
             }
 
             // ===============================
@@ -6250,10 +7238,882 @@ app.get('/client/:id', async (c) => {
             window.loadDocuments = loadDocuments;
 
             Promise.all([loadSubsidyTypes(), loadUsers()]).then(() => {
+                console.log('Initial data loaded, now loading client data...');
                 loadClient();
                 loadDocuments();
                 loadCommunications();
+            }).catch(error => {
+                console.error('Error during initial load:', error);
+                document.getElementById('clientInfo').innerHTML = '<div class="text-red-600">初期データの読み込みに失敗しました</div>';
             });
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// ===============================
+// 案件詳細ページ（管理者用）
+// ===============================
+
+app.get('/case/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const caseData = await DB.prepare(`
+    SELECT 
+      cases.*,
+      clients.name as client_name,
+      clients.company_name,
+      clients.email,
+      clients.phone,
+      clients.address,
+      subsidy_types.name as subsidy_type_name,
+      subsidy_types.category as subsidy_category,
+      admin_users.name as assigned_to_name
+    FROM cases
+    LEFT JOIN clients ON cases.client_id = clients.id
+    LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+    WHERE cases.id = ?
+  `).bind(id).first()
+  
+  if (!caseData) {
+    return c.text('Case not found', 404)
+  }
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${caseData.case_number} - 案件詳細</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            .sidebar-link { transition: all 0.2s; }
+            .sidebar-link:hover { background-color: rgba(255,255,255,0.1); }
+            .sidebar-link.active { background-color: rgba(255,255,255,0.2); border-left: 3px solid white; }
+        </style>
+    </head>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            <!-- サイドバー -->
+            <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+                <div class="p-4 border-b border-blue-700">
+                    <h1 class="text-xl font-bold flex items-center gap-2">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>助成金管理</span>
+                    </h1>
+                </div>
+                <nav class="p-4 space-y-1 flex-1 overflow-y-auto">
+                    <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-home w-5"></i>
+                        <span>ダッシュボード</span>
+                    </a>
+                    <a href="/client/${caseData.client_id}" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-user w-5"></i>
+                        <span>顧客詳細</span>
+                    </a>
+                    <a href="/case/${id}" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-folder-open w-5"></i>
+                        <span>案件詳細</span>
+                    </a>
+                </nav>
+            </aside>
+            
+            <!-- メインコンテンツ -->
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <div>
+                                <div class="text-sm text-gray-500">案件詳細</div>
+                                <h2 class="text-lg font-bold text-gray-800">${caseData.case_number}</h2>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <a href="/portal/${caseData.access_token}" target="_blank" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                <i class="fas fa-external-link-alt mr-2"></i>ポータル
+                            </a>
+                            <button onclick="copyPortalUrl()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm">
+                                <i class="fas fa-copy mr-2"></i>URL
+                            </button>
+                        </div>
+                    </div>
+                </header>
+                
+                <div class="p-4 lg:p-6">
+                    <!-- 案件ヘッダー情報 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            <div class="flex items-center gap-4">
+                                <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <i class="fas fa-folder-open text-2xl text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-xl font-bold text-gray-900">${caseData.client_name}</h1>
+                                    <div class="text-sm text-gray-500">${caseData.company_name || ''} ${caseData.address ? '/ ' + caseData.address : ''}</div>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <span id="statusBadge" class="px-3 py-1 rounded-full text-xs font-medium"></span>
+                                        ${caseData.subsidy_type_name ? `<span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">${caseData.subsidy_type_name}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <div class="flex items-center gap-2">
+                                    <label class="text-sm text-gray-600">ステータス:</label>
+                                    <select id="statusSelect" onchange="updateStatus()" class="border rounded-lg px-3 py-1.5 text-sm">
+                                        <option value="inquiry">見込み</option>
+                                        <option value="preparing">書類準備中</option>
+                                        <option value="applying">申請中</option>
+                                        <option value="completed">完了</option>
+                                    </select>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    <i class="fas fa-user mr-1"></i>担当: ${caseData.assigned_to_name || '未割り当て'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 見込みステータス時の制限説明バナー -->
+                    <div id="inquiryRestrictionBanner" class="${caseData.status === 'inquiry' ? '' : 'hidden'} mb-6">
+                        <div class="bg-gradient-to-r from-yellow-400 to-amber-400 rounded-xl shadow-lg p-4 text-white">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-info-circle text-2xl"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-lg">現在「見込み」ステータスです</h3>
+                                    <p class="text-sm opacity-90 mt-1">
+                                        顧客ポータルでは<span class="font-bold">ヒアリング回答</span>と<span class="font-bold">書類アップロード</span>が制限されています。
+                                    </p>
+                                    <p class="text-sm opacity-90 mt-1">
+                                        案件を開始するには、ステータスを「書類準備中」以降に変更してください。変更時に<span class="font-bold">1枠</span>を消費します。
+                                    </p>
+                                </div>
+                                <button onclick="document.getElementById('statusSelect').focus()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
+                                    <i class="fas fa-play-circle mr-1"></i>案件を開始
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- タブナビゲーション -->
+                    <div class="bg-white rounded-xl shadow-sm mb-6">
+                        <div class="border-b flex overflow-x-auto">
+                            <button onclick="switchTab('pipeline')" id="tab-pipeline" class="tab-btn px-6 py-3 font-medium text-blue-600 border-b-2 border-blue-600 whitespace-nowrap">
+                                <i class="fas fa-tasks mr-2"></i>パイプライン
+                            </button>
+                            <button onclick="switchTab('documents')" id="tab-documents" class="tab-btn px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                                <i class="fas fa-file-alt mr-2"></i>書類管理
+                            </button>
+                            <button onclick="switchTab('hearing')" id="tab-hearing" class="tab-btn px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                                <i class="fas fa-clipboard-list mr-2"></i>ヒアリング
+                            </button>
+                            <button onclick="switchTab('payment')" id="tab-payment" class="tab-btn px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                                <i class="fas fa-yen-sign mr-2"></i>手付金・契約
+                            </button>
+                            <button onclick="switchTab('communications')" id="tab-communications" class="tab-btn px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                                <i class="fas fa-comments mr-2"></i>やり取り
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- パイプラインタブ -->
+                    <div id="content-pipeline" class="tab-content">
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold">
+                                    <i class="fas fa-tasks mr-2 text-blue-600"></i>パイプライン進捗
+                                </h3>
+                                <button onclick="openApplyPipelineModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                    <i class="fas fa-plus mr-2"></i>テンプレート適用
+                                </button>
+                            </div>
+                            <div id="pipelineProgress" class="mb-4">
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div id="pipelineProgressBar" class="bg-blue-600 h-3 rounded-full transition-all" style="width: 0%"></div>
+                                </div>
+                                <div class="text-right text-sm text-gray-600 mt-1"><span id="pipelineProgressText">0%</span></div>
+                            </div>
+                            <div id="pipelineTasksList" class="space-y-3">
+                                <div class="text-center py-8 text-gray-500">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <div>読み込み中...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 書類管理タブ -->
+                    <div id="content-documents" class="tab-content hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-white rounded-xl shadow-sm p-6">
+                                <h3 class="text-lg font-bold mb-4">
+                                    <i class="fas fa-list-check mr-2 text-green-600"></i>必要書類チェックリスト
+                                </h3>
+                                <div id="documentChecklist" class="space-y-2">
+                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-sm p-6">
+                                <h3 class="text-lg font-bold mb-4">
+                                    <i class="fas fa-upload mr-2 text-blue-600"></i>アップロード済み書類
+                                </h3>
+                                <div id="uploadedDocuments" class="space-y-2">
+                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- ヒアリングタブ -->
+                    <div id="content-hearing" class="tab-content hidden">
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h3 class="text-lg font-bold mb-4">
+                                <i class="fas fa-clipboard-list mr-2 text-indigo-600"></i>ヒアリング回答
+                            </h3>
+                            <div id="hearingProgress" class="mb-4">
+                                <div class="flex items-center justify-between text-sm text-gray-600 mb-1">
+                                    <span>回答進捗</span>
+                                    <span id="hearingProgressText">0/0問</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div id="hearingProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div id="hearingAnswersList" class="space-y-4">
+                                <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 手付金・契約タブ -->
+                    <div id="content-payment" class="tab-content hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-white rounded-xl shadow-sm p-6">
+                                <h3 class="text-lg font-bold mb-4">
+                                    <i class="fas fa-yen-sign mr-2 text-yellow-600"></i>手付金情報
+                                </h3>
+                                <div id="depositInfo">
+                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-sm p-6">
+                                <h3 class="text-lg font-bold mb-4">
+                                    <i class="fas fa-file-signature mr-2 text-blue-600"></i>契約情報
+                                </h3>
+                                <div id="contractInfo">
+                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- やり取りタブ -->
+                    <div id="content-communications" class="tab-content hidden">
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h3 class="text-lg font-bold mb-4">
+                                <i class="fas fa-comments mr-2 text-green-600"></i>やり取り記録
+                            </h3>
+                            <div id="communicationsList" class="space-y-3 mb-4 max-h-96 overflow-y-auto">
+                                <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                            </div>
+                            <form id="communicationForm" class="border-t pt-4">
+                                <textarea id="communicationMessage" rows="3" class="w-full px-3 py-2 border rounded-lg mb-2" placeholder="メッセージを入力..."></textarea>
+                                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                    <i class="fas fa-paper-plane mr-2"></i>送信
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+        
+        <!-- パイプラインテンプレート適用モーダル -->
+        <div id="applyPipelineModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold">パイプラインテンプレートを適用</h3>
+                        <button onclick="closeApplyPipelineModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <select id="pipelineTemplateSelect" class="w-full px-3 py-2 border rounded-lg mb-4">
+                        <option value="">テンプレートを選択...</option>
+                    </select>
+                    <div id="templateDescription" class="text-sm text-gray-600 mb-4 hidden"></div>
+                    <div class="flex gap-3">
+                        <button onclick="applyPipelineTemplate()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-check mr-2"></i>適用
+                        </button>
+                        <button onclick="closeApplyPipelineModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
+                            キャンセル
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            const CASE_ID = ${id};
+            const CLIENT_ID = ${caseData.client_id};
+            const PORTAL_URL = '${new URL(c.req.url).origin}/portal/${caseData.access_token}';
+            
+            const STATUS_LABELS = {
+                inquiry: '見込み',
+                preparing: '書類準備中',
+                applying: '申請中',
+                completed: '完了'
+            };
+            const STATUS_COLORS = {
+                inquiry: 'bg-yellow-100 text-yellow-800',
+                preparing: 'bg-orange-100 text-orange-800',
+                applying: 'bg-purple-100 text-purple-800',
+                completed: 'bg-green-100 text-green-800'
+            };
+            
+            // 認証チェック
+            function checkAuth() {
+                const token = localStorage.getItem('admin_token');
+                if (!token) {
+                    window.location.href = '/login';
+                    return false;
+                }
+                return true;
+            }
+            if (!checkAuth()) { /* redirect */ }
+            
+            axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
+            
+            // サイドバートグル
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('-translate-x-full');
+            }
+            
+            // タブ切り替え
+            function switchTab(tabId) {
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                    btn.classList.add('text-gray-500');
+                });
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                document.getElementById('tab-' + tabId).classList.remove('text-gray-500');
+                document.getElementById('tab-' + tabId).classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+                document.getElementById('content-' + tabId).classList.remove('hidden');
+            }
+            
+            // 現在のステータスを追跡
+            let currentCaseStatus = '${caseData.status || 'inquiry'}';
+            
+            // ステータス更新
+            async function updateStatus() {
+                const newStatus = document.getElementById('statusSelect').value;
+                
+                // 見込み → 他ステータスへの変更時は確認ダイアログを表示
+                if (currentCaseStatus === 'inquiry' && newStatus !== 'inquiry') {
+                    const confirmed = await showSlotConfirmDialog();
+                    if (!confirmed) {
+                        document.getElementById('statusSelect').value = currentCaseStatus;
+                        return;
+                    }
+                }
+                
+                try {
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { status: newStatus });
+                    currentCaseStatus = newStatus;
+                    updateStatusBadge(newStatus);
+                    showToast('ステータスを更新しました');
+                } catch (error) {
+                    console.error('Status update error:', error);
+                    const errorMessage = error.response?.data?.error || '更新に失敗しました';
+                    
+                    // 枠不足エラーの場合は特別なメッセージを表示
+                    if (errorMessage.includes('枠') || errorMessage.includes('slot')) {
+                        alert('枠が不足しています。\\n\\n見込み → 他のステータスに変更するには、利用可能な枠が必要です。\\n\\n管理画面の「プラン・枠管理」から追加枠を購入してください。');
+                    } else {
+                        alert(errorMessage);
+                    }
+                    document.getElementById('statusSelect').value = currentCaseStatus;
+                }
+            }
+            
+            // 枠消費確認ダイアログ
+            function showSlotConfirmDialog() {
+                return new Promise((resolve) => {
+                    const modal = document.createElement('div');
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                    modal.innerHTML = \`
+                        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-yellow-400 to-amber-500 p-4 text-white">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                                        <i class="fas fa-ticket-alt text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-lg">案件を開始しますか？</h3>
+                                        <p class="text-sm opacity-90">枠を1つ消費します</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-5">
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                                    <div class="flex items-start gap-3">
+                                        <i class="fas fa-info-circle text-yellow-500 mt-0.5"></i>
+                                        <div class="text-sm text-yellow-800">
+                                            <p class="font-medium mb-1">「見込み」から他のステータスに変更すると：</p>
+                                            <ul class="list-disc list-inside space-y-1 text-yellow-700">
+                                                <li>利用可能な枠を<strong>1枠消費</strong>します</li>
+                                                <li>顧客がヒアリング回答・書類アップロード可能になります</li>
+                                                <li>この操作は取り消せません</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3">
+                                    <button onclick="this.closest('.fixed').remove(); window._slotConfirmResolve(false);" 
+                                            class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700">
+                                        キャンセル
+                                    </button>
+                                    <button onclick="this.closest('.fixed').remove(); window._slotConfirmResolve(true);" 
+                                            class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                                        <i class="fas fa-play-circle mr-1"></i>案件を開始
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    \`;
+                    document.body.appendChild(modal);
+                    window._slotConfirmResolve = resolve;
+                });
+            }
+            
+            function updateStatusBadge(status) {
+                const badge = document.getElementById('statusBadge');
+                badge.textContent = STATUS_LABELS[status];
+                badge.className = 'px-3 py-1 rounded-full text-xs font-medium ' + STATUS_COLORS[status];
+                
+                // 見込みステータス時の制限バナーの表示/非表示
+                const restrictionBanner = document.getElementById('inquiryRestrictionBanner');
+                if (restrictionBanner) {
+                    if (status === 'inquiry') {
+                        restrictionBanner.classList.remove('hidden');
+                    } else {
+                        restrictionBanner.classList.add('hidden');
+                    }
+                }
+            }
+            
+            // URL コピー
+            function copyPortalUrl() {
+                navigator.clipboard.writeText(PORTAL_URL).then(() => {
+                    showToast('ポータルURLをコピーしました');
+                });
+            }
+            
+            // トースト表示
+            function showToast(message) {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+            
+            // 案件データ読み込み
+            async function loadCaseData() {
+                try {
+                    const response = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                    const caseData = response.data;
+                    
+                    document.getElementById('statusSelect').value = caseData.status;
+                    updateStatusBadge(caseData.status);
+                } catch (error) {
+                    console.error('Error loading case data:', error);
+                }
+            }
+            
+            // パイプライン読み込み
+            async function loadPipeline() {
+                try {
+                    const response = await axios.get(\`/api/cases/\${CASE_ID}/pipelines\`);
+                    const tasks = response.data;
+                    
+                    const container = document.getElementById('pipelineTasksList');
+                    
+                    if (!tasks || tasks.length === 0) {
+                        container.innerHTML = \`
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-tasks text-4xl mb-3 text-gray-300"></i>
+                                <p>パイプラインが設定されていません</p>
+                                <button onclick="openApplyPipelineModal()" class="mt-3 text-blue-600 hover:text-blue-700">
+                                    <i class="fas fa-plus mr-1"></i>テンプレートを適用
+                                </button>
+                            </div>
+                        \`;
+                        document.getElementById('pipelineProgressBar').style.width = '0%';
+                        document.getElementById('pipelineProgressText').textContent = '0%';
+                        return;
+                    }
+                    
+                    const completed = tasks.filter(t => t.status === 'completed').length;
+                    const progress = Math.round((completed / tasks.length) * 100);
+                    document.getElementById('pipelineProgressBar').style.width = progress + '%';
+                    document.getElementById('pipelineProgressText').textContent = progress + '% (' + completed + '/' + tasks.length + ')';
+                    
+                    container.innerHTML = tasks.map((task, index) => {
+                        const statusClass = {
+                            pending: 'bg-gray-100 text-gray-600',
+                            in_progress: 'bg-blue-100 text-blue-700',
+                            completed: 'bg-green-100 text-green-700'
+                        }[task.status] || 'bg-gray-100 text-gray-600';
+                        
+                        const statusLabel = {
+                            pending: '未着手',
+                            in_progress: '進行中',
+                            completed: '完了'
+                        }[task.status] || task.status;
+                        
+                        const taskTypeLabel = task.task_type === 'external' ? '顧客' : task.task_type === 'both' ? '両方' : '自社';
+                        
+                        return \`
+                            <div class="border rounded-lg p-4 \${task.status === 'completed' ? 'bg-green-50' : ''}">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <span class="w-8 h-8 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-bold">\${index + 1}</span>
+                                        <div>
+                                            <div class="font-medium">\${task.task_name}</div>
+                                            <div class="text-xs text-gray-500">
+                                                <span class="px-1.5 py-0.5 rounded bg-gray-100">\${taskTypeLabel}</span>
+                                                \${task.is_required ? '<span class="text-red-500 ml-1">*必須</span>' : ''}
+                                                \${task.start_date ? ' | 期間: ' + task.start_date + ' 〜 ' + task.end_date : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <select onchange="updateTaskStatus(\${task.id}, this.value)" class="text-xs border rounded px-2 py-1">
+                                            <option value="pending" \${task.status === 'pending' ? 'selected' : ''}>未着手</option>
+                                            <option value="in_progress" \${task.status === 'in_progress' ? 'selected' : ''}>進行中</option>
+                                            <option value="completed" \${task.status === 'completed' ? 'selected' : ''}>完了</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                \${task.description ? '<p class="text-sm text-gray-600 mt-2 ml-11">' + task.description + '</p>' : ''}
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading pipeline:', error);
+                    document.getElementById('pipelineTasksList').innerHTML = '<div class="text-center py-4 text-red-500">読み込みエラー</div>';
+                }
+            }
+            
+            // タスクステータス更新
+            async function updateTaskStatus(taskId, status) {
+                try {
+                    await axios.put(\`/api/pipeline-tasks/\${taskId}\`, { status });
+                    showToast('タスクを更新しました');
+                    loadPipeline();
+                } catch (error) {
+                    alert('更新に失敗しました');
+                    loadPipeline();
+                }
+            }
+            
+            // 書類読み込み
+            async function loadDocuments() {
+                try {
+                    const [checklistRes, docsRes] = await Promise.all([
+                        axios.get(\`/api/cases/\${CASE_ID}/document-checklist\`),
+                        axios.get(\`/api/cases/\${CASE_ID}/documents\`)
+                    ]);
+                    
+                    const checklist = checklistRes.data;
+                    const documents = docsRes.data;
+                    
+                    // チェックリスト
+                    const checklistContainer = document.getElementById('documentChecklist');
+                    if (checklist.length === 0) {
+                        checklistContainer.innerHTML = '<div class="text-gray-500 text-center py-4">チェックリストがありません</div>';
+                    } else {
+                        const uploadedTypes = new Set(documents.map(d => d.document_type));
+                        checklistContainer.innerHTML = checklist.map(item => {
+                            const isUploaded = uploadedTypes.has(item.document_type);
+                            return \`
+                                <div class="flex items-center gap-3 p-2 rounded \${isUploaded ? 'bg-green-50' : 'bg-gray-50'}">
+                                    <i class="fas fa-\${isUploaded ? 'check-circle text-green-500' : 'circle text-gray-300'}"></i>
+                                    <div class="flex-1">
+                                        <div class="text-sm font-medium">\${item.document_type}</div>
+                                        \${item.description ? '<div class="text-xs text-gray-500">' + item.description + '</div>' : ''}
+                                    </div>
+                                    \${item.is_required ? '<span class="text-xs text-red-500">必須</span>' : ''}
+                                </div>
+                            \`;
+                        }).join('');
+                    }
+                    
+                    // アップロード済み
+                    const docsContainer = document.getElementById('uploadedDocuments');
+                    if (documents.length === 0) {
+                        docsContainer.innerHTML = '<div class="text-gray-500 text-center py-4">アップロードされた書類はありません</div>';
+                    } else {
+                        docsContainer.innerHTML = documents.map(doc => {
+                            const statusClass = {
+                                pending: 'bg-yellow-100 text-yellow-700',
+                                approved: 'bg-green-100 text-green-700',
+                                rejected: 'bg-red-100 text-red-700'
+                            }[doc.status] || 'bg-gray-100';
+                            const statusLabel = { pending: '確認待ち', approved: '承認済み', rejected: '差し戻し' }[doc.status] || doc.status;
+                            
+                            return \`
+                                <div class="flex items-center gap-3 p-2 border rounded">
+                                    <i class="fas fa-file text-blue-500"></i>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-medium truncate">\${doc.document_type}</div>
+                                        <div class="text-xs text-gray-500">\${doc.file_name}</div>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-xs \${statusClass}">\${statusLabel}</span>
+                                    <a href="/api/documents/\${doc.id}/download" class="text-blue-600 hover:text-blue-700">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            \`;
+                        }).join('');
+                    }
+                } catch (error) {
+                    console.error('Error loading documents:', error);
+                }
+            }
+            
+            // ヒアリング読み込み
+            async function loadHearing() {
+                try {
+                    const [answersRes] = await Promise.all([
+                        axios.get(\`/api/cases/\${CASE_ID}/hearing-answers\`)
+                    ]);
+                    
+                    const answers = answersRes.data;
+                    const container = document.getElementById('hearingAnswersList');
+                    
+                    if (answers.length === 0) {
+                        container.innerHTML = '<div class="text-gray-500 text-center py-4">ヒアリング回答がありません</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = answers.map(a => \`
+                        <div class="border rounded-lg p-4">
+                            <div class="font-medium text-gray-800 mb-2">
+                                \${a.question_text || 'Q: ' + a.question_id}
+                                \${a.is_required ? '<span class="text-red-500 text-xs ml-1">*必須</span>' : ''}
+                            </div>
+                            <div class="bg-gray-50 rounded p-3 text-sm">\${a.answer_text || '<span class="text-gray-400">未回答</span>'}</div>
+                        </div>
+                    \`).join('');
+                    
+                    const total = answers.length;
+                    const answered = answers.filter(a => a.answer_text).length;
+                    const progress = total > 0 ? Math.round((answered / total) * 100) : 0;
+                    
+                    document.getElementById('hearingProgressText').textContent = answered + '/' + total + '問';
+                    document.getElementById('hearingProgressBar').style.width = progress + '%';
+                } catch (error) {
+                    console.error('Error loading hearing:', error);
+                }
+            }
+            
+            // 手付金・契約読み込み
+            async function loadPayment() {
+                try {
+                    const response = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                    const caseData = response.data;
+                    
+                    const depositContainer = document.getElementById('depositInfo');
+                    const contractContainer = document.getElementById('contractInfo');
+                    
+                    // 手付金
+                    if (!caseData.deposit_required) {
+                        depositContainer.innerHTML = '<div class="text-gray-500">手付金は設定されていません</div>';
+                    } else {
+                        const amount = (caseData.deposit_amount || 0).toLocaleString();
+                        const isPaid = caseData.deposit_paid;
+                        
+                        depositContainer.innerHTML = \`
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-2xl font-bold">¥\${amount}</span>
+                                    <span class="px-3 py-1 rounded-full text-sm \${isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
+                                        \${isPaid ? '✓ 支払い済み' : '未払い'}
+                                    </span>
+                                </div>
+                                \${!isPaid ? \`
+                                    <button onclick="markDepositPaid()" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                                        <i class="fas fa-check mr-2"></i>支払い済みにする
+                                    </button>
+                                \` : ''}
+                            </div>
+                        \`;
+                    }
+                    
+                    // 契約
+                    if (caseData.contract_url) {
+                        contractContainer.innerHTML = \`
+                            <a href="\${caseData.contract_url}" target="_blank" class="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50">
+                                <i class="fas fa-file-signature text-2xl text-blue-600"></i>
+                                <div class="flex-1">
+                                    <div class="font-medium">電子契約書</div>
+                                    <div class="text-sm text-gray-500">クリックして開く</div>
+                                </div>
+                                <i class="fas fa-external-link-alt text-gray-400"></i>
+                            </a>
+                        \`;
+                    } else {
+                        contractContainer.innerHTML = '<div class="text-gray-500">契約URLは設定されていません</div>';
+                    }
+                } catch (error) {
+                    console.error('Error loading payment:', error);
+                }
+            }
+            
+            // 支払い済みにする
+            async function markDepositPaid() {
+                if (!confirm('手付金を支払い済みにしますか？')) return;
+                try {
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { deposit_paid: true });
+                    showToast('手付金を支払い済みにしました');
+                    loadPayment();
+                } catch (error) {
+                    alert('更新に失敗しました');
+                }
+            }
+            
+            // やり取り読み込み
+            async function loadCommunications() {
+                try {
+                    const response = await axios.get(\`/api/cases/\${CASE_ID}/communications\`);
+                    const communications = response.data;
+                    
+                    const container = document.getElementById('communicationsList');
+                    
+                    if (communications.length === 0) {
+                        container.innerHTML = '<div class="text-gray-500 text-center py-4">やり取りの記録はありません</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = communications.map(comm => \`
+                        <div class="flex gap-3 \${comm.sender_type === 'staff' ? '' : 'flex-row-reverse'}">
+                            <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center \${comm.sender_type === 'staff' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}">
+                                <i class="fas fa-\${comm.sender_type === 'staff' ? 'user-tie' : 'user'}"></i>
+                            </div>
+                            <div class="flex-1 \${comm.sender_type === 'staff' ? '' : 'text-right'}">
+                                <div class="inline-block max-w-[80%] p-3 rounded-lg \${comm.sender_type === 'staff' ? 'bg-blue-50' : 'bg-green-50'}">
+                                    <div class="text-sm">\${comm.message}</div>
+                                </div>
+                                <div class="text-xs text-gray-400 mt-1">\${comm.sender_name} - \${new Date(comm.created_at).toLocaleString('ja-JP')}</div>
+                            </div>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Error loading communications:', error);
+                }
+            }
+            
+            // メッセージ送信
+            document.getElementById('communicationForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const message = document.getElementById('communicationMessage').value.trim();
+                if (!message) return;
+                
+                try {
+                    await axios.post(\`/api/cases/\${CASE_ID}/communications\`, {
+                        message,
+                        sender_type: 'staff',
+                        sender_name: localStorage.getItem('admin_name') || 'スタッフ'
+                    });
+                    document.getElementById('communicationMessage').value = '';
+                    loadCommunications();
+                    showToast('メッセージを送信しました');
+                } catch (error) {
+                    alert('送信に失敗しました');
+                }
+            });
+            
+            // パイプラインテンプレート適用モーダル
+            async function openApplyPipelineModal() {
+                document.getElementById('applyPipelineModal').classList.remove('hidden');
+                
+                try {
+                    const response = await axios.get('/api/pipeline-templates');
+                    const templates = response.data;
+                    
+                    const select = document.getElementById('pipelineTemplateSelect');
+                    select.innerHTML = '<option value="">テンプレートを選択...</option>';
+                    
+                    templates.forEach(t => {
+                        const option = document.createElement('option');
+                        option.value = t.id;
+                        option.textContent = t.name + ' (' + (t.task_count || 0) + 'タスク)';
+                        option.dataset.description = t.description || '';
+                        select.appendChild(option);
+                    });
+                    
+                    select.addEventListener('change', function() {
+                        const desc = this.options[this.selectedIndex]?.dataset?.description;
+                        const descDiv = document.getElementById('templateDescription');
+                        if (desc) {
+                            descDiv.textContent = desc;
+                            descDiv.classList.remove('hidden');
+                        } else {
+                            descDiv.classList.add('hidden');
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error loading templates:', error);
+                }
+            }
+            
+            function closeApplyPipelineModal() {
+                document.getElementById('applyPipelineModal').classList.add('hidden');
+            }
+            
+            async function applyPipelineTemplate() {
+                const templateId = document.getElementById('pipelineTemplateSelect').value;
+                if (!templateId) {
+                    alert('テンプレートを選択してください');
+                    return;
+                }
+                
+                try {
+                    await axios.post(\`/api/cases/\${CASE_ID}/apply-pipeline\`, { template_id: templateId });
+                    showToast('パイプラインを適用しました');
+                    closeApplyPipelineModal();
+                    loadPipeline();
+                } catch (error) {
+                    alert('適用に失敗しました: ' + (error.response?.data?.error || error.message));
+                }
+            }
+            
+            // 初期読み込み
+            loadCaseData();
+            loadPipeline();
+            loadDocuments();
+            loadHearing();
+            loadPayment();
+            loadCommunications();
         </script>
     </body>
     </html>
@@ -6348,6 +8208,21 @@ app.get('/portal/:token', async (c) => {
             </header>
 
             <div class="container mx-auto px-4 py-4 lg:py-6">
+                <!-- 見込みステータス時の制限バナー -->
+                <div id="inquiryRestrictionBanner" class="hidden mb-4">
+                    <div class="bg-gradient-to-r from-yellow-400 to-amber-400 rounded-lg shadow-lg p-4 text-white">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-info-circle text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">現在「見込み」ステータスです</h3>
+                                <p class="text-sm opacity-90 mt-1">担当者が案件を開始すると、ヒアリング回答や書類アップロードが可能になります。<br>ご不明点はお気軽にお問い合わせください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- お知らせバナー -->
                 <div id="announcementBanner" class="hidden mb-4">
                     <!-- お知らせが動的に挿入される -->
@@ -6837,28 +8712,102 @@ app.get('/portal/:token', async (c) => {
             const CASE_ID = ${caseId || 'null'};
             const STATUS_INFO = {
                 inquiry: { icon: '🔍', text: '見込み', desc: 'まずはお話を聞かせてください' },
-                consulting: { icon: '💬', text: '相談中', desc: '詳細をヒアリングしています' },
                 preparing: { icon: '📝', text: '書類準備中', desc: '必要書類をアップロードしてください' },
                 applying: { icon: '📤', text: '申請中', desc: '申請手続きを進めています' },
                 completed: { icon: '✅', text: '完了', desc: 'お疲れ様でした！' }
             };
+            
+            // 見込みステータスかどうかを保持
+            let isInquiryStatus = false;
+            let currentStatus = 'inquiry';
 
             async function loadStatus() {
-                const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                const client = response.data;
-                const info = STATUS_INFO[client.status];
+                // 案件データからステータスを取得（優先）
+                let status = 'inquiry';
+                let contractUrl = null;
+                
+                if (CASE_ID) {
+                    try {
+                        const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                        status = caseRes.data.status || 'inquiry';
+                        contractUrl = caseRes.data.contract_url;
+                    } catch (e) {
+                        console.log('Case data not found, falling back to client');
+                    }
+                }
+                
+                // フォールバック: クライアントデータから
+                if (!CASE_ID || status === 'inquiry') {
+                    try {
+                        const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
+                        const client = response.data;
+                        if (!CASE_ID) {
+                            status = client.status || 'inquiry';
+                        }
+                        contractUrl = contractUrl || client.contract_url;
+                    } catch (e) {}
+                }
+                
+                currentStatus = status;
+                isInquiryStatus = (status === 'inquiry');
+                
+                const info = STATUS_INFO[status] || STATUS_INFO['inquiry'];
                 
                 document.getElementById('statusIcon').textContent = info.icon;
                 document.getElementById('statusText').textContent = info.text;
                 document.getElementById('statusDescription').textContent = info.desc;
                 
                 // 電子契約URLがあれば表示
-                if (client.contract_url) {
+                if (contractUrl) {
                     const contractSection = document.getElementById('contractSection');
                     const contractLink = document.getElementById('contractLink');
                     if (contractSection && contractLink) {
                         contractSection.classList.remove('hidden');
-                        contractLink.href = client.contract_url;
+                        contractLink.href = contractUrl;
+                    }
+                }
+                
+                // 見込みステータス時の制限バナーを表示
+                updateInquiryRestrictions();
+            }
+            
+            // 見込みステータス時の制限表示を更新
+            function updateInquiryRestrictions() {
+                const restrictionBanner = document.getElementById('inquiryRestrictionBanner');
+                const hearingSection = document.getElementById('hearingSection');
+                const documentUploadArea = document.getElementById('documentUploadArea');
+                
+                if (isInquiryStatus) {
+                    // 制限バナーを表示
+                    if (restrictionBanner) {
+                        restrictionBanner.classList.remove('hidden');
+                    }
+                    // ヒアリングセクションに制限を追加
+                    if (hearingSection) {
+                        const hearingContent = hearingSection.querySelector('#hearingQuestions');
+                        if (hearingContent) {
+                            hearingContent.innerHTML = \`
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                                    <i class="fas fa-lock text-yellow-500 text-2xl mb-2"></i>
+                                    <p class="font-medium text-yellow-700">ヒアリング機能は案件開始後にご利用いただけます</p>
+                                    <p class="text-sm text-yellow-600 mt-1">担当者からのご連絡をお待ちください</p>
+                                </div>
+                            \`;
+                        }
+                    }
+                    // 書類アップロードエリアに制限を追加
+                    if (documentUploadArea) {
+                        documentUploadArea.innerHTML = \`
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                                <i class="fas fa-lock text-yellow-500 text-2xl mb-2"></i>
+                                <p class="font-medium text-yellow-700">書類アップロードは案件開始後にご利用いただけます</p>
+                                <p class="text-sm text-yellow-600 mt-1">担当者からのご連絡をお待ちください</p>
+                            </div>
+                        \`;
+                    }
+                } else {
+                    if (restrictionBanner) {
+                        restrictionBanner.classList.add('hidden');
                     }
                 }
             }
@@ -6868,9 +8817,14 @@ app.get('/portal/:token', async (c) => {
                 try {
                     const nextActions = [];
                     
-                    // 1. 手付金未払いチェック
+                    // 1. 手付金未払いチェック（案件データから取得）
+                    let depositInfo = {};
+                    if (CASE_ID) {
+                        const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                        depositInfo = caseRes.data;
+                    }
                     const clientRes = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                    const client = clientRes.data;
+                    const client = { ...clientRes.data, ...depositInfo };
                     
                     if (client.deposit_required && !client.deposit_paid && !client.deposit_transfer_reported) {
                         nextActions.push({
@@ -7267,8 +9221,17 @@ app.get('/portal/:token', async (c) => {
             // 手付金・契約情報を読み込む
             async function loadDepositInfo() {
                 try {
-                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                    const client = response.data;
+                    // 案件データから手付金情報を取得（CASE_IDがある場合）
+                    let depositData = null;
+                    if (CASE_ID) {
+                        const caseResponse = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                        depositData = caseResponse.data;
+                    } else {
+                        // フォールバック：クライアントデータから取得
+                        const clientResponse = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
+                        depositData = clientResponse.data;
+                    }
+                    const client = depositData;
                     
                     const section = document.getElementById('depositSection');
                     const badge = document.getElementById('depositStatusBadge');
@@ -7575,6 +9538,18 @@ app.get('/portal/:token', async (c) => {
             }
 
             async function loadChecklist() {
+                // 見込みステータスの場合は制限メッセージを表示
+                if (isInquiryStatus) {
+                    document.getElementById('checklistItems').innerHTML = \`
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                            <i class="fas fa-lock text-yellow-500 text-xl mb-2"></i>
+                            <p class="font-medium text-yellow-700 text-sm">書類アップロードは案件開始後に利用可能です</p>
+                            <p class="text-xs text-yellow-600 mt-1">担当者からのご連絡をお待ちください</p>
+                        </div>
+                    \`;
+                    return;
+                }
+                
                 // 案件の助成金種別に基づくチェックリストを取得
                 const checklistUrl = CASE_ID ? \`/api/cases/\${CASE_ID}/document-checklist\` : \`/api/clients/\${CLIENT_ID}/document-checklist\`;
                 const response = await axios.get(checklistUrl);
@@ -7603,6 +9578,12 @@ app.get('/portal/:token', async (c) => {
             }
             
             function openUploadModal(documentType, isUploaded) {
+                // 見込みステータスの場合はアップロードをブロック
+                if (isInquiryStatus) {
+                    showMessage('error', '書類アップロードは案件開始後にご利用いただけます');
+                    return;
+                }
+                
                 document.getElementById('selectedDocumentType').value = documentType;
                 document.getElementById('uploadModalTitle').innerHTML = \`
                     <i class="fas fa-\${isUploaded ? 'sync-alt' : 'upload'} mr-2"></i>\${documentType}
@@ -7694,6 +9675,13 @@ app.get('/portal/:token', async (c) => {
             });
 
             document.getElementById('fileInput').addEventListener('change', async (e) => {
+                // 見込みステータスの場合はアップロードをブロック
+                if (isInquiryStatus) {
+                    showMessage('error', '書類アップロードは案件開始後にご利用いただけます');
+                    closeUploadModal();
+                    return;
+                }
+                
                 const files = e.target.files;
                 const documentType = document.getElementById('selectedDocumentType').value;
                 
@@ -7767,6 +9755,13 @@ app.get('/portal/:token', async (c) => {
             dropZone.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 dropZone.classList.remove('border-green-500', 'bg-green-100');
+                
+                // 見込みステータスの場合はアップロードをブロック
+                if (isInquiryStatus) {
+                    showMessage('error', '書類アップロードは案件開始後にご利用いただけます');
+                    closeUploadModal();
+                    return;
+                }
                 
                 const documentType = document.getElementById('selectedDocumentType').value;
                 if (!documentType) {
@@ -7877,6 +9872,18 @@ app.get('/portal/:token', async (c) => {
             
             async function loadHearingQuestions() {
                 try {
+                    // 見込みステータスの場合は制限メッセージを表示
+                    if (isInquiryStatus) {
+                        document.getElementById('hearingQuestionsList').innerHTML = \`
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                                <i class="fas fa-lock text-yellow-500 text-3xl mb-3"></i>
+                                <p class="font-bold text-yellow-700 text-lg">ヒアリング機能は案件開始後にご利用いただけます</p>
+                                <p class="text-yellow-600 mt-2">現在、担当者が内容を確認中です。<br>案件が開始されましたら、ご質問への回答をお願いいたします。</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
                     // 案件の助成金種別を取得（CASE_IDがある場合はcasesテーブルから）
                     let subsidyTypeId = null;
                     
@@ -8218,6 +10225,12 @@ app.get('/portal/:token', async (c) => {
             }
             
             async function saveAllHearingAnswers() {
+                // 見込みステータスの場合は保存をブロック
+                if (isInquiryStatus) {
+                    showMessage('error', 'ヒアリング回答の保存は案件開始後にご利用いただけます');
+                    return;
+                }
+                
                 showMessage('info', '回答を保存中...');
                 
                 try {
@@ -9271,66 +11284,58 @@ app.get('/admin/users', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>従業員管理 - 助成金申請管理システム</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            ${sidebarStyles}
+        </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <!-- ヘッダー -->
-            <header class="bg-green-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <h1 class="text-2xl font-bold">
-                            <i class="fas fa-users-cog mr-2"></i>
-                            従業員管理
-                        </h1>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('users')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
-                            <a href="/" class="hover:underline">
-                                <i class="fas fa-arrow-left mr-1"></i>
-                                トップに戻る
-                            </a>
-                            <button onclick="logout()" class="hover:underline">
-                                <i class="fas fa-sign-out-alt mr-1"></i>
-                                ログアウト
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
                             </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-users-cog mr-2"></i>従業員管理
+                            </h2>
                         </div>
+                        <button onclick="openAddUserModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                            <i class="fas fa-user-plus mr-2"></i>新規追加
+                        </button>
+                    </div>
+                </header>
+
+                <div class="p-4 lg:p-6">
+                    <!-- 従業員一覧 -->
+                    <div class="bg-white rounded-lg shadow overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ユーザー名</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">表示名</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">登録日</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersList" class="divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                        <div>読み込み中...</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </header>
-
-            <!-- メインコンテンツ -->
-            <div class="container mx-auto px-4 py-8">
-                <!-- アクションボタン -->
-                <div class="mb-6">
-                    <button onclick="openAddUserModal()" 
-                            class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">
-                        <i class="fas fa-user-plus mr-2"></i>
-                        新規従業員追加
-                    </button>
-                </div>
-
-                <!-- 従業員一覧 -->
-                <div class="bg-white rounded-lg shadow overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-gray-50 border-b">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ユーザー名</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">表示名</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">登録日</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="usersList" class="divide-y divide-gray-200">
-                            <tr>
-                                <td colspan="5" class="px-6 py-8 text-center text-gray-500">
-                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                    <div>読み込み中...</div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            </main>
         </div>
 
         <!-- 新規追加モーダル -->
@@ -10200,38 +12205,37 @@ app.get('/admin/guidelines', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>公募要領管理 - 助成金申請管理システム</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            ${sidebarStyles}
+        </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <!-- ヘッダー -->
-            <header class="bg-indigo-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <a href="/" class="text-sm hover:underline mb-1 block">
-                                <i class="fas fa-arrow-left mr-1"></i>トップに戻る
-                            </a>
-                            <h1 class="text-xl md:text-2xl font-bold">
-                                <i class="fas fa-book-open mr-2"></i>
-                                公募要領管理
-                            </h1>
-                        </div>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('guidelines')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-book-open mr-2"></i>公募要領管理
+                            </h2>
+                        </div>
+                        <div class="flex items-center gap-3">
                             <div id="notificationBadge" class="relative cursor-pointer" onclick="showNotifications()">
-                                <i class="fas fa-bell text-xl"></i>
+                                <i class="fas fa-bell text-xl text-gray-600"></i>
                                 <span id="unreadCount" class="hidden absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
                             </div>
-                            <button onclick="logout()" class="text-sm hover:underline">
-                                <i class="fas fa-sign-out-alt mr-1"></i>
-                                ログアウト
-                            </button>
                         </div>
                     </div>
-                </div>
-            </header>
+                </header>
 
-            <div class="container mx-auto px-4 py-8">
+                <div class="p-4 lg:p-6">
                 <!-- タブ切り替え -->
                 <div class="bg-white rounded-lg shadow mb-6">
                     <div class="border-b flex overflow-x-auto">
@@ -11374,34 +13378,31 @@ app.get('/admin/backup', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>バックアップ管理 - 助成金申請管理システム</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            ${sidebarStyles}
+        </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <!-- ヘッダー -->
-            <header class="bg-amber-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <h1 class="text-xl md:text-2xl font-bold">
-                            <i class="fas fa-database mr-2"></i>
-                            バックアップ管理
-                        </h1>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('backup')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
-                            <a href="/" class="hover:underline text-sm">
-                                <i class="fas fa-arrow-left mr-1"></i>
-                                ダッシュボードに戻る
-                            </a>
-                            <button onclick="logout()" class="hover:underline text-sm">
-                                <i class="fas fa-sign-out-alt mr-1"></i>
-                                ログアウト
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
                             </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-database mr-2"></i>バックアップ管理
+                            </h2>
                         </div>
                     </div>
-                </div>
-            </header>
+                </header>
 
-            <!-- メインコンテンツ -->
-            <div class="container mx-auto px-4 py-8">
+                <div class="p-4 lg:p-6">
                 <!-- 警告メッセージ -->
                 <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 rounded-r-lg">
                     <div class="flex items-start">
@@ -14048,7 +16049,6 @@ app.get('/api/dashboard/stats', async (c) => {
     SELECT 
       COUNT(*) as total,
       SUM(CASE WHEN status = 'inquiry' THEN 1 ELSE 0 END) as inquiry,
-      SUM(CASE WHEN status = 'consulting' THEN 1 ELSE 0 END) as consulting,
       SUM(CASE WHEN status = 'preparing' THEN 1 ELSE 0 END) as preparing,
       SUM(CASE WHEN status = 'applying' THEN 1 ELSE 0 END) as applying,
       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
@@ -15172,7 +17172,7 @@ app.post('/api/pipeline-templates', async (c) => {
   `).bind(
     data.name,
     data.description || '',
-    data.category || 'general',
+    data.category || '許認可',
     data.service_start_offset || 0,
     data.service_end_offset || 30,
     data.requires_approval ? 1 : 0,
@@ -15229,7 +17229,7 @@ app.put('/api/pipeline-templates/:id', async (c) => {
   `).bind(
     data.name,
     data.description || '',
-    data.category || 'general',
+    data.category || '許認可',
     data.service_start_offset || 0,
     data.service_end_offset || 30,
     data.requires_approval ? 1 : 0,
@@ -15358,6 +17358,26 @@ app.post('/api/clients/:clientId/apply-pipeline', async (c) => {
 })
 
 // クライアントのパイプライン一覧取得
+// 顧客の案件一覧取得
+app.get('/api/clients/:clientId/cases', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId')
+  
+  const cases = await DB.prepare(`
+    SELECT 
+      cases.*,
+      subsidy_types.name as subsidy_type_name,
+      admin_users.name as assigned_to_name
+    FROM cases
+    LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+    WHERE cases.client_id = ?
+    ORDER BY cases.created_at DESC
+  `).bind(clientId).all()
+  
+  return c.json(cases.results || [])
+})
+
 app.get('/api/clients/:clientId/pipelines', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
@@ -15664,8 +17684,8 @@ app.get('/admin/pipelines', (c) => {
     <body class="bg-gray-100">
         <div class="min-h-screen flex">
             <!-- 左サイドバー -->
-            <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50">
-                <div class="p-4 border-b border-blue-700">
+            <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+                <div class="p-4 border-b border-blue-700 flex-shrink-0">
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
                         <span>助成金管理</span>
@@ -15673,7 +17693,7 @@ app.get('/admin/pipelines', (c) => {
                     <p class="text-xs text-blue-300 mt-1">Subsidy Manager</p>
                 </div>
                 
-                <nav class="p-4 space-y-1">
+                <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
                     <a href="/" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-home w-5"></i>
                         <span>ダッシュボード</span>
@@ -15699,6 +17719,11 @@ app.get('/admin/pipelines', (c) => {
                         <i class="fas fa-users w-5"></i>
                         <span>助成金一覧</span>
                         <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
+                    </a>
+                    <a href="/subsidy-types?category=許認可" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                        <i class="fas fa-stamp w-5"></i>
+                        <span>許認可申請</span>
+                        <span class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
                     </a>
                     <a href="/admin/pipelines" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-project-diagram w-5"></i>
@@ -15743,9 +17768,9 @@ app.get('/admin/pipelines', (c) => {
                             <h3 class="text-base font-bold text-gray-800">パイプラインテンプレート</h3>
                             <select id="filterCategory" onchange="loadTemplates()" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm">
                                 <option value="">すべてのカテゴリ</option>
-                                <option value="subsidy">補助金</option>
-                                <option value="grant">助成金</option>
-                                <option value="general">一般</option>
+                                <option value="行政書士管轄">行政書士管轄</option>
+                                <option value="社労士管轄">社労士管轄</option>
+                                <option value="許認可">許認可</option>
                             </select>
                         </div>
                         <div id="templatesList" class="divide-y divide-gray-100">
@@ -15784,9 +17809,9 @@ app.get('/admin/pipelines', (c) => {
                         <div>
                             <label class="block text-sm font-medium mb-1">カテゴリ *</label>
                             <select name="category" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="subsidy">補助金</option>
-                                <option value="grant">助成金</option>
-                                <option value="general">一般</option>
+                                <option value="行政書士管轄">行政書士管轄</option>
+                                <option value="社労士管轄">社労士管轄</option>
+                                <option value="許認可">許認可</option>
                             </select>
                         </div>
                         <div>
@@ -15993,13 +18018,13 @@ app.get('/admin/pipelines', (c) => {
                     }
                     
                     const categoryLabels = {
-                        'subsidy': { label: '補助金', color: 'bg-blue-100 text-blue-800' },
-                        'grant': { label: '助成金', color: 'bg-green-100 text-green-800' },
-                        'general': { label: '一般', color: 'bg-gray-100 text-gray-800' }
+                        '行政書士管轄': { label: '行政書士管轄', color: 'bg-emerald-100 text-emerald-800' },
+                        '社労士管轄': { label: '社労士管轄', color: 'bg-blue-100 text-blue-800' },
+                        '許認可': { label: '許認可', color: 'bg-indigo-100 text-indigo-800' }
                     };
                     
                     container.innerHTML = templates.map(t => {
-                        const cat = categoryLabels[t.category] || categoryLabels.general;
+                        const cat = categoryLabels[t.category] || categoryLabels['許認可'];
                         return \`
                             <div class="p-4 hover:bg-gray-50 cursor-pointer" onclick="showTemplateDetail(\${t.id})">
                                 <div class="flex items-center justify-between">
@@ -16042,11 +18067,11 @@ app.get('/admin/pipelines', (c) => {
                     document.getElementById('templateDetailTitle').textContent = template.name;
                     
                     const categoryLabels = {
-                        'subsidy': { label: '補助金', color: 'bg-blue-100 text-blue-800' },
-                        'grant': { label: '助成金', color: 'bg-green-100 text-green-800' },
-                        'general': { label: '一般', color: 'bg-gray-100 text-gray-800' }
+                        '行政書士管轄': { label: '行政書士管轄', color: 'bg-emerald-100 text-emerald-800' },
+                        '社労士管轄': { label: '社労士管轄', color: 'bg-blue-100 text-blue-800' },
+                        '許認可': { label: '許認可', color: 'bg-indigo-100 text-indigo-800' }
                     };
-                    const cat = categoryLabels[template.category] || categoryLabels.general;
+                    const cat = categoryLabels[template.category] || categoryLabels['許認可'];
                     
                     const taskTypeLabels = {
                         'internal': { label: '自社', color: 'bg-purple-100 text-purple-800' },
@@ -16201,7 +18226,7 @@ app.get('/admin/pipelines', (c) => {
                     // フォームに値を設定
                     document.querySelector('input[name="name"]').value = template.name;
                     document.querySelector('textarea[name="description"]').value = template.description || '';
-                    document.querySelector('select[name="category"]').value = template.category || 'general';
+                    document.querySelector('select[name="category"]').value = template.category || '許認可';
                     document.querySelector('input[name="service_start_offset"]').value = template.service_start_offset || 0;
                     document.querySelector('input[name="service_end_offset"]').value = template.service_end_offset || 30;
                     
@@ -16795,6 +18820,389 @@ app.post('/api/stripe/webhook', async (c) => {
 // 管理画面: システム設定
 // ===============================
 
+// プラン・枠管理ページ
+app.get('/admin/subscription', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>プラン・枠管理 - 助成金申請管理システム</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>
+            ${sidebarStyles}
+        </style>
+    </head>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('subscription')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-ticket-alt mr-2"></i>プラン・枠管理
+                            </h2>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="p-4 lg:p-6">
+            
+            <!-- 現在のプラン・枠状況 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">現在のプラン</h3>
+                        <i class="fas fa-crown text-yellow-500"></i>
+                    </div>
+                    <p id="currentPlan" class="text-2xl font-bold text-gray-900">読み込み中...</p>
+                    <p id="planPrice" class="text-sm text-gray-500 mt-1"></p>
+                    <div id="scheduledPlanInfo" class="hidden mt-2 text-xs bg-yellow-50 border border-yellow-200 rounded p-2">
+                        <i class="fas fa-clock text-yellow-600 mr-1"></i>
+                        <span id="scheduledPlanText"></span>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">次回切り替わり日</h3>
+                        <i class="fas fa-calendar-alt text-purple-500"></i>
+                    </div>
+                    <p id="nextResetDate" class="text-2xl font-bold text-purple-600">-</p>
+                    <p class="text-xs text-gray-500 mt-1">この日にプラン枠がリセットされます</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">利用可能枠</h3>
+                        <i class="fas fa-ticket-alt text-green-500"></i>
+                    </div>
+                    <p id="totalSlots" class="text-3xl font-bold text-green-600">-</p>
+                    <div class="text-xs text-gray-500 mt-1 space-y-1">
+                        <div class="flex justify-between">
+                            <span><i class="fas fa-sync-alt mr-1 text-blue-400"></i>プラン枠:</span>
+                            <span id="monthlySlots" class="font-medium">-</span>
+                            <span class="text-orange-500">(有限)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span><i class="fas fa-plus-circle mr-1 text-green-400"></i>追加枠:</span>
+                            <span id="purchasedSlots" class="font-medium">-</span>
+                            <span class="text-green-500">(無期限)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">今月の使用</h3>
+                        <i class="fas fa-chart-bar text-blue-500"></i>
+                    </div>
+                    <p id="usedThisMonth" class="text-3xl font-bold text-blue-600">-</p>
+                    <p class="text-sm text-gray-500 mt-1">件の案件を開始</p>
+                </div>
+            </div>
+            
+            <!-- 枠の説明 -->
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-8">
+                <h3 class="font-bold text-blue-800 mb-2"><i class="fas fa-info-circle mr-2"></i>枠の仕組みについて</h3>
+                <div class="text-sm text-blue-700 space-y-1">
+                    <p><i class="fas fa-sync-alt mr-1"></i><strong>プラン枠（有限）</strong>：毎月の切り替わり日にリセットされ、新しい枠が付与されます。未使用分は繰り越されません。</p>
+                    <p><i class="fas fa-plus-circle mr-1"></i><strong>追加枠（無期限）</strong>：購入した枠は無期限で使用できます。リセットされることはありません。</p>
+                    <p><i class="fas fa-arrow-right mr-1"></i><strong>消費順序</strong>：プラン枠から優先的に消費され、プラン枠がなくなると追加枠から消費されます。</p>
+                </div>
+            </div>
+            
+            <!-- プラン一覧 -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                <h2 class="text-lg font-bold mb-2">
+                    <i class="fas fa-list mr-2 text-blue-600"></i>料金プラン
+                </h2>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                    <p class="text-sm text-yellow-800">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        <strong>重要</strong>：プラン変更は<strong>次回切り替わり日</strong>から適用されます。即座には反映されません。
+                    </p>
+                </div>
+                <div id="plansList" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+            </div>
+            
+            <!-- 追加枠購入 -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                <h2 class="text-lg font-bold mb-4">
+                    <i class="fas fa-shopping-cart mr-2 text-green-600"></i>追加枠を購入
+                </h2>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                    <p class="text-sm text-green-800">
+                        <i class="fas fa-check-circle mr-1"></i>
+                        追加購入した枠は<strong class="text-green-700">無期限</strong>で使用できます。月々のリセットの影響を受けません。
+                    </p>
+                </div>
+                <div id="packagesList" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+            </div>
+            
+            <!-- 使用履歴 -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-lg font-bold mb-4">
+                    <i class="fas fa-history mr-2 text-purple-600"></i>枠の使用履歴
+                </h2>
+                <div id="historyList" class="space-y-2 max-h-96 overflow-y-auto">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+            </div>
+        </div>
+        
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            // 認証チェック
+            const token = localStorage.getItem('admin_token');
+            if (!token) {
+                window.location.href = '/login';
+            }
+            axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_username') + ':' + localStorage.getItem('admin_role');
+            
+            let currentSubscription = null;
+            
+            async function loadAll() {
+                await Promise.all([
+                    loadStatus(),
+                    loadPlans(),
+                    loadPackages(),
+                    loadHistory()
+                ]);
+            }
+            
+            let scheduledPlanData = null;
+            let nextResetDateData = null;
+            
+            let isUnlimitedPlan = false;
+            
+            async function loadStatus() {
+                try {
+                    const response = await axios.get('/api/subscription/status');
+                    const data = response.data;
+                    currentSubscription = data.subscription;
+                    scheduledPlanData = data.scheduled_plan;
+                    nextResetDateData = data.next_reset_date;
+                    isUnlimitedPlan = data.is_unlimited || false;
+                    
+                    document.getElementById('currentPlan').textContent = data.subscription?.plan_name || '未設定';
+                    document.getElementById('planPrice').textContent = data.subscription ? '月額 ¥' + (data.subscription.monthly_price || 0).toLocaleString() : '';
+                    
+                    // 無制限プランの場合の表示
+                    if (isUnlimitedPlan) {
+                        document.getElementById('totalSlots').innerHTML = '<i class="fas fa-infinity"></i>';
+                        document.getElementById('monthlySlots').innerHTML = '<i class="fas fa-infinity text-sm"></i>';
+                        document.getElementById('purchasedSlots').textContent = data.balance?.purchased_slots_remaining || 0;
+                    } else {
+                        document.getElementById('totalSlots').textContent = data.total_available || 0;
+                        document.getElementById('monthlySlots').textContent = data.balance?.monthly_slots_remaining || 0;
+                        document.getElementById('purchasedSlots').textContent = data.balance?.purchased_slots_remaining || 0;
+                    }
+                    document.getElementById('usedThisMonth').textContent = data.used_this_month || 0;
+                    
+                    // 次回切り替わり日を表示
+                    if (data.next_reset_date) {
+                        const resetDate = new Date(data.next_reset_date);
+                        document.getElementById('nextResetDate').textContent = resetDate.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                    
+                    // 予約されたプラン変更の表示
+                    const scheduledInfo = document.getElementById('scheduledPlanInfo');
+                    if (data.scheduled_plan && data.scheduled_plan_date) {
+                        const scheduledDate = new Date(data.scheduled_plan_date);
+                        document.getElementById('scheduledPlanText').textContent = 
+                            scheduledDate.toLocaleDateString('ja-JP') + 'から「' + data.scheduled_plan.plan_name + '」に変更予定';
+                        scheduledInfo.classList.remove('hidden');
+                    } else {
+                        scheduledInfo.classList.add('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error loading status:', error);
+                }
+            }
+            
+            async function loadPlans() {
+                try {
+                    const response = await axios.get('/api/subscription/plans');
+                    const plans = response.data;
+                    
+                    const container = document.getElementById('plansList');
+                    container.innerHTML = plans.map(plan => {
+                        const isCurrent = currentSubscription?.plan_code === plan.plan_code;
+                        const isScheduled = scheduledPlanData?.plan_code === plan.plan_code;
+                        
+                        let statusBadge = '';
+                        let borderClass = 'border-gray-200 hover:border-blue-300';
+                        let buttonHtml = \`<button onclick="changePlan(\${plan.id})" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">このプランに変更</button>\`;
+                        
+                        if (isCurrent) {
+                            statusBadge = '<div class="text-xs font-bold text-blue-600 mb-2"><i class="fas fa-check-circle mr-1"></i>現在のプラン</div>';
+                            borderClass = 'border-blue-500 bg-blue-50';
+                            buttonHtml = '';
+                        } else if (isScheduled) {
+                            statusBadge = '<div class="text-xs font-bold text-yellow-600 mb-2"><i class="fas fa-clock mr-1"></i>変更予約済み（' + new Date(nextResetDateData).toLocaleDateString('ja-JP') + 'から適用）</div>';
+                            borderClass = 'border-yellow-500 bg-yellow-50';
+                            buttonHtml = '<button onclick="cancelScheduledPlan()" class="w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">予約をキャンセル</button>';
+                        }
+                        
+                        // 無制限プランかどうか
+                        const isPlanUnlimited = plan.monthly_slots === -1;
+                        const slotsDisplay = isPlanUnlimited ? '<i class="fas fa-infinity"></i> 無制限' : plan.monthly_slots + '枠';
+                        
+                        // 無制限プランの場合は特別なスタイル
+                        if (isPlanUnlimited && !isCurrent && !isScheduled) {
+                            borderClass = 'border-purple-300 hover:border-purple-500 bg-gradient-to-br from-purple-50 to-indigo-50';
+                        }
+                        
+                        return \`
+                            <div class="border-2 rounded-xl p-6 \${borderClass} transition-colors \${isPlanUnlimited ? 'relative' : ''}">
+                                \${isPlanUnlimited && !isCurrent ? '<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full"><i class="fas fa-crown mr-1"></i>おすすめ</div>' : ''}
+                                \${statusBadge}
+                                <h3 class="text-lg font-bold text-gray-900">\${plan.plan_name}</h3>
+                                <p class="text-3xl font-bold text-gray-900 my-3">¥\${plan.monthly_price.toLocaleString()}<span class="text-sm font-normal text-gray-500">/月</span></p>
+                                <p class="text-sm text-gray-600 mb-4">\${plan.description}</p>
+                                <ul class="text-sm text-gray-600 space-y-2 mb-4">
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>毎月<span class="font-bold">\${slotsDisplay}</span>付与</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>見込み案件は無制限</li>
+                                    \${isPlanUnlimited ? '<li class="text-purple-600 font-bold"><i class="fas fa-star mr-2"></i>案件数の制限なし</li>' : '<li><i class="fas fa-check text-green-500 mr-2"></i>追加枠の購入可能</li>'}
+                                    \${isPlanUnlimited ? '' : '<li class="text-orange-600"><i class="fas fa-sync-alt mr-2"></i>プラン枠は毎月リセット</li>'}
+                                </ul>
+                                \${buttonHtml}
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading plans:', error);
+                }
+            }
+            
+            async function loadPackages() {
+                try {
+                    const response = await axios.get('/api/subscription/packages');
+                    const packages = response.data;
+                    
+                    const container = document.getElementById('packagesList');
+                    container.innerHTML = packages.map(pkg => {
+                        const perSlot = Math.round(pkg.price / pkg.slot_count);
+                        const isBest = pkg.package_code === 'bulk';
+                        return \`
+                            <div class="border-2 rounded-xl p-6 \${isBest ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-300'} transition-colors relative">
+                                \${isBest ? '<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">最もお得</div>' : ''}
+                                <h3 class="text-lg font-bold text-gray-900">\${pkg.package_name}</h3>
+                                <p class="text-3xl font-bold text-gray-900 my-3">¥\${pkg.price.toLocaleString()}</p>
+                                <p class="text-sm text-gray-500 mb-4">1枠あたり ¥\${perSlot.toLocaleString()}</p>
+                                <button onclick="purchaseSlots(\${pkg.id}, '\${pkg.package_name}', \${pkg.price})" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                                    <i class="fas fa-shopping-cart mr-2"></i>購入する
+                                </button>
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading packages:', error);
+                }
+            }
+            
+            async function loadHistory() {
+                try {
+                    const response = await axios.get('/api/subscription/history');
+                    const history = response.data;
+                    
+                    const container = document.getElementById('historyList');
+                    if (history.length === 0) {
+                        container.innerHTML = '<div class="text-center py-8 text-gray-500">履歴はありません</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = history.map(h => {
+                        const isPositive = h.slots_changed > 0;
+                        const actionLabel = {
+                            'consumed': '案件開始',
+                            'granted': '月次付与',
+                            'purchased': '枠購入',
+                            'plan_changed': 'プラン変更'
+                        }[h.action] || h.action;
+                        const icon = {
+                            'consumed': 'fa-minus-circle text-red-500',
+                            'granted': 'fa-gift text-blue-500',
+                            'purchased': 'fa-plus-circle text-green-500',
+                            'plan_changed': 'fa-exchange-alt text-purple-500'
+                        }[h.action] || 'fa-circle text-gray-500';
+                        
+                        return \`
+                            <div class="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                                <i class="fas \${icon} text-xl"></i>
+                                <div class="flex-1">
+                                    <div class="font-medium text-gray-900">\${actionLabel}</div>
+                                    <div class="text-sm text-gray-500">\${h.note || ''}\${h.case_number ? ' - ' + h.case_number : ''}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-bold \${isPositive ? 'text-green-600' : 'text-red-600'}">\${isPositive ? '+' : ''}\${h.slots_changed}枠</div>
+                                    <div class="text-xs text-gray-500">\${new Date(h.created_at).toLocaleString('ja-JP')}</div>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading history:', error);
+                }
+            }
+            
+            async function changePlan(planId) {
+                const nextDate = nextResetDateData ? new Date(nextResetDateData).toLocaleDateString('ja-JP') : '次回切り替わり日';
+                if (!confirm('プランを変更しますか？\\n\\n※変更は ' + nextDate + ' から適用されます。\\n　それまでは現在のプラン枠が使用されます。')) return;
+                
+                try {
+                    const response = await axios.post('/api/subscription/change-plan', { plan_id: planId });
+                    alert(response.data.message || 'プラン変更を予約しました');
+                    loadAll();
+                } catch (error) {
+                    alert('プラン変更に失敗しました');
+                }
+            }
+            
+            async function cancelScheduledPlan() {
+                if (!confirm('プラン変更の予約をキャンセルしますか？')) return;
+                
+                try {
+                    await axios.post('/api/subscription/cancel-scheduled-plan');
+                    alert('プラン変更の予約をキャンセルしました');
+                    loadAll();
+                } catch (error) {
+                    alert('キャンセルに失敗しました');
+                }
+            }
+            
+            async function purchaseSlots(packageId, name, price) {
+                if (!confirm(name + '（¥' + price.toLocaleString() + '）を購入しますか？\\n\\n※追加購入した枠は無期限で使用できます。')) return;
+                
+                try {
+                    const response = await axios.post('/api/subscription/purchase-slots', { package_id: packageId });
+                    alert(response.data.slots_added + '枠を追加しました！');
+                    loadAll();
+                } catch (error) {
+                    alert('購入に失敗しました');
+                }
+            }
+            
+            loadAll();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
 app.get('/admin/settings', async (c) => {
   return c.html(`
     <!DOCTYPE html>
@@ -16806,23 +19214,29 @@ app.get('/admin/settings', async (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <style>
+            ${sidebarStyles}
+        </style>
     </head>
-    <body class="bg-gray-100 min-h-screen">
-        <nav class="bg-white shadow">
-            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-                <div class="flex items-center gap-4">
-                    <a href="/" class="text-gray-600 hover:text-gray-900">
-                        <i class="fas fa-arrow-left"></i>
-                    </a>
-                    <h1 class="text-xl font-bold text-gray-800">システム設定</h1>
-                </div>
-                <div class="flex items-center gap-4">
-                    <span id="adminName" class="text-sm text-gray-600"></span>
-                </div>
-            </div>
-        </nav>
-        
-        <div class="max-w-4xl mx-auto p-6">
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('settings')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-cog mr-2"></i>システム設定
+                            </h2>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="p-4 lg:p-6 max-w-4xl">
             <!-- 銀行振込先設定 -->
             <div class="bg-white rounded-lg shadow mb-6">
                 <div class="p-4 border-b">
@@ -17153,20 +19567,32 @@ app.get('/admin/payments', async (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <style>
+            ${sidebarStyles}
+        </style>
     </head>
-    <body class="bg-gray-100 min-h-screen">
-        <nav class="bg-white shadow">
-            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-                <div class="flex items-center gap-4">
-                    <a href="/" class="text-gray-600 hover:text-gray-900">
-                        <i class="fas fa-arrow-left"></i>
-                    </a>
-                    <h1 class="text-xl font-bold text-gray-800">支払い確認</h1>
-                </div>
-            </div>
-        </nav>
-        
-        <div class="max-w-6xl mx-auto p-6">
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('payments')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-credit-card mr-2"></i>支払い確認
+                            </h2>
+                        </div>
+                        <button onclick="loadPayments()" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-sync-alt"></i> 更新
+                        </button>
+                    </div>
+                </header>
+
+                <div class="p-4 lg:p-6">
             <div class="bg-white rounded-lg shadow">
                 <div class="p-4 border-b flex justify-between items-center">
                     <h2 class="text-lg font-bold">振込確認待ち</h2>
@@ -17276,82 +19702,93 @@ app.get('/clients', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>顧客管理 - 助成金申請管理システム</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            ${sidebarStyles}
+        </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <header class="bg-blue-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <a href="/" class="text-sm hover:underline mb-2 block">
-                                <i class="fas fa-arrow-left mr-1"></i>ダッシュボードに戻る
-                            </a>
-                            <h1 class="text-2xl font-bold">
-                                <i class="fas fa-users mr-2"></i>顧客管理
-                            </h1>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('clients')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-address-book mr-2"></i>顧客一覧
+                            </h2>
                         </div>
-                        <button onclick="openNewCustomerModal()" class="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50">
+                        <button onclick="openNewCustomerModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
                             <i class="fas fa-user-plus mr-2"></i>新規顧客追加
                         </button>
                     </div>
-                </div>
-            </header>
+                </header>
 
-            <div class="container mx-auto px-4 py-8">
-                <!-- 検索・フィルター -->
-                <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <div class="flex-1 relative">
-                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
-                                   class="w-full pl-10 pr-4 py-2 border rounded-lg" onkeyup="filterCustomers()">
+                <div class="p-4 lg:p-6">
+                    <!-- 検索・フィルター -->
+                    <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <div class="flex-1 relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
+                                       class="w-full pl-10 pr-4 py-2 border rounded-lg" onkeyup="filterCustomers()">
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- 顧客一覧 -->
-                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">顧客名</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">会社名</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">連絡先</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">案件数</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">登録日</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="customerList" class="divide-y divide-gray-200">
-                            ${(clients.results || []).map((client: any) => `
-                                <tr class="hover:bg-gray-50 customer-row" data-name="${client.name}" data-company="${client.company_name || ''}">
-                                    <td class="px-4 py-3">
-                                        <div class="font-medium text-gray-900">${client.name}</div>
-                                    </td>
-                                    <td class="px-4 py-3 text-gray-600">${client.company_name || '-'}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-600">
-                                        ${client.email ? `<div><i class="fas fa-envelope mr-1"></i>${client.email}</div>` : ''}
-                                        ${client.phone ? `<div><i class="fas fa-phone mr-1"></i>${client.phone}</div>` : ''}
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <span class="${client.case_count > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-sm">${client.case_count || 0}件</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-sm text-gray-600">${client.created_at?.split(' ')[0] || '-'}</td>
-                                    <td class="px-4 py-3">
-                                        <a href="/client/${client.id}" class="text-blue-600 hover:text-blue-800 mr-3">
-                                            <i class="fas fa-eye"></i> 詳細
-                                        </a>
-                                    </td>
+                    <!-- 顧客一覧 -->
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">顧客名</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">会社名</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">連絡先</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">案件数</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">登録日</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody id="customerList" class="divide-y divide-gray-200">
+                                ${(clients.results || []).map((client: any) => `
+                                    <tr class="hover:bg-blue-50 customer-row cursor-pointer transition-colors" 
+                                        data-name="${client.name}" 
+                                        data-company="${client.company_name || ''}"
+                                        onclick="window.location.href='/client/${client.id}'">
+                                        <td class="px-4 py-3">
+                                            <div class="font-medium text-gray-900">${client.name}</div>
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-600">${client.company_name || '-'}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                            ${client.email ? `<div><i class="fas fa-envelope mr-1"></i>${client.email}</div>` : ''}
+                                            ${client.phone ? `<div><i class="fas fa-phone mr-1"></i>${client.phone}</div>` : ''}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <span class="${client.case_count > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-sm">${client.case_count || 0}件</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">${client.created_at?.split(' ')[0] || '-'}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="text-blue-600 hover:text-blue-800">
+                                                <i class="fas fa-eye"></i> 詳細
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            </main>
         </div>
 
         <script>
+            ${sidebarScripts}
+            
             function filterCustomers() {
                 const query = document.getElementById('searchQuery').value.toLowerCase();
                 document.querySelectorAll('.customer-row').forEach(row => {
@@ -17362,7 +19799,6 @@ app.get('/clients', async (c) => {
             }
             
             function openNewCustomerModal() {
-                // 新規顧客追加のモーダルを開く（簡易版はダッシュボードへリダイレクト）
                 window.location.href = '/?action=new_customer';
             }
         </script>
@@ -17377,68 +19813,96 @@ app.get('/clients', async (c) => {
 app.get('/cases', async (c) => {
   try {
     const { DB } = c.env
-    const statusFilter = c.req.query('status') || ''
     
-    let query = `
-      SELECT c.*, st.name as subsidy_type_name, st.category as subsidy_category,
-             sg.application_end_date
-      FROM clients c
-      LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-      LEFT JOIN subsidy_guidelines sg ON st.id = sg.subsidy_type_id
-      WHERE 1=1
+    // casesテーブルから案件を取得
+    const query = `
+      SELECT 
+        cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
+        cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
+        cl.id as client_id, cl.name as client_name, cl.company_name,
+        st.name as subsidy_type_name, st.category as subsidy_category,
+        au.name as assigned_to_name
+      FROM cases cs
+      LEFT JOIN clients cl ON cs.client_id = cl.id
+      LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+      LEFT JOIN admin_users au ON cs.assigned_to = au.username
+      ORDER BY cs.created_at DESC
     `
     
-    if (statusFilter) {
-      query += ` AND c.status = '${statusFilter}'`
-    }
+    const casesResult = await DB.prepare(query).all()
+    const allCases = casesResult.results || []
     
-    query += ` ORDER BY 
-      CASE WHEN sg.application_end_date IS NOT NULL AND sg.application_end_date != '' 
-           THEN sg.application_end_date 
-           ELSE '9999-12-31' END ASC,
-      c.created_at DESC
-    `
+    // ステータス定義
+    const STATUSES = [
+      { key: 'inquiry', label: '見込み', color: 'yellow', icon: 'fa-lightbulb' },
+      { key: 'preparing', label: '書類準備中', color: 'orange', icon: 'fa-file-alt' },
+      { key: 'applying', label: '申請中', color: 'purple', icon: 'fa-paper-plane' },
+      { key: 'completed', label: '完了', color: 'green', icon: 'fa-check-circle' }
+    ]
     
-    const cases = await DB.prepare(query).all()
-  
-  const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-    inquiry: { label: '見込み', color: 'yellow' },
-    preparing: { label: '書類準備中', color: 'orange' },
-    applying: { label: '申請中', color: 'purple' },
-    completed: { label: '完了', color: 'green' }
-  }
-
-  // Build case items HTML
-  const caseItemsHtml = (cases.results || []).map((item: any) => {
-    const statusInfo = STATUS_LABELS[item.status] || { label: item.status, color: 'gray' }
-    const isDeadlineNear = item.application_end_date && new Date(item.application_end_date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    const subsidyBadge = item.subsidy_type_name ? '<span class="text-sm text-gray-500">' + item.subsidy_type_name + '</span>' : ''
-    const deadlineBadge = isDeadlineNear ? '<span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs"><i class="fas fa-exclamation-triangle mr-1"></i>期限間近</span>' : ''
-    const deadlineText = item.application_end_date ? '<p class="text-sm text-gray-500 mt-1"><i class="fas fa-calendar mr-1"></i>申請期限: ' + item.application_end_date + '</p>' : ''
+    // ステータスごとにグループ化
+    const casesByStatus: Record<string, any[]> = {}
+    STATUSES.forEach(s => casesByStatus[s.key] = [])
+    allCases.forEach((c: any) => {
+      if (casesByStatus[c.status]) {
+        casesByStatus[c.status].push(c)
+      } else {
+        casesByStatus['inquiry'].push(c)
+      }
+    })
     
-    return '<div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition border-l-4 border-' + statusInfo.color + '-400">' +
-      '<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">' +
-        '<div class="flex-1">' +
-          '<div class="flex items-center gap-3 mb-2">' +
-            '<span class="bg-' + statusInfo.color + '-100 text-' + statusInfo.color + '-800 px-2 py-1 rounded text-sm font-medium">' + statusInfo.label + '</span>' +
-            subsidyBadge +
-            deadlineBadge +
-          '</div>' +
-          '<h3 class="text-lg font-bold text-gray-900">' + item.name + '</h3>' +
-          '<p class="text-gray-600">' + (item.company_name || '') + '</p>' +
-          deadlineText +
-        '</div>' +
-        '<div class="flex gap-2">' +
-          '<a href="/client/' + item.id + '" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">' +
-            '<i class="fas fa-eye mr-1"></i>詳細' +
-          '</a>' +
-        '</div>' +
-      '</div>' +
-    '</div>'
-  }).join('')
-  
-  const emptyMessage = (cases.results || []).length === 0 ? '<div class="text-center py-12 text-gray-500">案件がありません</div>' : ''
-  const statusTitle = statusFilter && STATUS_LABELS[statusFilter] ? '<span class="text-lg font-normal">（' + STATUS_LABELS[statusFilter].label + '）</span>' : ''
+    // カンバンボードHTML生成
+    const kanbanHtml = STATUSES.map(status => {
+      const statusCases = casesByStatus[status.key]
+      const colorMap: Record<string, { bg: string; border: string; header: string; badge: string }> = {
+        yellow: { bg: 'bg-yellow-50', border: 'border-yellow-300', header: 'bg-yellow-100 text-yellow-800', badge: 'bg-yellow-500' },
+        blue: { bg: 'bg-blue-50', border: 'border-blue-300', header: 'bg-blue-100 text-blue-800', badge: 'bg-blue-500' },
+        orange: { bg: 'bg-orange-50', border: 'border-orange-300', header: 'bg-orange-100 text-orange-800', badge: 'bg-orange-500' },
+        purple: { bg: 'bg-purple-50', border: 'border-purple-300', header: 'bg-purple-100 text-purple-800', badge: 'bg-purple-500' },
+        green: { bg: 'bg-green-50', border: 'border-green-300', header: 'bg-green-100 text-green-800', badge: 'bg-green-500' }
+      }
+      const colors = colorMap[status.color]
+      
+      const cardsHtml = statusCases.length === 0 
+        ? '<div class="text-center py-6 text-gray-400 text-sm">案件なし</div>'
+        : statusCases.map((c: any) => `
+          <a href="/case/${c.id}" class="block bg-white rounded-lg shadow-sm border hover:shadow-md hover:border-blue-300 transition-all cursor-pointer">
+            <div class="p-3">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-mono text-xs text-gray-500">${c.case_number || '#' + c.id}</span>
+                ${c.deposit_required && !c.deposit_paid ? '<span class="text-yellow-600 text-xs" title="手付金未払"><i class="fas fa-yen-sign"></i></span>' : ''}
+              </div>
+              <div class="font-bold text-gray-900 mb-1">${c.client_name || '名称未設定'}</div>
+              ${c.company_name ? '<div class="text-xs text-gray-500 mb-2">' + c.company_name + '</div>' : ''}
+              ${c.subsidy_type_name ? '<div class="inline-block px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800 mb-2">' + c.subsidy_type_name + '</div>' : ''}
+              <div class="flex items-center gap-2 text-xs text-gray-500 mt-2">
+                ${c.assigned_to_name ? '<span><i class="fas fa-user mr-1"></i>' + c.assigned_to_name + '</span>' : ''}
+              </div>
+              ${c.deposit_required ? `
+                <div class="mt-2 text-xs ${c.deposit_paid ? 'text-green-600' : 'text-yellow-600'}">
+                  <i class="fas fa-yen-sign mr-1"></i>¥${(c.deposit_amount || 0).toLocaleString()}
+                  ${c.deposit_paid ? '<span class="ml-1">✓支払済</span>' : '<span class="ml-1">未払</span>'}
+                </div>
+              ` : ''}
+            </div>
+          </a>
+        `).join('')
+      
+      return `
+        <div class="flex flex-col rounded-lg ${colors.bg} border ${colors.border} overflow-hidden min-w-[280px]">
+          <div class="${colors.header} px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i class="fas ${status.icon}"></i>
+              <span class="font-bold">${status.label}</span>
+            </div>
+            <span class="${colors.badge} text-white text-xs px-2 py-0.5 rounded-full">${statusCases.length}</span>
+          </div>
+          <div class="p-3 space-y-3 flex-1 overflow-y-auto" style="max-height: calc(100vh - 250px);">
+            ${cardsHtml}
+          </div>
+        </div>
+      `
+    }).join('')
 
   return c.html(`
     <!DOCTYPE html>
@@ -17448,48 +19912,68 @@ app.get('/cases', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>案件一覧 - 助成金申請管理システム</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            ${sidebarStyles}
+            .kanban-container {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(280px, 1fr));
+                gap: 1rem;
+                overflow-x: auto;
+                padding-bottom: 1rem;
+            }
+            @media (max-width: 1400px) {
+                .kanban-container {
+                    grid-template-columns: repeat(3, minmax(280px, 1fr));
+                }
+            }
+            @media (max-width: 900px) {
+                .kanban-container {
+                    grid-template-columns: repeat(2, minmax(280px, 1fr));
+                }
+            }
+            @media (max-width: 640px) {
+                .kanban-container {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <header class="bg-blue-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <a href="/" class="text-sm hover:underline mb-2 block">
-                                <i class="fas fa-arrow-left mr-1"></i>ダッシュボードに戻る
-                            </a>
-                            <h1 class="text-2xl font-bold">
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('cases')}
+            
+            <main class="flex-1 min-h-screen overflow-hidden flex flex-col">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
                                 <i class="fas fa-folder-open mr-2"></i>案件一覧
-                                ${statusTitle}
-                            </h1>
+                            </h2>
+                            <span class="text-sm text-gray-500">${allCases.length}件</span>
                         </div>
-                        <a href="/?action=new_case" class="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50">
+                        <a href="/?openNewCase=true" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
                             <i class="fas fa-plus mr-2"></i>新規案件登録
                         </a>
                     </div>
-                </div>
-            </header>
+                </header>
 
-            <div class="container mx-auto px-4 py-8">
-                <!-- フィルター -->
-                <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
-                    <div class="flex flex-wrap gap-2">
-                        <a href="/cases" class="px-4 py-2 rounded-lg ${!statusFilter ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">すべて</a>
-                        <a href="/cases?status=inquiry" class="px-4 py-2 rounded-lg ${statusFilter === 'inquiry' ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">見込み</a>
-                        <a href="/cases?status=preparing" class="px-4 py-2 rounded-lg ${statusFilter === 'preparing' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">書類準備中</a>
-                        <a href="/cases?status=applying" class="px-4 py-2 rounded-lg ${statusFilter === 'applying' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">申請中</a>
-                        <a href="/cases?status=completed" class="px-4 py-2 rounded-lg ${statusFilter === 'completed' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">完了</a>
+                <div class="p-4 lg:p-6 flex-1 overflow-auto">
+                    <!-- カンバンボード -->
+                    <div class="kanban-container">
+                        ${kanbanHtml}
                     </div>
                 </div>
-
-                <!-- 案件一覧 -->
-                <div class="space-y-4">
-                    ${caseItemsHtml}
-                    ${emptyMessage}
-                </div>
-            </div>
+            </main>
         </div>
+        
+        <script>
+            ${sidebarScripts}
+        </script>
     </body>
     </html>
   `)
@@ -17543,14 +20027,12 @@ app.get('/admin/statistics', async (c) => {
   // Build HTML for status cards
   const labels: Record<string, string> = {
     inquiry: '見込み',
-    consulting: '相談中',
     preparing: '書類準備中',
     applying: '申請中',
     completed: '完了'
   }
   const colors: Record<string, string> = {
     inquiry: 'yellow',
-    consulting: 'blue',
     preparing: 'orange',
     applying: 'purple',
     completed: 'green'
@@ -17591,110 +20073,626 @@ app.get('/admin/statistics', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>統計情報 - 助成金申請管理システム</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            ${sidebarStyles}
+        </style>
     </head>
-    <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <header class="bg-blue-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <a href="/" class="text-sm hover:underline mb-2 block">
-                                <i class="fas fa-arrow-left mr-1"></i>ダッシュボードに戻る
-                            </a>
-                            <h1 class="text-2xl font-bold">
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('statistics')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold text-gray-800">
                                 <i class="fas fa-chart-line mr-2"></i>統計情報
-                            </h1>
+                            </h2>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="p-4 lg:p-6">
+                    <!-- サマリーカード -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">総顧客数</p>
+                                    <p class="text-3xl font-bold text-gray-900">${totalClients?.count || 0}</p>
+                                </div>
+                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-users text-blue-600 text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">今月の新規</p>
+                                    <p class="text-3xl font-bold text-blue-600">${newThisMonth?.count || 0}</p>
+                                </div>
+                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-user-plus text-blue-600 text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">今月の完了</p>
+                                    <p class="text-3xl font-bold text-green-600">${completedThisMonth?.count || 0}</p>
+                                </div>
+                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- ステータス別 -->
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                                <i class="fas fa-chart-pie text-purple-600"></i>ステータス別
+                            </h2>
+                            <div class="space-y-3">
+                                ${statusItemsHtml}
+                            </div>
+                        </div>
+
+                        <!-- 申請種別ランキング -->
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                                <i class="fas fa-ranking-star text-orange-600"></i>申請種別ランキング
+                            </h2>
+                            <div class="space-y-3">
+                                ${subsidyTypeHtml}
+                            </div>
+                        </div>
+
+                        <!-- 月別推移 -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 lg:col-span-2">
+                            <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                                <i class="fas fa-chart-bar text-blue-600"></i>月別推移（過去6ヶ月）
+                            </h2>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b">
+                                            <th class="py-2 text-left text-sm font-medium text-gray-500">月</th>
+                                            <th class="py-2 text-right text-sm font-medium text-gray-500">新規</th>
+                                            <th class="py-2 text-right text-sm font-medium text-gray-500">完了</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${monthlyStatsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </header>
-
-            <div class="container mx-auto px-4 py-8">
-                <!-- サマリーカード -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm">総顧客数</p>
-                                <p class="text-3xl font-bold text-gray-900">${totalClients?.count || 0}</p>
-                            </div>
-                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-users text-blue-600 text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm">今月の新規</p>
-                                <p class="text-3xl font-bold text-blue-600">${newThisMonth?.count || 0}</p>
-                            </div>
-                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-user-plus text-blue-600 text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm">今月の完了</p>
-                                <p class="text-3xl font-bold text-green-600">${completedThisMonth?.count || 0}</p>
-                            </div>
-                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-check-circle text-green-600 text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- ステータス別 -->
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-chart-pie text-purple-600"></i>ステータス別
-                        </h2>
-                        <div class="space-y-3">
-                            ${statusItemsHtml}
-                        </div>
-                    </div>
-
-                    <!-- 申請種別ランキング -->
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-ranking-star text-orange-600"></i>申請種別ランキング
-                        </h2>
-                        <div class="space-y-3">
-                            ${subsidyTypeHtml}
-                        </div>
-                    </div>
-
-                    <!-- 月別推移 -->
-                    <div class="bg-white rounded-xl shadow-sm p-6 lg:col-span-2">
-                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-chart-bar text-blue-600"></i>月別推移（過去6ヶ月）
-                        </h2>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="border-b">
-                                        <th class="py-2 text-left text-sm font-medium text-gray-500">月</th>
-                                        <th class="py-2 text-right text-sm font-medium text-gray-500">新規</th>
-                                        <th class="py-2 text-right text-sm font-medium text-gray-500">完了</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${monthlyStatsHtml}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            </main>
         </div>
+        
+        <script>
+            ${sidebarScripts}
+        </script>
     </body>
     </html>
   `)
+})
+
+// ===============================
+// サブスクリプション・枠管理API
+// ===============================
+
+// プラン一覧取得
+app.get('/api/subscription/plans', async (c) => {
+  const { DB } = c.env
+  const plans = await DB.prepare(`
+    SELECT * FROM subscription_plans WHERE is_active = 1 ORDER BY monthly_price ASC
+  `).all()
+  return c.json(plans.results || [])
+})
+
+// 追加枠パッケージ一覧取得
+app.get('/api/subscription/packages', async (c) => {
+  const { DB } = c.env
+  const packages = await DB.prepare(`
+    SELECT * FROM slot_packages WHERE is_active = 1 ORDER BY price ASC
+  `).all()
+  return c.json(packages.results || [])
+})
+
+// 現在のサブスクリプション・枠情報取得
+app.get('/api/subscription/status', async (c) => {
+  const { DB } = c.env
+  
+  // システム全体のサブスクリプションを取得（user_id = NULL）
+  let subscription = await DB.prepare(`
+    SELECT us.*, sp.plan_code, sp.plan_name, sp.monthly_price, sp.monthly_slots
+    FROM user_subscriptions us
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE us.user_id IS NULL AND us.status = 'active'
+    ORDER BY us.created_at DESC
+    LIMIT 1
+  `).first()
+  
+  // サブスクリプションがない場合は初期作成（ベーシックプラン）
+  if (!subscription) {
+    const basicPlan = await DB.prepare(`
+      SELECT id FROM subscription_plans WHERE plan_code = 'basic'
+    `).first()
+    
+    if (basicPlan) {
+      const today = new Date()
+      const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0) // 月末
+      
+      await DB.prepare(`
+        INSERT INTO user_subscriptions (user_id, plan_id, status, current_period_start, current_period_end)
+        VALUES (NULL, ?, 'active', ?, ?)
+      `).bind(basicPlan.id, today.toISOString().split('T')[0], periodEnd.toISOString().split('T')[0]).run()
+      
+      const newSub = await DB.prepare(`
+        SELECT id FROM user_subscriptions WHERE user_id IS NULL ORDER BY id DESC LIMIT 1
+      `).first()
+      
+      if (newSub) {
+        // 枠残高を初期化
+        await DB.prepare(`
+          INSERT INTO slot_balances (subscription_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+          VALUES (?, 1, 0, ?)
+        `).bind(newSub.id, today.toISOString().split('T')[0]).run()
+      }
+      
+      subscription = await DB.prepare(`
+        SELECT us.*, sp.plan_code, sp.plan_name, sp.monthly_price, sp.monthly_slots
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.id
+        WHERE us.id = ?
+      `).bind(newSub?.id).first()
+    }
+  }
+  
+  // 枠残高を取得
+  let balance = await DB.prepare(`
+    SELECT * FROM slot_balances WHERE subscription_id = ?
+  `).bind(subscription?.id).first()
+  
+  // 月次リセットチェック（切り替わり日処理）
+  if (balance && subscription) {
+    const today = new Date()
+    const lastReset = balance.last_monthly_reset ? new Date(balance.last_monthly_reset) : null
+    
+    // 先月以前にリセットされていた場合、今月分をリセット
+    if (!lastReset || lastReset.getMonth() !== today.getMonth() || lastReset.getFullYear() !== today.getFullYear()) {
+      
+      // 予約されたプラン変更があればここで適用
+      if (subscription.scheduled_plan_id && subscription.scheduled_plan_date) {
+        const scheduledDate = new Date(subscription.scheduled_plan_date)
+        if (today >= scheduledDate) {
+          // 新しいプランを取得
+          const newPlan = await DB.prepare(`
+            SELECT * FROM subscription_plans WHERE id = ?
+          `).bind(subscription.scheduled_plan_id).first()
+          
+          if (newPlan) {
+            // プランを更新し、予約をクリア
+            await DB.prepare(`
+              UPDATE user_subscriptions 
+              SET plan_id = ?, scheduled_plan_id = NULL, scheduled_plan_date = NULL, 
+                  current_period_start = ?, current_period_end = ?,
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).bind(
+              newPlan.id, 
+              today.toISOString().split('T')[0],
+              new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0],
+              subscription.id
+            ).run()
+            
+            // 新プランの枠数を使用（古い月次枠はリセット）
+            subscription.monthly_slots = newPlan.monthly_slots
+            subscription.plan_id = newPlan.id
+            subscription.plan_name = newPlan.plan_name
+            
+            // プラン変更履歴を記録
+            await DB.prepare(`
+              INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
+              VALUES (?, 'monthly', 'plan_changed', 0, 0, ?)
+            `).bind(subscription.id, `プランを${newPlan.plan_name}に変更`).run()
+          }
+        }
+      }
+      
+      // プラン枠をリセット（追加購入枠はそのまま維持）
+      // 重要：月次枠は毎月リセットされるが、追加購入枠は無期限で維持される
+      // 無制限プラン（monthly_slots = -1）の場合は枠数を0に設定（枠管理は不要だが履歴のため）
+      const resetSlots = subscription.monthly_slots === -1 ? 0 : subscription.monthly_slots
+      await DB.prepare(`
+        UPDATE slot_balances 
+        SET monthly_slots_remaining = ?, last_monthly_reset = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE subscription_id = ?
+      `).bind(resetSlots, today.toISOString().split('T')[0], subscription.id).run()
+      
+      // 期間を更新（current_period_endも更新）
+      await DB.prepare(`
+        UPDATE user_subscriptions
+        SET current_period_start = ?, current_period_end = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        today.toISOString().split('T')[0],
+        new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0],
+        subscription.id
+      ).run()
+      
+      // 付与履歴を記録（無制限プランの場合は特別なメッセージ）
+      const grantNote = subscription.monthly_slots === -1 
+        ? `${today.getFullYear()}年${today.getMonth() + 1}月分 - 無制限プラン`
+        : `${today.getFullYear()}年${today.getMonth() + 1}月分の枠を付与（プラン枠リセット）`
+      await DB.prepare(`
+        INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
+        VALUES (?, 'monthly', 'granted', ?, ?, ?)
+      `).bind(
+        subscription.id, 
+        resetSlots, 
+        resetSlots,
+        grantNote
+      ).run()
+      
+      balance = await DB.prepare(`
+        SELECT * FROM slot_balances WHERE subscription_id = ?
+      `).bind(subscription.id).first()
+      
+      // subscriptionも再取得
+      subscription = await DB.prepare(`
+        SELECT us.*, sp.plan_code, sp.plan_name, sp.monthly_price, sp.monthly_slots
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON us.plan_id = sp.id
+        WHERE us.id = ?
+      `).bind(subscription.id).first()
+    }
+  }
+  
+  // 今月の使用枠数を計算
+  const today = new Date()
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
+  const usedThisMonth = await DB.prepare(`
+    SELECT COUNT(*) as count FROM slot_usage_history
+    WHERE subscription_id = ? AND action = 'consumed' AND created_at >= ?
+  `).bind(subscription?.id, monthStart).first()
+  
+  // 次回切り替わり日を計算（現在の期間終了日の翌日）
+  let nextResetDate = null
+  if (subscription?.current_period_end) {
+    const periodEnd = new Date(subscription.current_period_end)
+    nextResetDate = new Date(periodEnd)
+    nextResetDate.setDate(nextResetDate.getDate() + 1)
+  } else {
+    // デフォルトは来月1日
+    const today = new Date()
+    nextResetDate = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+  }
+  
+  // 予約されたプラン情報を取得
+  let scheduledPlan = null
+  if (subscription?.scheduled_plan_id) {
+    scheduledPlan = await DB.prepare(`
+      SELECT * FROM subscription_plans WHERE id = ?
+    `).bind(subscription.scheduled_plan_id).first()
+  }
+  
+  // 無制限プランかどうかを判定 (monthly_slots = -1)
+  const isUnlimited = subscription?.monthly_slots === -1
+  
+  return c.json({
+    subscription: subscription || null,
+    balance: balance || { monthly_slots_remaining: 0, purchased_slots_remaining: 0 },
+    total_available: isUnlimited ? -1 : (balance?.monthly_slots_remaining || 0) + (balance?.purchased_slots_remaining || 0),
+    used_this_month: usedThisMonth?.count || 0,
+    next_reset_date: nextResetDate.toISOString().split('T')[0],
+    current_period_start: subscription?.current_period_start || null,
+    current_period_end: subscription?.current_period_end || null,
+    scheduled_plan: scheduledPlan,
+    scheduled_plan_date: subscription?.scheduled_plan_date || null,
+    is_unlimited: isUnlimited
+  })
+})
+
+// 枠を消費（ステータス変更時に呼ばれる）
+app.post('/api/subscription/consume-slot', async (c) => {
+  const { DB } = c.env
+  const { case_id } = await c.req.json()
+  
+  if (!case_id) {
+    return c.json({ error: 'case_id is required' }, 400)
+  }
+  
+  // 既にこの案件で枠を消費済みかチェック
+  const alreadyConsumed = await DB.prepare(`
+    SELECT id FROM slot_usage_history WHERE case_id = ? AND action = 'consumed'
+  `).bind(case_id).first()
+  
+  if (alreadyConsumed) {
+    return c.json({ success: true, message: 'Already consumed', already_consumed: true })
+  }
+  
+  // サブスクリプション取得（プラン情報も含める）
+  const subscription = await DB.prepare(`
+    SELECT us.id, sb.monthly_slots_remaining, sb.purchased_slots_remaining, sp.monthly_slots
+    FROM user_subscriptions us
+    JOIN slot_balances sb ON us.id = sb.subscription_id
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE us.user_id IS NULL AND us.status = 'active'
+    LIMIT 1
+  `).first()
+  
+  if (!subscription) {
+    return c.json({ error: 'No active subscription' }, 400)
+  }
+  
+  // 無制限プランの場合は枠消費せずに成功を返す
+  if (subscription.monthly_slots === -1) {
+    // 履歴のみ記録（消費数0）
+    await DB.prepare(`
+      INSERT INTO slot_usage_history (subscription_id, case_id, slot_type, action, slots_changed, balance_after, note)
+      VALUES (?, ?, 'unlimited', 'consumed', 0, -1, '無制限プラン - 枠消費なし')
+    `).bind(subscription.id, case_id).run()
+    
+    return c.json({ success: true, message: 'Unlimited plan - no slot consumed', is_unlimited: true })
+  }
+  
+  const totalAvailable = (subscription.monthly_slots_remaining || 0) + (subscription.purchased_slots_remaining || 0)
+  
+  if (totalAvailable <= 0) {
+    return c.json({ error: 'No slots available', need_purchase: true }, 400)
+  }
+  
+  // 月次枠から優先消費、なければ購入枠から消費
+  let slotType = 'monthly'
+  let newMonthly = subscription.monthly_slots_remaining
+  let newPurchased = subscription.purchased_slots_remaining
+  
+  if (subscription.monthly_slots_remaining > 0) {
+    newMonthly = subscription.monthly_slots_remaining - 1
+  } else {
+    slotType = 'purchased'
+    newPurchased = subscription.purchased_slots_remaining - 1
+  }
+  
+  // 枠を消費
+  await DB.prepare(`
+    UPDATE slot_balances 
+    SET monthly_slots_remaining = ?, purchased_slots_remaining = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE subscription_id = ?
+  `).bind(newMonthly, newPurchased, subscription.id).run()
+  
+  // 使用履歴を記録
+  await DB.prepare(`
+    INSERT INTO slot_usage_history (subscription_id, case_id, slot_type, action, slots_changed, balance_after, note)
+    VALUES (?, ?, ?, 'consumed', -1, ?, '案件開始による枠消費')
+  `).bind(subscription.id, case_id, slotType, newMonthly + newPurchased).run()
+  
+  return c.json({ 
+    success: true, 
+    slot_type_used: slotType,
+    remaining: {
+      monthly: newMonthly,
+      purchased: newPurchased,
+      total: newMonthly + newPurchased
+    }
+  })
+})
+
+// 枠残数チェック（ステータス変更前に呼ばれる）
+app.get('/api/subscription/check-slot', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.query('case_id')
+  
+  // 既にこの案件で枠を消費済みかチェック
+  if (caseId) {
+    const alreadyConsumed = await DB.prepare(`
+      SELECT id FROM slot_usage_history WHERE case_id = ? AND action = 'consumed'
+    `).bind(caseId).first()
+    
+    if (alreadyConsumed) {
+      return c.json({ available: true, already_consumed: true, message: 'この案件は既に開始済みです' })
+    }
+  }
+  
+  // サブスクリプション取得（プラン情報も含める）
+  const subscription = await DB.prepare(`
+    SELECT sb.monthly_slots_remaining, sb.purchased_slots_remaining, sp.monthly_slots
+    FROM user_subscriptions us
+    JOIN slot_balances sb ON us.id = sb.subscription_id
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE us.user_id IS NULL AND us.status = 'active'
+    LIMIT 1
+  `).first()
+  
+  if (!subscription) {
+    return c.json({ available: false, message: 'サブスクリプションがありません' })
+  }
+  
+  // 無制限プランの場合
+  if (subscription.monthly_slots === -1) {
+    return c.json({
+      available: true,
+      is_unlimited: true,
+      monthly_remaining: -1,
+      purchased_remaining: subscription.purchased_slots_remaining || 0,
+      total_remaining: -1,
+      message: '無制限プラン - 枠の制限なし'
+    })
+  }
+  
+  const totalAvailable = (subscription.monthly_slots_remaining || 0) + (subscription.purchased_slots_remaining || 0)
+  
+  return c.json({
+    available: totalAvailable > 0,
+    is_unlimited: false,
+    monthly_remaining: subscription.monthly_slots_remaining || 0,
+    purchased_remaining: subscription.purchased_slots_remaining || 0,
+    total_remaining: totalAvailable,
+    message: totalAvailable > 0 ? `残り${totalAvailable}枠利用可能` : '枠がありません。追加購入が必要です。'
+  })
+})
+
+// 追加枠購入
+app.post('/api/subscription/purchase-slots', async (c) => {
+  const { DB } = c.env
+  const { package_id } = await c.req.json()
+  
+  if (!package_id) {
+    return c.json({ error: 'package_id is required' }, 400)
+  }
+  
+  // パッケージ情報取得
+  const pkg = await DB.prepare(`
+    SELECT * FROM slot_packages WHERE id = ? AND is_active = 1
+  `).bind(package_id).first()
+  
+  if (!pkg) {
+    return c.json({ error: 'Package not found' }, 404)
+  }
+  
+  // サブスクリプション取得
+  const subscription = await DB.prepare(`
+    SELECT us.id, sb.purchased_slots_remaining
+    FROM user_subscriptions us
+    JOIN slot_balances sb ON us.id = sb.subscription_id
+    WHERE us.user_id IS NULL AND us.status = 'active'
+    LIMIT 1
+  `).first()
+  
+  if (!subscription) {
+    return c.json({ error: 'No active subscription' }, 400)
+  }
+  
+  const newPurchased = (subscription.purchased_slots_remaining || 0) + pkg.slot_count
+  
+  // 購入枠を追加
+  await DB.prepare(`
+    UPDATE slot_balances 
+    SET purchased_slots_remaining = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE subscription_id = ?
+  `).bind(newPurchased, subscription.id).run()
+  
+  // 購入履歴を記録
+  await DB.prepare(`
+    INSERT INTO slot_purchases (subscription_id, package_id, slots_purchased, amount_paid, payment_status)
+    VALUES (?, ?, ?, ?, 'completed')
+  `).bind(subscription.id, package_id, pkg.slot_count, pkg.price).run()
+  
+  // 使用履歴を記録
+  await DB.prepare(`
+    INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
+    VALUES (?, 'purchased', 'purchased', ?, ?, ?)
+  `).bind(subscription.id, pkg.slot_count, newPurchased, `${pkg.package_name}を購入`).run()
+  
+  return c.json({ 
+    success: true, 
+    slots_added: pkg.slot_count,
+    new_purchased_balance: newPurchased,
+    amount_paid: pkg.price
+  })
+})
+
+// プラン変更（次回切り替わり日から適用）
+app.post('/api/subscription/change-plan', async (c) => {
+  const { DB } = c.env
+  const { plan_id } = await c.req.json()
+  
+  if (!plan_id) {
+    return c.json({ error: 'plan_id is required' }, 400)
+  }
+  
+  const plan = await DB.prepare(`
+    SELECT * FROM subscription_plans WHERE id = ? AND is_active = 1
+  `).bind(plan_id).first()
+  
+  if (!plan) {
+    return c.json({ error: 'Plan not found' }, 404)
+  }
+  
+  // 現在のサブスクリプションを取得
+  const currentSub = await DB.prepare(`
+    SELECT * FROM user_subscriptions WHERE user_id IS NULL AND status = 'active' LIMIT 1
+  `).first()
+  
+  if (!currentSub) {
+    return c.json({ error: 'No active subscription' }, 400)
+  }
+  
+  // 次回切り替わり日を計算
+  let nextResetDate
+  if (currentSub.current_period_end) {
+    const periodEnd = new Date(currentSub.current_period_end)
+    nextResetDate = new Date(periodEnd)
+    nextResetDate.setDate(nextResetDate.getDate() + 1)
+  } else {
+    const today = new Date()
+    nextResetDate = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+  }
+  
+  // 予約プランとして保存（次回切り替わり日に適用）
+  await DB.prepare(`
+    UPDATE user_subscriptions 
+    SET scheduled_plan_id = ?, scheduled_plan_date = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE user_id IS NULL AND status = 'active'
+  `).bind(plan_id, nextResetDate.toISOString().split('T')[0]).run()
+  
+  return c.json({ 
+    success: true, 
+    new_plan: plan,
+    scheduled_date: nextResetDate.toISOString().split('T')[0],
+    message: `${nextResetDate.toLocaleDateString('ja-JP')}からプランが変更されます`
+  })
+})
+
+// 予約プランのキャンセル
+app.post('/api/subscription/cancel-scheduled-plan', async (c) => {
+  const { DB } = c.env
+  
+  await DB.prepare(`
+    UPDATE user_subscriptions 
+    SET scheduled_plan_id = NULL, scheduled_plan_date = NULL, updated_at = CURRENT_TIMESTAMP
+    WHERE user_id IS NULL AND status = 'active'
+  `).run()
+  
+  return c.json({ success: true, message: 'プラン変更の予約をキャンセルしました' })
+})
+
+// 使用履歴取得
+app.get('/api/subscription/history', async (c) => {
+  const { DB } = c.env
+  
+  const subscription = await DB.prepare(`
+    SELECT id FROM user_subscriptions WHERE user_id IS NULL AND status = 'active' LIMIT 1
+  `).first()
+  
+  if (!subscription) {
+    return c.json([])
+  }
+  
+  const history = await DB.prepare(`
+    SELECT suh.*, c.case_number, cl.name as client_name
+    FROM slot_usage_history suh
+    LEFT JOIN cases c ON suh.case_id = c.id
+    LEFT JOIN clients cl ON c.client_id = cl.id
+    WHERE suh.subscription_id = ?
+    ORDER BY suh.created_at DESC
+    LIMIT 50
+  `).bind(subscription.id).all()
+  
+  return c.json(history.results || [])
 })
 
 export default app
