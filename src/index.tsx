@@ -512,8 +512,8 @@ app.get('/signup', (c) => {
                         <div class="flex items-start">
                             <input type="checkbox" id="terms" name="terms" required class="mt-1 mr-2">
                             <label for="terms" class="text-sm text-gray-600">
-                                <a href="#" class="text-blue-600 hover:underline">利用規約</a>および
-                                <a href="#" class="text-blue-600 hover:underline">プライバシーポリシー</a>に同意します
+                                <a href="/terms" target="_blank" class="text-blue-600 hover:underline">利用規約</a>および
+                                <a href="/privacy-policy" target="_blank" class="text-blue-600 hover:underline">プライバシーポリシー</a>に同意します
                             </label>
                         </div>
                         
@@ -1151,7 +1151,8 @@ app.get('/api/public/settings', async (c) => {
       FROM site_settings
       WHERE setting_key IN ('company_name', 'company_address', 'company_phone', 'company_email', 
                             'company_representative', 'company_registration',
-                            'privacy_policy', 'legal_notice', 'terms_of_service', 'footer_text')
+                            'privacy_policy', 'legal_notice', 'terms_of_service', 'footer_text',
+                            'company_website_url', 'privacy_policy_url', 'terms_url', 'legal_notice_url')
     `).all()
     
     const settingsObj: Record<string, string> = {}
@@ -19031,22 +19032,29 @@ app.get('/privacy-policy', async (c) => {
   const { DB } = c.env
   
   let privacyPolicy = ''
+  let privacyPolicyUrl = ''
   let companyName = ''
   let footerText = ''
   
   try {
     const settings = await DB.prepare(`
       SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key IN ('privacy_policy', 'company_name', 'footer_text')
+      WHERE setting_key IN ('privacy_policy', 'privacy_policy_url', 'company_name', 'footer_text')
     `).all()
     
     for (const s of (settings.results || [])) {
       if ((s as any).setting_key === 'privacy_policy') privacyPolicy = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'privacy_policy_url') privacyPolicyUrl = (s as any).setting_value || ''
       if ((s as any).setting_key === 'company_name') companyName = (s as any).setting_value || ''
       if ((s as any).setting_key === 'footer_text') footerText = (s as any).setting_value || ''
     }
   } catch (e) {
     // テーブルがない場合はデフォルト値を使用
+  }
+  
+  // 外部URLが設定されている場合はリダイレクト
+  if (privacyPolicyUrl && privacyPolicyUrl.trim()) {
+    return c.redirect(privacyPolicyUrl)
   }
   
   // Markdownを簡易的にHTMLに変換
@@ -19116,22 +19124,29 @@ app.get('/legal', async (c) => {
   const { DB } = c.env
   
   let legalNotice = ''
+  let legalNoticeUrl = ''
   let companyName = ''
   let footerText = ''
   
   try {
     const settings = await DB.prepare(`
       SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key IN ('legal_notice', 'company_name', 'footer_text')
+      WHERE setting_key IN ('legal_notice', 'legal_notice_url', 'company_name', 'footer_text')
     `).all()
     
     for (const s of (settings.results || [])) {
       if ((s as any).setting_key === 'legal_notice') legalNotice = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'legal_notice_url') legalNoticeUrl = (s as any).setting_value || ''
       if ((s as any).setting_key === 'company_name') companyName = (s as any).setting_value || ''
       if ((s as any).setting_key === 'footer_text') footerText = (s as any).setting_value || ''
     }
   } catch (e) {
     // テーブルがない場合はデフォルト値を使用
+  }
+  
+  // 外部URLが設定されている場合はリダイレクト
+  if (legalNoticeUrl && legalNoticeUrl.trim()) {
+    return c.redirect(legalNoticeUrl)
   }
   
   // Markdownを簡易的にHTMLに変換
@@ -19177,6 +19192,98 @@ app.get('/legal', async (c) => {
                 
                 <div class="mt-6 text-center">
                     <button onclick="window.close()" class="text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-times mr-1"></i>このタブを閉じる
+                    </button>
+                </div>
+            </div>
+            
+            <footer class="bg-gray-100 border-t py-4 mt-8">
+                <div class="container mx-auto px-4 text-center text-sm text-gray-600">
+                    ${footerText || ''}
+                </div>
+            </footer>
+        </div>
+    </body>
+    </html>
+  `)
+})
+
+// ===============================
+// 利用規約ページ（動的）
+// ===============================
+
+app.get('/terms', async (c) => {
+  const { DB } = c.env
+  
+  let termsOfService = ''
+  let termsUrl = ''
+  let companyName = ''
+  let footerText = ''
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key IN ('terms_of_service', 'terms_url', 'company_name', 'footer_text')
+    `).all()
+    
+    for (const s of (settings.results || [])) {
+      if ((s as any).setting_key === 'terms_of_service') termsOfService = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'terms_url') termsUrl = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'company_name') companyName = (s as any).setting_value || ''
+      if ((s as any).setting_key === 'footer_text') footerText = (s as any).setting_value || ''
+    }
+  } catch (e) {
+    // テーブルがない場合はデフォルト値を使用
+  }
+  
+  // 外部URLが設定されている場合はリダイレクト
+  if (termsUrl && termsUrl.trim()) {
+    return c.redirect(termsUrl)
+  }
+  
+  // Markdownを簡易的にHTMLに変換
+  const markdownToHtml = (text: string) => {
+    if (!text) return '<p class="text-gray-500">利用規約が設定されていません。</p>'
+    return text
+      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-6 mb-3 text-gray-800">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-gray-800">$1</h1>')
+      .replace(/^- (.+)$/gm, '<li class="ml-4 text-gray-700">$1</li>')
+      .replace(/\n\n/g, '</p><p class="text-gray-700 mb-4">')
+      .replace(/\n/g, '<br>')
+  }
+  
+  const contentHtml = markdownToHtml(termsOfService)
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>利用規約 - ${companyName || '助成金申請管理システム'}</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50">
+        <div class="min-h-screen flex flex-col">
+            <header class="bg-purple-600 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-4">
+                    <h1 class="text-2xl font-bold">
+                        <i class="fas fa-scroll mr-2"></i>
+                        利用規約
+                    </h1>
+                    ${companyName ? `<p class="text-purple-100 text-sm mt-1">${companyName}</p>` : ''}
+                </div>
+            </header>
+            
+            <div class="container mx-auto px-4 py-8 max-w-4xl flex-1">
+                <div class="bg-white rounded-lg shadow p-6 md:p-8 prose max-w-none">
+                    ${contentHtml}
+                </div>
+                
+                <div class="mt-6 text-center">
+                    <button onclick="window.close()" class="text-purple-600 hover:text-purple-700">
                         <i class="fas fa-times mr-1"></i>このタブを閉じる
                     </button>
                 </div>
@@ -20036,38 +20143,77 @@ app.get('/admin/settings', async (c) => {
                         <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
                         <input type="email" id="company_email" class="w-full px-3 py-2 border rounded-lg" placeholder="例: info@example.com">
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-globe text-blue-600 mr-1"></i>会社・事務所HP URL
+                        </label>
+                        <input type="url" id="company_website_url" class="w-full px-3 py-2 border rounded-lg" placeholder="例: https://www.example.com">
+                        <p class="text-xs text-gray-500 mt-1">既存のホームページがあれば入力してください</p>
+                    </div>
+                    
+                    <!-- 外部URL設定案内 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                            <div class="text-sm text-blue-800">
+                                <p class="font-medium">既存HPの法務ページがある場合</p>
+                                <p class="mt-1">各項目に外部URLを設定すると、システム内のページではなく既存HPへリンクします。<br>URLが空欄の場合は、下記で入力した内容がシステム内ページとして表示されます。</p>
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- プライバシーポリシー -->
-                    <div>
+                    <div class="border rounded-lg p-4 bg-gray-50">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             <i class="fas fa-shield-alt text-green-600 mr-1"></i>プライバシーポリシー
                         </label>
-                        <p class="text-xs text-gray-500 mb-2">顧客ポータルに表示されます。Markdown記法が使えます。</p>
-                        <textarea id="privacy_policy" rows="12" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## プライバシーポリシー&#10;&#10;### 1. 個人情報の取得&#10;..."></textarea>
-                        <button type="button" onclick="previewPrivacyPolicy()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
-                            <i class="fas fa-eye mr-1"></i>プレビュー
-                        </button>
-                    </div>
-                    
-                    <!-- 特定商取引法に基づく表記 -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                            <i class="fas fa-file-contract text-orange-600 mr-1"></i>特定商取引法に基づく表記
-                        </label>
-                        <p class="text-xs text-gray-500 mb-2">顧客ポータルに表示されます。Markdown記法が使えます。</p>
-                        <textarea id="legal_notice" rows="12" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## 特定商取引法に基づく表記&#10;&#10;### 事業者名&#10;..."></textarea>
-                        <button type="button" onclick="previewLegalNotice()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
-                            <i class="fas fa-eye mr-1"></i>プレビュー
-                        </button>
+                        <div class="mb-3">
+                            <label class="block text-xs text-gray-600 mb-1">外部URL（既存HPがある場合）</label>
+                            <input type="url" id="privacy_policy_url" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: https://www.example.com/privacy">
+                        </div>
+                        <div id="privacy_policy_content" class="transition-opacity">
+                            <label class="block text-xs text-gray-600 mb-1">または、以下に内容を入力（Markdown対応）</label>
+                            <textarea id="privacy_policy" rows="10" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## プライバシーポリシー&#10;&#10;### 1. 個人情報の取得&#10;..."></textarea>
+                            <button type="button" onclick="previewPrivacyPolicy()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-eye mr-1"></i>プレビュー
+                            </button>
+                        </div>
                     </div>
                     
                     <!-- 利用規約 -->
-                    <div>
+                    <div class="border rounded-lg p-4 bg-gray-50">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             <i class="fas fa-scroll text-purple-600 mr-1"></i>利用規約
                         </label>
-                        <p class="text-xs text-gray-500 mb-2">サービス利用規約。Markdown記法が使えます。</p>
-                        <textarea id="terms_of_service" rows="10" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## 利用規約&#10;&#10;### 第1条（適用）&#10;..."></textarea>
+                        <div class="mb-3">
+                            <label class="block text-xs text-gray-600 mb-1">外部URL（既存HPがある場合）</label>
+                            <input type="url" id="terms_url" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: https://www.example.com/terms">
+                        </div>
+                        <div id="terms_content" class="transition-opacity">
+                            <label class="block text-xs text-gray-600 mb-1">または、以下に内容を入力（Markdown対応）</label>
+                            <textarea id="terms_of_service" rows="10" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## 利用規約&#10;&#10;### 第1条（適用）&#10;..."></textarea>
+                            <button type="button" onclick="previewTerms()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-eye mr-1"></i>プレビュー
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 特定商取引法に基づく表記 -->
+                    <div class="border rounded-lg p-4 bg-gray-50">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-file-contract text-orange-600 mr-1"></i>特定商取引法に基づく表記
+                        </label>
+                        <div class="mb-3">
+                            <label class="block text-xs text-gray-600 mb-1">外部URL（既存HPがある場合）</label>
+                            <input type="url" id="legal_notice_url" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: https://www.example.com/legal">
+                        </div>
+                        <div id="legal_notice_content" class="transition-opacity">
+                            <label class="block text-xs text-gray-600 mb-1">または、以下に内容を入力（Markdown対応）</label>
+                            <textarea id="legal_notice" rows="10" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" placeholder="## 特定商取引法に基づく表記&#10;&#10;### 事業者名&#10;..."></textarea>
+                            <button type="button" onclick="previewLegalNotice()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-eye mr-1"></i>プレビュー
+                            </button>
+                        </div>
                     </div>
                     
                     <!-- フッター -->
@@ -20141,10 +20287,17 @@ app.get('/admin/settings', async (c) => {
                     document.getElementById('company_registration').value = getSettingValue(settings, 'company_registration');
                     
                     // 法務設定
+                    document.getElementById('company_website_url').value = getSettingValue(settings, 'company_website_url');
+                    document.getElementById('privacy_policy_url').value = getSettingValue(settings, 'privacy_policy_url');
+                    document.getElementById('terms_url').value = getSettingValue(settings, 'terms_url');
+                    document.getElementById('legal_notice_url').value = getSettingValue(settings, 'legal_notice_url');
                     document.getElementById('privacy_policy').value = getSettingValue(settings, 'privacy_policy');
                     document.getElementById('legal_notice').value = getSettingValue(settings, 'legal_notice');
                     document.getElementById('terms_of_service').value = getSettingValue(settings, 'terms_of_service');
                     document.getElementById('footer_text').value = getSettingValue(settings, 'footer_text');
+                    
+                    // 外部URL入力時にテキストエリアを薄く表示
+                    toggleContentVisibility();
                     
                     // Stripe
                     const stripeEnabled = getSettingValue(settings, 'stripe_enabled');
@@ -20171,7 +20324,12 @@ app.get('/admin/settings', async (c) => {
                         company_email: document.getElementById('company_email').value,
                         company_representative: document.getElementById('company_representative').value,
                         company_registration: document.getElementById('company_registration').value,
-                        // 法務設定
+                        // 法務設定 - 外部URL
+                        company_website_url: document.getElementById('company_website_url').value,
+                        privacy_policy_url: document.getElementById('privacy_policy_url').value,
+                        terms_url: document.getElementById('terms_url').value,
+                        legal_notice_url: document.getElementById('legal_notice_url').value,
+                        // 法務設定 - 内部コンテンツ
                         privacy_policy: document.getElementById('privacy_policy').value,
                         legal_notice: document.getElementById('legal_notice').value,
                         terms_of_service: document.getElementById('terms_of_service').value,
@@ -20214,6 +20372,34 @@ app.get('/admin/settings', async (c) => {
                 document.getElementById('previewContent').innerHTML = simpleMarkdown(content);
                 document.getElementById('previewModal').classList.remove('hidden');
             }
+            
+            // 利用規約のプレビュー
+            function previewTerms() {
+                const content = document.getElementById('terms_of_service').value;
+                document.getElementById('previewTitle').textContent = '利用規約 プレビュー';
+                document.getElementById('previewContent').innerHTML = simpleMarkdown(content);
+                document.getElementById('previewModal').classList.remove('hidden');
+            }
+            
+            // 外部URL入力時にコンテンツエリアの表示を切り替え
+            function toggleContentVisibility() {
+                const privacyUrl = document.getElementById('privacy_policy_url').value;
+                const termsUrl = document.getElementById('terms_url').value;
+                const legalUrl = document.getElementById('legal_notice_url').value;
+                
+                const privacyContent = document.getElementById('privacy_policy_content');
+                const termsContent = document.getElementById('terms_content');
+                const legalContent = document.getElementById('legal_notice_content');
+                
+                privacyContent.style.opacity = privacyUrl ? '0.5' : '1';
+                termsContent.style.opacity = termsUrl ? '0.5' : '1';
+                legalContent.style.opacity = legalUrl ? '0.5' : '1';
+            }
+            
+            // URL入力フィールドの変更を監視
+            document.getElementById('privacy_policy_url').addEventListener('input', toggleContentVisibility);
+            document.getElementById('terms_url').addEventListener('input', toggleContentVisibility);
+            document.getElementById('legal_notice_url').addEventListener('input', toggleContentVisibility);
             
             // プレビューを閉じる
             function closePreview() {
