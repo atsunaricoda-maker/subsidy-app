@@ -22154,6 +22154,9 @@ app.get('/master/organizations/:id', async (c) => {
                             <p id="orgEmail" class="text-gray-600 mt-1"></p>
                         </div>
                         <div class="flex gap-2">
+                            <button onclick="openEditModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                <i class="fas fa-edit mr-2"></i>編集
+                            </button>
                             <button onclick="loginAsOrg(${orgId})" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
                                 <i class="fas fa-sign-in-alt mr-2"></i>この法人としてログイン
                             </button>
@@ -22182,10 +22185,23 @@ app.get('/master/organizations/:id', async (c) => {
                     <!-- サイドバー -->
                     <div class="space-y-6">
                         <div class="bg-white rounded-xl shadow-sm p-6">
-                            <h2 class="text-lg font-semibold mb-4">契約情報</h2>
+                            <h2 class="text-lg font-semibold mb-4 flex justify-between items-center">
+                                契約情報
+                                <button onclick="openPlanModal()" class="text-sm text-blue-600 hover:underline">変更</button>
+                            </h2>
                             <div id="subscriptionInfo" class="space-y-3">
                                 <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
                             </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-semibold mb-4">枠管理</h2>
+                            <div id="slotInfo" class="space-y-3">
+                                <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
+                            </div>
+                            <button onclick="openAddSlotsModal()" class="mt-4 w-full bg-blue-100 text-blue-800 px-4 py-2 rounded-lg hover:bg-blue-200">
+                                <i class="fas fa-plus mr-2"></i>枠を追加
+                            </button>
                         </div>
                         
                         <div class="bg-white rounded-xl shadow-sm p-6">
@@ -22208,12 +22224,128 @@ app.get('/master/organizations/:id', async (c) => {
                 </div>
             </main>
         </div>
+        
+        <!-- 編集モーダル -->
+        <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">法人情報を編集</h3>
+                        <button onclick="closeEditModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <form id="editForm" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">法人名</label>
+                        <input type="text" id="edit_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                        <input type="email" id="edit_email" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                        <input type="tel" id="edit_phone" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">代表者名</label>
+                        <input type="text" id="edit_representative" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">住所</label>
+                        <input type="text" id="edit_address" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ステータス</label>
+                        <select id="edit_status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="active">稼働中</option>
+                            <option value="trial">トライアル</option>
+                            <option value="suspended">停止中</option>
+                            <option value="cancelled">解約済み</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">備考</label>
+                        <textarea id="edit_notes" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">キャンセル</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- プラン変更モーダル -->
+        <div id="planModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">プランを変更</h3>
+                        <button onclick="closePlanModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div id="planOptions" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <!-- プランはJSで動的に読み込み -->
+                    </div>
+                    <div class="flex gap-3 pt-6">
+                        <button onclick="closePlanModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">キャンセル</button>
+                        <button onclick="changePlan()" id="changePlanBtn" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">変更を適用</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 枠追加モーダル -->
+        <div id="addSlotsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">枠を追加</h3>
+                        <button onclick="closeAddSlotsModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">追加する枠数</label>
+                        <input type="number" id="addSlotCount" min="1" value="10" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">追加理由</label>
+                        <select id="addSlotReason" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="purchase">購入</option>
+                            <option value="bonus">ボーナス付与</option>
+                            <option value="compensation">補償</option>
+                            <option value="other">その他</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">備考</label>
+                        <input type="text" id="addSlotNote" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="任意">
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button onclick="closeAddSlotsModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">キャンセル</button>
+                        <button onclick="addSlots()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">追加</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             ${masterSidebarScripts}
             
             const ORG_ID = ${orgId};
+            let currentOrg = null;
+            let selectedPlanId = null;
+            let plans = [];
             
             async function loadOrgDetails() {
                 try {
@@ -22299,8 +22431,157 @@ app.get('/master/organizations/:id', async (c) => {
                         </div>
                     \`;
                     
+                    // 枠情報
+                    document.getElementById('slotInfo').innerHTML = \`
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">月間枠（残り）</span>
+                            <span class="font-medium">\${org.slots?.monthly_remaining || 0}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">購入枠（残り）</span>
+                            <span class="font-medium">\${org.slots?.purchased_remaining || 0}</span>
+                        </div>
+                        <div class="flex justify-between font-bold">
+                            <span class="text-gray-700">合計</span>
+                            <span class="text-blue-600">\${(org.slots?.monthly_remaining || 0) + (org.slots?.purchased_remaining || 0)}</span>
+                        </div>
+                    \`;
+                    
                 } catch (error) {
                     console.error('Load error:', error);
+                }
+            }
+            
+            // 編集モーダル関連
+            function openEditModal() {
+                if (!currentOrg) return;
+                document.getElementById('edit_name').value = currentOrg.name || '';
+                document.getElementById('edit_email').value = currentOrg.email || '';
+                document.getElementById('edit_phone').value = currentOrg.phone || '';
+                document.getElementById('edit_representative').value = currentOrg.representative_name || '';
+                document.getElementById('edit_address').value = currentOrg.address || '';
+                document.getElementById('edit_status').value = currentOrg.status || 'active';
+                document.getElementById('edit_notes').value = currentOrg.notes || '';
+                document.getElementById('editModal').classList.remove('hidden');
+            }
+            
+            function closeEditModal() {
+                document.getElementById('editModal').classList.add('hidden');
+            }
+            
+            document.getElementById('editForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.put('/api/master/organizations/' + ORG_ID, {
+                        name: document.getElementById('edit_name').value,
+                        email: document.getElementById('edit_email').value,
+                        phone: document.getElementById('edit_phone').value,
+                        representative_name: document.getElementById('edit_representative').value,
+                        address: document.getElementById('edit_address').value,
+                        status: document.getElementById('edit_status').value,
+                        notes: document.getElementById('edit_notes').value
+                    }, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    closeEditModal();
+                    loadOrgDetails();
+                    alert('保存しました');
+                } catch (error) {
+                    alert('保存に失敗しました');
+                }
+            });
+            
+            // プラン変更モーダル関連
+            async function openPlanModal() {
+                document.getElementById('planModal').classList.remove('hidden');
+                if (plans.length === 0) {
+                    try {
+                        const response = await axios.get('/api/subscription/plans');
+                        plans = response.data;
+                    } catch (e) {
+                        plans = [];
+                    }
+                }
+                renderPlanOptions();
+            }
+            
+            function closePlanModal() {
+                document.getElementById('planModal').classList.add('hidden');
+            }
+            
+            function renderPlanOptions() {
+                const container = document.getElementById('planOptions');
+                container.innerHTML = plans.map(plan => \`
+                    <div class="plan-option border-2 rounded-lg p-4 cursor-pointer transition-all hover:border-blue-300 \${currentOrg?.subscription?.plan_id === plan.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}"
+                         onclick="selectPlan(\${plan.id}, this)" data-plan-id="\${plan.id}">
+                        <h4 class="font-bold">\${plan.plan_name}</h4>
+                        <p class="text-xl font-bold text-blue-600">¥\${plan.monthly_price.toLocaleString()}<span class="text-sm text-gray-500">/月</span></p>
+                        <p class="text-sm text-gray-500">\${plan.monthly_slots > 0 ? plan.monthly_slots + '枠/月' : '無制限'}</p>
+                    </div>
+                \`).join('');
+                selectedPlanId = currentOrg?.subscription?.plan_id;
+            }
+            
+            function selectPlan(planId, element) {
+                selectedPlanId = planId;
+                document.querySelectorAll('.plan-option').forEach(el => {
+                    el.classList.remove('border-blue-500', 'bg-blue-50');
+                    el.classList.add('border-gray-200');
+                });
+                element.classList.remove('border-gray-200');
+                element.classList.add('border-blue-500', 'bg-blue-50');
+            }
+            
+            async function changePlan() {
+                if (!selectedPlanId) return;
+                if (!confirm('プランを変更しますか？')) return;
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.post('/api/master/organizations/' + ORG_ID + '/change-plan', {
+                        plan_id: selectedPlanId
+                    }, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    closePlanModal();
+                    loadOrgDetails();
+                    alert('プランを変更しました');
+                } catch (error) {
+                    alert('変更に失敗しました');
+                }
+            }
+            
+            // 枠追加モーダル関連
+            function openAddSlotsModal() {
+                document.getElementById('addSlotsModal').classList.remove('hidden');
+            }
+            
+            function closeAddSlotsModal() {
+                document.getElementById('addSlotsModal').classList.add('hidden');
+            }
+            
+            async function addSlots() {
+                const count = parseInt(document.getElementById('addSlotCount').value);
+                const reason = document.getElementById('addSlotReason').value;
+                const note = document.getElementById('addSlotNote').value;
+                
+                if (count < 1) {
+                    alert('1以上の数を入力してください');
+                    return;
+                }
+                
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.post('/api/master/organizations/' + ORG_ID + '/add-slots', {
+                        count, reason, note
+                    }, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    closeAddSlotsModal();
+                    loadOrgDetails();
+                    alert(count + '枠を追加しました');
+                } catch (error) {
+                    alert('追加に失敗しました');
                 }
             }
             
@@ -22392,16 +22673,146 @@ app.get('/api/master/organizations/:id', async (c) => {
     WHERE organization_id = ? AND created_at >= date('now', 'start of month')
   `).bind(orgId).first()
   
+  // 枠情報
+  const slots = await DB.prepare(`
+    SELECT monthly_slots_remaining, purchased_slots_remaining
+    FROM slot_balances sb
+    JOIN user_subscriptions us ON sb.subscription_id = us.id
+    WHERE us.organization_id = ? AND us.status = 'active'
+  `).bind(orgId).first()
+  
   return c.json({
     ...org,
     staff: staff?.results || [],
     subscription,
+    slots: slots ? {
+      monthly_remaining: slots.monthly_slots_remaining || 0,
+      purchased_remaining: slots.purchased_slots_remaining || 0
+    } : null,
     stats: {
       client_count: clientCount?.count || 0,
       case_count: caseCount?.count || 0,
       cases_this_month: casesThisMonth?.count || 0
     }
   })
+})
+
+// 法人更新API
+app.put('/api/master/organizations/:id', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  const data = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE organizations SET 
+      name = COALESCE(?, name),
+      email = COALESCE(?, email),
+      phone = COALESCE(?, phone),
+      representative_name = COALESCE(?, representative_name),
+      address = COALESCE(?, address),
+      status = COALESCE(?, status),
+      notes = COALESCE(?, notes),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    data.name || null,
+    data.email || null,
+    data.phone || null,
+    data.representative_name || null,
+    data.address || null,
+    data.status || null,
+    data.notes || null,
+    orgId
+  ).run()
+  
+  return c.json({ success: true })
+})
+
+// プラン変更API
+app.post('/api/master/organizations/:id/change-plan', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  const { plan_id } = await c.req.json()
+  
+  // プラン情報取得
+  const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(plan_id).first()
+  if (!plan) {
+    return c.json({ error: 'Plan not found' }, 404)
+  }
+  
+  // 既存のサブスクリプション更新
+  const existing = await DB.prepare(`
+    SELECT id FROM user_subscriptions WHERE organization_id = ? AND status = 'active'
+  `).bind(orgId).first()
+  
+  if (existing) {
+    await DB.prepare(`
+      UPDATE user_subscriptions SET plan_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(plan_id, existing.id).run()
+    
+    // 月間枠をリセット
+    await DB.prepare(`
+      UPDATE slot_balances SET monthly_slots_remaining = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE subscription_id = ?
+    `).bind(plan.monthly_slots, existing.id).run()
+  } else {
+    // 新規サブスクリプション作成
+    const result = await DB.prepare(`
+      INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
+      VALUES (?, ?, 'active', date('now'), date('now', '+1 month'))
+    `).bind(orgId, plan_id).run()
+    
+    await DB.prepare(`
+      INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining)
+      VALUES (?, ?, ?, 0)
+    `).bind(result.meta?.last_row_id, orgId, plan.monthly_slots).run()
+  }
+  
+  return c.json({ success: true })
+})
+
+// 枠追加API
+app.post('/api/master/organizations/:id/add-slots', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  const { count, reason, note } = await c.req.json()
+  
+  if (!count || count < 1) {
+    return c.json({ error: 'Invalid count' }, 400)
+  }
+  
+  // slot_balances更新
+  const subscription = await DB.prepare(`
+    SELECT us.id as subscription_id, sb.id as balance_id, sb.purchased_slots_remaining
+    FROM user_subscriptions us
+    JOIN slot_balances sb ON us.id = sb.subscription_id
+    WHERE us.organization_id = ? AND us.status = 'active'
+  `).bind(orgId).first()
+  
+  if (!subscription) {
+    return c.json({ error: 'No active subscription found' }, 404)
+  }
+  
+  const newBalance = (subscription.purchased_slots_remaining || 0) + count
+  
+  await DB.prepare(`
+    UPDATE slot_balances SET purchased_slots_remaining = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(newBalance, subscription.balance_id).run()
+  
+  // 履歴記録
+  await DB.prepare(`
+    INSERT INTO slot_usage_history (subscription_id, organization_id, slot_type, action, slots_changed, balance_after, note)
+    VALUES (?, ?, 'purchased', 'added', ?, ?, ?)
+  `).bind(
+    subscription.subscription_id,
+    orgId,
+    count,
+    newBalance,
+    note || reason || 'マスター管理者による追加'
+  ).run()
+  
+  return c.json({ success: true, new_balance: newBalance })
 })
 
 // 法人停止API
@@ -22457,6 +22868,784 @@ app.post('/api/master/impersonate/:id', async (c) => {
     role: admin.role || 'admin',
     organization_id: orgId
   })
+})
+
+// ===============================
+// マスター管理者ページ
+// ===============================
+app.get('/master/admins', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>マスター管理者 - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('admins')}
+            
+            <main class="flex-1 p-8">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">マスター管理者</h1>
+                        <p class="text-gray-600 mt-1">SaaS全体を管理できるユーザー</p>
+                    </div>
+                    <button onclick="openAddModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-plus mr-2"></i>管理者を追加
+                    </button>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm">
+                    <div id="adminList" class="divide-y">
+                        <div class="p-8 text-center text-gray-500">読み込み中...</div>
+                    </div>
+                </div>
+            </main>
+        </div>
+        
+        <!-- 追加モーダル -->
+        <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">管理者を追加</h3>
+                        <button onclick="closeAddModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <form id="addForm" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ユーザー名</label>
+                        <input type="text" id="add_username" required pattern="[a-zA-Z0-9_]+" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">表示名</label>
+                        <input type="text" id="add_name" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">パスワード</label>
+                        <input type="password" id="add_password" required minlength="6" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeAddModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">キャンセル</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">追加</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            async function loadAdmins() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/master/admins', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const admins = response.data;
+                    
+                    document.getElementById('adminList').innerHTML = admins.map(admin => \`
+                        <div class="p-4 flex items-center justify-between hover:bg-gray-50">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-user-shield text-purple-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium">\${admin.name}</p>
+                                    <p class="text-sm text-gray-500">@\${admin.username}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <span class="text-sm text-gray-500">\${new Date(admin.created_at).toLocaleDateString('ja-JP')}</span>
+                                \${admin.id !== 1 ? \`
+                                    <button onclick="deleteAdmin(\${admin.id})" class="text-red-500 hover:text-red-700">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                \` : '<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">デフォルト</span>'}
+                            </div>
+                        </div>
+                    \`).join('') || '<div class="p-8 text-center text-gray-500">管理者がいません</div>';
+                } catch (error) {
+                    console.error('Load error:', error);
+                }
+            }
+            
+            function openAddModal() {
+                document.getElementById('addModal').classList.remove('hidden');
+            }
+            
+            function closeAddModal() {
+                document.getElementById('addModal').classList.add('hidden');
+                document.getElementById('addForm').reset();
+            }
+            
+            document.getElementById('addForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.post('/api/master/admins', {
+                        username: document.getElementById('add_username').value,
+                        name: document.getElementById('add_name').value,
+                        password: document.getElementById('add_password').value
+                    }, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    closeAddModal();
+                    loadAdmins();
+                    alert('管理者を追加しました');
+                } catch (error) {
+                    alert(error.response?.data?.error || '追加に失敗しました');
+                }
+            });
+            
+            async function deleteAdmin(id) {
+                if (!confirm('この管理者を削除しますか？')) return;
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.delete('/api/master/admins/' + id, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    loadAdmins();
+                    alert('削除しました');
+                } catch (error) {
+                    alert('削除に失敗しました');
+                }
+            }
+            
+            loadAdmins();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// マスター管理者API
+app.get('/api/master/admins', async (c) => {
+  const { DB } = c.env
+  const admins = await DB.prepare(`SELECT id, username, name, created_at FROM master_admins ORDER BY id`).all()
+  return c.json(admins?.results || [])
+})
+
+app.post('/api/master/admins', async (c) => {
+  const { DB } = c.env
+  const { username, name, password } = await c.req.json()
+  
+  if (!username || !name || !password) {
+    return c.json({ error: '必須項目を入力してください' }, 400)
+  }
+  
+  const existing = await DB.prepare(`SELECT id FROM master_admins WHERE username = ?`).bind(username).first()
+  if (existing) {
+    return c.json({ error: 'このユーザー名は既に使用されています' }, 400)
+  }
+  
+  await DB.prepare(`
+    INSERT INTO master_admins (username, password_hash, name) VALUES (?, ?, ?)
+  `).bind(username, password, name).run()
+  
+  return c.json({ success: true })
+})
+
+app.delete('/api/master/admins/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  if (id === '1') {
+    return c.json({ error: 'デフォルト管理者は削除できません' }, 400)
+  }
+  
+  await DB.prepare(`DELETE FROM master_admins WHERE id = ?`).bind(id).run()
+  return c.json({ success: true })
+})
+
+// ===============================
+// プラン管理ページ
+// ===============================
+app.get('/master/plans', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>プラン管理 - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('plans')}
+            
+            <main class="flex-1 p-8">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">プラン管理</h1>
+                        <p class="text-gray-600 mt-1">料金プランの設定・管理</p>
+                    </div>
+                    <button onclick="openAddPlanModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-plus mr-2"></i>プランを追加
+                    </button>
+                </div>
+                
+                <div id="planList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="animate-pulse h-48 bg-gray-200 rounded-xl"></div>
+                    <div class="animate-pulse h-48 bg-gray-200 rounded-xl"></div>
+                    <div class="animate-pulse h-48 bg-gray-200 rounded-xl"></div>
+                </div>
+            </main>
+        </div>
+        
+        <!-- プラン編集モーダル -->
+        <div id="editPlanModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold" id="planModalTitle">プランを編集</h3>
+                        <button onclick="closePlanModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <form id="planForm" class="p-6 space-y-4">
+                    <input type="hidden" id="plan_id">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">プランコード</label>
+                        <input type="text" id="plan_code" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">プラン名</label>
+                        <input type="text" id="plan_name" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">月額料金（円）</label>
+                        <input type="number" id="plan_price" required min="0" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">月間枠数（-1で無制限）</label>
+                        <input type="number" id="plan_slots" required min="-1" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">最大スタッフ数</label>
+                        <input type="number" id="plan_max_staff" min="1" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">説明</label>
+                        <input type="text" id="plan_description" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="plan_is_active" class="rounded">
+                        <label for="plan_is_active" class="text-sm text-gray-700">有効</label>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closePlanModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">キャンセル</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            async function loadPlans() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/master/plans', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const plans = response.data;
+                    
+                    document.getElementById('planList').innerHTML = plans.map(plan => \`
+                        <div class="bg-white rounded-xl shadow-sm p-6 \${!plan.is_active ? 'opacity-60' : ''}">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <span class="text-xs font-mono bg-gray-100 px-2 py-1 rounded">\${plan.plan_code}</span>
+                                    <h3 class="text-xl font-bold mt-2">\${plan.plan_name}</h3>
+                                </div>
+                                <span class="text-xs px-2 py-1 rounded \${plan.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                    \${plan.is_active ? '有効' : '無効'}
+                                </span>
+                            </div>
+                            <p class="text-3xl font-bold text-blue-600 mb-2">
+                                \${plan.monthly_price > 0 ? '¥' + plan.monthly_price.toLocaleString() : '要相談'}
+                                <span class="text-sm font-normal text-gray-500">/月</span>
+                            </p>
+                            <div class="space-y-1 text-sm text-gray-600 mb-4">
+                                <p><i class="fas fa-box w-5"></i> \${plan.monthly_slots > 0 ? plan.monthly_slots + '枠/月' : '無制限'}</p>
+                                <p><i class="fas fa-users w-5"></i> 最大\${plan.max_staff || '∞'}人</p>
+                                <p class="text-gray-400">\${plan.description || ''}</p>
+                            </div>
+                            <div class="flex justify-between items-center pt-4 border-t">
+                                <span class="text-sm text-gray-500">\${plan.subscriber_count || 0}社が利用中</span>
+                                <button onclick="editPlan(\${plan.id})" class="text-blue-600 hover:underline text-sm">
+                                    <i class="fas fa-edit mr-1"></i>編集
+                                </button>
+                            </div>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Load error:', error);
+                }
+            }
+            
+            let editingPlanId = null;
+            let plans = [];
+            
+            function openAddPlanModal() {
+                editingPlanId = null;
+                document.getElementById('planModalTitle').textContent = 'プランを追加';
+                document.getElementById('planForm').reset();
+                document.getElementById('plan_is_active').checked = true;
+                document.getElementById('editPlanModal').classList.remove('hidden');
+            }
+            
+            async function editPlan(id) {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/master/plans', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const plan = response.data.find(p => p.id === id);
+                    if (!plan) return;
+                    
+                    editingPlanId = id;
+                    document.getElementById('planModalTitle').textContent = 'プランを編集';
+                    document.getElementById('plan_id').value = plan.id;
+                    document.getElementById('plan_code').value = plan.plan_code;
+                    document.getElementById('plan_name').value = plan.plan_name;
+                    document.getElementById('plan_price').value = plan.monthly_price;
+                    document.getElementById('plan_slots').value = plan.monthly_slots;
+                    document.getElementById('plan_max_staff').value = plan.max_staff || '';
+                    document.getElementById('plan_description').value = plan.description || '';
+                    document.getElementById('plan_is_active').checked = plan.is_active;
+                    document.getElementById('editPlanModal').classList.remove('hidden');
+                } catch (error) {
+                    alert('読み込みに失敗しました');
+                }
+            }
+            
+            function closePlanModal() {
+                document.getElementById('editPlanModal').classList.add('hidden');
+            }
+            
+            document.getElementById('planForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const data = {
+                        plan_code: document.getElementById('plan_code').value,
+                        plan_name: document.getElementById('plan_name').value,
+                        monthly_price: parseInt(document.getElementById('plan_price').value),
+                        monthly_slots: parseInt(document.getElementById('plan_slots').value),
+                        max_staff: parseInt(document.getElementById('plan_max_staff').value) || null,
+                        description: document.getElementById('plan_description').value,
+                        is_active: document.getElementById('plan_is_active').checked ? 1 : 0
+                    };
+                    
+                    if (editingPlanId) {
+                        await axios.put('/api/master/plans/' + editingPlanId, data, {
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        });
+                    } else {
+                        await axios.post('/api/master/plans', data, {
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        });
+                    }
+                    closePlanModal();
+                    loadPlans();
+                    alert('保存しました');
+                } catch (error) {
+                    alert(error.response?.data?.error || '保存に失敗しました');
+                }
+            });
+            
+            loadPlans();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// プラン管理API
+app.get('/api/master/plans', async (c) => {
+  const { DB } = c.env
+  const plans = await DB.prepare(`
+    SELECT sp.*, 
+           (SELECT COUNT(*) FROM user_subscriptions us WHERE us.plan_id = sp.id AND us.status = 'active') as subscriber_count
+    FROM subscription_plans sp
+    ORDER BY sp.monthly_price ASC
+  `).all()
+  return c.json(plans?.results || [])
+})
+
+app.post('/api/master/plans', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  await DB.prepare(`
+    INSERT INTO subscription_plans (plan_code, plan_name, monthly_price, monthly_slots, max_staff, description, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    data.plan_code,
+    data.plan_name,
+    data.monthly_price,
+    data.monthly_slots,
+    data.max_staff,
+    data.description,
+    data.is_active
+  ).run()
+  
+  return c.json({ success: true })
+})
+
+app.put('/api/master/plans/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE subscription_plans SET 
+      plan_code = ?, plan_name = ?, monthly_price = ?, monthly_slots = ?, 
+      max_staff = ?, description = ?, is_active = ?
+    WHERE id = ?
+  `).bind(
+    data.plan_code,
+    data.plan_name,
+    data.monthly_price,
+    data.monthly_slots,
+    data.max_staff,
+    data.description,
+    data.is_active,
+    id
+  ).run()
+  
+  return c.json({ success: true })
+})
+
+// ===============================
+// 売上・請求ページ
+// ===============================
+app.get('/master/billing', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>売上・請求 - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('billing')}
+            
+            <main class="flex-1 p-8">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800">売上・請求</h1>
+                    <p class="text-gray-600 mt-1">月次売上と請求状況の管理</p>
+                </div>
+                
+                <!-- サマリーカード -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <p class="text-sm text-gray-500">今月の売上</p>
+                        <p id="monthlyRevenue" class="text-3xl font-bold text-blue-600 mt-1">-</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <p class="text-sm text-gray-500">アクティブ契約数</p>
+                        <p id="activeCount" class="text-3xl font-bold text-green-600 mt-1">-</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <p class="text-sm text-gray-500">トライアル中</p>
+                        <p id="trialCount" class="text-3xl font-bold text-yellow-600 mt-1">-</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <p class="text-sm text-gray-500">平均単価</p>
+                        <p id="avgPrice" class="text-3xl font-bold text-purple-600 mt-1">-</p>
+                    </div>
+                </div>
+                
+                <!-- プラン別売上 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                    <h2 class="text-lg font-semibold mb-4">プラン別売上</h2>
+                    <div id="planRevenue" class="space-y-3">
+                        <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+                
+                <!-- 最近の契約 -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-lg font-semibold mb-4">最近の契約変更</h2>
+                    <div id="recentSubscriptions" class="space-y-2">
+                        <div class="animate-pulse h-12 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            async function loadBillingData() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/master/billing', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const data = response.data;
+                    
+                    document.getElementById('monthlyRevenue').textContent = '¥' + (data.monthly_revenue || 0).toLocaleString();
+                    document.getElementById('activeCount').textContent = data.active_count || 0;
+                    document.getElementById('trialCount').textContent = data.trial_count || 0;
+                    document.getElementById('avgPrice').textContent = '¥' + Math.round(data.avg_price || 0).toLocaleString();
+                    
+                    document.getElementById('planRevenue').innerHTML = data.plan_breakdown.map(p => \`
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <p class="font-medium">\${p.plan_name}</p>
+                                <p class="text-sm text-gray-500">\${p.count}社</p>
+                            </div>
+                            <p class="font-bold text-blue-600">¥\${(p.revenue || 0).toLocaleString()}</p>
+                        </div>
+                    \`).join('') || '<p class="text-gray-500">データがありません</p>';
+                    
+                    document.getElementById('recentSubscriptions').innerHTML = data.recent_subscriptions.map(s => \`
+                        <div class="flex items-center justify-between p-3 border-b">
+                            <div>
+                                <p class="font-medium">\${s.org_name}</p>
+                                <p class="text-sm text-gray-500">\${s.plan_name}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-medium">¥\${(s.price || 0).toLocaleString()}/月</p>
+                                <p class="text-xs text-gray-500">\${new Date(s.created_at).toLocaleDateString('ja-JP')}</p>
+                            </div>
+                        </div>
+                    \`).join('') || '<p class="text-gray-500 p-3">データがありません</p>';
+                    
+                } catch (error) {
+                    console.error('Load error:', error);
+                }
+            }
+            
+            loadBillingData();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// 売上API
+app.get('/api/master/billing', async (c) => {
+  const { DB } = c.env
+  
+  // 月次売上
+  const revenue = await DB.prepare(`
+    SELECT SUM(sp.monthly_price) as total
+    FROM user_subscriptions us
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE us.status = 'active'
+  `).first()
+  
+  // アクティブ数
+  const activeCount = await DB.prepare(`
+    SELECT COUNT(*) as count FROM organizations WHERE status = 'active'
+  `).first()
+  
+  // トライアル数
+  const trialCount = await DB.prepare(`
+    SELECT COUNT(*) as count FROM organizations WHERE status = 'trial'
+  `).first()
+  
+  // プラン別内訳
+  const planBreakdown = await DB.prepare(`
+    SELECT sp.plan_name, COUNT(*) as count, SUM(sp.monthly_price) as revenue
+    FROM user_subscriptions us
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE us.status = 'active'
+    GROUP BY sp.id
+    ORDER BY revenue DESC
+  `).all()
+  
+  // 最近の契約
+  const recentSubs = await DB.prepare(`
+    SELECT o.name as org_name, sp.plan_name, sp.monthly_price as price, us.created_at
+    FROM user_subscriptions us
+    JOIN organizations o ON us.organization_id = o.id
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    ORDER BY us.created_at DESC
+    LIMIT 10
+  `).all()
+  
+  return c.json({
+    monthly_revenue: revenue?.total || 0,
+    active_count: activeCount?.count || 0,
+    trial_count: trialCount?.count || 0,
+    avg_price: (revenue?.total || 0) / Math.max(1, activeCount?.count || 1),
+    plan_breakdown: planBreakdown?.results || [],
+    recent_subscriptions: recentSubs?.results || []
+  })
+})
+
+// ===============================
+// 操作ログページ
+// ===============================
+app.get('/master/logs', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>操作ログ - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('logs')}
+            
+            <main class="flex-1 p-8">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800">操作ログ</h1>
+                    <p class="text-gray-600 mt-1">システム全体のアクティビティログ</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex gap-4 mb-6">
+                        <select id="filterType" class="px-3 py-2 border rounded-lg" onchange="loadLogs()">
+                            <option value="">すべての種類</option>
+                            <option value="signup">新規登録</option>
+                            <option value="login">ログイン</option>
+                            <option value="plan_change">プラン変更</option>
+                            <option value="slot_usage">枠消費</option>
+                        </select>
+                        <select id="filterOrg" class="px-3 py-2 border rounded-lg" onchange="loadLogs()">
+                            <option value="">すべての法人</option>
+                        </select>
+                    </div>
+                    
+                    <div id="logList" class="space-y-2">
+                        <div class="animate-pulse h-12 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            async function loadOrgs() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/master/organizations', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const select = document.getElementById('filterOrg');
+                    response.data.organizations.forEach(org => {
+                        const option = document.createElement('option');
+                        option.value = org.id;
+                        option.textContent = org.name;
+                        select.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Load orgs error:', error);
+                }
+            }
+            
+            async function loadLogs() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const type = document.getElementById('filterType').value;
+                    const orgId = document.getElementById('filterOrg').value;
+                    
+                    const params = new URLSearchParams();
+                    if (type) params.append('type', type);
+                    if (orgId) params.append('org_id', orgId);
+                    
+                    const response = await axios.get('/api/master/logs?' + params.toString(), {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const logs = response.data;
+                    
+                    const icons = {
+                        signup: 'fa-user-plus text-green-500',
+                        login: 'fa-sign-in-alt text-blue-500',
+                        plan_change: 'fa-exchange-alt text-purple-500',
+                        slot_usage: 'fa-box text-yellow-500',
+                        default: 'fa-circle text-gray-400'
+                    };
+                    
+                    document.getElementById('logList').innerHTML = logs.map(log => \`
+                        <div class="flex items-center gap-4 p-3 border-b hover:bg-gray-50">
+                            <i class="fas \${icons[log.type] || icons.default} w-5"></i>
+                            <div class="flex-1">
+                                <p class="font-medium">\${log.message}</p>
+                                <p class="text-sm text-gray-500">\${log.org_name || 'システム'}</p>
+                            </div>
+                            <span class="text-sm text-gray-400">\${new Date(log.created_at).toLocaleString('ja-JP')}</span>
+                        </div>
+                    \`).join('') || '<p class="text-gray-500 p-4">ログがありません</p>';
+                    
+                } catch (error) {
+                    console.error('Load logs error:', error);
+                    document.getElementById('logList').innerHTML = '<p class="text-gray-500 p-4">ログの読み込みに失敗しました</p>';
+                }
+            }
+            
+            loadOrgs();
+            loadLogs();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// 操作ログAPI
+app.get('/api/master/logs', async (c) => {
+  const { DB } = c.env
+  const type = c.req.query('type')
+  const orgId = c.req.query('org_id')
+  
+  // slot_usage_historyから操作ログを取得
+  let query = `
+    SELECT 
+      suh.id,
+      'slot_usage' as type,
+      CASE 
+        WHEN suh.action = 'consumed' THEN '枠を消費: ' || suh.note
+        WHEN suh.action = 'added' THEN '枠を追加: ' || suh.note
+        ELSE suh.action || ': ' || COALESCE(suh.note, '')
+      END as message,
+      o.name as org_name,
+      suh.created_at
+    FROM slot_usage_history suh
+    LEFT JOIN organizations o ON suh.organization_id = o.id
+    WHERE 1=1
+  `
+  
+  const bindings: any[] = []
+  
+  if (orgId) {
+    query += ` AND suh.organization_id = ?`
+    bindings.push(orgId)
+  }
+  
+  query += ` ORDER BY suh.created_at DESC LIMIT 100`
+  
+  const logs = await DB.prepare(query).bind(...bindings).all()
+  
+  return c.json(logs?.results || [])
 })
 
 export default app
