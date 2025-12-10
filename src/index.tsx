@@ -3561,6 +3561,8 @@ app.put('/api/cases/:id', async (c) => {
   
   try {
     const data = await c.req.json()
+    const user = await getCurrentUser(c)
+    const organizationId = user?.organization_id || 1
     
     // ステータス変更時の枠消費チェック
     if (data.status) {
@@ -3575,14 +3577,14 @@ app.put('/api/cases/:id', async (c) => {
         `).bind(id).first()
         
         if (!alreadyConsumed) {
-          // サブスクリプション取得
+          // サブスクリプション取得（テナント分離: organization_id で検索）
           const subscription = await DB.prepare(`
             SELECT us.id, sb.monthly_slots_remaining, sb.purchased_slots_remaining
             FROM user_subscriptions us
             JOIN slot_balances sb ON us.id = sb.subscription_id
-            WHERE us.user_id IS NULL AND us.status = 'active'
+            WHERE us.organization_id = ? AND us.status = 'active'
             LIMIT 1
-          `).first()
+          `).bind(organizationId).first()
           
           if (subscription) {
             const totalAvailable = (subscription.monthly_slots_remaining || 0) + (subscription.purchased_slots_remaining || 0)
