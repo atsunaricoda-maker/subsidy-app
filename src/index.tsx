@@ -20695,4 +20695,1218 @@ app.get('/api/subscription/history', async (c) => {
   return c.json(history.results || [])
 })
 
+// ===============================
+// マスター管理画面（SaaS運営側）
+// ===============================
+
+// マスター用サイドバー
+function generateMasterSidebar(activePage: string = '') {
+  const isActive = (page: string) => activePage === page ? 'active' : '';
+  
+  return `
+    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-gray-800 to-gray-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+        <div class="p-4 border-b border-gray-700 flex-shrink-0">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fas fa-shield-alt"></i>
+                <span>マスター管理</span>
+            </h1>
+            <p class="text-xs text-gray-400 mt-1">SaaS Management Console</p>
+        </div>
+        
+        <nav class="p-4 space-y-1 flex-1 overflow-y-auto">
+            <a href="/master" class="sidebar-link ${isActive('dashboard')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-tachometer-alt w-5"></i>
+                <span>ダッシュボード</span>
+            </a>
+            
+            <div class="pt-4 pb-2">
+                <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">法人管理</p>
+            </div>
+            <a href="/master/organizations" class="sidebar-link ${isActive('organizations')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-building w-5"></i>
+                <span>法人一覧</span>
+            </a>
+            <a href="/master/organizations/new" class="sidebar-link ${isActive('new-org')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-plus-circle w-5"></i>
+                <span>新規法人登録</span>
+            </a>
+            
+            <div class="pt-4 pb-2">
+                <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">プラン・課金</p>
+            </div>
+            <a href="/master/plans" class="sidebar-link ${isActive('plans')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-tags w-5"></i>
+                <span>プラン管理</span>
+            </a>
+            <a href="/master/billing" class="sidebar-link ${isActive('billing')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-file-invoice-dollar w-5"></i>
+                <span>売上・請求</span>
+            </a>
+            
+            <div class="pt-4 pb-2">
+                <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">システム</p>
+            </div>
+            <a href="/master/admins" class="sidebar-link ${isActive('admins')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-user-shield w-5"></i>
+                <span>マスター管理者</span>
+            </a>
+            <a href="/master/logs" class="sidebar-link ${isActive('logs')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-history w-5"></i>
+                <span>操作ログ</span>
+            </a>
+        </nav>
+        
+        <div class="p-4 border-t border-gray-700 flex-shrink-0">
+            <button onclick="masterLogout()" class="w-full flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>ログアウト</span>
+            </button>
+        </div>
+    </aside>
+    
+    <style>
+        .sidebar-link.active {
+            background: rgba(59, 130, 246, 0.3);
+            border-left: 3px solid #3B82F6;
+        }
+        .sidebar-link:hover {
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+  `;
+}
+
+// マスター用共通スクリプト
+const masterSidebarScripts = `
+    function masterLogout() {
+        localStorage.removeItem('master_token');
+        localStorage.removeItem('master_name');
+        window.location.href = '/master/login';
+    }
+    
+    function checkMasterAuth() {
+        const token = localStorage.getItem('master_token');
+        if (!token) {
+            window.location.href = '/master/login';
+            return false;
+        }
+        return true;
+    }
+    
+    // 認証チェック
+    checkMasterAuth();
+`;
+
+// マスターログインページ
+app.get('/master/login', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>マスター管理ログイン</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-900 min-h-screen flex items-center justify-center">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full border border-gray-700">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-shield-alt text-3xl text-white"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white">マスター管理コンソール</h1>
+                <p class="text-sm text-gray-400 mt-2">SaaS運営管理者専用</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">ユーザー名</label>
+                    <input type="text" name="username" required 
+                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">パスワード</label>
+                    <input type="password" name="password" required 
+                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <button type="submit" 
+                        class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium transition-colors">
+                    <i class="fas fa-lock mr-2"></i>ログイン
+                </button>
+            </form>
+            
+            <div id="errorMessage" class="hidden mt-4 p-3 bg-red-900/50 text-red-300 rounded-lg text-sm border border-red-800"></div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                
+                try {
+                    const response = await axios.post('/api/master/login', data);
+                    localStorage.setItem('master_token', response.data.token);
+                    localStorage.setItem('master_name', response.data.name);
+                    window.location.href = '/master';
+                } catch (error) {
+                    const errorDiv = document.getElementById('errorMessage');
+                    errorDiv.textContent = 'ログインに失敗しました。認証情報を確認してください。';
+                    errorDiv.classList.remove('hidden');
+                }
+            });
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// マスターログインAPI
+app.post('/api/master/login', async (c) => {
+  const { DB } = c.env
+  const { username, password } = await c.req.json()
+  
+  const admin = await DB.prepare(`
+    SELECT * FROM master_admins WHERE username = ? AND password_hash = ?
+  `).bind(username, password).first()
+  
+  if (!admin) {
+    return c.json({ error: 'Invalid credentials' }, 401)
+  }
+  
+  const token = btoa(`master:${admin.id}:${Date.now()}`)
+  
+  return c.json({
+    token,
+    name: admin.name,
+    role: admin.role
+  })
+})
+
+// マスターダッシュボード
+app.get('/master', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>マスター管理 - ダッシュボード</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('dashboard')}
+            
+            <main class="flex-1 p-8">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800">ダッシュボード</h1>
+                    <p class="text-gray-600 mt-1">SaaS全体の状況を確認</p>
+                </div>
+                
+                <!-- 統計カード -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">総法人数</p>
+                                <p id="totalOrgs" class="text-3xl font-bold text-gray-800">-</p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-building text-blue-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <p class="text-sm text-green-600 mt-2"><i class="fas fa-arrow-up mr-1"></i><span id="newOrgsMonth">-</span> 今月</p>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">アクティブ法人</p>
+                                <p id="activeOrgs" class="text-3xl font-bold text-gray-800">-</p>
+                            </div>
+                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-2">稼働中の契約</p>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">月間売上</p>
+                                <p id="monthlyRevenue" class="text-3xl font-bold text-gray-800">-</p>
+                            </div>
+                            <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-yen-sign text-yellow-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-2">定期契約ベース</p>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">総案件数</p>
+                                <p id="totalCases" class="text-3xl font-bold text-gray-800">-</p>
+                            </div>
+                            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-folder-open text-purple-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-2">全法人合計</p>
+                    </div>
+                </div>
+                
+                <!-- プラン別分布 & 最近の法人 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- プラン別分布 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-semibold mb-4">プラン別契約数</h2>
+                        <div id="planDistribution" class="space-y-3">
+                            <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
+                            <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
+                            <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 最近登録された法人 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-semibold">最近の法人登録</h2>
+                            <a href="/master/organizations" class="text-blue-600 hover:underline text-sm">すべて見る →</a>
+                        </div>
+                        <div id="recentOrgs" class="space-y-3">
+                            <div class="animate-pulse h-16 bg-gray-200 rounded"></div>
+                            <div class="animate-pulse h-16 bg-gray-200 rounded"></div>
+                            <div class="animate-pulse h-16 bg-gray-200 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            async function loadDashboard() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/master/dashboard', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const data = response.data;
+                    
+                    document.getElementById('totalOrgs').textContent = data.total_organizations;
+                    document.getElementById('activeOrgs').textContent = data.active_organizations;
+                    document.getElementById('newOrgsMonth').textContent = '+' + data.new_organizations_this_month;
+                    document.getElementById('monthlyRevenue').textContent = '¥' + data.monthly_revenue.toLocaleString();
+                    document.getElementById('totalCases').textContent = data.total_cases.toLocaleString();
+                    
+                    // プラン分布
+                    const planHtml = data.plan_distribution.map(p => \`
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="font-medium">\${p.plan_name || '未設定'}</span>
+                            <span class="text-lg font-bold text-blue-600">\${p.count}社</span>
+                        </div>
+                    \`).join('');
+                    document.getElementById('planDistribution').innerHTML = planHtml || '<p class="text-gray-500">データがありません</p>';
+                    
+                    // 最近の法人
+                    const orgsHtml = data.recent_organizations.map(o => \`
+                        <a href="/master/organizations/\${o.id}" class="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-medium">\${o.name}</p>
+                                    <p class="text-sm text-gray-500">\${o.email}</p>
+                                </div>
+                                <span class="text-xs px-2 py-1 rounded-full \${o.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">\${o.status === 'active' ? '稼働中' : o.status}</span>
+                            </div>
+                        </a>
+                    \`).join('');
+                    document.getElementById('recentOrgs').innerHTML = orgsHtml || '<p class="text-gray-500">データがありません</p>';
+                    
+                } catch (error) {
+                    console.error('Dashboard load error:', error);
+                }
+            }
+            
+            loadDashboard();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// マスターダッシュボードAPI
+app.get('/api/master/dashboard', async (c) => {
+  const { DB } = c.env
+  
+  // 組織統計
+  const orgStats = await DB.prepare(`
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+      SUM(CASE WHEN created_at >= date('now', 'start of month') THEN 1 ELSE 0 END) as new_this_month
+    FROM organizations
+  `).first()
+  
+  // 総案件数
+  const caseCount = await DB.prepare(`SELECT COUNT(*) as count FROM cases`).first()
+  
+  // プラン別分布
+  const planDistribution = await DB.prepare(`
+    SELECT sp.plan_name, COUNT(us.id) as count
+    FROM subscription_plans sp
+    LEFT JOIN user_subscriptions us ON sp.id = us.plan_id AND us.status = 'active'
+    WHERE sp.is_active = 1
+    GROUP BY sp.id
+    ORDER BY sp.monthly_price
+  `).all()
+  
+  // 月間売上計算
+  const revenueResult = await DB.prepare(`
+    SELECT COALESCE(SUM(sp.monthly_price), 0) as revenue
+    FROM user_subscriptions us
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE us.status = 'active'
+  `).first()
+  
+  // 最近の法人
+  const recentOrgs = await DB.prepare(`
+    SELECT id, name, email, status, created_at
+    FROM organizations
+    ORDER BY created_at DESC
+    LIMIT 5
+  `).all()
+  
+  return c.json({
+    total_organizations: orgStats?.total || 0,
+    active_organizations: orgStats?.active || 0,
+    new_organizations_this_month: orgStats?.new_this_month || 0,
+    total_cases: caseCount?.count || 0,
+    monthly_revenue: revenueResult?.revenue || 0,
+    plan_distribution: planDistribution?.results || [],
+    recent_organizations: recentOrgs?.results || []
+  })
+})
+
+// 法人一覧ページ
+app.get('/master/organizations', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>法人一覧 - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('organizations')}
+            
+            <main class="flex-1 p-8">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">法人一覧</h1>
+                        <p class="text-gray-600 mt-1">登録されている全法人を管理</p>
+                    </div>
+                    <a href="/master/organizations/new" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                        <i class="fas fa-plus"></i>
+                        新規法人登録
+                    </a>
+                </div>
+                
+                <!-- 検索・フィルター -->
+                <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+                    <div class="flex flex-wrap gap-4">
+                        <div class="flex-1 min-w-64">
+                            <input type="text" id="searchInput" placeholder="法人名・メールで検索..." 
+                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <select id="statusFilter" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">全てのステータス</option>
+                            <option value="active">稼働中</option>
+                            <option value="trial">トライアル</option>
+                            <option value="suspended">停止中</option>
+                            <option value="cancelled">解約済み</option>
+                        </select>
+                        <select id="planFilter" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">全てのプラン</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 法人リスト -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">法人名</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">プラン</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ステータス</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">案件数</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">登録日</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="organizationsList" class="divide-y divide-gray-200">
+                            <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">読み込み中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            const STATUS_LABELS = {
+                active: { text: '稼働中', class: 'bg-green-100 text-green-800' },
+                trial: { text: 'トライアル', class: 'bg-blue-100 text-blue-800' },
+                suspended: { text: '停止中', class: 'bg-yellow-100 text-yellow-800' },
+                cancelled: { text: '解約済み', class: 'bg-red-100 text-red-800' }
+            };
+            
+            async function loadOrganizations() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const search = document.getElementById('searchInput').value;
+                    const status = document.getElementById('statusFilter').value;
+                    const plan = document.getElementById('planFilter').value;
+                    
+                    const params = new URLSearchParams();
+                    if (search) params.set('search', search);
+                    if (status) params.set('status', status);
+                    if (plan) params.set('plan', plan);
+                    
+                    const response = await axios.get('/api/master/organizations?' + params.toString(), {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    
+                    const orgs = response.data;
+                    const tbody = document.getElementById('organizationsList');
+                    
+                    if (orgs.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">法人が見つかりません</td></tr>';
+                        return;
+                    }
+                    
+                    tbody.innerHTML = orgs.map(org => {
+                        const status = STATUS_LABELS[org.status] || STATUS_LABELS.active;
+                        return \`
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4">
+                                    <div>
+                                        <p class="font-medium text-gray-900">\${org.name}</p>
+                                        <p class="text-sm text-gray-500">\${org.email}</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">\${org.plan_name || '未設定'}</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 rounded text-sm \${status.class}">\${status.text}</span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-600">\${org.case_count || 0}件</td>
+                                <td class="px-6 py-4 text-gray-600">\${new Date(org.created_at).toLocaleDateString('ja-JP')}</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex gap-2">
+                                        <a href="/master/organizations/\${org.id}" class="text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button onclick="loginAsOrg(\${org.id})" class="text-green-600 hover:text-green-800" title="この法人としてログイン">
+                                            <i class="fas fa-sign-in-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        \`;
+                    }).join('');
+                    
+                } catch (error) {
+                    console.error('Load error:', error);
+                }
+            }
+            
+            async function loadPlans() {
+                try {
+                    const response = await axios.get('/api/subscription/plans');
+                    const select = document.getElementById('planFilter');
+                    response.data.forEach(plan => {
+                        const option = document.createElement('option');
+                        option.value = plan.id;
+                        option.textContent = plan.name;
+                        select.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Load plans error:', error);
+                }
+            }
+            
+            async function loginAsOrg(orgId) {
+                if (!confirm('この法人の管理画面に切り替えますか？')) return;
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.post('/api/master/impersonate/' + orgId, {}, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    
+                    // 法人側の認証情報をセット
+                    localStorage.setItem('admin_token', response.data.token);
+                    localStorage.setItem('admin_name', response.data.name);
+                    localStorage.setItem('admin_username', response.data.username);
+                    localStorage.setItem('admin_role', response.data.role);
+                    localStorage.setItem('organization_id', orgId);
+                    
+                    window.location.href = '/';
+                } catch (error) {
+                    alert('ログインに失敗しました');
+                }
+            }
+            
+            // イベントリスナー
+            document.getElementById('searchInput').addEventListener('input', debounce(loadOrganizations, 300));
+            document.getElementById('statusFilter').addEventListener('change', loadOrganizations);
+            document.getElementById('planFilter').addEventListener('change', loadOrganizations);
+            
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(this, args), wait);
+                };
+            }
+            
+            loadPlans();
+            loadOrganizations();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// 法人一覧API
+app.get('/api/master/organizations', async (c) => {
+  const { DB } = c.env
+  const search = c.req.query('search') || ''
+  const status = c.req.query('status') || ''
+  const plan = c.req.query('plan') || ''
+  
+  let query = `
+    SELECT o.*, sp.plan_name,
+           (SELECT COUNT(*) FROM cases WHERE organization_id = o.id) as case_count
+    FROM organizations o
+    LEFT JOIN user_subscriptions us ON o.id = us.organization_id AND us.status = 'active'
+    LEFT JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE 1=1
+  `
+  const params: string[] = []
+  
+  if (search) {
+    query += ` AND (o.name LIKE ? OR o.email LIKE ?)`
+    params.push(`%${search}%`, `%${search}%`)
+  }
+  if (status) {
+    query += ` AND o.status = ?`
+    params.push(status)
+  }
+  
+  query += ` ORDER BY o.created_at DESC LIMIT 100`
+  
+  const stmt = DB.prepare(query)
+  const result = await (params.length > 0 ? stmt.bind(...params) : stmt).all()
+  
+  return c.json(result?.results || [])
+})
+
+// 新規法人登録ページ
+app.get('/master/organizations/new', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>新規法人登録 - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('new-org')}
+            
+            <main class="flex-1 p-8">
+                <div class="mb-8">
+                    <a href="/master/organizations" class="text-blue-600 hover:underline mb-2 inline-block">
+                        <i class="fas fa-arrow-left mr-1"></i>法人一覧に戻る
+                    </a>
+                    <h1 class="text-3xl font-bold text-gray-800">新規法人登録</h1>
+                    <p class="text-gray-600 mt-1">新しい法人アカウントを作成します</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6 max-w-2xl">
+                    <form id="orgForm" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">法人名 / 事務所名 <span class="text-red-500">*</span></label>
+                                <input type="text" name="name" required 
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       placeholder="例: 田中社労士事務所">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">URLスラッグ <span class="text-red-500">*</span></label>
+                                <input type="text" name="slug" required pattern="[a-z0-9-]+"
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       placeholder="例: tanaka-office">
+                                <p class="text-xs text-gray-500 mt-1">半角英数字とハイフンのみ</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス <span class="text-red-500">*</span></label>
+                                <input type="email" name="email" required 
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       placeholder="例: info@tanaka-office.jp">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                                <input type="tel" name="phone" 
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       placeholder="例: 03-1234-5678">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">代表者名</label>
+                                <input type="text" name="representative_name" 
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       placeholder="例: 田中太郎">
+                            </div>
+                            
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">住所</label>
+                                <input type="text" name="address" 
+                                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       placeholder="例: 東京都千代田区...">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">初期プラン <span class="text-red-500">*</span></label>
+                                <select name="plan_id" required id="planSelect"
+                                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">選択してください</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ステータス</label>
+                                <select name="status" 
+                                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="active">稼働中</option>
+                                    <option value="trial">トライアル（14日間）</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t pt-6">
+                            <h3 class="font-medium text-gray-800 mb-4">管理者アカウント</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">管理者ユーザー名 <span class="text-red-500">*</span></label>
+                                    <input type="text" name="admin_username" required 
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="例: admin">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">管理者パスワード <span class="text-red-500">*</span></label>
+                                    <input type="password" name="admin_password" required minlength="6"
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="6文字以上">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">管理者表示名 <span class="text-red-500">*</span></label>
+                                    <input type="text" name="admin_name" required 
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="例: 田中太郎">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end gap-4">
+                            <a href="/master/organizations" class="px-6 py-2 border rounded-lg hover:bg-gray-50">キャンセル</a>
+                            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                <i class="fas fa-plus mr-2"></i>法人を登録
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </main>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            async function loadPlans() {
+                try {
+                    const response = await axios.get('/api/subscription/plans');
+                    const select = document.getElementById('planSelect');
+                    response.data.forEach(plan => {
+                        const option = document.createElement('option');
+                        option.value = plan.id;
+                        option.textContent = plan.name + ' - ¥' + plan.price.toLocaleString() + '/月';
+                        select.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Load plans error:', error);
+                }
+            }
+            
+            document.getElementById('orgForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData);
+                
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.post('/api/master/organizations', data, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    
+                    alert('法人を登録しました！');
+                    window.location.href = '/master/organizations/' + response.data.id;
+                } catch (error) {
+                    alert(error.response?.data?.error || '登録に失敗しました');
+                }
+            });
+            
+            // スラッグ自動生成
+            document.querySelector('input[name="name"]').addEventListener('input', (e) => {
+                const slugInput = document.querySelector('input[name="slug"]');
+                if (!slugInput.value) {
+                    // 簡易的なスラッグ生成（日本語は除去）
+                    const slug = e.target.value.toLowerCase()
+                        .replace(/[^a-z0-9]/g, '-')
+                        .replace(/-+/g, '-')
+                        .replace(/^-|-$/g, '');
+                    slugInput.value = slug || '';
+                }
+            });
+            
+            loadPlans();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// 法人登録API
+app.post('/api/master/organizations', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  // スラッグの重複チェック
+  const existing = await DB.prepare(`SELECT id FROM organizations WHERE slug = ?`).bind(data.slug).first()
+  if (existing) {
+    return c.json({ error: 'このURLスラッグは既に使用されています' }, 400)
+  }
+  
+  // トランザクション的に処理
+  try {
+    // 1. 組織を作成
+    const trialEndsAt = data.status === 'trial' 
+      ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      : null
+    
+    const orgResult = await DB.prepare(`
+      INSERT INTO organizations (name, slug, email, phone, address, representative_name, status, trial_ends_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.name,
+      data.slug,
+      data.email,
+      data.phone || null,
+      data.address || null,
+      data.representative_name || null,
+      data.status || 'active',
+      trialEndsAt
+    ).run()
+    
+    const orgId = orgResult.meta?.last_row_id
+    
+    // 2. 管理者アカウントを作成
+    await DB.prepare(`
+      INSERT INTO admin_users (username, password_hash, name, role, organization_id)
+      VALUES (?, ?, ?, 'admin', ?)
+    `).bind(data.admin_username, data.admin_password, data.admin_name, orgId).run()
+    
+    // 3. サブスクリプションを作成
+    const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(data.plan_id).first()
+    if (plan) {
+      const periodEnd = new Date()
+      periodEnd.setMonth(periodEnd.getMonth() + 1)
+      
+      await DB.prepare(`
+        INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
+        VALUES (?, ?, 'active', date('now'), ?)
+      `).bind(orgId, data.plan_id, periodEnd.toISOString().split('T')[0]).run()
+      
+      // 4. 初期枠を付与
+      await DB.prepare(`
+        INSERT INTO slot_balances (organization_id, monthly_slots, purchased_slots)
+        VALUES (?, ?, 0)
+      `).bind(orgId, plan.monthly_slots).run()
+    }
+    
+    return c.json({ success: true, id: orgId })
+    
+  } catch (error: any) {
+    console.error('Organization creation error:', error)
+    return c.json({ error: '登録に失敗しました: ' + error.message }, 500)
+  }
+})
+
+// 法人詳細ページ
+app.get('/master/organizations/:id', async (c) => {
+  const orgId = c.req.param('id')
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>法人詳細 - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('organizations')}
+            
+            <main class="flex-1 p-8">
+                <div class="mb-8">
+                    <a href="/master/organizations" class="text-blue-600 hover:underline mb-2 inline-block">
+                        <i class="fas fa-arrow-left mr-1"></i>法人一覧に戻る
+                    </a>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 id="orgName" class="text-3xl font-bold text-gray-800">読み込み中...</h1>
+                            <p id="orgEmail" class="text-gray-600 mt-1"></p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="loginAsOrg(${orgId})" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                <i class="fas fa-sign-in-alt mr-2"></i>この法人としてログイン
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- 基本情報 -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-semibold mb-4">基本情報</h2>
+                            <div id="orgDetails" class="grid grid-cols-2 gap-4">
+                                <div class="animate-pulse h-20 bg-gray-200 rounded col-span-2"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-semibold mb-4">スタッフ一覧</h2>
+                            <div id="staffList" class="space-y-2">
+                                <div class="animate-pulse h-12 bg-gray-200 rounded"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- サイドバー -->
+                    <div class="space-y-6">
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-semibold mb-4">契約情報</h2>
+                            <div id="subscriptionInfo" class="space-y-3">
+                                <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-semibold mb-4">利用状況</h2>
+                            <div id="usageStats" class="space-y-3">
+                                <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-semibold mb-4 text-red-600">危険な操作</h2>
+                            <button onclick="suspendOrg()" class="w-full mb-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200">
+                                <i class="fas fa-pause mr-2"></i>一時停止
+                            </button>
+                            <button onclick="deleteOrg()" class="w-full px-4 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200">
+                                <i class="fas fa-trash mr-2"></i>法人を削除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            const ORG_ID = ${orgId};
+            
+            async function loadOrgDetails() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/master/organizations/' + ORG_ID, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const org = response.data;
+                    
+                    document.getElementById('orgName').textContent = org.name;
+                    document.getElementById('orgEmail').textContent = org.email;
+                    
+                    const statusLabel = {
+                        active: '<span class="px-2 py-1 bg-green-100 text-green-800 rounded">稼働中</span>',
+                        trial: '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded">トライアル</span>',
+                        suspended: '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">停止中</span>',
+                        cancelled: '<span class="px-2 py-1 bg-red-100 text-red-800 rounded">解約済み</span>'
+                    };
+                    
+                    document.getElementById('orgDetails').innerHTML = \`
+                        <div>
+                            <p class="text-sm text-gray-500">ステータス</p>
+                            <p class="mt-1">\${statusLabel[org.status] || org.status}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">登録日</p>
+                            <p class="mt-1 font-medium">\${new Date(org.created_at).toLocaleDateString('ja-JP')}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">電話番号</p>
+                            <p class="mt-1 font-medium">\${org.phone || '-'}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">代表者</p>
+                            <p class="mt-1 font-medium">\${org.representative_name || '-'}</p>
+                        </div>
+                        <div class="col-span-2">
+                            <p class="text-sm text-gray-500">住所</p>
+                            <p class="mt-1 font-medium">\${org.address || '-'}</p>
+                        </div>
+                    \`;
+                    
+                    // スタッフ一覧
+                    document.getElementById('staffList').innerHTML = org.staff.map(s => \`
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <p class="font-medium">\${s.name}</p>
+                                <p class="text-sm text-gray-500">@\${s.username}</p>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded \${s.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}">\${s.role === 'admin' ? '管理者' : 'スタッフ'}</span>
+                        </div>
+                    \`).join('') || '<p class="text-gray-500">スタッフがいません</p>';
+                    
+                    // 契約情報
+                    document.getElementById('subscriptionInfo').innerHTML = \`
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">プラン</span>
+                            <span class="font-medium">\${org.subscription?.plan_name || '未設定'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">月額</span>
+                            <span class="font-medium">¥\${(org.subscription?.price || 0).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">次回更新</span>
+                            <span class="font-medium">\${org.subscription?.current_period_end ? new Date(org.subscription.current_period_end).toLocaleDateString('ja-JP') : '-'}</span>
+                        </div>
+                    \`;
+                    
+                    // 利用状況
+                    document.getElementById('usageStats').innerHTML = \`
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">総顧客数</span>
+                            <span class="font-medium">\${org.stats?.client_count || 0}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">総案件数</span>
+                            <span class="font-medium">\${org.stats?.case_count || 0}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">今月の案件</span>
+                            <span class="font-medium">\${org.stats?.cases_this_month || 0}</span>
+                        </div>
+                    \`;
+                    
+                } catch (error) {
+                    console.error('Load error:', error);
+                }
+            }
+            
+            async function loginAsOrg(orgId) {
+                if (!confirm('この法人の管理画面に切り替えますか？')) return;
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.post('/api/master/impersonate/' + orgId, {}, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    
+                    localStorage.setItem('admin_token', response.data.token);
+                    localStorage.setItem('admin_name', response.data.name);
+                    localStorage.setItem('admin_username', response.data.username);
+                    localStorage.setItem('admin_role', response.data.role);
+                    localStorage.setItem('organization_id', orgId);
+                    
+                    window.location.href = '/';
+                } catch (error) {
+                    alert('ログインに失敗しました');
+                }
+            }
+            
+            async function suspendOrg() {
+                if (!confirm('この法人を一時停止しますか？')) return;
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.post('/api/master/organizations/' + ORG_ID + '/suspend', {}, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    alert('法人を一時停止しました');
+                    loadOrgDetails();
+                } catch (error) {
+                    alert('操作に失敗しました');
+                }
+            }
+            
+            async function deleteOrg() {
+                if (!confirm('この法人を削除しますか？この操作は取り消せません。')) return;
+                if (!confirm('本当に削除しますか？関連するすべてのデータが失われます。')) return;
+                
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.delete('/api/master/organizations/' + ORG_ID, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    alert('法人を削除しました');
+                    window.location.href = '/master/organizations';
+                } catch (error) {
+                    alert('削除に失敗しました');
+                }
+            }
+            
+            loadOrgDetails();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// 法人詳細API
+app.get('/api/master/organizations/:id', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  
+  const org = await DB.prepare(`SELECT * FROM organizations WHERE id = ?`).bind(orgId).first()
+  if (!org) {
+    return c.json({ error: 'Organization not found' }, 404)
+  }
+  
+  // スタッフ一覧
+  const staff = await DB.prepare(`
+    SELECT id, username, name, role, created_at FROM admin_users WHERE organization_id = ?
+  `).bind(orgId).all()
+  
+  // サブスクリプション情報
+  const subscription = await DB.prepare(`
+    SELECT us.*, sp.plan_name, sp.monthly_price as price, sp.monthly_slots
+    FROM user_subscriptions us
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE us.organization_id = ? AND us.status = 'active'
+  `).bind(orgId).first()
+  
+  // 統計
+  const clientCount = await DB.prepare(`SELECT COUNT(*) as count FROM clients WHERE organization_id = ?`).bind(orgId).first()
+  const caseCount = await DB.prepare(`SELECT COUNT(*) as count FROM cases WHERE organization_id = ?`).bind(orgId).first()
+  const casesThisMonth = await DB.prepare(`
+    SELECT COUNT(*) as count FROM cases 
+    WHERE organization_id = ? AND created_at >= date('now', 'start of month')
+  `).bind(orgId).first()
+  
+  return c.json({
+    ...org,
+    staff: staff?.results || [],
+    subscription,
+    stats: {
+      client_count: clientCount?.count || 0,
+      case_count: caseCount?.count || 0,
+      cases_this_month: casesThisMonth?.count || 0
+    }
+  })
+})
+
+// 法人停止API
+app.post('/api/master/organizations/:id/suspend', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  
+  await DB.prepare(`UPDATE organizations SET status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(orgId).run()
+  
+  return c.json({ success: true })
+})
+
+// 法人削除API
+app.delete('/api/master/organizations/:id', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  
+  // 関連データの削除（本番環境では論理削除を推奨）
+  await DB.prepare(`DELETE FROM slot_usage_history WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM slot_balances WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM user_subscriptions WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM communications WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM documents WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM hearing_responses WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM cases WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM clients WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM admin_users WHERE organization_id = ?`).bind(orgId).run()
+  await DB.prepare(`DELETE FROM organizations WHERE id = ?`).bind(orgId).run()
+  
+  return c.json({ success: true })
+})
+
+// 法人としてログイン（なりすまし）API
+app.post('/api/master/impersonate/:id', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  
+  // 組織の管理者アカウントを取得
+  const admin = await DB.prepare(`
+    SELECT * FROM admin_users WHERE organization_id = ? AND role = 'admin' LIMIT 1
+  `).bind(orgId).first()
+  
+  if (!admin) {
+    return c.json({ error: 'Admin not found for this organization' }, 404)
+  }
+  
+  const token = btoa(`${admin.id}:${Date.now()}:impersonate`)
+  
+  return c.json({
+    token,
+    name: admin.name,
+    username: admin.username,
+    role: admin.role || 'admin',
+    organization_id: orgId
+  })
+})
+
 export default app
