@@ -20021,30 +20021,46 @@ app.get('/admin/subscription', async (c) => {
 
                 <div class="p-4 lg:p-6">
             
-            <!-- 現在のプラン・枠状況 -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <!-- 現在のプラン・業務範囲 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- 現在のプランカード -->
                 <div class="bg-white rounded-xl shadow-sm p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-medium text-gray-500">現在のプラン</h3>
-                        <i class="fas fa-crown text-yellow-500"></i>
+                        <h3 class="text-lg font-bold text-gray-800">
+                            <i class="fas fa-crown text-yellow-500 mr-2"></i>現在のプラン
+                        </h3>
                     </div>
-                    <p id="currentPlan" class="text-2xl font-bold text-gray-900">読み込み中...</p>
-                    <p id="planPrice" class="text-sm text-gray-500 mt-1"></p>
-                    <div id="scheduledPlanInfo" class="hidden mt-2 text-xs bg-yellow-50 border border-yellow-200 rounded p-2">
+                    <div class="flex items-center gap-4">
+                        <div class="flex-1">
+                            <p id="currentPlan" class="text-2xl font-bold text-gray-900">読み込み中...</p>
+                            <p id="planPrice" class="text-sm text-gray-500 mt-1"></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-500">次回切り替わり</p>
+                            <p id="nextResetDate" class="text-lg font-bold text-purple-600">-</p>
+                        </div>
+                    </div>
+                    <div id="scheduledPlanInfo" class="hidden mt-3 text-xs bg-yellow-50 border border-yellow-200 rounded p-2">
                         <i class="fas fa-clock text-yellow-600 mr-1"></i>
                         <span id="scheduledPlanText"></span>
                     </div>
                 </div>
                 
+                <!-- 業務範囲カード -->
                 <div class="bg-white rounded-xl shadow-sm p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-medium text-gray-500">次回切り替わり日</h3>
-                        <i class="fas fa-calendar-alt text-purple-500"></i>
+                        <h3 class="text-lg font-bold text-gray-800">
+                            <i class="fas fa-briefcase text-blue-500 mr-2"></i>利用可能な業務範囲
+                        </h3>
                     </div>
-                    <p id="nextResetDate" class="text-2xl font-bold text-purple-600">-</p>
-                    <p class="text-xs text-gray-500 mt-1">この日にプラン枠がリセットされます</p>
+                    <div id="businessScopeDisplay" class="space-y-3">
+                        <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                    </div>
                 </div>
-                
+            </div>
+            
+            <!-- 枠状況 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-sm font-medium text-gray-500">利用可能枠</h3>
@@ -20073,6 +20089,15 @@ app.get('/admin/subscription', async (c) => {
                     <p id="usedThisMonth" class="text-3xl font-bold text-blue-600">-</p>
                     <p class="text-sm text-gray-500 mt-1">件の案件を開始</p>
                 </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">月額合計</h3>
+                        <i class="fas fa-yen-sign text-orange-500"></i>
+                    </div>
+                    <p id="totalMonthlyPrice" class="text-3xl font-bold text-orange-600">-</p>
+                    <p id="priceBreakdown" class="text-xs text-gray-500 mt-1"></p>
+                </div>
             </div>
             
             <!-- 枠の説明 -->
@@ -20097,6 +20122,22 @@ app.get('/admin/subscription', async (c) => {
                     </p>
                 </div>
                 <div id="plansList" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+            </div>
+            
+            <!-- オプション追加 -->
+            <div id="addonSection" class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                <h2 class="text-lg font-bold mb-4">
+                    <i class="fas fa-puzzle-piece mr-2 text-purple-600"></i>オプション追加
+                </h2>
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
+                    <p class="text-sm text-purple-800">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        業務範囲を拡張するオプションを追加できます。
+                    </p>
+                </div>
+                <div id="addonsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="text-center py-8 text-gray-500">読み込み中...</div>
                 </div>
             </div>
@@ -20193,8 +20234,193 @@ app.get('/admin/subscription', async (c) => {
                     } else {
                         scheduledInfo.classList.add('hidden');
                     }
+                    
+                    // 業務範囲の表示
+                    const scopeLabels = {
+                        'labor': { name: '社労士業務（助成金）', icon: 'fa-users', color: 'blue' },
+                        'administrative': { name: '行政書士業務（補助金・許認可）', icon: 'fa-file-signature', color: 'emerald' },
+                        'both': { name: '両方利用（助成金 + 補助金・許認可）', icon: 'fa-layer-group', color: 'purple' }
+                    };
+                    
+                    const currentScope = data.business_scope || 'labor';
+                    const scopeInfo = scopeLabels[currentScope] || scopeLabels.labor;
+                    const hasDualScope = data.has_dual_scope || false;
+                    
+                    let scopeHtml = '';
+                    if (currentScope === 'labor') {
+                        scopeHtml = \`
+                            <div class="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                    <i class="fas fa-users text-white"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-bold text-blue-800">社労士業務</p>
+                                    <p class="text-sm text-blue-600">助成金申請に対応</p>
+                                </div>
+                                <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded-full">有効</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg opacity-60">
+                                <div class="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center">
+                                    <i class="fas fa-file-signature text-white"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-bold text-gray-600">行政書士業務</p>
+                                    <p class="text-sm text-gray-500">補助金・許認可申請</p>
+                                </div>
+                                <span class="px-2 py-1 bg-gray-400 text-white text-xs rounded-full">未契約</span>
+                            </div>
+                        \`;
+                    } else if (currentScope === 'administrative') {
+                        scopeHtml = \`
+                            <div class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg opacity-60">
+                                <div class="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center">
+                                    <i class="fas fa-users text-white"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-bold text-gray-600">社労士業務</p>
+                                    <p class="text-sm text-gray-500">助成金申請</p>
+                                </div>
+                                <span class="px-2 py-1 bg-gray-400 text-white text-xs rounded-full">未契約</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <div class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
+                                    <i class="fas fa-file-signature text-white"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-bold text-emerald-800">行政書士業務</p>
+                                    <p class="text-sm text-emerald-600">補助金・許認可申請に対応</p>
+                                </div>
+                                <span class="px-2 py-1 bg-emerald-500 text-white text-xs rounded-full">有効</span>
+                            </div>
+                        \`;
+                    } else {
+                        scopeHtml = \`
+                            <div class="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                    <i class="fas fa-users text-white"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-bold text-blue-800">社労士業務</p>
+                                    <p class="text-sm text-blue-600">助成金申請に対応</p>
+                                </div>
+                                <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded-full">有効</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <div class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
+                                    <i class="fas fa-file-signature text-white"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-bold text-emerald-800">行政書士業務</p>
+                                    <p class="text-sm text-emerald-600">補助金・許認可申請に対応</p>
+                                </div>
+                                <span class="px-2 py-1 bg-emerald-500 text-white text-xs rounded-full">有効</span>
+                            </div>
+                        \`;
+                    }
+                    document.getElementById('businessScopeDisplay').innerHTML = scopeHtml;
+                    
+                    // 月額合計の計算
+                    let totalPrice = data.subscription?.monthly_price || 0;
+                    let breakdown = \`プラン: ¥\${totalPrice.toLocaleString()}\`;
+                    if (hasDualScope) {
+                        totalPrice += 2000;
+                        breakdown += ' + 両方利用: ¥2,000';
+                    }
+                    document.getElementById('totalMonthlyPrice').textContent = '¥' + totalPrice.toLocaleString();
+                    document.getElementById('priceBreakdown').textContent = breakdown;
+                    
+                    // アドオン表示を更新
+                    updateAddonsDisplay(currentScope, hasDualScope);
+                    
                 } catch (error) {
                     console.error('Error loading status:', error);
+                }
+            }
+            
+            // アドオン表示を更新
+            function updateAddonsDisplay(currentScope, hasDualScope) {
+                const container = document.getElementById('addonsList');
+                
+                // 社労士の場合は行政書士追加、行政書士の場合は社労士追加を表示
+                // 両方の場合は追加オプションなし
+                if (currentScope === 'both' || hasDualScope) {
+                    container.innerHTML = \`
+                        <div class="col-span-full text-center py-8 text-gray-500">
+                            <i class="fas fa-check-circle text-green-500 text-3xl mb-2"></i>
+                            <p>すべての業務範囲が有効です</p>
+                        </div>
+                    \`;
+                    return;
+                }
+                
+                if (currentScope === 'labor') {
+                    container.innerHTML = \`
+                        <div class="border-2 border-emerald-300 rounded-xl p-6 bg-emerald-50">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center">
+                                    <i class="fas fa-file-signature text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-emerald-800">行政書士業務を追加</h3>
+                                    <p class="text-sm text-emerald-600">補助金・許認可申請に対応</p>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <span class="text-2xl font-bold text-emerald-700">+¥2,000</span>
+                                <span class="text-sm text-emerald-600">/月</span>
+                            </div>
+                            <ul class="text-sm text-emerald-700 space-y-1 mb-4">
+                                <li><i class="fas fa-check mr-2"></i>IT導入補助金、ものづくり補助金など</li>
+                                <li><i class="fas fa-check mr-2"></i>各種許認可申請（建設業、飲食業など）</li>
+                                <li><i class="fas fa-check mr-2"></i>補助金専用のヒアリング質問</li>
+                            </ul>
+                            <button onclick="addDualScope()" class="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-bold">
+                                <i class="fas fa-plus mr-2"></i>追加する
+                            </button>
+                        </div>
+                    \`;
+                } else {
+                    container.innerHTML = \`
+                        <div class="border-2 border-blue-300 rounded-xl p-6 bg-blue-50">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center">
+                                    <i class="fas fa-users text-white text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-blue-800">社労士業務を追加</h3>
+                                    <p class="text-sm text-blue-600">助成金申請に対応</p>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <span class="text-2xl font-bold text-blue-700">+¥2,000</span>
+                                <span class="text-sm text-blue-600">/月</span>
+                            </div>
+                            <ul class="text-sm text-blue-700 space-y-1 mb-4">
+                                <li><i class="fas fa-check mr-2"></i>キャリアアップ助成金、両立支援助成金など</li>
+                                <li><i class="fas fa-check mr-2"></i>雇用関連の各種助成金</li>
+                                <li><i class="fas fa-check mr-2"></i>助成金専用のヒアリング質問</li>
+                            </ul>
+                            <button onclick="addDualScope()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-bold">
+                                <i class="fas fa-plus mr-2"></i>追加する
+                            </button>
+                        </div>
+                    \`;
+                }
+            }
+            
+            // 両方利用オプションを追加
+            async function addDualScope() {
+                if (!confirm('業務範囲を追加しますか？\\n\\n月額 +¥2,000 で両方の業務に対応できるようになります。')) {
+                    return;
+                }
+                
+                try {
+                    await axios.post('/api/subscription/add-dual-scope');
+                    alert('業務範囲を追加しました！');
+                    loadAll();
+                } catch (error) {
+                    console.error('Error adding dual scope:', error);
+                    alert('エラーが発生しました: ' + (error.response?.data?.error || error.message));
                 }
             }
             
@@ -21670,6 +21896,17 @@ app.get('/api/subscription/status', async (c) => {
   // 無制限プランかどうかを判定 (monthly_slots = -1)
   const isUnlimited = subscription?.monthly_slots === -1
   
+  // 組織の業務範囲とアドオン情報を取得
+  const organization = await DB.prepare(`
+    SELECT business_scope FROM organizations WHERE id = ?
+  `).bind(orgId).first()
+  
+  const addons = await DB.prepare(`
+    SELECT * FROM organization_addons WHERE organization_id = ? AND status = 'active'
+  `).bind(orgId).all()
+  
+  const hasDualScope = addons.results?.some((a: any) => a.addon_type === 'dual_scope') || false
+  
   return c.json({
     subscription: subscription || null,
     balance: balance || { monthly_slots_remaining: 0, purchased_slots_remaining: 0 },
@@ -21680,7 +21917,10 @@ app.get('/api/subscription/status', async (c) => {
     current_period_end: subscription?.current_period_end || null,
     scheduled_plan: scheduledPlan,
     scheduled_plan_date: subscription?.scheduled_plan_date || null,
-    is_unlimited: isUnlimited
+    is_unlimited: isUnlimited,
+    business_scope: organization?.business_scope || 'labor',
+    has_dual_scope: hasDualScope,
+    addons: addons.results || []
   })
 })
 
@@ -21966,6 +22206,46 @@ app.post('/api/subscription/cancel-scheduled-plan', async (c) => {
   `).bind(orgId).run()
   
   return c.json({ success: true, message: 'プラン変更の予約をキャンセルしました' })
+})
+
+// 両方利用オプションを追加
+app.post('/api/subscription/add-dual-scope', async (c) => {
+  const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  if (!user) {
+    return c.json({ error: '認証が必要です' }, 401)
+  }
+  
+  const orgId = user.organization_id
+  if (!orgId) {
+    return c.json({ error: '組織が見つかりません' }, 400)
+  }
+  
+  // 既にアドオンがあるか確認
+  const existingAddon = await DB.prepare(`
+    SELECT id FROM organization_addons 
+    WHERE organization_id = ? AND addon_type = 'dual_scope' AND status = 'active'
+  `).bind(orgId).first()
+  
+  if (existingAddon) {
+    return c.json({ error: '既に両方利用オプションが有効です' }, 400)
+  }
+  
+  // 組織の業務範囲を更新
+  await DB.prepare(`
+    UPDATE organizations 
+    SET business_scope = 'both', updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(orgId).run()
+  
+  // アドオンを追加
+  await DB.prepare(`
+    INSERT INTO organization_addons (organization_id, addon_type, price, status)
+    VALUES (?, 'dual_scope', 2000, 'active')
+  `).bind(orgId).run()
+  
+  return c.json({ success: true, message: '両方利用オプションを追加しました' })
 })
 
 // 使用履歴取得
