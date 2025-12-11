@@ -22876,6 +22876,16 @@ app.get('/master/organizations/:id', async (c) => {
                         </div>
                         
                         <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-semibold mb-4 flex justify-between items-center">
+                                <span><i class="fas fa-credit-card mr-2 text-green-600"></i>決済設定</span>
+                                <button onclick="openPaymentModal()" class="text-sm text-blue-600 hover:underline">編集</button>
+                            </h2>
+                            <div id="paymentInfo" class="space-y-3">
+                                <div class="animate-pulse h-8 bg-gray-200 rounded"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-sm p-6">
                             <h2 class="text-lg font-semibold mb-4 text-red-600">危険な操作</h2>
                             <button onclick="suspendOrg()" class="w-full mb-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200">
                                 <i class="fas fa-pause mr-2"></i>一時停止
@@ -23010,6 +23020,92 @@ app.get('/master/organizations/:id', async (c) => {
                 </div>
             </div>
         </div>
+        
+        <!-- 決済設定モーダル -->
+        <div id="paymentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold"><i class="fas fa-credit-card mr-2 text-green-600"></i>決済設定</h3>
+                        <button onclick="closePaymentModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <form id="paymentForm" class="p-6 space-y-6">
+                    <!-- 決済方法選択 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">決済方法</label>
+                        <select id="payment_method" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="bank_transfer">銀行振込のみ</option>
+                            <option value="stripe">Stripe（カード決済）</option>
+                            <option value="both">銀行振込 + Stripe</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 銀行振込設定 -->
+                    <div class="border rounded-lg p-4 bg-gray-50">
+                        <h4 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fas fa-university text-blue-600"></i>銀行振込先情報
+                        </h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">銀行名</label>
+                                <input type="text" id="payment_bank_name" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 三菱UFJ銀行">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">支店名</label>
+                                <input type="text" id="payment_bank_branch" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 渋谷支店">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">口座種別</label>
+                                <select id="payment_bank_account_type" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    <option value="普通">普通</option>
+                                    <option value="当座">当座</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">口座番号</label>
+                                <input type="text" id="payment_bank_account_number" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 1234567">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-xs text-gray-600 mb-1">口座名義</label>
+                                <input type="text" id="payment_bank_account_holder" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: カ）サンプルジムショ">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Stripe設定 -->
+                    <div class="border rounded-lg p-4 bg-purple-50">
+                        <h4 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fab fa-stripe text-purple-600"></i>Stripe設定
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" id="payment_stripe_enabled" class="w-4 h-4 text-purple-600">
+                                <label for="payment_stripe_enabled" class="text-sm">Stripe決済を有効にする</label>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Stripe Connect アカウントID</label>
+                                <input type="text" id="payment_stripe_account_id" class="w-full px-3 py-2 border rounded-lg text-sm font-mono" placeholder="例: acct_xxxxxxxxxxxxx">
+                                <p class="text-xs text-gray-500 mt-1">※ Stripe Connectで連携したアカウントIDを入力</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 備考 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">決済に関する備考</label>
+                        <textarea id="payment_notes" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="特記事項があれば入力"></textarea>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closePaymentModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">キャンセル</button>
+                        <button type="submit" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
@@ -23129,6 +23225,35 @@ app.get('/master/organizations/:id', async (c) => {
                             <span class="text-blue-600">\${(org.slots?.monthly_remaining || 0) + (org.slots?.purchased_remaining || 0)}</span>
                         </div>
                     \`;
+                    
+                    // 決済情報
+                    const paymentMethodLabels = {
+                        'bank_transfer': '銀行振込',
+                        'stripe': 'Stripe',
+                        'both': '銀行振込 + Stripe'
+                    };
+                    const hasBankInfo = org.bank_name && org.bank_account_number;
+                    document.getElementById('paymentInfo').innerHTML = \`
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">決済方法</span>
+                            <span class="font-medium">\${paymentMethodLabels[org.payment_method] || '銀行振込'}</span>
+                        </div>
+                        \${hasBankInfo ? \`
+                        <div class="text-sm bg-gray-50 rounded p-2 mt-2">
+                            <p class="text-gray-600">\${org.bank_name} \${org.bank_branch || ''}</p>
+                            <p class="text-gray-600">\${org.bank_account_type || '普通'} \${org.bank_account_number}</p>
+                            <p class="text-gray-800 font-medium">\${org.bank_account_holder || ''}</p>
+                        </div>
+                        \` : '<p class="text-sm text-gray-400">振込先未設定</p>'}
+                        \${org.stripe_enabled ? \`
+                        <div class="flex items-center gap-2 mt-2">
+                            <i class="fab fa-stripe text-purple-600"></i>
+                            <span class="text-sm text-green-600">Stripe有効</span>
+                        </div>
+                        \` : ''}
+                    \`;
+                    
+                    currentOrg = org;
                     
                 } catch (error) {
                     console.error('Load error:', error);
@@ -23269,6 +23394,50 @@ app.get('/master/organizations/:id', async (c) => {
                     alert('追加に失敗しました');
                 }
             }
+            
+            // 決済設定モーダル関連
+            function openPaymentModal() {
+                if (!currentOrg) return;
+                document.getElementById('payment_method').value = currentOrg.payment_method || 'bank_transfer';
+                document.getElementById('payment_bank_name').value = currentOrg.bank_name || '';
+                document.getElementById('payment_bank_branch').value = currentOrg.bank_branch || '';
+                document.getElementById('payment_bank_account_type').value = currentOrg.bank_account_type || '普通';
+                document.getElementById('payment_bank_account_number').value = currentOrg.bank_account_number || '';
+                document.getElementById('payment_bank_account_holder').value = currentOrg.bank_account_holder || '';
+                document.getElementById('payment_stripe_enabled').checked = currentOrg.stripe_enabled == 1;
+                document.getElementById('payment_stripe_account_id').value = currentOrg.stripe_account_id || '';
+                document.getElementById('payment_notes').value = currentOrg.payment_notes || '';
+                document.getElementById('paymentModal').classList.remove('hidden');
+            }
+            
+            function closePaymentModal() {
+                document.getElementById('paymentModal').classList.add('hidden');
+            }
+            
+            document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.put('/api/master/organizations/' + ORG_ID + '/payment-settings', {
+                        payment_method: document.getElementById('payment_method').value,
+                        bank_name: document.getElementById('payment_bank_name').value,
+                        bank_branch: document.getElementById('payment_bank_branch').value,
+                        bank_account_type: document.getElementById('payment_bank_account_type').value,
+                        bank_account_number: document.getElementById('payment_bank_account_number').value,
+                        bank_account_holder: document.getElementById('payment_bank_account_holder').value,
+                        stripe_enabled: document.getElementById('payment_stripe_enabled').checked ? 1 : 0,
+                        stripe_account_id: document.getElementById('payment_stripe_account_id').value,
+                        payment_notes: document.getElementById('payment_notes').value
+                    }, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    closePaymentModal();
+                    loadOrgDetails();
+                    alert('決済設定を保存しました');
+                } catch (error) {
+                    alert('保存に失敗しました');
+                }
+            });
             
             async function loginAsOrg(orgId) {
                 if (!confirm('この法人の管理画面に切り替えますか？')) return;
@@ -23441,6 +23610,41 @@ app.put('/api/master/organizations/:id', async (c) => {
   ).run()
   
   return c.json({ success: true })
+})
+
+// 決済設定更新API
+app.put('/api/master/organizations/:id/payment-settings', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  const data = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE organizations SET
+      payment_method = COALESCE(?, payment_method),
+      bank_name = ?,
+      bank_branch = ?,
+      bank_account_type = COALESCE(?, '普通'),
+      bank_account_number = ?,
+      bank_account_holder = ?,
+      stripe_enabled = COALESCE(?, 0),
+      stripe_account_id = ?,
+      payment_notes = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    data.payment_method || null,
+    data.bank_name || null,
+    data.bank_branch || null,
+    data.bank_account_type || null,
+    data.bank_account_number || null,
+    data.bank_account_holder || null,
+    data.stripe_enabled || 0,
+    data.stripe_account_id || null,
+    data.payment_notes || null,
+    orgId
+  ).run()
+  
+  return c.json({ success: true, message: '決済設定を更新しました' })
 })
 
 // プラン変更API
