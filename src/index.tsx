@@ -10516,6 +10516,7 @@ app.get('/portal/:token', async (c) => {
                     await axios.post(\`/api/clients/\${CLIENT_ID}/report-transfer\`, {
                         payment_type: 'deposit',
                         amount: amount,
+                        case_id: CASE_ID, // 案件IDも送信
                         notes: '顧客ポータルから報告'
                     });
                     
@@ -19724,13 +19725,22 @@ app.post('/api/clients/:clientId/report-transfer', async (c) => {
   
   try {
     const data = await c.req.json()
+    const caseId = data.case_id // 案件IDも受け取る
     
-    // クライアント情報を取得して金額を確認
-    const client = await DB.prepare(`
-      SELECT deposit_amount FROM clients WHERE id = ?
-    `).bind(clientId).first() as any
-    
-    const amount = data.amount || client?.deposit_amount || 0
+    // 金額を取得（案件から優先、なければクライアントから）
+    let amount = data.amount || 0
+    if (!amount && caseId) {
+      const caseData = await DB.prepare(`
+        SELECT deposit_amount FROM cases WHERE id = ?
+      `).bind(caseId).first() as any
+      amount = caseData?.deposit_amount || 0
+    }
+    if (!amount) {
+      const client = await DB.prepare(`
+        SELECT deposit_amount FROM clients WHERE id = ?
+      `).bind(clientId).first() as any
+      amount = client?.deposit_amount || 0
+    }
     
     // 支払い履歴を作成
     await DB.prepare(`
@@ -19746,6 +19756,26 @@ app.post('/api/clients/:clientId/report-transfer', async (c) => {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(clientId).run()
+    
+    // 案件の振込報告フラグも更新（案件IDがある場合）
+    if (caseId) {
+      await DB.prepare(`
+        UPDATE cases 
+        SET deposit_transfer_reported = 1, 
+            deposit_transfer_reported_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(caseId).run()
+    } else {
+      // 案件IDがない場合は、このクライアントに紐づく全ての案件を更新
+      await DB.prepare(`
+        UPDATE cases 
+        SET deposit_transfer_reported = 1, 
+            deposit_transfer_reported_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE client_id = ?
+      `).bind(clientId).run()
+    }
     
     return c.json({ success: true, message: '振込完了報告を送信しました。確認まで少々お待ちください。' })
   } catch (error: any) {
