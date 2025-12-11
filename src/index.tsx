@@ -5250,6 +5250,17 @@ app.get('/subsidy-types', async (c) => {
                 }
             }
             
+            // サイドバートグル
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                if (sidebar && overlay) {
+                    sidebar.classList.toggle('-translate-x-full');
+                    overlay.classList.toggle('hidden');
+                }
+            }
+            window.toggleSidebar = toggleSidebar;
+            
             if (!checkAuth()) {}
 
             let subsidyTypes = [];
