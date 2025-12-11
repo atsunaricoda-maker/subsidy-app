@@ -236,6 +236,8 @@ const sidebarScripts = `
     
     // 業務範囲に応じてサイドバーのリンクをロック
     function applyBusinessScopeLock(scope) {
+        console.log('applyBusinessScopeLock called with scope:', scope);
+        
         const subsidyLink = document.getElementById('sidebarSubsidyLink');
         const subsidyIcon = document.getElementById('sidebarSubsidyIcon');
         const subsidyBadge = document.getElementById('sidebarSubsidyBadge');
@@ -246,16 +248,27 @@ const sidebarScripts = `
         const licenseIcon = document.getElementById('sidebarLicenseIcon');
         const licenseBadge = document.getElementById('sidebarLicenseBadge');
         
+        console.log('Sidebar elements found:', {
+            subsidyLink: !!subsidyLink,
+            grantLink: !!grantLink,
+            licenseLink: !!licenseLink
+        });
+        
         // 社労士のみ: 補助金と許認可をロック
         if (scope === 'labor') {
+            console.log('Labor scope: locking subsidy and license');
             if (subsidyLink) lockSidebarItem(subsidyLink, subsidyIcon, subsidyBadge, '行政書士業務', 'administrative');
             if (licenseLink) lockSidebarItem(licenseLink, licenseIcon, licenseBadge, '行政書士業務', 'administrative');
         }
         // 行政書士のみ: 助成金をロック
         else if (scope === 'administrative') {
+            console.log('Administrative scope: locking grant only');
             if (grantLink) lockSidebarItem(grantLink, grantIcon, grantBadge, '社労士業務', 'labor');
         }
         // both: すべてアクセス可能
+        else {
+            console.log('Both scope: all features unlocked');
+        }
     }
     
     // サイドバー項目をロック状態にする
@@ -5858,23 +5871,35 @@ app.get('/subsidy-types', async (c) => {
                     const data = response.data;
                     const scope = data.business_scope || 'both';
                     
-                    // カテゴリと必要な業務範囲のマッピング
+                    // カテゴリと必要な業務範囲のマッピング（英語・日本語両対応）
                     const categoryToScope = {
                         'subsidy': ['administrative', 'both'],
                         'license': ['administrative', 'both'],
-                        'grant': ['labor', 'both']
+                        'grant': ['labor', 'both'],
+                        // 日本語カテゴリ名にも対応
+                        '行政書士管轄': ['administrative', 'both'],
+                        '補助金': ['administrative', 'both'],
+                        '許認可': ['administrative', 'both'],
+                        '社労士管轄': ['labor', 'both'],
+                        '助成金': ['labor', 'both']
                     };
                     
-                    const allowedScopes = categoryToScope[currentCategory] || [];
+                    const allowedScopes = categoryToScope[currentCategory] || ['administrative', 'labor', 'both']; // マッピングにない場合は全てアクセス可能
                     
                     // 業務範囲外の場合はロック画面を表示
                     if (currentCategory && !allowedScopes.includes(scope)) {
                         const scopeNames = {
                             'subsidy': '行政書士業務（補助金）',
                             'license': '行政書士業務（許認可）',
-                            'grant': '社労士業務（助成金）'
+                            'grant': '社労士業務（助成金）',
+                            '行政書士管轄': '行政書士業務（補助金）',
+                            '補助金': '行政書士業務（補助金）',
+                            '許認可': '行政書士業務（許認可）',
+                            '社労士管轄': '社労士業務（助成金）',
+                            '助成金': '社労士業務（助成金）'
                         };
-                        const requiredScope = currentCategory === 'grant' ? '社労士業務' : '行政書士業務';
+                        const isGrantCategory = ['grant', '社労士管轄', '助成金'].includes(currentCategory);
+                        const requiredScope = isGrantCategory ? '社労士業務' : '行政書士業務';
                         
                         document.getElementById('subsidyTypesList').innerHTML = \`
                             <div class="bg-white rounded-xl shadow-lg p-8 max-w-lg mx-auto text-center">
