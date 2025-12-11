@@ -52,20 +52,20 @@ function generateSidebar(activePage: string = '') {
             <div class="pt-4 pb-2">
                 <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
             </div>
-            <a href="/subsidy-types?category=subsidy" class="sidebar-link ${isActive('subsidy-gyosei')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-file-signature w-5"></i>
+            <a href="/subsidy-types?category=subsidy" id="sidebarSubsidyLink" class="sidebar-link ${isActive('subsidy-gyosei')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-file-signature w-5" id="sidebarSubsidyIcon"></i>
                 <span>補助金一覧</span>
-                <span class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
+                <span id="sidebarSubsidyBadge" class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
             </a>
-            <a href="/subsidy-types?category=grant" class="sidebar-link ${isActive('subsidy-sharoshi')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-users w-5"></i>
+            <a href="/subsidy-types?category=grant" id="sidebarGrantLink" class="sidebar-link ${isActive('subsidy-sharoshi')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-users w-5" id="sidebarGrantIcon"></i>
                 <span>助成金一覧</span>
-                <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
+                <span id="sidebarGrantBadge" class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
             </a>
-            <a href="/subsidy-types?category=license" class="sidebar-link ${isActive('subsidy-kyoninka')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-stamp w-5"></i>
+            <a href="/subsidy-types?category=license" id="sidebarLicenseLink" class="sidebar-link ${isActive('subsidy-kyoninka')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-stamp w-5" id="sidebarLicenseIcon"></i>
                 <span>許認可申請</span>
-                <span class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
+                <span id="sidebarLicenseBadge" class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
             </a>
             <a href="/admin/pipelines" class="sidebar-link ${isActive('pipelines')} flex items-center gap-3 px-4 py-3 rounded-lg">
                 <i class="fas fa-project-diagram w-5"></i>
@@ -189,7 +189,7 @@ const sidebarScripts = `
         axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_username') + ':' + localStorage.getItem('admin_role');
     }
     
-    // 枠残数をサイドバーに表示
+    // 枠残数をサイドバーに表示 & 業務範囲ロック
     async function loadSidebarSlotBalance() {
         const badge = document.getElementById('slotsBadge');
         if (!badge) return;
@@ -220,12 +220,116 @@ const sidebarScripts = `
                     ? 'ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full'
                     : 'ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full';
             }
+            
+            // 業務範囲に応じてサイドバーをロック
+            applyBusinessScopeLock(data.business_scope || 'labor');
+            
         } catch (error) {
             console.error('Error loading slot balance:', error);
             badge.textContent = '!';
             badge.className = 'ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full';
         }
     }
+    
+    // 業務範囲に応じてサイドバーのリンクをロック
+    function applyBusinessScopeLock(scope) {
+        const subsidyLink = document.getElementById('sidebarSubsidyLink');
+        const subsidyIcon = document.getElementById('sidebarSubsidyIcon');
+        const subsidyBadge = document.getElementById('sidebarSubsidyBadge');
+        const grantLink = document.getElementById('sidebarGrantLink');
+        const grantIcon = document.getElementById('sidebarGrantIcon');
+        const grantBadge = document.getElementById('sidebarGrantBadge');
+        const licenseLink = document.getElementById('sidebarLicenseLink');
+        const licenseIcon = document.getElementById('sidebarLicenseIcon');
+        const licenseBadge = document.getElementById('sidebarLicenseBadge');
+        
+        // 社労士のみ: 補助金と許認可をロック
+        if (scope === 'labor') {
+            if (subsidyLink) lockSidebarItem(subsidyLink, subsidyIcon, subsidyBadge, '行政書士業務', 'administrative');
+            if (licenseLink) lockSidebarItem(licenseLink, licenseIcon, licenseBadge, '行政書士業務', 'administrative');
+        }
+        // 行政書士のみ: 助成金をロック
+        else if (scope === 'administrative') {
+            if (grantLink) lockSidebarItem(grantLink, grantIcon, grantBadge, '社労士業務', 'labor');
+        }
+        // both: すべてアクセス可能
+    }
+    
+    // サイドバー項目をロック状態にする
+    function lockSidebarItem(link, icon, badge, scopeName, scopeType) {
+        // リンクを無効化
+        link.href = 'javascript:void(0)';
+        link.onclick = function(e) {
+            e.preventDefault();
+            showScopeLockModal(scopeName, scopeType);
+        };
+        link.classList.add('opacity-50', 'cursor-not-allowed');
+        
+        // アイコンをロックに変更
+        if (icon) {
+            icon.className = 'fas fa-lock w-5 text-gray-400';
+        }
+        
+        // バッジをロック表示に変更
+        if (badge) {
+            badge.innerHTML = '<i class="fas fa-lock text-xs"></i>';
+            badge.className = 'ml-auto text-xs bg-gray-500 px-2 py-0.5 rounded';
+        }
+    }
+    
+    // ロック解除モーダルを表示
+    function showScopeLockModal(scopeName, scopeType) {
+        // 既存のモーダルを削除
+        const existingModal = document.getElementById('scopeLockModal');
+        if (existingModal) existingModal.remove();
+        
+        const modal = document.createElement('div');
+        modal.id = 'scopeLockModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = \`
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+                <div class="bg-gradient-to-r from-gray-600 to-gray-700 text-white p-6 text-center">
+                    <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-lock text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold">この機能はロックされています</h3>
+                </div>
+                <div class="p-6">
+                    <p class="text-gray-600 mb-4 text-center">
+                        <strong>\${scopeName}</strong>の機能を使用するには、<br>
+                        オプションプランへの加入が必要です。
+                    </p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <p class="text-sm text-blue-800">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>月額 +¥2,000</strong> で\${scopeName}を追加できます。
+                        </p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="document.getElementById('scopeLockModal').remove()" 
+                                class="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            閉じる
+                        </button>
+                        <a href="/admin/subscription" 
+                           class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center font-bold">
+                            <i class="fas fa-arrow-right mr-2"></i>プラン管理へ
+                        </a>
+                    </div>
+                </div>
+            </div>
+        \`;
+        document.body.appendChild(modal);
+        
+        // モーダルの背景クリックで閉じる
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+    
+    // グローバルに公開
+    window.showScopeLockModal = showScopeLockModal;
     
     // DOMContentLoadedを待ってから実行
     if (document.readyState === 'loading') {
@@ -5744,8 +5848,72 @@ app.get('/subsidy-types', async (c) => {
             window.editHearingQuestion = editHearingQuestion;
             window.deleteHearingQuestion = deleteHearingQuestion;
 
+            // 業務範囲チェック
+            async function checkBusinessScope() {
+                try {
+                    const response = await axios.get('/api/subscription/status');
+                    const data = response.data;
+                    const scope = data.business_scope || 'labor';
+                    
+                    // カテゴリと必要な業務範囲のマッピング
+                    const categoryToScope = {
+                        'subsidy': ['administrative', 'both'],
+                        'license': ['administrative', 'both'],
+                        'grant': ['labor', 'both']
+                    };
+                    
+                    const allowedScopes = categoryToScope[currentCategory] || [];
+                    
+                    // 業務範囲外の場合はロック画面を表示
+                    if (currentCategory && !allowedScopes.includes(scope)) {
+                        const scopeNames = {
+                            'subsidy': '行政書士業務（補助金）',
+                            'license': '行政書士業務（許認可）',
+                            'grant': '社労士業務（助成金）'
+                        };
+                        const requiredScope = currentCategory === 'grant' ? '社労士業務' : '行政書士業務';
+                        
+                        document.getElementById('subsidyTypesList').innerHTML = \`
+                            <div class="bg-white rounded-xl shadow-lg p-8 max-w-lg mx-auto text-center">
+                                <div class="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-6">
+                                    <i class="fas fa-lock text-4xl text-gray-400"></i>
+                                </div>
+                                <h2 class="text-2xl font-bold text-gray-800 mb-4">この機能はロックされています</h2>
+                                <p class="text-gray-600 mb-6">
+                                    <strong>\${scopeNames[currentCategory] || currentCategory}</strong>を使用するには、<br>
+                                    <strong>\${requiredScope}</strong>のオプション追加が必要です。
+                                </p>
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                                    <p class="text-blue-800">
+                                        <i class="fas fa-info-circle mr-2"></i>
+                                        <strong>月額 +¥2,000</strong> で\${requiredScope}を追加できます。
+                                    </p>
+                                </div>
+                                <div class="flex gap-3 justify-center">
+                                    <a href="/" class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                        <i class="fas fa-arrow-left mr-2"></i>戻る
+                                    </a>
+                                    <a href="/admin/subscription" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold">
+                                        <i class="fas fa-unlock mr-2"></i>オプションを追加
+                                    </a>
+                                </div>
+                            </div>
+                        \`;
+                        return false;
+                    }
+                    return true;
+                } catch (error) {
+                    console.error('Error checking business scope:', error);
+                    return true; // エラー時はアクセス許可
+                }
+            }
+
             // 初期読み込み
-            loadSubsidyTypes();
+            checkBusinessScope().then(allowed => {
+                if (allowed) {
+                    loadSubsidyTypes();
+                }
+            });
         </script>
     </body>
     </html>
