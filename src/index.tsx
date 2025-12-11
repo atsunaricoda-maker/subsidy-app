@@ -2670,7 +2670,29 @@ app.get('/', (c) => {
                 '行政書士管轄': { bg: 'bg-emerald-50', border: 'border-emerald-300', hover: 'hover:bg-emerald-100', selected: 'bg-emerald-500 text-white' },
                 '社労士管轄': { bg: 'bg-blue-50', border: 'border-blue-300', hover: 'hover:bg-blue-100', selected: 'bg-blue-500 text-white' },
                 '許認可': { bg: 'bg-indigo-50', border: 'border-indigo-300', hover: 'hover:bg-indigo-100', selected: 'bg-indigo-500 text-white' },
-                'その他': { bg: 'bg-gray-50', border: 'border-gray-300', hover: 'hover:bg-gray-100', selected: 'bg-gray-500 text-white' }
+                'その他': { bg: 'bg-gray-50', border: 'border-gray-300', hover: 'hover:bg-gray-100', selected: 'bg-gray-500 text-white' },
+                // DB英語カテゴリも対応
+                'subsidy': { bg: 'bg-emerald-50', border: 'border-emerald-300', hover: 'hover:bg-emerald-100', selected: 'bg-emerald-500 text-white' },
+                'grant': { bg: 'bg-blue-50', border: 'border-blue-300', hover: 'hover:bg-blue-100', selected: 'bg-blue-500 text-white' },
+                'license': { bg: 'bg-indigo-50', border: 'border-indigo-300', hover: 'hover:bg-indigo-100', selected: 'bg-indigo-500 text-white' }
+            };
+            
+            // DBカテゴリ（英語）とUIカテゴリ（日本語）のマッピング
+            const CATEGORY_MAP = {
+                'subsidy': '行政書士管轄',
+                'grant': '社労士管轄',
+                'license': '許認可',
+                '行政書士管轄': '行政書士管轄',
+                '社労士管轄': '社労士管轄',
+                '許認可': '許認可',
+                'その他': 'その他'
+            };
+            
+            // UIカテゴリから対応するDBカテゴリを取得
+            const UI_TO_DB_CATEGORY = {
+                '行政書士管轄': ['subsidy', '行政書士管轄'],
+                '社労士管轄': ['grant', '社労士管轄'],
+                '許認可': ['license', '許認可']
             };
             
             // カテゴリ選択
@@ -2704,18 +2726,32 @@ app.get('/', (c) => {
                 const searchFilter = filter || (searchInput ? searchInput.value : '');
                 const filterLower = searchFilter.toLowerCase();
                 
-                // カテゴリでグループ化
-                const grouped = {};
+                // カテゴリでグループ化（日本語カテゴリに正規化）
+                const grouped = {
+                    '行政書士管轄': [],
+                    '社労士管轄': [],
+                    '許認可': []
+                };
+                
                 subsidyTypes.forEach(type => {
-                    const cat = type.category || 'その他';
+                    // システムカテゴリは表示しない
+                    if (type.category === 'システム') return;
+                    
+                    const rawCat = type.category || 'その他';
+                    // DBカテゴリ（英語）を日本語に変換
+                    const cat = CATEGORY_MAP[rawCat] || rawCat;
                     if (!grouped[cat]) grouped[cat] = [];
                     grouped[cat].push(type);
                 });
                 
                 let html = '';
-                const categoriesToShow = currentSubsidyCategory === 'all' 
-                    ? Object.keys(grouped) 
-                    : [currentSubsidyCategory];
+                let categoriesToShow;
+                if (currentSubsidyCategory === 'all') {
+                    categoriesToShow = ['行政書士管轄', '社労士管轄', '許認可'];
+                } else {
+                    // 選択されたUIカテゴリに対応するものを表示
+                    categoriesToShow = [currentSubsidyCategory];
+                }
                 
                 categoriesToShow.forEach(category => {
                     if (!grouped[category]) return;
@@ -10386,7 +10422,12 @@ app.get('/portal/:token', async (c) => {
             }
             
             // 銀行振込モーダル
+            let currentTransferAmount = 0; // モーダルで表示中の金額を保持
             function showBankTransferModal(amount) {
+                // 金額文字列から数値を抽出（¥10,000 -> 10000）
+                const numericAmount = parseInt(String(amount).replace(/[¥,]/g, '')) || 0;
+                currentTransferAmount = numericAmount;
+                
                 const modal = document.createElement('div');
                 modal.id = 'bankTransferModal';
                 modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
@@ -10469,8 +10510,8 @@ app.get('/portal/:token', async (c) => {
                 let reportSuccess = false;
                 
                 try {
-                    const clientRes = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                    const amount = clientRes.data.deposit_amount || 0;
+                    // モーダルで表示されていた金額を使用（クライアントDBから再取得ではなく）
+                    const amount = currentTransferAmount || 0;
                     
                     await axios.post(\`/api/clients/\${CLIENT_ID}/report-transfer\`, {
                         payment_type: 'deposit',
