@@ -4703,38 +4703,47 @@ app.get('/api/cases/:id/document-checklist', async (c) => {
 app.get('/api/subsidy-types', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
+  const categoryFilter = c.req.query('category') || ''
   
   // id = 0 は共通質問用の内部レコードなので除外
   let query = `SELECT * FROM subsidy_types WHERE id > 0`
   const params: string[] = []
   
-  // 組織の業務範囲を取得してフィルタリング
-  if (user?.organization_id) {
-    const org = await DB.prepare(`SELECT business_scope FROM organizations WHERE id = ?`)
-      .bind(user.organization_id).first()
-    
-    if (org?.business_scope) {
-      const scope = org.business_scope as string
+  // カテゴリフィルターが指定されている場合
+  if (categoryFilter) {
+    query += ` AND category = ?`
+    params.push(categoryFilter)
+  } else {
+    // 組織の業務範囲を取得してフィルタリング（カテゴリ指定がない場合のみ）
+    if (user?.organization_id) {
+      const org = await DB.prepare(`SELECT business_scope FROM organizations WHERE id = ?`)
+        .bind(user.organization_id).first()
       
-      // カテゴリマッピング:
-      // - grant (助成金) = 厚労省系 = 社労士管轄 (labor)
-      // - subsidy (補助金) = 経産省系 = 行政書士管轄 (administrative)
-      // - license (許認可) = 行政書士管轄 (administrative)
-      
-      if (scope === 'labor') {
-        // 社労士: 助成金のみ
-        query += ` AND (category IN ('grant', '雇用系', '助成金') OR category IS NULL)`
-      } else if (scope === 'administrative') {
-        // 行政書士: 補助金と許認可
-        query += ` AND (category IN ('subsidy', 'license', 'IT系', '設備投資系', '一般', '補助金', '許認可') OR category IS NULL)`
+      if (org?.business_scope) {
+        const scope = org.business_scope as string
+        
+        // カテゴリマッピング:
+        // - grant (助成金) = 厚労省系 = 社労士管轄 (labor)
+        // - subsidy (補助金) = 経産省系 = 行政書士管轄 (administrative)
+        // - license (許認可) = 行政書士管轄 (administrative)
+        
+        if (scope === 'labor') {
+          // 社労士: 助成金のみ
+          query += ` AND (category IN ('grant', '雇用系', '助成金') OR category IS NULL)`
+        } else if (scope === 'administrative') {
+          // 行政書士: 補助金と許認可
+          query += ` AND (category IN ('subsidy', 'license', 'IT系', '設備投資系', '一般', '補助金', '許認可') OR category IS NULL)`
+        }
+        // 'both' の場合は全て表示
       }
-      // 'both' の場合は全て表示
     }
   }
   
   query += ` ORDER BY category, name`
   
-  const result = await DB.prepare(query).all()
+  const result = params.length > 0 
+    ? await DB.prepare(query).bind(...params).all()
+    : await DB.prepare(query).all()
   
   return c.json(result.results)
 })
@@ -5125,11 +5134,20 @@ app.get('/subsidy-types', async (c) => {
 
             let subsidyTypes = [];
             let documentFieldCount = 0;
+            
+            // URLからカテゴリパラメータを取得
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentCategory = urlParams.get('category') || '';
 
             // 助成金種別一覧読み込み（管理画面では非表示含む全て表示）
             async function loadSubsidyTypes() {
                 try {
-                    const response = await axios.get('/api/subsidy-types?include_hidden=true');
+                    // カテゴリが指定されている場合はフィルタリング
+                    let apiUrl = '/api/subsidy-types?include_hidden=true';
+                    if (currentCategory) {
+                        apiUrl += '&category=' + encodeURIComponent(currentCategory);
+                    }
+                    const response = await axios.get(apiUrl);
                     subsidyTypes = response.data;
                     renderSubsidyTypes();
                 } catch (error) {
