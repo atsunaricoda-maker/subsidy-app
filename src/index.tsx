@@ -222,7 +222,10 @@ const sidebarScripts = `
             }
             
             // 業務範囲に応じてサイドバーをロック
-            applyBusinessScopeLock(data.business_scope || 'labor');
+            // デフォルトは 'both'（すべてアクセス可能）- 明示的に設定されている場合のみロック
+            const scope = data.business_scope || 'both';
+            console.log('Business scope from API:', data.business_scope, '-> Using:', scope);
+            applyBusinessScopeLock(scope);
             
         } catch (error) {
             console.error('Error loading slot balance:', error);
@@ -5853,7 +5856,7 @@ app.get('/subsidy-types', async (c) => {
                 try {
                     const response = await axios.get('/api/subscription/status');
                     const data = response.data;
-                    const scope = data.business_scope || 'labor';
+                    const scope = data.business_scope || 'both';
                     
                     // カテゴリと必要な業務範囲のマッピング
                     const categoryToScope = {
@@ -20410,7 +20413,7 @@ app.get('/admin/subscription', async (c) => {
                         'both': { name: '両方利用（助成金 + 補助金・許認可）', icon: 'fa-layer-group', color: 'purple' }
                     };
                     
-                    const currentScope = data.business_scope || 'labor';
+                    const currentScope = data.business_scope || 'both';
                     const scopeInfo = scopeLabels[currentScope] || scopeLabels.labor;
                     const hasDualScope = data.has_dual_scope || false;
                     
@@ -22086,7 +22089,7 @@ app.get('/api/subscription/status', async (c) => {
     scheduled_plan: scheduledPlan,
     scheduled_plan_date: subscription?.scheduled_plan_date || null,
     is_unlimited: isUnlimited,
-    business_scope: organization?.business_scope || 'labor',
+    business_scope: organization?.business_scope || 'both',
     has_dual_scope: hasDualScope,
     addons: addons.results || []
   })
