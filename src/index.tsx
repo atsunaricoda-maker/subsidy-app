@@ -10536,14 +10536,15 @@ app.get('/portal/:token', async (c) => {
                     return;
                 }
                 
-                // 報告成功後の処理（エラーがあっても無視）
+                // 報告成功後の処理
                 if (reportSuccess) {
                     try { closeBankTransferModal(); } catch(e) { console.warn('closeBankTransferModal error:', e); }
-                    try { showMessage('振込完了報告を送信しました。確認までしばらくお待ちください。', 'success'); } catch(e) { console.warn('showMessage error:', e); }
-                    try { await loadDepositInfo(); } catch(e) { console.warn('loadDepositInfo error:', e); }
                     
-                    // 万が一showMessageが失敗した場合の代替
-                    alert('振込完了報告を送信しました。確認までしばらくお待ちください。');
+                    // 成功メッセージを表示
+                    alert('振込完了報告を送信しました。\\n確認までしばらくお待ちください。');
+                    
+                    // ページをリロードしてUIを最新状態に更新
+                    window.location.reload();
                 }
             }
 
