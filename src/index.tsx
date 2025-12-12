@@ -2705,7 +2705,15 @@ app.get('/', (c) => {
             
             // 時間の相対表示
             function formatTimeAgo(dateStr) {
-                const date = new Date(dateStr);
+                // D1のDATETIMEはUTCで保存されているが、タイムゾーン情報がないので明示的にUTCとして解釈
+                let date;
+                if (dateStr && !dateStr.endsWith('Z') && !dateStr.includes('+')) {
+                    // タイムゾーン情報がない場合、UTCとして解釈
+                    date = new Date(dateStr.replace(' ', 'T') + 'Z');
+                } else {
+                    date = new Date(dateStr);
+                }
+                
                 const now = new Date();
                 const diffMs = now - date;
                 const diffMins = Math.floor(diffMs / 60000);
