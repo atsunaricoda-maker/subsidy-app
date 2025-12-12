@@ -18129,13 +18129,13 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
   throw lastError || new Error('Claude API failed after retries')
 }
 
-// 統合AI API呼び出し（設定に応じてGemini/Claudeを切り替え）
+// 統合AI API呼び出し（Geminiがレート制限にかかったらClaudeにフォールバック）
 async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: number): Promise<string> {
   const { DB, GEMINI_API_KEY, CLAUDE_API_KEY } = env
   
-  // DB設定から使用するAIモデルを取得
-  let aiProvider = 'gemini' // デフォルトはGemini
+  // DB設定からClaude APIキーを取得
   let claudeApiKey = CLAUDE_API_KEY || ''
+  let aiProvider = 'gemini' // デフォルトはGemini
   
   try {
     const aiSettings = await DB.prepare(`
@@ -18155,10 +18155,36 @@ async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: numbe
     console.error('Failed to load AI settings:', e)
   }
   
+  // 設定がClaudeの場合は直接Claude使用
   if (aiProvider === 'claude' && claudeApiKey) {
     return callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars)
-  } else {
-    return callGeminiAPI(prompt, GEMINI_API_KEY, maxRetries, maxChars)
+  }
+  
+  // Geminiを試行し、レート制限時はClaudeにフォールバック
+  try {
+    return await callGeminiAPI(prompt, GEMINI_API_KEY, maxRetries, maxChars)
+  } catch (error: any) {
+    const errorMessage = error?.message || ''
+    const isRateLimited = errorMessage.includes('429') || 
+                          errorMessage.includes('RESOURCE_EXHAUSTED') || 
+                          errorMessage.includes('quota')
+    
+    // レート制限でClaudeのAPIキーがある場合はフォールバック
+    if (isRateLimited && claudeApiKey) {
+      console.log('Gemini rate limited, falling back to Claude Haiku 4.5...')
+      try {
+        const result = await callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars)
+        // フォールバック成功時にログ
+        console.log('Successfully generated content using Claude fallback')
+        return result
+      } catch (claudeError) {
+        console.error('Claude fallback also failed:', claudeError)
+        throw new Error(`Both Gemini and Claude failed. Gemini: ${errorMessage}`)
+      }
+    }
+    
+    // Claudeキーがない場合は元のエラーをスロー
+    throw error
   }
 }
 
@@ -25640,7 +25666,7 @@ app.get('/admin/settings', async (c) => {
                 <div class="p-4 space-y-4">
                     <!-- AIプロバイダー選択 -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">使用するAIモデル</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">メインAIモデル</label>
                         <div class="grid grid-cols-2 gap-4">
                             <label class="relative flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition" id="ai_provider_gemini_label">
                                 <input type="radio" name="ai_provider" value="gemini" id="ai_provider_gemini" class="sr-only" onchange="updateAIProviderUI()">
@@ -25675,10 +25701,28 @@ app.get('/admin/settings', async (c) => {
                         </div>
                     </div>
                     
-                    <!-- Claude API Key入力 -->
-                    <div id="claude_api_key_section" class="hidden">
+                    <!-- フォールバック説明 -->
+                    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-sync-alt text-amber-600"></i>
+                            </div>
+                            <div class="text-sm">
+                                <p class="font-medium text-amber-800">自動フォールバック機能</p>
+                                <p class="text-amber-700 mt-1">
+                                    Gemini選択時、レート制限（429エラー）にかかった場合は<strong>自動的にClaude Haiku 4.5</strong>に切り替えて生成を継続します。
+                                </p>
+                                <p class="text-amber-600 mt-1 text-xs">
+                                    ※フォールバック機能を利用するには、下記でClaude APIキーを設定してください
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Claude API Key入力（常に表示） -->
+                    <div id="claude_api_key_section">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
-                            <i class="fas fa-key text-orange-500 mr-1"></i>Claude API Key
+                            <i class="fas fa-key text-orange-500 mr-1"></i>Claude API Key <span class="text-xs text-gray-500">（フォールバック用 / Claude使用時は必須）</span>
                         </label>
                         <div class="flex gap-2">
                             <input type="password" id="claude_api_key" class="flex-1 px-3 py-2 border rounded-lg" placeholder="sk-ant-api03-...">
@@ -25935,8 +25979,7 @@ app.get('/admin/settings', async (c) => {
                 document.getElementById('gemini_check').classList.toggle('hidden', !isGemini);
                 document.getElementById('claude_check').classList.toggle('hidden', !isClaude);
                 
-                // Claude API Key入力欄の表示切り替え
-                document.getElementById('claude_api_key_section').classList.toggle('hidden', !isClaude);
+                // Gemini情報表示切り替え（Claudeメイン選択時は非表示）
                 document.getElementById('gemini_api_key_section').classList.toggle('hidden', isClaude);
             }
             
