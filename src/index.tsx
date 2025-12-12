@@ -18412,17 +18412,17 @@ app.get('/api/pipeline-templates', async (c) => {
   if (subsidyTypeId) {
     const targetId = parseInt(subsidyTypeId)
     results = results.filter((t: any) => {
-      // subsidy_type_idsがnullまたは空の場合はすべての申請種別で利用可能
-      if (!t.subsidy_type_ids) return true
+      // subsidy_type_idsがnullまたは空の場合は表示しない（明示的に紐付けが必要）
+      if (!t.subsidy_type_ids) return false
       
       try {
         const ids = JSON.parse(t.subsidy_type_ids)
         if (Array.isArray(ids) && ids.length > 0) {
           return ids.includes(targetId)
         }
-        return true // 空配列の場合もすべてで利用可能
+        return false // 空配列の場合も表示しない
       } catch {
-        return true // JSON解析エラーの場合もすべてで利用可能
+        return false // JSON解析エラーの場合も表示しない
       }
     })
   }
