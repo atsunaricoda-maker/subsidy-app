@@ -4805,18 +4805,6 @@ app.get('/api/cases/:id/documents', async (c) => {
   return c.json(result.results)
 })
 
-// 案件のヒアリング回答一覧取得
-app.get('/api/cases/:id/hearing-answers', async (c) => {
-  const { DB } = c.env
-  const id = c.req.param('id')
-  
-  const result = await DB.prepare(`
-    SELECT * FROM hearing_answers WHERE case_id = ? ORDER BY created_at DESC
-  `).bind(id).all()
-  
-  return c.json(result.results)
-})
-
 // 案件のパイプライン取得
 app.get('/api/cases/:id/pipelines', async (c) => {
   const { DB } = c.env
@@ -4984,37 +4972,61 @@ app.get('/api/cases/:id/hearing-answers', async (c) => {
     return c.json({ error: 'Case not found' }, 404)
   }
   
-  // 共通質問（subsidy_type_id = 0）と案件固有の質問を取得
-  // 共通質問の回答はclient_idで、案件固有の回答はcase_idで取得
-  const result = await DB.prepare(`
-    SELECT 
-      hq.id as question_id,
-      hq.question_key,
-      hq.question_text,
-      hq.question_type,
-      hq.options,
-      hq.category,
-      hq.is_required,
-      hq.display_order as sort_order,
-      hq.help_text,
-      hq.example_answer,
-      hq.subsidy_type_id,
-      CASE 
-        WHEN hq.subsidy_type_id = 0 THEN ha_common.answer_text
-        ELSE ha_case.answer_text
-      END as answer_text,
-      CASE 
-        WHEN hq.subsidy_type_id = 0 THEN ha_common.created_at
-        ELSE ha_case.created_at
-      END as answered_at
-    FROM hearing_questions hq
-    LEFT JOIN hearing_answers ha_common ON hq.id = ha_common.question_id AND ha_common.client_id = ? AND (ha_common.case_id IS NULL OR hq.subsidy_type_id = 0)
-    LEFT JOIN hearing_answers ha_case ON hq.id = ha_case.question_id AND ha_case.case_id = ?
-    WHERE hq.subsidy_type_id = ? OR hq.subsidy_type_id = 0
-    ORDER BY hq.subsidy_type_id ASC, hq.display_order ASC
-  `).bind(caseData.client_id, caseId, caseData.subsidy_type_id || 0).all()
+  const subsidyTypeId = caseData.subsidy_type_id || 0
+  const clientId = caseData.client_id
   
-  return c.json(result.results)
+  // 共通質問（subsidy_type_id = 0）と案件固有の質問を取得
+  const questions = await DB.prepare(`
+    SELECT 
+      id as question_id,
+      question_key,
+      question_text,
+      question_type,
+      options,
+      category,
+      is_required,
+      display_order as sort_order,
+      help_text,
+      example_answer,
+      subsidy_type_id
+    FROM hearing_questions 
+    WHERE subsidy_type_id = ? OR subsidy_type_id = 0
+    ORDER BY subsidy_type_id ASC, display_order ASC
+  `).bind(subsidyTypeId).all()
+  
+  // 共通質問の回答（client_idで検索、case_idがNULLのもの優先）
+  const commonAnswers = await DB.prepare(`
+    SELECT question_id, answer_text, created_at as answered_at
+    FROM hearing_answers 
+    WHERE client_id = ? AND (case_id IS NULL OR case_id = 0)
+  `).bind(clientId).all()
+  
+  // 案件固有の回答（case_idで検索）
+  const caseAnswers = await DB.prepare(`
+    SELECT question_id, answer_text, created_at as answered_at
+    FROM hearing_answers 
+    WHERE case_id = ?
+  `).bind(caseId).all()
+  
+  // 回答をマップに変換
+  const commonAnswerMap = new Map((commonAnswers.results || []).map((a: any) => [a.question_id, a]))
+  const caseAnswerMap = new Map((caseAnswers.results || []).map((a: any) => [a.question_id, a]))
+  
+  // 質問と回答をマージ
+  const result = (questions.results || []).map((q: any) => {
+    // 共通質問（subsidy_type_id = 0）は共通回答から、それ以外は案件固有の回答から取得
+    const answer = q.subsidy_type_id === 0 
+      ? commonAnswerMap.get(q.question_id) 
+      : caseAnswerMap.get(q.question_id)
+    
+    return {
+      ...q,
+      answer_text: answer?.answer_text || null,
+      answered_at: answer?.answered_at || null
+    }
+  })
+  
+  return c.json(result)
 })
 
 // 案件のヒアリング回答保存（共通質問と案件固有質問を区別）
@@ -18533,8 +18545,13 @@ ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text |
   try {
     const suggestion = await callGeminiAPI(prompt, GEMINI_API_KEY)
     return c.json({ suggestion })
-  } catch (error) {
-    return c.json({ error: '提案の生成に失敗しました' }, 500)
+  } catch (error: any) {
+    console.error('AI suggest error:', error)
+    return c.json({ 
+      error: '提案の生成に失敗しました', 
+      details: error?.message || 'Unknown error',
+      suggestion: `【エラー】AI提案の生成に失敗しました。\n\nAPIキーが設定されているか確認してください。\n\n手動で回答を入力するか、後でもう一度お試しください。`
+    }, 200) // エラーでもUIに表示できるよう200で返す
   }
 })
 
