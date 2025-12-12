@@ -7102,6 +7102,15 @@ app.get('/client/:id', async (c) => {
                     <i class="fas fa-magic mr-2 text-indigo-600"></i>AI文書生成
                 </h3>
                 <form id="generateDocumentForm" class="space-y-4">
+                    <!-- 案件選択 -->
+                    <div>
+                        <label class="block text-sm font-medium mb-1">対象案件 <span class="text-red-500">*</span></label>
+                        <select id="caseSelect" class="w-full px-3 py-2 border rounded-lg" required onchange="onCaseSelectChange(this.value)">
+                            <option value="">選択してください</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">選択した案件のヒアリング内容のみが使用されます</p>
+                    </div>
+                    
                     <div>
                         <label class="block text-sm font-medium mb-1">テンプレート <span class="text-red-500">*</span></label>
                         <select id="templateSelect" class="w-full px-3 py-2 border rounded-lg" required onchange="onTemplateSelectChange(this.value)">
@@ -7113,10 +7122,10 @@ app.get('/client/:id', async (c) => {
                     <!-- ヒアリング状況 -->
                     <div class="bg-blue-50 rounded-lg p-4">
                         <h4 class="text-sm font-medium mb-2">
-                            <i class="fas fa-clipboard-check mr-1 text-blue-600"></i>ヒアリング状況
+                            <i class="fas fa-clipboard-check mr-1 text-blue-600"></i>選択した案件のヒアリング状況
                         </h4>
                         <div id="hearingStatus" class="text-sm text-gray-600">
-                            <i class="fas fa-spinner fa-spin"></i> 確認中...
+                            案件を選択してください
                         </div>
                     </div>
                     
@@ -8985,8 +8994,8 @@ app.get('/client/:id', async (c) => {
             
             async function openGenerateDocumentModal() {
                 document.getElementById('generateDocumentModal').classList.remove('hidden');
+                await loadCasesForGeneration();
                 await loadDocumentTemplates();
-                await loadHearingStatusForGeneration();
                 await loadSuccessCasesPreview();
             }
             
@@ -8994,18 +9003,54 @@ app.get('/client/:id', async (c) => {
                 document.getElementById('generateDocumentModal').classList.add('hidden');
             }
             
-            // ヒアリング状況を読み込み
-            async function loadHearingStatusForGeneration() {
-                const container = document.getElementById('hearingStatus');
+            // 案件一覧を読み込み
+            async function loadCasesForGeneration() {
+                const select = document.getElementById('caseSelect');
                 try {
-                    const answersRes = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing-answers\`);
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/cases\`);
+                    const cases = response.data || [];
+                    
+                    select.innerHTML = '<option value="">選択してください</option>' + 
+                        cases.map(c => \`<option value="\${c.id}">\${c.subsidy_name || '補助金'} - \${c.status === 'completed' ? '完了' : c.status === 'preparing' ? '準備中' : c.status}</option>\`).join('');
+                    
+                    // 案件が1つだけなら自動選択
+                    if (cases.length === 1) {
+                        select.value = cases[0].id;
+                        onCaseSelectChange(cases[0].id);
+                    }
+                } catch (error) {
+                    select.innerHTML = '<option value="">案件の読み込みに失敗しました</option>';
+                }
+            }
+            
+            // 案件選択時の処理
+            async function onCaseSelectChange(caseId) {
+                if (!caseId) {
+                    document.getElementById('hearingStatus').innerHTML = '案件を選択してください';
+                    return;
+                }
+                await loadHearingStatusForGeneration(caseId);
+            }
+            
+            // ヒアリング状況を読み込み（案件別）
+            async function loadHearingStatusForGeneration(caseId) {
+                const container = document.getElementById('hearingStatus');
+                if (!caseId) {
+                    container.innerHTML = '案件を選択してください';
+                    return;
+                }
+                
+                container.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 確認中...';
+                
+                try {
+                    const answersRes = await axios.get(\`/api/cases/\${caseId}/hearing-answers\`);
                     const answers = answersRes.data || [];
                     
                     if (answers.length === 0) {
                         container.innerHTML = \`
                             <div class="flex items-center gap-2 text-yellow-700">
                                 <i class="fas fa-exclamation-triangle"></i>
-                                <span>ヒアリング回答がありません。AIチャットで情報を入力してください。</span>
+                                <span>この案件のヒアリング回答がありません。AIチャットで情報を入力してください。</span>
                             </div>
                         \`;
                     } else {
@@ -9031,6 +9076,8 @@ app.get('/client/:id', async (c) => {
                     container.innerHTML = '<span class="text-gray-500">読み込みエラー</span>';
                 }
             }
+            
+            window.onCaseSelectChange = onCaseSelectChange;
             
             // 採択事例プレビューを読み込み
             async function loadSuccessCasesPreview() {
@@ -9066,7 +9113,13 @@ app.get('/client/:id', async (c) => {
             
             document.getElementById('generateDocumentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const caseId = document.getElementById('caseSelect').value;
                 const templateId = document.getElementById('templateSelect').value;
+                
+                if (!caseId) {
+                    alert('案件を選択してください');
+                    return;
+                }
                 if (!templateId) {
                     alert('テンプレートを選択してください');
                     return;
@@ -9086,6 +9139,7 @@ app.get('/client/:id', async (c) => {
                 try {
                     const response = await axios.post(\`/api/clients/\${CLIENT_ID}/generate-document\`, {
                         template_id: parseInt(templateId),
+                        case_id: parseInt(caseId),
                         options: options
                     });
                     
@@ -18695,14 +18749,28 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
     ORDER BY created_at DESC LIMIT 1
   `).bind(client.subsidy_type_id).first()
   
-  // ヒアリング回答取得
-  const answers = await DB.prepare(`
-    SELECT hq.question_key, hq.question_text, hq.category, ha.answer_text
-    FROM hearing_answers ha
-    JOIN hearing_questions hq ON ha.question_id = hq.id
-    WHERE ha.client_id = ?
-    ORDER BY hq.display_order
-  `).bind(clientId).all()
+  // ヒアリング回答取得（案件IDが指定されている場合はその案件のみ）
+  const caseId = data.case_id
+  let answers
+  if (caseId) {
+    // 案件に紐づくヒアリング回答のみ取得
+    answers = await DB.prepare(`
+      SELECT hq.question_key, hq.question_text, hq.category, ha.answer_text
+      FROM hearing_answers ha
+      JOIN hearing_questions hq ON ha.question_id = hq.id
+      WHERE ha.case_id = ?
+      ORDER BY hq.display_order
+    `).bind(caseId).all()
+  } else {
+    // 後方互換性: case_idがない場合はclient_idで取得
+    answers = await DB.prepare(`
+      SELECT hq.question_key, hq.question_text, hq.category, ha.answer_text
+      FROM hearing_answers ha
+      JOIN hearing_questions hq ON ha.question_id = hq.id
+      WHERE ha.client_id = ?
+      ORDER BY hq.display_order
+    `).bind(clientId).all()
+  }
   
   // 採択事例取得
   const successCases = await DB.prepare(`
@@ -18957,14 +19025,15 @@ ${sectionSpecific}
   
   const result = await DB.prepare(`
     INSERT INTO generated_documents 
-    (client_id, template_id, document_title, sections_content, ai_model_used)
-    VALUES (?, ?, ?, ?, ?)
+    (client_id, template_id, document_title, sections_content, ai_model_used, case_id)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).bind(
     clientId,
     data.template_id,
     documentTitle,
     JSON.stringify(generatedSections),
-    'gemini-2.5-flash-lite'
+    'gemini-2.5-flash-lite',
+    caseId || null
   ).run()
   
   return c.json({ 
@@ -19091,13 +19160,23 @@ app.post('/api/generated-documents/:id/regenerate-section', async (c) => {
     WHERE c.id = ?
   `).bind(doc.client_id).first()
   
-  // ヒアリング回答取得
-  const answers = await DB.prepare(`
-    SELECT hq.question_text, hq.category, ha.answer_text
-    FROM hearing_answers ha
-    JOIN hearing_questions hq ON ha.question_id = hq.id
-    WHERE ha.client_id = ?
-  `).bind(doc.client_id).all()
+  // ヒアリング回答取得（文書に紐づくcase_idがある場合はその案件のみ）
+  let answers
+  if (doc.case_id) {
+    answers = await DB.prepare(`
+      SELECT hq.question_text, hq.category, ha.answer_text
+      FROM hearing_answers ha
+      JOIN hearing_questions hq ON ha.question_id = hq.id
+      WHERE ha.case_id = ?
+    `).bind(doc.case_id).all()
+  } else {
+    answers = await DB.prepare(`
+      SELECT hq.question_text, hq.category, ha.answer_text
+      FROM hearing_answers ha
+      JOIN hearing_questions hq ON ha.question_id = hq.id
+      WHERE ha.client_id = ?
+    `).bind(doc.client_id).all()
+  }
   
   // セクション別の専用プロンプトを定義
   const sectionSpecificPrompts: Record<string, string> = {
