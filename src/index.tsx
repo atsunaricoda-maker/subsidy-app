@@ -22,9 +22,9 @@ function generateSidebar(activePage: string = '') {
         <div class="p-4 border-b border-blue-700 flex-shrink-0">
             <h1 class="text-xl font-bold flex items-center gap-2">
                 <i class="fas fa-file-invoice-dollar"></i>
-                <span>助成金管理</span>
+                <span>申請革命</span>
             </h1>
-            <p class="text-xs text-blue-300 mt-1">Subsidy Manager</p>
+            <p class="text-xs text-blue-300 mt-1">Shinsei Kakumei</p>
         </div>
         
         <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
@@ -67,22 +67,30 @@ function generateSidebar(activePage: string = '') {
                 <span>許認可申請</span>
                 <span id="sidebarLicenseBadge" class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
             </a>
-            <a href="/admin/pipelines" class="sidebar-link ${isActive('pipelines')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-project-diagram w-5"></i>
-                <span>パイプライン管理</span>
-            </a>
             <a href="/admin/statistics" class="sidebar-link ${isActive('statistics')} flex items-center gap-3 px-4 py-3 rounded-lg">
                 <i class="fas fa-chart-line w-5"></i>
                 <span>統計情報</span>
             </a>
             
             <div class="pt-4 pb-2">
-                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">設定</p>
+                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">マスター管理</p>
             </div>
+            <a href="/admin/master" class="sidebar-link ${isActive('master')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-database w-5"></i>
+                <span>マスター管理</span>
+            </a>
+            <a href="/admin/pipelines" class="sidebar-link ${isActive('pipelines')} flex items-center gap-3 px-4 py-3 rounded-lg">
+                <i class="fas fa-project-diagram w-5"></i>
+                <span>パイプライン管理</span>
+            </a>
             <a href="/admin/guidelines" class="sidebar-link ${isActive('guidelines')} flex items-center gap-3 px-4 py-3 rounded-lg">
                 <i class="fas fa-book-open w-5"></i>
                 <span>公募要領管理</span>
             </a>
+            
+            <div class="pt-4 pb-2">
+                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">設定</p>
+            </div>
             <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link ${isActive('users')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
                 <i class="fas fa-users-cog w-5"></i>
                 <span>従業員管理</span>
@@ -367,7 +375,7 @@ app.get('/login', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>ログイン - 助成金申請管理システム</title>
+        <title>ログイン - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
@@ -376,7 +384,7 @@ app.get('/login', (c) => {
             <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
                 <div class="text-center mb-8">
                     <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
-                    <h1 class="text-2xl font-bold text-gray-800">助成金申請管理システム</h1>
+                    <h1 class="text-2xl font-bold text-gray-800">申請革命</h1>
                     <p class="text-sm text-gray-600 mt-2">管理者ログイン</p>
                 </div>
                 
@@ -411,6 +419,15 @@ app.get('/login', (c) => {
                 </div>
                 
                 <div id="errorMessage" class="hidden mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm"></div>
+                
+                <!-- フッターリンク -->
+                <div class="mt-6 pt-4 border-t text-center text-xs text-gray-500">
+                    <a href="/legal" class="hover:text-blue-600">特定商取引法に基づく表記</a>
+                    <span class="mx-2">|</span>
+                    <a href="/terms" class="hover:text-blue-600">利用規約</a>
+                    <span class="mx-2">|</span>
+                    <a href="/privacy-policy" class="hover:text-blue-600">プライバシーポリシー</a>
+                </div>
             </div>
         </div>
 
@@ -450,7 +467,7 @@ app.get('/signup', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>新規登録 - 助成金申請管理システム</title>
+        <title>新規登録 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
@@ -460,7 +477,7 @@ app.get('/signup', (c) => {
                 <!-- ヘッダー -->
                 <div class="text-center mb-8">
                     <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
-                    <h1 class="text-3xl font-bold text-gray-800">助成金申請管理システム</h1>
+                    <h1 class="text-3xl font-bold text-gray-800">申請革命</h1>
                     <p class="text-gray-600 mt-2">14日間の無料トライアルで今すぐ始めましょう</p>
                 </div>
                 
@@ -649,6 +666,15 @@ app.get('/signup', (c) => {
                         すでにアカウントをお持ちですか？ 
                         <a href="/login" class="text-blue-600 hover:underline font-medium">ログイン</a>
                     </p>
+                </div>
+                
+                <!-- フッターリンク -->
+                <div class="mt-8 text-center text-xs text-gray-500">
+                    <a href="/legal" class="hover:text-blue-600">特定商取引法に基づく表記</a>
+                    <span class="mx-2">|</span>
+                    <a href="/terms" class="hover:text-blue-600">利用規約</a>
+                    <span class="mx-2">|</span>
+                    <a href="/privacy-policy" class="hover:text-blue-600">プライバシーポリシー</a>
                 </div>
             </div>
         </div>
@@ -1596,7 +1622,7 @@ app.get('/', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>助成金申請管理システム - 管理者</title>
+        <title>申請革命 - 管理者</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
@@ -1664,9 +1690,9 @@ app.get('/', (c) => {
                 <div class="p-4 border-b border-blue-700 flex-shrink-0">
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
-                        <span>助成金管理</span>
+                        <span>申請革命</span>
                     </h1>
-                    <p class="text-xs text-blue-300 mt-1">Subsidy Manager</p>
+                    <p class="text-xs text-blue-300 mt-1">Shinsei Kakumei</p>
                 </div>
                 
                 <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
@@ -1793,42 +1819,98 @@ app.get('/', (c) => {
                 </header>
                 
                 <div class="p-4 lg:p-6">
+                    <!-- 未対応通知セクション -->
+                    <div id="notificationSummary" class="hidden mb-6">
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm p-4 border border-blue-100">
+                            <h3 class="text-base font-bold mb-3 text-blue-700 flex items-center gap-2">
+                                <i class="fas fa-bell"></i>未対応の通知
+                            </h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="notificationCards">
+                                <button type="button" id="notifyCardMessage" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-blue-50 transition border-l-4 border-blue-400 text-left w-full">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-gray-500 text-xs">未読メッセージ</div>
+                                            <div class="text-xl font-bold text-blue-600" id="notify-message">0</div>
+                                        </div>
+                                        <i class="fas fa-envelope text-blue-200 text-xl"></i>
+                                    </div>
+                                </button>
+                                <button type="button" id="notifyCardDocument" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-green-50 transition border-l-4 border-green-400 text-left w-full">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-gray-500 text-xs">書類アップロード</div>
+                                            <div class="text-xl font-bold text-green-600" id="notify-document">0</div>
+                                        </div>
+                                        <i class="fas fa-file-upload text-green-200 text-xl"></i>
+                                    </div>
+                                </button>
+                                <button type="button" id="notifyCardPayment" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-yellow-50 transition border-l-4 border-yellow-400 text-left w-full">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-gray-500 text-xs">入金報告</div>
+                                            <div class="text-xl font-bold text-yellow-600" id="notify-payment">0</div>
+                                        </div>
+                                        <i class="fas fa-yen-sign text-yellow-200 text-xl"></i>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- ステータスカード -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-4 mb-6" id="statusCards">
-                        <a href="/cases?status=inquiry" class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-yellow-400 hover:shadow-md transition cursor-pointer block">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4 mb-6" id="statusCards">
+                        <a href="/cases?status=inquiry" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-yellow-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">見込み</div>
-                                    <div class="text-2xl lg:text-3xl font-bold text-yellow-500" id="count-inquiry">-</div>
+                                    <div class="text-gray-500 text-xs mb-1">見込み</div>
+                                    <div class="text-xl lg:text-2xl font-bold text-yellow-500" id="count-inquiry">-</div>
                                 </div>
-                                <i class="fas fa-search text-yellow-200 text-2xl lg:text-3xl"></i>
+                                <i class="fas fa-search text-yellow-200 text-xl lg:text-2xl"></i>
                             </div>
                         </a>
-                        <a href="/cases?status=preparing" class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition cursor-pointer block">
+                        <a href="/cases?status=preparing" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">書類準備</div>
-                                    <div class="text-2xl lg:text-3xl font-bold text-orange-500" id="count-preparing">-</div>
+                                    <div class="text-gray-500 text-xs mb-1">書類準備</div>
+                                    <div class="text-xl lg:text-2xl font-bold text-orange-500" id="count-preparing">-</div>
                                 </div>
-                                <i class="fas fa-folder-open text-orange-200 text-2xl lg:text-3xl"></i>
+                                <i class="fas fa-folder-open text-orange-200 text-xl lg:text-2xl"></i>
                             </div>
                         </a>
-                        <a href="/cases?status=applying" class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-purple-400 hover:shadow-md transition cursor-pointer block">
+                        <a href="/cases?status=applying" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-purple-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">申請中</div>
-                                    <div class="text-2xl lg:text-3xl font-bold text-purple-500" id="count-applying">-</div>
+                                    <div class="text-gray-500 text-xs mb-1">申請中</div>
+                                    <div class="text-xl lg:text-2xl font-bold text-purple-500" id="count-applying">-</div>
                                 </div>
-                                <i class="fas fa-paper-plane text-purple-200 text-2xl lg:text-3xl"></i>
+                                <i class="fas fa-paper-plane text-purple-200 text-xl lg:text-2xl"></i>
                             </div>
                         </a>
-                        <a href="/cases?status=completed" class="bg-white p-4 lg:p-6 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer block">
+                        <a href="/cases?status=adopted" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-blue-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <div class="text-gray-500 text-xs lg:text-sm mb-1">完了</div>
-                                    <div class="text-2xl lg:text-3xl font-bold text-green-500" id="count-completed">-</div>
+                                    <div class="text-gray-500 text-xs mb-1">採択・入金待</div>
+                                    <div class="text-xl lg:text-2xl font-bold text-blue-500" id="count-adopted">-</div>
                                 </div>
-                                <i class="fas fa-check-circle text-green-200 text-2xl lg:text-3xl"></i>
+                                <i class="fas fa-trophy text-blue-200 text-xl lg:text-2xl"></i>
+                            </div>
+                        </a>
+                        <a href="/cases?status=rejected" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-red-400 hover:shadow-md transition cursor-pointer block">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-gray-500 text-xs mb-1">不採択</div>
+                                    <div class="text-xl lg:text-2xl font-bold text-red-500" id="count-rejected">-</div>
+                                </div>
+                                <i class="fas fa-times-circle text-red-200 text-xl lg:text-2xl"></i>
+                            </div>
+                        </a>
+                        <a href="/cases?status=completed" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer block">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-gray-500 text-xs mb-1">完了</div>
+                                    <div class="text-xl lg:text-2xl font-bold text-green-500" id="count-completed">-</div>
+                                </div>
+                                <i class="fas fa-check-circle text-green-200 text-xl lg:text-2xl"></i>
                             </div>
                         </a>
                     </div>
@@ -1841,6 +1923,8 @@ app.get('/', (c) => {
                                 <option value="inquiry">見込み</option>
                                 <option value="preparing">書類準備中</option>
                                 <option value="applying">申請中</option>
+                                <option value="adopted">採択・入金待ち</option>
+                                <option value="rejected">不採択</option>
                                 <option value="completed">完了</option>
                             </select>
                             <div class="flex-1 relative">
@@ -1986,6 +2070,21 @@ app.get('/', (c) => {
                     </div>
                 </div>
             </main>
+        </div>
+
+        <!-- 通知モーダル -->
+        <div id="notificationsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-lg p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">通知</h3>
+                    <button onclick="document.getElementById('notificationsModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div id="notificationsList" class="space-y-3">
+                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                </div>
+            </div>
         </div>
 
         <!-- 新規案件登録モーダル -->
@@ -2586,6 +2685,8 @@ app.get('/', (c) => {
                 inquiry: '見込み',
                 preparing: '書類準備中',
                 applying: '申請中',
+                adopted: '採択・入金待ち',
+                rejected: '不採択',
                 completed: '完了',
                 cancelled: 'キャンセル'
             };
@@ -2594,6 +2695,8 @@ app.get('/', (c) => {
                 inquiry: 'bg-yellow-100 text-yellow-800',
                 preparing: 'bg-orange-100 text-orange-800',
                 applying: 'bg-purple-100 text-purple-800',
+                adopted: 'bg-blue-100 text-blue-800',
+                rejected: 'bg-red-100 text-red-800',
                 completed: 'bg-green-100 text-green-800',
                 cancelled: 'bg-gray-100 text-gray-800'
             };
@@ -2628,12 +2731,135 @@ app.get('/', (c) => {
                     renderDeadlineAlerts(allCases);
                     loadRecentActivity();
                     loadSlotBalance();
+                    loadNotificationSummary();
                 } catch (error) {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
                         '<div class="text-center py-8 text-red-500">データの読み込みに失敗しました</div>';
                 }
             }
+            
+            // 通知サマリーを読み込む
+            async function loadNotificationSummary() {
+                try {
+                    const response = await axios.get('/api/admin/notifications/summary');
+                    const summary = response.data;
+                    
+                    document.getElementById('notify-message').textContent = summary.new_message || 0;
+                    document.getElementById('notify-document').textContent = summary.document_upload || 0;
+                    document.getElementById('notify-payment').textContent = summary.payment_report || 0;
+                    
+                    // 未対応があればサマリーセクションを表示
+                    const total = (summary.new_message || 0) + (summary.document_upload || 0) + (summary.payment_report || 0);
+                    const summarySection = document.getElementById('notificationSummary');
+                    if (total > 0) {
+                        summarySection.classList.remove('hidden');
+                    } else {
+                        summarySection.classList.add('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error loading notification summary:', error);
+                }
+            }
+            
+            // 通知タイプでフィルター表示（グローバル関数として公開）
+            window.filterNotifications = function(type) {
+                if (typeof window.showNotificationsWithFilter === 'function') {
+                    window.showNotificationsWithFilter(type);
+                } else {
+                    // フォールバック：直接モーダルを開く
+                    const modal = document.getElementById('notificationsModal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        window.loadNotificationsWithType(type);
+                    }
+                }
+            };
+            
+            // 通知を読み込んで表示（ダッシュボード用・グローバル）
+            window.loadNotificationsWithType = async function(filterType) {
+                try {
+                    const response = await axios.get('/api/admin/notifications?unread_only=true');
+                    let notifications = response.data;
+                    
+                    if (filterType) {
+                        notifications = notifications.filter(n => n.notification_type === filterType);
+                    }
+                    
+                    const container = document.getElementById('notificationsList');
+                    if (!container) return;
+                    
+                    const filterHtml = \`
+                        <div class="flex flex-wrap gap-2 mb-4 pb-3 border-b">
+                            <button onclick="window.loadNotificationsWithType()" class="px-3 py-1 text-xs rounded-full \${!filterType ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">すべて</button>
+                            <button onclick="window.loadNotificationsWithType('new_message')" class="px-3 py-1 text-xs rounded-full \${filterType === 'new_message' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                <i class="fas fa-envelope mr-1"></i>メッセージ
+                            </button>
+                            <button onclick="window.loadNotificationsWithType('document_upload')" class="px-3 py-1 text-xs rounded-full \${filterType === 'document_upload' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                <i class="fas fa-file-upload mr-1"></i>書類
+                            </button>
+                            <button onclick="window.loadNotificationsWithType('payment_report')" class="px-3 py-1 text-xs rounded-full \${filterType === 'payment_report' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                <i class="fas fa-yen-sign mr-1"></i>入金
+                            </button>
+                        </div>
+                    \`;
+                    
+                    if (notifications.length === 0) {
+                        container.innerHTML = filterHtml + '<div class="text-center py-4 text-gray-500">未読の通知はありません</div>';
+                        return;
+                    }
+                    
+                    const getTypeIcon = (type) => {
+                        switch(type) {
+                            case 'new_message': return '<i class="fas fa-envelope text-blue-500"></i>';
+                            case 'document_upload': return '<i class="fas fa-file-upload text-green-500"></i>';
+                            case 'payment_report': return '<i class="fas fa-yen-sign text-yellow-500"></i>';
+                            default: return '<i class="fas fa-bell text-gray-500"></i>';
+                        }
+                    };
+                    
+                    const getTypeColor = (type) => {
+                        switch(type) {
+                            case 'new_message': return 'border-blue-200 bg-blue-50';
+                            case 'document_upload': return 'border-green-200 bg-green-50';
+                            case 'payment_report': return 'border-yellow-200 bg-yellow-50';
+                            default: return 'border-gray-200 bg-gray-50';
+                        }
+                    };
+                    
+                    container.innerHTML = filterHtml + notifications.map(n => \`
+                        <div class="border rounded-lg p-3 \${getTypeColor(n.notification_type)}">
+                            <div class="flex justify-between items-start">
+                                <div class="flex items-center gap-2">
+                                    \${getTypeIcon(n.notification_type)}
+                                    <h4 class="font-medium text-sm">\${n.title}</h4>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    \${n.related_id ? \`<a href="/client/\${n.related_id}" onclick="window.markNotificationRead(\${n.id})" class="text-xs text-blue-600 hover:underline">詳細</a>\` : ''}
+                                    <button onclick="window.markNotificationRead(\${n.id})" class="text-xs text-gray-500 hover:text-gray-700">既読</button>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1 whitespace-pre-wrap">\${n.message}</p>
+                            <div class="text-xs text-gray-400 mt-2">\${new Date(n.created_at).toLocaleString('ja-JP')}</div>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Error loading notifications:', error);
+                }
+            }
+            
+            // 通知を既読にする（グローバル関数）
+            window.markNotificationRead = async function(notificationId) {
+                try {
+                    await axios.put(\`/api/admin/notifications/\${notificationId}/read\`, {
+                        read_by: localStorage.getItem('admin_name') || 'admin'
+                    });
+                    // サマリーを更新（ページ遷移しない場合のため）
+                    loadNotificationSummary();
+                } catch (error) {
+                    console.error('Error marking notification as read:', error);
+                }
+            };
             
             // 枠残数を読み込む
             async function loadSlotBalance() {
@@ -3036,6 +3262,8 @@ app.get('/', (c) => {
                     inquiry: 0,
                     preparing: 0,
                     applying: 0,
+                    adopted: 0,
+                    rejected: 0,
                     completed: 0
                 };
                 
@@ -3197,10 +3425,12 @@ app.get('/', (c) => {
                                         </a>
                                         <!-- 右側: アクションボタン -->
                                         <div class="flex items-center gap-1.5 flex-shrink-0">
-                                            <select onchange="updateCaseStatus(\${caseItem.id}, this.value, '\${caseItem.status}')" class="text-xs border rounded px-2 py-1 bg-white w-24">
+                                            <select onchange="updateCaseStatus(\${caseItem.id}, this.value, '\${caseItem.status}')" class="text-xs border rounded px-2 py-1 bg-white w-28">
                                                 <option value="inquiry" \${caseItem.status === 'inquiry' ? 'selected' : ''}>見込み</option>
                                                 <option value="preparing" \${caseItem.status === 'preparing' ? 'selected' : ''}>書類準備中</option>
                                                 <option value="applying" \${caseItem.status === 'applying' ? 'selected' : ''}>申請中</option>
+                                                <option value="adopted" \${caseItem.status === 'adopted' ? 'selected' : ''}>採択・入金待ち</option>
+                                                <option value="rejected" \${caseItem.status === 'rejected' ? 'selected' : ''}>不採択</option>
                                                 <option value="completed" \${caseItem.status === 'completed' ? 'selected' : ''}>完了</option>
                                             </select>
                                             <button onclick="copyPortalUrl('\${portalUrl}', '\${clientData.clientName}')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-purple-100 hover:text-purple-600" title="URLコピー">
@@ -3529,6 +3759,17 @@ app.get('/', (c) => {
             window.renderSubsidyOptions = renderSubsidyOptions;
             window.selectSubsidyCategory = selectSubsidyCategory;
             window.selectSubsidy = selectSubsidy;
+            
+            // 通知カードのクリックイベント
+            document.getElementById('notifyCardMessage')?.addEventListener('click', () => {
+                window.filterNotifications('new_message');
+            });
+            document.getElementById('notifyCardDocument')?.addEventListener('click', () => {
+                window.filterNotifications('document_upload');
+            });
+            document.getElementById('notifyCardPayment')?.addEventListener('click', () => {
+                window.filterNotifications('payment_report');
+            });
 
             // 初期読み込み
             loadSubsidyTypes();
@@ -4015,6 +4256,8 @@ app.get('/api/cases', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   const clientId = c.req.query('client_id')
+  const showArchived = c.req.query('show_archived') === 'true'
+  const resultFilter = c.req.query('result') // 'approved', 'rejected', 'pending'
   
   // organization_idでテナント分離
   const orgId = user?.organization_id || 1
@@ -4034,6 +4277,20 @@ app.get('/api/cases', async (c) => {
     LEFT JOIN admin_users ON cases.assigned_to = admin_users.username
     WHERE cases.organization_id = ?
   `
+  
+  // アーカイブフィルタ（デフォルトはアーカイブを非表示）
+  if (!showArchived) {
+    query += ` AND (cases.is_archived = 0 OR cases.is_archived IS NULL)`
+  }
+  
+  // 結果フィルタ
+  if (resultFilter === 'approved') {
+    query += ` AND cases.result = 'approved'`
+  } else if (resultFilter === 'rejected') {
+    query += ` AND cases.result = 'rejected'`
+  } else if (resultFilter === 'pending') {
+    query += ` AND (cases.result IS NULL AND cases.status = 'completed')`
+  }
   
   if (clientId) {
     query += ` AND cases.client_id = ? ORDER BY cases.created_at DESC`
@@ -4340,6 +4597,10 @@ app.put('/api/cases/:id', async (c) => {
         applied_amount = COALESCE(?, applied_amount),
         granted_amount = COALESCE(?, granted_amount),
         granted_at = COALESCE(?, granted_at),
+        is_archived = COALESCE(?, is_archived),
+        result = COALESCE(?, result),
+        approved_amount = COALESCE(?, approved_amount),
+        result_date = COALESCE(?, result_date),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
@@ -4358,6 +4619,10 @@ app.put('/api/cases/:id', async (c) => {
       data.applied_amount !== undefined ? data.applied_amount : null,
       data.granted_amount !== undefined ? data.granted_amount : null,
       data.granted_at !== undefined ? data.granted_at : null,
+      data.is_archived !== undefined ? (data.is_archived ? 1 : 0) : null,
+      data.result !== undefined ? data.result : null,
+      data.approved_amount !== undefined ? data.approved_amount : null,
+      data.result_date !== undefined ? data.result_date : null,
       id
     ).run()
     
@@ -4709,6 +4974,22 @@ app.post('/api/clients/:id/documents/upload', async (c) => {
       uploadedBy || 'client'
     ).run()
     
+    // 顧客からのアップロードの場合、管理者に通知を作成
+    if (uploadedBy === 'client') {
+      const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(id).first()
+      const clientName = client?.company_name || client?.name || '顧客'
+      await DB.prepare(`
+        INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(
+        'document_upload',
+        '書類がアップロードされました',
+        `${clientName}様が「${documentType}」をアップロードしました`,
+        id,
+        'clients'
+      ).run()
+    }
+    
     return c.json({ 
       id: result.meta.last_row_id,
       file_path: filePath
@@ -4972,6 +5253,22 @@ app.post('/api/clients/:id/communications', async (c) => {
     data.sender_name
   ).run()
   
+  // 顧客からのメッセージの場合、管理者に通知を作成
+  if (data.sender_type === 'client') {
+    const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(id).first()
+    const clientName = client?.company_name || client?.name || '顧客'
+    await DB.prepare(`
+      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(
+      'new_message',
+      '新しいメッセージ',
+      `${clientName}様から新しいメッセージが届きました`,
+      id,
+      'clients'
+    ).run()
+  }
+  
   return c.json({ 
     id: result.meta.last_row_id 
   })
@@ -5064,8 +5361,14 @@ app.get('/api/subsidy-types', async (c) => {
   
   // カテゴリフィルターが指定されている場合
   if (categoryFilter) {
+    // 旧カテゴリ名から新カテゴリ名へのマッピング
+    let mappedCategory = categoryFilter
+    if (categoryFilter === 'subsidy') mappedCategory = '行政書士管轄'
+    else if (categoryFilter === 'grant') mappedCategory = '社労士管轄'
+    else if (categoryFilter === 'license') mappedCategory = '許認可'
+    
     query += ` AND category = ?`
-    params.push(categoryFilter)
+    params.push(mappedCategory)
   } else {
     // 組織の業務範囲を取得してフィルタリング（カテゴリ指定がない場合のみ）
     if (user?.organization_id) {
@@ -5082,10 +5385,10 @@ app.get('/api/subsidy-types', async (c) => {
         
         if (scope === 'labor') {
           // 社労士: 助成金のみ
-          query += ` AND (category IN ('grant', '雇用系', '助成金') OR category IS NULL)`
+          query += ` AND (category IN ('grant', '雇用系', '助成金', '社労士管轄') OR category IS NULL)`
         } else if (scope === 'administrative') {
           // 行政書士: 補助金と許認可
-          query += ` AND (category IN ('subsidy', 'license', 'IT系', '設備投資系', '一般', '補助金', '許認可') OR category IS NULL)`
+          query += ` AND (category IN ('subsidy', 'license', 'IT系', '設備投資系', '一般', '補助金', '許認可', '行政書士管轄') OR category IS NULL)`
         }
         // 'both' の場合は全て表示
       }
@@ -6266,56 +6569,49 @@ app.get('/client/:id', async (c) => {
 
                 <!-- 基本情報タブ -->
                 <div id="client-content-overview" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- 顧客情報 -->
-                    <div class="lg:col-span-1">
-                        <div class="bg-white rounded-lg shadow p-6 mb-6">
-                            <h2 class="text-lg font-bold mb-4">顧客情報</h2>
+                    <!-- 左カラム：顧客情報 -->
+                    <div class="lg:col-span-1 space-y-6">
+                        <!-- 顧客情報カード -->
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-bold mb-4 flex items-center">
+                                <i class="fas fa-user-circle mr-2 text-blue-600"></i>顧客情報
+                            </h2>
                             <div class="space-y-3 text-sm" id="clientInfo"></div>
-                            <button onclick="editClient()" class="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-                                <i class="fas fa-edit mr-2"></i>編集
-                            </button>
-                            <button onclick="deleteCurrentClient()" id="deleteClientBtn" class="hidden mt-2 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
-                                <i class="fas fa-trash mr-2"></i>削除
-                            </button>
+                            <div class="flex gap-2 mt-4">
+                                <button onclick="editClient()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                    <i class="fas fa-edit mr-1"></i>編集
+                                </button>
+                                <button onclick="deleteCurrentClient()" id="deleteClientBtn" class="hidden flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 text-sm">
+                                    <i class="fas fa-trash mr-1"></i>削除
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- 共通書類 -->
-                        <div class="bg-white rounded-lg shadow p-6 mb-6">
-                            <h2 class="text-lg font-bold mb-3">
-                                <i class="fas fa-building mr-2 text-blue-600"></i>共通書類
-                                <span class="text-xs text-gray-500 font-normal ml-1">（全申請で共通利用）</span>
+                        <!-- 共通書類カード -->
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h2 class="text-lg font-bold mb-3 flex items-center">
+                                <i class="fas fa-folder mr-2 text-yellow-600"></i>共通書類
                             </h2>
-                            <div id="commonDocumentsListAdmin" class="space-y-2">
+                            <p class="text-xs text-gray-500 mb-3">全申請で共通利用できる書類</p>
+                            <div id="commonDocumentsListAdmin" class="space-y-2 max-h-64 overflow-y-auto">
                                 <div class="text-sm text-gray-500 py-2">読み込み中...</div>
                             </div>
                         </div>
-                        
-                        <!-- 案件別書類進捗 -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h2 class="text-lg font-bold mb-2">
-                                <i class="fas fa-folder-open mr-2 text-green-600"></i>案件別書類
-                            </h2>
-                            <div id="documentProgress" class="mb-3"></div>
-                            <div id="documentChecklist" class="space-y-2 mb-4"></div>
-                            
-                            <h3 class="text-sm font-bold text-gray-700 mb-2 pt-3 border-t">
-                                <i class="fas fa-file-upload mr-1"></i>アップロード済み
-                            </h3>
-                            <div id="documentsList" class="max-h-48 overflow-y-auto"></div>
-                        </div>
                     </div>
 
-                    <!-- やり取り記録 -->
+                    <!-- 右カラム：やり取り記録 -->
                     <div class="lg:col-span-2">
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h2 class="text-lg font-bold mb-4">やり取り記録</h2>
-                            <div id="communicationsList" class="space-y-4 mb-6 max-h-96 overflow-y-auto"></div>
+                        <div class="bg-white rounded-xl shadow-sm p-6 h-full flex flex-col">
+                            <h2 class="text-lg font-bold mb-4 flex items-center">
+                                <i class="fas fa-comments mr-2 text-green-600"></i>やり取り記録
+                            </h2>
+                            <div id="communicationsList" class="space-y-4 mb-4 flex-1 max-h-[500px] overflow-y-auto"></div>
                             
-                            <form id="messageForm" class="flex gap-2">
+                            <form id="messageForm" class="flex gap-2 pt-4 border-t">
                                 <input type="text" id="messageInput" placeholder="メッセージを入力..." 
-                                       class="flex-1 px-4 py-2 border rounded-lg" required>
+                                       class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
                                 <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                                    送信
+                                    <i class="fas fa-paper-plane mr-1"></i>送信
                                 </button>
                             </form>
                         </div>
@@ -6324,94 +6620,110 @@ app.get('/client/:id', async (c) => {
 
                 <!-- 案件一覧タブ -->
                 <div id="client-content-cases" class="hidden">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-bold">
-                            <i class="fas fa-folder-open mr-2 text-blue-600"></i>案件一覧
-                        </h2>
-                        <button onclick="openNewCaseModalForThisClient()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                            <i class="fas fa-plus mr-2"></i>新規案件登録
-                        </button>
-                    </div>
-                    <div id="clientCasesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                        <div class="col-span-full text-center py-8 text-gray-500">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <div>読み込み中...</div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-lg font-bold flex items-center">
+                                <i class="fas fa-folder-open mr-2 text-blue-600"></i>案件一覧
+                            </h2>
+                            <button onclick="openNewCaseModalForThisClient()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-plus mr-2"></i>新規案件登録
+                            </button>
+                        </div>
+                        <div id="clientCasesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div class="col-span-full text-center py-12 text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <div>読み込み中...</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- AIアシスタントタブ -->
-                <div id="client-content-ai" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- ヒアリング -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-bold mb-4">
-                            <i class="fas fa-comments mr-2 text-purple-600"></i>AIヒアリング
-                        </h2>
-                        <p class="text-sm text-gray-600 mb-4">AIアシスタントが補助金申請に必要な情報をヒアリングします。</p>
-                        
-                        <div id="aiChatContainer" class="border rounded-lg mb-4 h-80 overflow-y-auto p-4 bg-gray-50">
-                            <div class="text-center text-gray-500 py-8">
-                                <i class="fas fa-robot text-4xl mb-2 text-purple-400"></i>
-                                <p>AIアシスタントとの会話を開始してください</p>
+                <div id="client-content-ai" class="hidden space-y-6">
+                    <!-- 上段：AIチャットと補助金マッチング -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- AIヒアリング -->
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-lg font-bold flex items-center">
+                                    <i class="fas fa-robot mr-2 text-purple-600"></i>AIアシスタント
+                                </h2>
+                                <div class="flex gap-2">
+                                    <button onclick="setAiChatMode('hearing')" id="aiModeHearing" class="px-3 py-1 text-xs rounded-full bg-purple-600 text-white">
+                                        ヒアリング
+                                    </button>
+                                    <button onclick="setAiChatMode('review')" id="aiModeReview" class="px-3 py-1 text-xs rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                        文書添削
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- ヒアリングモード説明 -->
+                            <p id="aiModeHearingDesc" class="text-sm text-gray-600 mb-4">補助金申請に必要な情報をAIがヒアリングします</p>
+                            
+                            <!-- 文書添削モード：文書選択 -->
+                            <div id="aiModeReviewSection" class="hidden mb-4">
+                                <p class="text-sm text-gray-600 mb-2">添削したい文書を選択してください</p>
+                                <select id="reviewDocumentSelect" class="w-full px-3 py-2 border rounded-lg text-sm" onchange="loadDocumentForReview()">
+                                    <option value="">-- 文書を選択 --</option>
+                                </select>
+                                <div id="selectedDocumentPreview" class="hidden mt-3 p-3 bg-gray-100 rounded-lg max-h-32 overflow-y-auto text-xs text-gray-700"></div>
+                            </div>
+                            
+                            <div id="aiChatContainer" class="border rounded-lg mb-4 h-64 overflow-y-auto p-4 bg-gray-50">
+                                <div class="text-center text-gray-500 py-8">
+                                    <i class="fas fa-robot text-4xl mb-2 text-purple-400"></i>
+                                    <p>AIアシスタントとの会話を開始してください</p>
+                                </div>
+                            </div>
+                            
+                            <form id="aiChatForm" class="flex gap-2">
+                                <input type="text" id="aiChatInput" placeholder="メッセージを入力..." 
+                                       class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" required>
+                                <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- 補助金マッチング -->
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-lg font-bold flex items-center">
+                                    <i class="fas fa-search-dollar mr-2 text-green-600"></i>補助金マッチング
+                                </h2>
+                                <div class="flex gap-2">
+                                    <button onclick="runComprehensiveMatching()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 text-sm">
+                                        <i class="fas fa-brain mr-1"></i>総合分析
+                                    </button>
+                                    <button onclick="runSubsidyMatching()" class="bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 text-sm">
+                                        <i class="fas fa-sync mr-1"></i>簡易
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="matchingResults" class="space-y-3 max-h-80 overflow-y-auto">
+                                <div class="text-center text-gray-500 py-8">
+                                    <i class="fas fa-search text-4xl mb-2 text-gray-300"></i>
+                                    <p class="text-sm">ボタンを押して補助金との適合性を分析</p>
+                                </div>
                             </div>
                         </div>
-                        
-                        <form id="aiChatForm" class="flex gap-2">
-                            <input type="text" id="aiChatInput" placeholder="メッセージを入力..." 
-                                   class="flex-1 px-4 py-2 border rounded-lg" required>
-                            <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </form>
                     </div>
 
-                    <!-- ヒアリング回答一覧 -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-bold mb-4">
-                            <i class="fas fa-clipboard-list mr-2 text-blue-600"></i>ヒアリング項目
-                        </h2>
-                        <div id="hearingQuestionsList" class="space-y-4 max-h-96 overflow-y-auto">
-                            <div class="text-center text-gray-500 py-4">
-                                <i class="fas fa-spinner fa-spin"></i> 読み込み中...
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 採択率予測（フェーズ4強化） -->
-                    <div class="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                    <!-- 下段：採択率予測 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
                         <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-bold">
+                            <h2 class="text-lg font-bold flex items-center">
                                 <i class="fas fa-chart-line mr-2 text-orange-600"></i>採択率予測
                             </h2>
                             <button onclick="runAdoptionPrediction()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 text-sm">
                                 <i class="fas fa-calculator mr-1"></i>詳細予測実行
                             </button>
                         </div>
-                        <div id="adoptionPredictionResult" class="space-y-4">
+                        <div id="adoptionPredictionResult">
                             <div class="text-center text-gray-500 py-8">
-                                「詳細予測実行」ボタンを押すと、AIが採択可能性を詳細に分析します。
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 補助金マッチング（フェーズ4強化） -->
-                    <div class="lg:col-span-2 bg-white rounded-lg shadow p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-bold">
-                                <i class="fas fa-search-dollar mr-2 text-green-600"></i>複数補助金マッチング
-                            </h2>
-                            <div class="flex gap-2">
-                                <button onclick="runComprehensiveMatching()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
-                                    <i class="fas fa-brain mr-1"></i>総合分析
-                                </button>
-                                <button onclick="runSubsidyMatching()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-                                    <i class="fas fa-sync mr-1"></i>簡易マッチング
-                                </button>
-                            </div>
-                        </div>
-                        <div id="matchingResults" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div class="text-center text-gray-500 py-8 col-span-full">
-                                「総合分析」で全補助金との適合性を詳細分析、「簡易マッチング」で素早くスコアを確認できます。
+                                <i class="fas fa-chart-bar text-4xl mb-2 text-gray-300"></i>
+                                <p class="text-sm">「詳細予測実行」でAIが採択可能性を詳細に分析します</p>
                             </div>
                         </div>
                     </div>
@@ -6664,6 +6976,8 @@ app.get('/client/:id', async (c) => {
                             <option value="inquiry">見込み</option>
                             <option value="preparing">書類準備中</option>
                             <option value="applying">申請中</option>
+                            <option value="adopted">採択・入金待ち</option>
+                            <option value="rejected">不採択</option>
                             <option value="completed">完了</option>
                         </select>
                     </div>
@@ -6757,12 +7071,16 @@ app.get('/client/:id', async (c) => {
                 inquiry: '見込み',
                 preparing: '書類準備中',
                 applying: '申請中',
+                adopted: '採択・入金待ち',
+                rejected: '不採択',
                 completed: '完了'
             };
             const STATUS_COLORS = {
                 inquiry: 'bg-yellow-100 text-yellow-800',
                 preparing: 'bg-orange-100 text-orange-800',
                 applying: 'bg-purple-100 text-purple-800',
+                adopted: 'bg-blue-100 text-blue-800',
+                rejected: 'bg-red-100 text-red-800',
                 completed: 'bg-green-100 text-green-800'
             };
             
@@ -7443,7 +7761,6 @@ app.get('/client/:id', async (c) => {
                 if (tab === 'cases') {
                     loadClientCases();
                 } else if (tab === 'ai') {
-                    loadHearingQuestions();
                     loadAiChatHistory();
                     loadMatchScores();
                 } else if (tab === 'documents') {
@@ -7850,6 +8167,89 @@ app.get('/client/:id', async (c) => {
             // AI機能
             // ===============================
             
+            // AIチャットモード管理
+            let currentAiChatMode = 'hearing';
+            let selectedDocumentContent = null;
+            let selectedDocumentTitle = null;
+            
+            function setAiChatMode(mode) {
+                currentAiChatMode = mode;
+                
+                // ボタンのスタイル切替
+                const hearingBtn = document.getElementById('aiModeHearing');
+                const reviewBtn = document.getElementById('aiModeReview');
+                const hearingDesc = document.getElementById('aiModeHearingDesc');
+                const reviewSection = document.getElementById('aiModeReviewSection');
+                
+                if (mode === 'hearing') {
+                    hearingBtn.className = 'px-3 py-1 text-xs rounded-full bg-purple-600 text-white';
+                    reviewBtn.className = 'px-3 py-1 text-xs rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300';
+                    hearingDesc.classList.remove('hidden');
+                    reviewSection.classList.add('hidden');
+                    document.getElementById('aiChatInput').placeholder = 'メッセージを入力...';
+                } else {
+                    hearingBtn.className = 'px-3 py-1 text-xs rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300';
+                    reviewBtn.className = 'px-3 py-1 text-xs rounded-full bg-indigo-600 text-white';
+                    hearingDesc.classList.add('hidden');
+                    reviewSection.classList.remove('hidden');
+                    document.getElementById('aiChatInput').placeholder = '添削の指示を入力（例：もっと具体的に、数値を増やして）';
+                    loadDocumentsForReview();
+                }
+            }
+            
+            async function loadDocumentsForReview() {
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/generated-documents\`);
+                    const docs = response.data;
+                    
+                    const select = document.getElementById('reviewDocumentSelect');
+                    select.innerHTML = '<option value="">-- 文書を選択 --</option>';
+                    
+                    docs.forEach(doc => {
+                        const option = document.createElement('option');
+                        option.value = doc.id;
+                        option.textContent = doc.document_title + ' (' + new Date(doc.created_at).toLocaleDateString('ja-JP') + ')';
+                        select.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error loading documents for review:', error);
+                }
+            }
+            
+            async function loadDocumentForReview() {
+                const docId = document.getElementById('reviewDocumentSelect').value;
+                const previewDiv = document.getElementById('selectedDocumentPreview');
+                
+                if (!docId) {
+                    previewDiv.classList.add('hidden');
+                    selectedDocumentContent = null;
+                    selectedDocumentTitle = null;
+                    return;
+                }
+                
+                try {
+                    const response = await axios.get(\`/api/generated-documents/\${docId}\`);
+                    const doc = response.data;
+                    
+                    selectedDocumentTitle = doc.document_title;
+                    const sections = JSON.parse(doc.sections_content || '{}');
+                    
+                    // 全セクションを結合
+                    selectedDocumentContent = Object.entries(sections)
+                        .map(([key, value]) => \`【\${key}】\\n\${value}\`)
+                        .join('\\n\\n');
+                    
+                    // プレビュー表示
+                    previewDiv.innerHTML = \`<div class="font-medium mb-1">\${doc.document_title}</div><div class="text-gray-500">\${selectedDocumentContent.substring(0, 200)}...</div>\`;
+                    previewDiv.classList.remove('hidden');
+                } catch (error) {
+                    console.error('Error loading document:', error);
+                }
+            }
+            
+            window.setAiChatMode = setAiChatMode;
+            window.loadDocumentForReview = loadDocumentForReview;
+            
             // AIチャット
             async function loadAiChatHistory() {
                 try {
@@ -7913,10 +8313,18 @@ app.get('/client/:id', async (c) => {
                 container.scrollTop = container.scrollHeight;
                 
                 try {
-                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/ai-chat\`, {
+                    const payload = {
                         message,
-                        context_type: 'hearing'
-                    });
+                        context_type: currentAiChatMode
+                    };
+                    
+                    // 文書添削モードの場合、文書内容を追加
+                    if (currentAiChatMode === 'review' && selectedDocumentContent) {
+                        payload.document_content = selectedDocumentContent;
+                        payload.document_title = selectedDocumentTitle;
+                    }
+                    
+                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/ai-chat\`, payload);
                     
                     document.getElementById('aiTyping').remove();
                     
@@ -7937,69 +8345,6 @@ app.get('/client/:id', async (c) => {
                 input.disabled = false;
                 input.focus();
             });
-            
-            // ヒアリング質問
-            async function loadHearingQuestions() {
-                if (!currentClient?.subsidy_type_id) {
-                    document.getElementById('hearingQuestionsList').innerHTML = \`
-                        <div class="text-center text-gray-500 py-4">
-                            <p>補助金種別が選択されていません</p>
-                        </div>
-                    \`;
-                    return;
-                }
-                
-                try {
-                    const [questionsRes, answersRes] = await Promise.all([
-                        axios.get(\`/api/hearing-questions/\${currentClient.subsidy_type_id}\`),
-                        axios.get(\`/api/clients/\${CLIENT_ID}/hearing-answers\`)
-                    ]);
-                    
-                    const questions = questionsRes.data;
-                    const answers = answersRes.data;
-                    const answersMap = {};
-                    answers.forEach(a => { answersMap[a.question_id] = a.answer_text; });
-                    
-                    const container = document.getElementById('hearingQuestionsList');
-                    if (questions.length === 0) {
-                        container.innerHTML = '<div class="text-center text-gray-500 py-4">質問テンプレートがありません</div>';
-                        return;
-                    }
-                    
-                    // カテゴリごとにグループ化
-                    const grouped = {};
-                    questions.forEach(q => {
-                        if (!grouped[q.category]) grouped[q.category] = [];
-                        grouped[q.category].push(q);
-                    });
-                    
-                    container.innerHTML = Object.entries(grouped).map(([category, qs]) => \`
-                        <div class="border rounded-lg p-3 mb-3">
-                            <h3 class="font-medium text-sm text-gray-700 mb-2">
-                                <i class="fas fa-folder mr-1"></i>\${category}
-                            </h3>
-                            \${qs.map(q => \`
-                                <div class="ml-4 mb-2 last:mb-0">
-                                    <div class="flex items-start gap-2">
-                                        <i class="fas \${answersMap[q.id] ? 'fa-check-circle text-green-500' : 'fa-circle text-gray-300'} mt-1"></i>
-                                        <div class="flex-1">
-                                            <div class="text-sm font-medium">
-                                                \${q.question_text}
-                                                \${q.is_required ? 
-                                                    '<span class="ml-1 px-1.5 py-0.5 text-xs bg-red-100 text-red-600 rounded">必須</span>' : 
-                                                    '<span class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 rounded">任意</span>'}
-                                            </div>
-                                            \${answersMap[q.id] ? \`<div class="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">\${answersMap[q.id]}</div>\` : ''}
-                                        </div>
-                                    </div>
-                                </div>
-                            \`).join('')}
-                        </div>
-                    \`).join('');
-                } catch (error) {
-                    console.error('Hearing questions load error:', error);
-                }
-            }
             
             // マッチングスコア
             async function loadMatchScores() {
@@ -8864,7 +9209,7 @@ app.get('/case/:id', async (c) => {
                 <div class="p-4 border-b border-blue-700">
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
-                        <span>助成金管理</span>
+                        <span>申請革命</span>
                     </h1>
                 </div>
                 <nav class="p-4 space-y-1 flex-1 overflow-y-auto">
@@ -8931,6 +9276,8 @@ app.get('/case/:id', async (c) => {
                                         <option value="inquiry">見込み</option>
                                         <option value="preparing">書類準備中</option>
                                         <option value="applying">申請中</option>
+                                        <option value="adopted">採択・入金待ち</option>
+                                        <option value="rejected">不採択</option>
                                         <option value="completed">完了</option>
                                     </select>
                                 </div>
@@ -8938,6 +9285,59 @@ app.get('/case/:id', async (c) => {
                                     <i class="fas fa-user mr-1"></i>担当: ${caseData.assigned_to_name || '未割り当て'}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 採択/不採択・アーカイブセクション（完了ステータスの場合のみ表示） -->
+                    <div id="resultSection" class="${caseData.status === 'completed' || caseData.status === 'adopted' || caseData.status === 'rejected' ? '' : 'hidden'} mb-6">
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                                <div>
+                                    <h3 class="text-lg font-bold mb-2">
+                                        <i class="fas fa-trophy mr-2 text-yellow-500"></i>申請結果
+                                    </h3>
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-sm text-gray-600">結果:</label>
+                                            <select id="resultSelect" onchange="updateResult()" class="border rounded-lg px-3 py-1.5 text-sm">
+                                                <option value="">未確定</option>
+                                                <option value="approved" ${caseData.result === 'approved' ? 'selected' : ''}>採択</option>
+                                                <option value="rejected" ${caseData.result === 'rejected' ? 'selected' : ''}>不採択</option>
+                                            </select>
+                                        </div>
+                                        <div id="approvedAmountField" class="${caseData.result === 'approved' ? '' : 'hidden'} flex items-center gap-2">
+                                            <label class="text-sm text-gray-600">採択額:</label>
+                                            <input type="number" id="approvedAmount" value="${caseData.approved_amount || ''}" 
+                                                   class="border rounded-lg px-3 py-1.5 text-sm w-36" placeholder="金額" />
+                                            <span class="text-sm text-gray-500">円</span>
+                                            <button onclick="updateApprovedAmount()" class="text-blue-600 hover:text-blue-800 text-sm">
+                                                <i class="fas fa-save"></i>
+                                            </button>
+                                        </div>
+                                        <div id="resultDateField" class="flex items-center gap-2">
+                                            <label class="text-sm text-gray-600">結果確定日:</label>
+                                            <input type="date" id="resultDate" value="${caseData.result_date || ''}" 
+                                                   onchange="updateResultDate()" class="border rounded-lg px-3 py-1.5 text-sm" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    ${caseData.is_archived ? `
+                                        <button onclick="unarchiveCase()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm">
+                                            <i class="fas fa-box-open mr-2"></i>アーカイブ解除
+                                        </button>
+                                    ` : `
+                                        <button onclick="archiveCase()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
+                                            <i class="fas fa-archive mr-2"></i>アーカイブ
+                                        </button>
+                                    `}
+                                </div>
+                            </div>
+                            ${caseData.is_archived ? `
+                                <div class="mt-3 text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
+                                    <i class="fas fa-archive mr-1"></i>この案件はアーカイブされています
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                     
@@ -8992,9 +9392,14 @@ app.get('/case/:id', async (c) => {
                                 <h3 class="text-lg font-bold">
                                     <i class="fas fa-tasks mr-2 text-blue-600"></i>パイプライン進捗
                                 </h3>
-                                <button onclick="openApplyPipelineModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                                    <i class="fas fa-plus mr-2"></i>テンプレート適用
-                                </button>
+                                <div class="flex gap-2">
+                                    <button id="addTaskBtn" onclick="openAddTaskModal()" class="hidden bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                        <i class="fas fa-plus mr-2"></i>タスク追加
+                                    </button>
+                                    <button onclick="openApplyPipelineModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                        <i class="fas fa-plus mr-2"></i>テンプレート適用
+                                    </button>
+                                </div>
                             </div>
                             <div id="pipelineProgress" class="mb-4">
                                 <div class="w-full bg-gray-200 rounded-full h-3">
@@ -9133,6 +9538,64 @@ app.get('/case/:id', async (c) => {
             </div>
         </div>
         
+        <!-- タスク追加モーダル -->
+        <div id="addTaskModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold">タスクを追加</h3>
+                        <button onclick="closeAddTaskModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <form id="addTaskForm" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">挿入位置</label>
+                        <select name="insert_position" id="insertPositionSelect" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                            <option value="0">先頭に追加</option>
+                            <!-- タスク一覧がここに動的に追加される -->
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">選択したタスクの後に挿入されます</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">タスク名 <span class="text-red-500">*</span></label>
+                        <input type="text" name="task_name" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">タスクタイプ</label>
+                        <select name="task_type" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                            <option value="internal">自社タスク</option>
+                            <option value="external">顧客タスク</option>
+                            <option value="both">両方</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">開始日</label>
+                            <input type="date" name="start_date" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">終了日</label>
+                            <input type="date" name="end_date" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">説明</label>
+                        <textarea name="description" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                            <i class="fas fa-plus mr-2"></i>追加
+                        </button>
+                        <button type="button" onclick="closeAddTaskModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
+                            キャンセル
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             const CASE_ID = ${id};
@@ -9143,12 +9606,16 @@ app.get('/case/:id', async (c) => {
                 inquiry: '見込み',
                 preparing: '書類準備中',
                 applying: '申請中',
+                adopted: '採択・入金待ち',
+                rejected: '不採択',
                 completed: '完了'
             };
             const STATUS_COLORS = {
                 inquiry: 'bg-yellow-100 text-yellow-800',
                 preparing: 'bg-orange-100 text-orange-800',
                 applying: 'bg-purple-100 text-purple-800',
+                adopted: 'bg-blue-100 text-blue-800',
+                rejected: 'bg-red-100 text-red-800',
                 completed: 'bg-green-100 text-green-800'
             };
             
@@ -9207,6 +9674,22 @@ app.get('/case/:id', async (c) => {
                     currentCaseStatus = newStatus;
                     updateStatusBadge(newStatus);
                     showToast('ステータスを更新しました');
+                    
+                    // 完了/採択/不採択ステータスの場合は結果セクションを表示
+                    const resultSection = document.getElementById('resultSection');
+                    if (['completed', 'adopted', 'rejected'].includes(newStatus)) {
+                        resultSection.classList.remove('hidden');
+                    } else {
+                        resultSection.classList.add('hidden');
+                    }
+                    
+                    // 見込みバナーの表示制御
+                    const inquiryBanner = document.getElementById('inquiryRestrictionBanner');
+                    if (newStatus === 'inquiry') {
+                        inquiryBanner.classList.remove('hidden');
+                    } else {
+                        inquiryBanner.classList.add('hidden');
+                    }
                 } catch (error) {
                     console.error('Status update error:', error);
                     const errorMessage = error.response?.data?.error || '更新に失敗しました';
@@ -9218,6 +9701,81 @@ app.get('/case/:id', async (c) => {
                         alert(errorMessage);
                     }
                     document.getElementById('statusSelect').value = currentCaseStatus;
+                }
+            }
+            
+            // 採択/不採択の更新
+            async function updateResult() {
+                const result = document.getElementById('resultSelect').value;
+                const approvedAmountField = document.getElementById('approvedAmountField');
+                
+                // 採択の場合のみ採択額フィールドを表示
+                if (result === 'approved') {
+                    approvedAmountField.classList.remove('hidden');
+                } else {
+                    approvedAmountField.classList.add('hidden');
+                }
+                
+                try {
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { result: result || null });
+                    showToast(result === 'approved' ? '採択として記録しました' : result === 'rejected' ? '不採択として記録しました' : '結果をクリアしました');
+                } catch (error) {
+                    console.error('Result update error:', error);
+                    alert('更新に失敗しました');
+                }
+            }
+            
+            // 採択額の更新
+            async function updateApprovedAmount() {
+                const amount = parseInt(document.getElementById('approvedAmount').value) || 0;
+                try {
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { approved_amount: amount });
+                    showToast('採択額を更新しました');
+                } catch (error) {
+                    console.error('Approved amount update error:', error);
+                    alert('更新に失敗しました');
+                }
+            }
+            
+            // 結果確定日の更新
+            async function updateResultDate() {
+                const date = document.getElementById('resultDate').value;
+                try {
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { result_date: date || null });
+                    showToast('結果確定日を更新しました');
+                } catch (error) {
+                    console.error('Result date update error:', error);
+                    alert('更新に失敗しました');
+                }
+            }
+            
+            // アーカイブ
+            async function archiveCase() {
+                if (!confirm('この案件をアーカイブしますか？\\n\\nアーカイブされた案件は案件一覧に表示されなくなりますが、「アーカイブ」ボタンから確認できます。')) {
+                    return;
+                }
+                try {
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { is_archived: true });
+                    showToast('アーカイブしました');
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Archive error:', error);
+                    alert('アーカイブに失敗しました');
+                }
+            }
+            
+            // アーカイブ解除
+            async function unarchiveCase() {
+                if (!confirm('この案件のアーカイブを解除しますか？')) {
+                    return;
+                }
+                try {
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { is_archived: false });
+                    showToast('アーカイブを解除しました');
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Unarchive error:', error);
+                    alert('アーカイブ解除に失敗しました');
                 }
             }
             
@@ -9323,6 +9881,7 @@ app.get('/case/:id', async (c) => {
                     const tasks = response.data;
                     
                     const container = document.getElementById('pipelineTasksList');
+                    const addTaskBtn = document.getElementById('addTaskBtn');
                     
                     if (!tasks || tasks.length === 0) {
                         container.innerHTML = \`
@@ -9336,8 +9895,16 @@ app.get('/case/:id', async (c) => {
                         \`;
                         document.getElementById('pipelineProgressBar').style.width = '0%';
                         document.getElementById('pipelineProgressText').textContent = '0%';
+                        addTaskBtn.classList.add('hidden');
+                        currentPipelineId = null;
+                        currentPipelineTasks = [];
                         return;
                     }
+                    
+                    // パイプラインIDを取得してタスク追加ボタンを表示
+                    currentPipelineId = tasks[0].pipeline_id;
+                    currentPipelineTasks = tasks;  // タスク一覧を保存
+                    addTaskBtn.classList.remove('hidden');
                     
                     const completed = tasks.filter(t => t.status === 'completed').length;
                     const progress = Math.round((completed / tasks.length) * 100);
@@ -9402,6 +9969,75 @@ app.get('/case/:id', async (c) => {
                     loadPipeline();
                 }
             }
+            
+            // タスク追加モーダル
+            let currentPipelineId = null;
+            let currentPipelineTasks = [];
+            
+            async function openAddTaskModal() {
+                document.getElementById('addTaskModal').classList.remove('hidden');
+                document.getElementById('addTaskForm').reset();
+                
+                // デフォルトで今日の日付を設定
+                const today = new Date().toISOString().split('T')[0];
+                document.querySelector('#addTaskForm input[name="start_date"]').value = today;
+                const endDate = new Date();
+                endDate.setDate(endDate.getDate() + 7);
+                document.querySelector('#addTaskForm input[name="end_date"]').value = endDate.toISOString().split('T')[0];
+                
+                // 挿入位置のセレクトボックスを更新
+                const select = document.getElementById('insertPositionSelect');
+                select.innerHTML = '<option value="0">先頭に追加</option>';
+                
+                currentPipelineTasks.forEach((task, index) => {
+                    const option = document.createElement('option');
+                    option.value = task.sort_order;
+                    option.textContent = \`\${index + 1}. \${task.task_name} の後\`;
+                    select.appendChild(option);
+                });
+                
+                // デフォルトで最後を選択
+                if (currentPipelineTasks.length > 0) {
+                    select.value = currentPipelineTasks[currentPipelineTasks.length - 1].sort_order;
+                }
+            }
+            
+            function closeAddTaskModal() {
+                document.getElementById('addTaskModal').classList.add('hidden');
+            }
+            
+            // タスク追加フォーム送信
+            document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                if (!currentPipelineId) {
+                    alert('パイプラインが設定されていません');
+                    return;
+                }
+                
+                const formData = new FormData(e.target);
+                const insertAfter = parseInt(formData.get('insert_position')) || 0;
+                
+                const data = {
+                    pipeline_id: currentPipelineId,
+                    task_name: formData.get('task_name'),
+                    task_type: formData.get('task_type') || 'internal',
+                    start_date: formData.get('start_date') || null,
+                    end_date: formData.get('end_date') || null,
+                    description: formData.get('description') || '',
+                    insert_after: insertAfter
+                };
+                
+                try {
+                    await axios.post('/api/pipeline-tasks', data);
+                    showToast('タスクを追加しました');
+                    closeAddTaskModal();
+                    loadPipeline();
+                } catch (error) {
+                    console.error('Error adding task:', error);
+                    alert('タスクの追加に失敗しました');
+                }
+            });
             
             // 書類読み込み
             async function loadDocuments() {
@@ -13376,7 +14012,7 @@ app.get('/admin/users', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>従業員管理 - 助成金申請管理システム</title>
+        <title>従業員管理 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -14165,9 +14801,80 @@ app.get('/api/admin/notifications/unread-count', async (c) => {
   return c.json({ count: result?.count || 0 })
 })
 
+// 種類別未読通知数取得
+app.get('/api/admin/notifications/summary', async (c) => {
+  const { DB } = c.env
+  
+  const result = await DB.prepare(`
+    SELECT 
+      notification_type,
+      COUNT(*) as count
+    FROM admin_notifications 
+    WHERE is_read = 0
+    GROUP BY notification_type
+  `).all()
+  
+  // 結果をオブジェクトに変換
+  const summary: Record<string, number> = {
+    new_message: 0,
+    document_upload: 0,
+    payment_report: 0,
+    other: 0
+  }
+  
+  for (const row of (result.results || []) as any[]) {
+    if (row.notification_type === 'new_message') {
+      summary.new_message = row.count
+    } else if (row.notification_type === 'document_upload') {
+      summary.document_upload = row.count
+    } else if (row.notification_type === 'payment_report') {
+      summary.payment_report = row.count
+    } else {
+      summary.other += row.count
+    }
+  }
+  
+  const total = Object.values(summary).reduce((a, b) => a + b, 0)
+  
+  return c.json({ ...summary, total })
+})
+
+// 通知を一括既読にする
+app.put('/api/admin/notifications/read-all', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  const { notification_type, read_by } = data
+  
+  if (notification_type) {
+    await DB.prepare(`
+      UPDATE admin_notifications 
+      SET is_read = 1, read_by = ?, read_at = CURRENT_TIMESTAMP
+      WHERE is_read = 0 AND notification_type = ?
+    `).bind(read_by, notification_type).run()
+  } else {
+    await DB.prepare(`
+      UPDATE admin_notifications 
+      SET is_read = 1, read_by = ?, read_at = CURRENT_TIMESTAMP
+      WHERE is_read = 0
+    `).bind(read_by).run()
+  }
+  
+  return c.json({ success: true })
+})
+
 // 公募要領詳細情報 CRUD
 app.get('/api/subsidy-guidelines', async (c) => {
   const { DB } = c.env
+  
+  // 申請期限が過ぎているものを自動的に終了ステータスに更新
+  const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+  await DB.prepare(`
+    UPDATE subsidy_guidelines 
+    SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+    WHERE status = 'active' 
+    AND application_end_date IS NOT NULL 
+    AND application_end_date < ?
+  `).bind(today).run()
   
   const result = await DB.prepare(`
     SELECT g.*, s.name as subsidy_name 
@@ -14297,7 +15004,7 @@ app.get('/admin/guidelines', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>公募要領管理 - 助成金申請管理システム</title>
+        <title>公募要領管理 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -14330,6 +15037,104 @@ app.get('/admin/guidelines', (c) => {
                 </header>
 
                 <div class="p-4 lg:p-6">
+                <!-- 管轄別サマリー -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-lg shadow p-4 border-l-4 border-emerald-500">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-file-signature text-emerald-600"></i>
+                                <h3 class="font-bold text-emerald-800">行政書士管轄</h3>
+                            </div>
+                            <span class="text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded">補助金</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-sm">
+                            <div class="text-center">
+                                <p class="text-gray-600">申請可能</p>
+                                <p class="text-xl font-bold text-emerald-700" id="summaryGyoseishoshiActive">-</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-gray-600">締切間近</p>
+                                <p class="text-xl font-bold text-orange-600" id="summaryGyoseishoshiDeadline">-</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-gray-600">最大補助額</p>
+                                <p class="text-xl font-bold text-blue-600" id="summaryGyoseishoshiAmount">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow p-4 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-users text-blue-600"></i>
+                                <h3 class="font-bold text-blue-800">社労士管轄</h3>
+                            </div>
+                            <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">助成金</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-sm">
+                            <div class="text-center">
+                                <p class="text-gray-600">申請可能</p>
+                                <p class="text-xl font-bold text-blue-700" id="summarySharoshiActive">-</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-gray-600">締切間近</p>
+                                <p class="text-xl font-bold text-orange-600" id="summarySharoshiDeadline">-</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-gray-600">最大補助額</p>
+                                <p class="text-xl font-bold text-blue-600" id="summarySharoshiAmount">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 全体サマリーダッシュボード -->
+                <div id="guidelinesSummary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">現在申請可能</p>
+                                <p class="text-2xl font-bold text-green-600" id="summaryActiveCount">-</p>
+                            </div>
+                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">締切間近(30日以内)</p>
+                                <p class="text-2xl font-bold text-orange-600" id="summaryDeadlineCount">-</p>
+                            </div>
+                            <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-clock text-orange-500 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">最大補助額合計</p>
+                                <p class="text-2xl font-bold text-blue-600" id="summaryTotalAmount">-</p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-yen-sign text-blue-500 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">登録補助金種別</p>
+                                <p class="text-2xl font-bold text-purple-600" id="summarySubsidyTypes">-</p>
+                            </div>
+                            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-list text-purple-500 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- タブ切り替え -->
                 <div class="bg-white rounded-lg shadow mb-6">
                     <div class="border-b flex overflow-x-auto">
@@ -14344,6 +15149,14 @@ app.get('/admin/guidelines', (c) => {
                         <button onclick="switchTab('guidelines')" id="tab-guidelines" 
                                 class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
                             <i class="fas fa-file-alt mr-2"></i>公募要領詳細
+                        </button>
+                        <button onclick="switchTab('calendar')" id="tab-calendar" 
+                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-calendar-alt mr-2"></i>スケジュール
+                        </button>
+                        <button onclick="switchTab('compare')" id="tab-compare" 
+                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-columns mr-2"></i>比較
                         </button>
                     </div>
                 </div>
@@ -14433,7 +15246,12 @@ app.get('/admin/guidelines', (c) => {
                             <h2 class="text-lg font-bold">公募要領詳細</h2>
                             <p class="text-sm text-gray-500">補助金・助成金ごとに公募情報を管理します</p>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
+                            <select id="categoryFilter" onchange="filterGuidelines()" class="px-3 py-2 border rounded-lg text-sm">
+                                <option value="all">全管轄</option>
+                                <option value="行政書士管轄">行政書士管轄</option>
+                                <option value="社労士管轄">社労士管轄</option>
+                            </select>
                             <select id="guidelinesFilter" onchange="filterGuidelines()" class="px-3 py-2 border rounded-lg text-sm">
                                 <option value="all">すべて表示</option>
                                 <option value="active">有効のみ</option>
@@ -14447,6 +15265,97 @@ app.get('/admin/guidelines', (c) => {
                     </div>
                     <div id="guidelinesList" class="space-y-8">
                         <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                    </div>
+                </div>
+                
+                <!-- スケジュールタブ（カレンダービュー） -->
+                <div id="content-calendar" class="hidden space-y-6">
+                    <div class="flex flex-wrap justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold">申請スケジュール</h2>
+                            <p class="text-sm text-gray-500">公募期間をタイムラインで確認できます</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <select id="calendarCategoryFilter" onchange="renderCalendarTimeline()" class="px-3 py-2 border rounded-lg text-sm">
+                                <option value="all">全管轄</option>
+                                <option value="行政書士管轄">行政書士管轄</option>
+                                <option value="社労士管轄">社労士管轄</option>
+                            </select>
+                            <button onclick="changeCalendarMonth(-1)" class="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span id="calendarMonthLabel" class="px-4 py-2 font-medium">2025年1月</span>
+                            <button onclick="changeCalendarMonth(1)" class="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- タイムライン表示 -->
+                    <div class="bg-white rounded-lg shadow overflow-hidden">
+                        <div class="p-4 bg-gray-50 border-b">
+                            <div class="flex items-center gap-4 text-sm">
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500"></span> 公募中</span>
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-500"></span> 締切間近</span>
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-500"></span> 締切7日以内</span>
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-gray-300"></span> 終了</span>
+                            </div>
+                        </div>
+                        <div id="calendarTimeline" class="p-4 min-h-[400px]">
+                            <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 締切間近リスト -->
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="p-4 border-b bg-orange-50">
+                            <h3 class="font-bold text-orange-800"><i class="fas fa-exclamation-triangle mr-2"></i>締切間近の公募（30日以内）</h3>
+                        </div>
+                        <div id="upcomingDeadlines" class="divide-y">
+                            <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 比較タブ -->
+                <div id="content-compare" class="hidden space-y-6">
+                    <div class="flex flex-wrap justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold">補助金・助成金比較</h2>
+                            <p class="text-sm text-gray-500">複数の補助金を並べて比較できます</p>
+                        </div>
+                        <select id="compareCategoryFilter" onchange="renderCompareSelection()" class="px-3 py-2 border rounded-lg text-sm">
+                            <option value="all">全管轄</option>
+                            <option value="行政書士管轄">行政書士管轄</option>
+                            <option value="社労士管轄">社労士管轄</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 比較対象選択 -->
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h3 class="font-medium mb-3">比較対象を選択（最大3つ）</h3>
+                        <div id="compareSelection" class="flex flex-wrap gap-2">
+                            <!-- 動的生成 -->
+                        </div>
+                    </div>
+                    
+                    <!-- 比較表 -->
+                    <div class="bg-white rounded-lg shadow overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr id="compareHeaders" class="bg-gray-50 border-b">
+                                    <th class="px-4 py-3 text-left font-medium text-gray-500 sticky left-0 bg-gray-50 min-w-[150px]">項目</th>
+                                    <!-- 動的生成 -->
+                                </tr>
+                            </thead>
+                            <tbody id="compareBody">
+                                <tr>
+                                    <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                                        比較する補助金を選択してください
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -14540,6 +15449,14 @@ app.get('/admin/guidelines', (c) => {
                         </div>
                     </div>
                     <div>
+                        <label class="block text-sm font-medium mb-1">対象者・要件</label>
+                        <textarea name="eligibility_requirements" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="中小企業者、小規模事業者など"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">対象経費</label>
+                        <textarea name="target_expenses" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="ソフトウェア購入費、導入関連費など"></textarea>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium mb-1">公式サイトURL</label>
                         <input type="url" name="source_url" class="w-full px-3 py-2 border rounded-lg" placeholder="https://...">
                     </div>
@@ -14598,6 +15515,14 @@ app.get('/admin/guidelines', (c) => {
                             <label class="block text-sm font-medium mb-1">補助率</label>
                             <input type="text" name="subsidy_rate" id="editGuidelineSubsidyRate" class="w-full px-3 py-2 border rounded-lg" placeholder="1/2〜2/3">
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">対象者・要件</label>
+                        <textarea name="eligibility_requirements" id="editGuidelineEligibility" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="中小企業者、小規模事業者など"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">対象経費</label>
+                        <textarea name="target_expenses" id="editGuidelineExpenses" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="ソフトウェア購入費、導入関連費など"></textarea>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">公式サイトURL</label>
@@ -14760,17 +15685,27 @@ app.get('/admin/guidelines', (c) => {
             }
 
             let subsidyTypes = [];
+            let currentCalendarMonth = new Date();
+            let selectedForCompare = [];
 
             // タブ切り替え
             function switchTab(tab) {
-                ['watch', 'updates', 'guidelines'].forEach(t => {
-                    document.getElementById('content-' + t).classList.add('hidden');
-                    document.getElementById('tab-' + t).classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
-                    document.getElementById('tab-' + t).classList.add('text-gray-500');
+                ['watch', 'updates', 'guidelines', 'calendar', 'compare'].forEach(t => {
+                    const content = document.getElementById('content-' + t);
+                    const tabEl = document.getElementById('tab-' + t);
+                    if (content) content.classList.add('hidden');
+                    if (tabEl) {
+                        tabEl.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
+                        tabEl.classList.add('text-gray-500');
+                    }
                 });
                 document.getElementById('content-' + tab).classList.remove('hidden');
                 document.getElementById('tab-' + tab).classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
                 document.getElementById('tab-' + tab).classList.remove('text-gray-500');
+                
+                // タブ切り替え時にデータ更新
+                if (tab === 'calendar') renderCalendarTimeline();
+                if (tab === 'compare') renderCompareSelection();
             }
 
             // トースト
@@ -15043,8 +15978,18 @@ app.get('/admin/guidelines', (c) => {
             
             function renderGuidelines() {
                 const filter = document.getElementById('guidelinesFilter').value;
+                const categoryFilter = document.getElementById('categoryFilter').value;
                 let guidelines = allGuidelines;
                 
+                // 管轄フィルター
+                if (categoryFilter !== 'all') {
+                    guidelines = guidelines.filter(g => {
+                        const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id);
+                        return subsidy?.category === categoryFilter;
+                    });
+                }
+                
+                // ステータスフィルター
                 if (filter === 'active') {
                     guidelines = guidelines.filter(g => g.status === 'active');
                 } else if (filter === 'inactive') {
@@ -15141,6 +16086,26 @@ app.get('/admin/guidelines', (c) => {
                         const days = getDaysRemaining(g.application_end_date);
                         const deadlineStatus = getDeadlineStatus(days);
                         
+                        // JSON文字列をパース（対象経費・要件）
+                        let eligibility = '';
+                        let expenses = '';
+                        try {
+                            if (g.eligibility_requirements) {
+                                const parsed = typeof g.eligibility_requirements === 'string' ? 
+                                    JSON.parse(g.eligibility_requirements) : g.eligibility_requirements;
+                                eligibility = Array.isArray(parsed) ? parsed.join('、') : (parsed.toString() || '');
+                            }
+                        } catch(e) { eligibility = g.eligibility_requirements || ''; }
+                        try {
+                            if (g.target_expenses) {
+                                const parsed = typeof g.target_expenses === 'string' ? 
+                                    JSON.parse(g.target_expenses) : g.target_expenses;
+                                expenses = Array.isArray(parsed) ? parsed.join('、') : (parsed.toString() || '');
+                            }
+                        } catch(e) { expenses = g.target_expenses || ''; }
+                        
+                        const hasDetails = eligibility || expenses || g.min_amount;
+                        
                         html += \`
                             <div class="p-4 hover:bg-gray-50 transition-colors">
                                 <div class="flex flex-wrap items-start justify-between gap-4">
@@ -15149,6 +16114,7 @@ app.get('/admin/guidelines', (c) => {
                                             <span class="font-bold">\${g.fiscal_year || '-'}</span>
                                             \${g.version ? \`<span class="text-gray-500">\${g.version}</span>\` : ''}
                                             <span class="px-2 py-0.5 rounded text-xs \${g.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}">\${g.status === 'active' ? '公募中' : '終了'}</span>
+                                            \${hasDetails ? \`<button onclick="toggleDetails(\${g.id})" class="text-indigo-600 hover:text-indigo-800 text-xs ml-2"><i class="fas fa-chevron-down" id="detailIcon\${g.id}"></i> 詳細</button>\` : ''}
                                         </div>
                                         <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 text-sm">
                                             <div>
@@ -15180,6 +16146,34 @@ app.get('/admin/guidelines', (c) => {
                                                 \` : ''}
                                             </div>
                                         \` : ''}
+                                        
+                                        <!-- 詳細展開セクション -->
+                                        <div id="details\${g.id}" class="hidden mt-4 pt-4 border-t border-gray-200">
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                                \${g.min_amount ? \`
+                                                    <div class="bg-blue-50 rounded-lg p-3">
+                                                        <h4 class="font-bold text-blue-800 mb-2"><i class="fas fa-yen-sign mr-1"></i>補助金額</h4>
+                                                        <div class="space-y-1">
+                                                            <div><span class="text-gray-600">上限:</span> <span class="font-medium">\${g.max_amount ? (g.max_amount / 10000).toLocaleString() + '万円' : '-'}</span></div>
+                                                            <div><span class="text-gray-600">下限:</span> <span class="font-medium">\${g.min_amount ? (g.min_amount / 10000).toLocaleString() + '万円' : '-'}</span></div>
+                                                            <div><span class="text-gray-600">補助率:</span> <span class="font-medium">\${g.subsidy_rate || '-'}</span></div>
+                                                        </div>
+                                                    </div>
+                                                \` : ''}
+                                                \${eligibility ? \`
+                                                    <div class="bg-green-50 rounded-lg p-3">
+                                                        <h4 class="font-bold text-green-800 mb-2"><i class="fas fa-user-check mr-1"></i>対象者・要件</h4>
+                                                        <p class="text-gray-700 whitespace-pre-wrap">\${eligibility}</p>
+                                                    </div>
+                                                \` : ''}
+                                                \${expenses ? \`
+                                                    <div class="bg-purple-50 rounded-lg p-3 md:col-span-2">
+                                                        <h4 class="font-bold text-purple-800 mb-2"><i class="fas fa-receipt mr-1"></i>対象経費</h4>
+                                                        <p class="text-gray-700 whitespace-pre-wrap">\${expenses}</p>
+                                                    </div>
+                                                \` : ''}
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <button onclick="toggleGuidelineStatus(\${g.id}, '\${g.status}')" 
@@ -15209,6 +16203,306 @@ app.get('/admin/guidelines', (c) => {
                 });
                 
                 container.innerHTML = html;
+                
+                // サマリー更新
+                updateSummary();
+            }
+            
+            // サマリー更新
+            function updateSummary() {
+                const activeGuidelines = allGuidelines.filter(g => g.status === 'active');
+                const deadlineWithin30 = activeGuidelines.filter(g => {
+                    if (!g.application_end_date) return false;
+                    const days = Math.ceil((new Date(g.application_end_date) - new Date()) / (1000*60*60*24));
+                    return days >= 0 && days <= 30;
+                });
+                const totalMaxAmount = activeGuidelines.reduce((sum, g) => sum + (g.max_amount || 0), 0);
+                const uniqueSubsidyTypes = new Set(allGuidelines.map(g => g.subsidy_type_id)).size;
+                
+                // 全体サマリー
+                document.getElementById('summaryActiveCount').textContent = activeGuidelines.length + '件';
+                document.getElementById('summaryDeadlineCount').textContent = deadlineWithin30.length + '件';
+                document.getElementById('summaryTotalAmount').textContent = (totalMaxAmount / 100000000).toFixed(1) + '億円';
+                document.getElementById('summarySubsidyTypes').textContent = uniqueSubsidyTypes + '種類';
+                
+                // 管轄別サマリー
+                const getGuidelinesByCategory = (category) => {
+                    return activeGuidelines.filter(g => {
+                        const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id);
+                        return subsidy?.category === category;
+                    });
+                };
+                
+                const getDeadlineCount = (guidelines) => {
+                    return guidelines.filter(g => {
+                        if (!g.application_end_date) return false;
+                        const days = Math.ceil((new Date(g.application_end_date) - new Date()) / (1000*60*60*24));
+                        return days >= 0 && days <= 30;
+                    }).length;
+                };
+                
+                const formatAmount = (amount) => {
+                    if (amount >= 100000000) return (amount / 100000000).toFixed(1) + '億円';
+                    if (amount >= 10000) return (amount / 10000).toLocaleString() + '万円';
+                    return amount.toLocaleString() + '円';
+                };
+                
+                // 行政書士管轄
+                const gyoseishoshi = getGuidelinesByCategory('行政書士管轄');
+                const gyoseishoshiAmount = gyoseishoshi.reduce((sum, g) => sum + (g.max_amount || 0), 0);
+                document.getElementById('summaryGyoseishoshiActive').textContent = gyoseishoshi.length + '件';
+                document.getElementById('summaryGyoseishoshiDeadline').textContent = getDeadlineCount(gyoseishoshi) + '件';
+                document.getElementById('summaryGyoseishoshiAmount').textContent = formatAmount(gyoseishoshiAmount);
+                
+                // 社労士管轄
+                const sharoshi = getGuidelinesByCategory('社労士管轄');
+                const sharoshiAmount = sharoshi.reduce((sum, g) => sum + (g.max_amount || 0), 0);
+                document.getElementById('summarySharoshiActive').textContent = sharoshi.length + '件';
+                document.getElementById('summarySharoshiDeadline').textContent = getDeadlineCount(sharoshi) + '件';
+                document.getElementById('summarySharoshiAmount').textContent = formatAmount(sharoshiAmount);
+            }
+            
+            // 詳細展開トグル
+            function toggleDetails(id) {
+                const details = document.getElementById('details' + id);
+                const icon = document.getElementById('detailIcon' + id);
+                if (details.classList.contains('hidden')) {
+                    details.classList.remove('hidden');
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    details.classList.add('hidden');
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            }
+            
+            // カレンダー関連
+            function changeCalendarMonth(delta) {
+                currentCalendarMonth.setMonth(currentCalendarMonth.getMonth() + delta);
+                renderCalendarTimeline();
+            }
+            
+            function renderCalendarTimeline() {
+                const container = document.getElementById('calendarTimeline');
+                const deadlinesContainer = document.getElementById('upcomingDeadlines');
+                const monthLabel = document.getElementById('calendarMonthLabel');
+                const categoryFilter = document.getElementById('calendarCategoryFilter')?.value || 'all';
+                
+                const year = currentCalendarMonth.getFullYear();
+                const month = currentCalendarMonth.getMonth();
+                monthLabel.textContent = \`\${year}年\${month + 1}月\`;
+                
+                let activeGuidelines = allGuidelines.filter(g => g.status === 'active');
+                
+                // 管轄フィルター適用
+                if (categoryFilter !== 'all') {
+                    activeGuidelines = activeGuidelines.filter(g => {
+                        const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id);
+                        return subsidy?.category === categoryFilter;
+                    });
+                }
+                
+                const today = new Date();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                
+                // タイムライン表示
+                let timelineHtml = '<div class="space-y-4">';
+                
+                activeGuidelines.forEach(g => {
+                    const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id) || { name: g.subsidy_name || '不明' };
+                    const startDate = g.application_start_date ? new Date(g.application_start_date) : null;
+                    const endDate = g.application_end_date ? new Date(g.application_end_date) : null;
+                    
+                    if (!endDate) return;
+                    
+                    const daysRemaining = Math.ceil((endDate - today) / (1000*60*60*24));
+                    let barColor = 'bg-green-500';
+                    if (daysRemaining < 0) barColor = 'bg-gray-300';
+                    else if (daysRemaining <= 7) barColor = 'bg-red-500';
+                    else if (daysRemaining <= 30) barColor = 'bg-yellow-500';
+                    
+                    // 月内の表示位置計算
+                    const monthStart = new Date(year, month, 1);
+                    const monthEnd = new Date(year, month + 1, 0);
+                    
+                    const displayStart = startDate && startDate > monthStart ? startDate : monthStart;
+                    const displayEnd = endDate < monthEnd ? endDate : monthEnd;
+                    
+                    if (displayEnd < monthStart || displayStart > monthEnd) return; // 月外はスキップ
+                    
+                    const startPercent = Math.max(0, ((displayStart - monthStart) / (monthEnd - monthStart)) * 100);
+                    const endPercent = Math.min(100, ((displayEnd - monthStart) / (monthEnd - monthStart)) * 100);
+                    const width = Math.max(2, endPercent - startPercent);
+                    
+                    timelineHtml += \`
+                        <div class="flex items-center gap-4">
+                            <div class="w-48 text-sm truncate font-medium">\${subsidy.name}</div>
+                            <div class="flex-1 relative h-8 bg-gray-100 rounded overflow-hidden">
+                                <div class="\${barColor} h-full rounded" style="margin-left: \${startPercent}%; width: \${width}%;">
+                                </div>
+                                <div class="absolute inset-0 flex items-center justify-center text-xs font-medium">
+                                    \${g.application_end_date ? \`〜\${g.application_end_date}\` : ''}
+                                </div>
+                            </div>
+                            <div class="w-24 text-sm text-right \${daysRemaining <= 7 ? 'text-red-600 font-bold' : daysRemaining <= 30 ? 'text-orange-600' : 'text-gray-600'}">
+                                \${daysRemaining >= 0 ? '残' + daysRemaining + '日' : '終了'}
+                            </div>
+                        </div>
+                    \`;
+                });
+                
+                timelineHtml += '</div>';
+                
+                // 日付目盛り
+                const scaleHtml = \`
+                    <div class="flex items-center gap-4 mt-4 pt-4 border-t">
+                        <div class="w-48"></div>
+                        <div class="flex-1 flex justify-between text-xs text-gray-400">
+                            <span>1日</span>
+                            <span>10日</span>
+                            <span>20日</span>
+                            <span>\${daysInMonth}日</span>
+                        </div>
+                        <div class="w-24"></div>
+                    </div>
+                \`;
+                
+                container.innerHTML = timelineHtml + scaleHtml;
+                
+                // 締切間近リスト
+                const within30 = activeGuidelines
+                    .filter(g => {
+                        if (!g.application_end_date) return false;
+                        const days = Math.ceil((new Date(g.application_end_date) - today) / (1000*60*60*24));
+                        return days >= 0 && days <= 30;
+                    })
+                    .sort((a, b) => new Date(a.application_end_date) - new Date(b.application_end_date));
+                
+                if (within30.length === 0) {
+                    deadlinesContainer.innerHTML = '<div class="p-4 text-center text-gray-500">締切間近の公募はありません</div>';
+                } else {
+                    deadlinesContainer.innerHTML = within30.map(g => {
+                        const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id) || { name: g.subsidy_name || '不明' };
+                        const days = Math.ceil((new Date(g.application_end_date) - today) / (1000*60*60*24));
+                        return \`
+                            <div class="p-4 flex items-center justify-between hover:bg-gray-50">
+                                <div>
+                                    <div class="font-medium">\${subsidy.name}</div>
+                                    <div class="text-sm text-gray-500">\${g.fiscal_year || ''} \${g.version || ''}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="\${days <= 7 ? 'text-red-600 font-bold' : 'text-orange-600'}">\${g.application_end_date}</div>
+                                    <div class="text-sm \${days <= 7 ? 'text-red-500' : 'text-gray-500'}">残り\${days}日</div>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                }
+            }
+            
+            // 比較機能
+            function renderCompareSelection() {
+                const container = document.getElementById('compareSelection');
+                const categoryFilter = document.getElementById('compareCategoryFilter')?.value || 'all';
+                
+                let activeGuidelines = allGuidelines.filter(g => g.status === 'active');
+                
+                // 管轄フィルター適用
+                if (categoryFilter !== 'all') {
+                    activeGuidelines = activeGuidelines.filter(g => {
+                        const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id);
+                        return subsidy?.category === categoryFilter;
+                    });
+                }
+                
+                const html = activeGuidelines.map(g => {
+                    const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id) || { name: g.subsidy_name || '不明' };
+                    const isSelected = selectedForCompare.includes(g.id);
+                    const categoryBadge = subsidy.category === '行政書士管轄' ? 'bg-emerald-100 text-emerald-800' : 
+                                         subsidy.category === '社労士管轄' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800';
+                    return \`
+                        <button onclick="toggleCompareSelection(\${g.id})" 
+                                class="px-3 py-2 rounded-lg text-sm transition-colors \${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                            <i class="fas fa-\${isSelected ? 'check-circle' : 'circle'} mr-1"></i>
+                            \${subsidy.name} \${g.fiscal_year || ''}
+                            <span class="ml-1 px-1 py-0.5 rounded text-xs \${isSelected ? 'bg-white/20' : categoryBadge}">\${subsidy.category || ''}</span>
+                        </button>
+                    \`;
+                }).join('');
+                
+                container.innerHTML = html || '<div class="text-gray-500">比較可能な公募要領がありません</div>';
+                
+                renderCompareTable();
+            }
+            
+            function toggleCompareSelection(id) {
+                const idx = selectedForCompare.indexOf(id);
+                if (idx > -1) {
+                    selectedForCompare.splice(idx, 1);
+                } else if (selectedForCompare.length < 3) {
+                    selectedForCompare.push(id);
+                } else {
+                    showToast('比較は最大3つまでです', 'error');
+                    return;
+                }
+                renderCompareSelection();
+            }
+            
+            function renderCompareTable() {
+                const headers = document.getElementById('compareHeaders');
+                const body = document.getElementById('compareBody');
+                
+                if (selectedForCompare.length === 0) {
+                    headers.innerHTML = '<th class="px-4 py-3 text-left font-medium text-gray-500 sticky left-0 bg-gray-50 min-w-[150px]">項目</th>';
+                    body.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">比較する補助金を選択してください</td></tr>';
+                    return;
+                }
+                
+                const selected = selectedForCompare.map(id => allGuidelines.find(g => g.id === id)).filter(Boolean);
+                
+                // ヘッダー
+                let headerHtml = '<th class="px-4 py-3 text-left font-medium text-gray-500 sticky left-0 bg-gray-50 min-w-[150px]">項目</th>';
+                selected.forEach(g => {
+                    const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id) || { name: g.subsidy_name || '不明' };
+                    headerHtml += \`<th class="px-4 py-3 text-left font-medium min-w-[200px]">\${subsidy.name}<br><span class="text-xs text-gray-500">\${g.fiscal_year || ''} \${g.version || ''}</span></th>\`;
+                });
+                headers.innerHTML = headerHtml;
+                
+                // 比較項目
+                const compareItems = [
+                    { label: 'ステータス', key: 'status', format: v => v === 'active' ? '<span class="text-green-600">公募中</span>' : '<span class="text-gray-500">終了</span>' },
+                    { label: '補助率', key: 'subsidy_rate', format: v => v || '-' },
+                    { label: '上限額', key: 'max_amount', format: v => v ? (v / 10000).toLocaleString() + '万円' : '-' },
+                    { label: '下限額', key: 'min_amount', format: v => v ? (v / 10000).toLocaleString() + '万円' : '-' },
+                    { label: '申請開始日', key: 'application_start_date', format: v => v || '-' },
+                    { label: '申請締切日', key: 'application_end_date', format: v => v || '-' },
+                    { label: '対象者・要件', key: 'eligibility_requirements', format: v => {
+                        try { 
+                            const p = typeof v === 'string' ? JSON.parse(v) : v;
+                            return Array.isArray(p) ? p.join('、') : (p || '-');
+                        } catch { return v || '-'; }
+                    }},
+                    { label: '対象経費', key: 'target_expenses', format: v => {
+                        try {
+                            const p = typeof v === 'string' ? JSON.parse(v) : v;
+                            return Array.isArray(p) ? p.join('、') : (p || '-');
+                        } catch { return v || '-'; }
+                    }},
+                    { label: '公式サイト', key: 'source_url', format: v => v ? \`<a href="\${v}" target="_blank" class="text-blue-600 hover:underline"><i class="fas fa-external-link-alt mr-1"></i>リンク</a>\` : '-' },
+                ];
+                
+                let bodyHtml = '';
+                compareItems.forEach(item => {
+                    bodyHtml += '<tr class="border-b hover:bg-gray-50">';
+                    bodyHtml += \`<td class="px-4 py-3 font-medium text-gray-700 sticky left-0 bg-white">\${item.label}</td>\`;
+                    selected.forEach(g => {
+                        bodyHtml += \`<td class="px-4 py-3 text-sm">\${item.format(g[item.key])}</td>\`;
+                    });
+                    bodyHtml += '</tr>';
+                });
+                
+                body.innerHTML = bodyHtml;
             }
 
             // 通知
@@ -15224,27 +16518,101 @@ app.get('/admin/guidelines', (c) => {
                 }
             }
 
-            async function showNotifications() {
+            let currentNotificationFilter = null;
+            
+            // グローバルに公開（ダッシュボードから呼び出せるように）
+            window.showNotificationsWithFilter = showNotificationsInternal;
+            
+            async function showNotifications(filterType = null) {
+                await showNotificationsInternal(filterType);
+            }
+            
+            async function showNotificationsInternal(filterType = null) {
                 document.getElementById('notificationsModal').classList.remove('hidden');
-                const response = await axios.get('/api/admin/notifications');
-                const notifications = response.data;
+                currentNotificationFilter = filterType;
+                
+                const response = await axios.get('/api/admin/notifications?unread_only=true');
+                let notifications = response.data;
+                
+                // フィルタリング
+                if (filterType) {
+                    notifications = notifications.filter(n => n.notification_type === filterType);
+                }
                 
                 const container = document.getElementById('notificationsList');
+                
+                // フィルターボタンを追加
+                const filterHtml = \`
+                    <div class="flex flex-wrap gap-2 mb-4 pb-3 border-b">
+                        <button onclick="showNotifications()" class="px-3 py-1 text-xs rounded-full \${!filterType ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">すべて</button>
+                        <button onclick="showNotifications('new_message')" class="px-3 py-1 text-xs rounded-full \${filterType === 'new_message' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                            <i class="fas fa-envelope mr-1"></i>メッセージ
+                        </button>
+                        <button onclick="showNotifications('document_upload')" class="px-3 py-1 text-xs rounded-full \${filterType === 'document_upload' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                            <i class="fas fa-file-upload mr-1"></i>書類
+                        </button>
+                        <button onclick="showNotifications('payment_report')" class="px-3 py-1 text-xs rounded-full \${filterType === 'payment_report' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                            <i class="fas fa-yen-sign mr-1"></i>入金
+                        </button>
+                        \${notifications.length > 0 ? \`<button onclick="markAllAsRead('\${filterType || ''}')" class="ml-auto px-3 py-1 text-xs rounded-full bg-gray-600 text-white hover:bg-gray-700">すべて既読にする</button>\` : ''}
+                    </div>
+                \`;
+                
                 if (notifications.length === 0) {
-                    container.innerHTML = '<div class="text-center py-4 text-gray-500">通知はありません</div>';
+                    container.innerHTML = filterHtml + '<div class="text-center py-4 text-gray-500">未読の通知はありません</div>';
                     return;
                 }
                 
-                container.innerHTML = notifications.map(n => \`
-                    <div class="border rounded-lg p-3 \${n.is_read ? 'bg-gray-50' : 'bg-yellow-50 border-yellow-200'}">
+                const getTypeIcon = (type) => {
+                    switch(type) {
+                        case 'new_message': return '<i class="fas fa-envelope text-blue-500"></i>';
+                        case 'document_upload': return '<i class="fas fa-file-upload text-green-500"></i>';
+                        case 'payment_report': return '<i class="fas fa-yen-sign text-yellow-500"></i>';
+                        default: return '<i class="fas fa-bell text-gray-500"></i>';
+                    }
+                };
+                
+                const getTypeColor = (type) => {
+                    switch(type) {
+                        case 'new_message': return 'border-blue-200 bg-blue-50';
+                        case 'document_upload': return 'border-green-200 bg-green-50';
+                        case 'payment_report': return 'border-yellow-200 bg-yellow-50';
+                        default: return 'border-gray-200 bg-gray-50';
+                    }
+                };
+                
+                container.innerHTML = filterHtml + notifications.map(n => \`
+                    <div class="border rounded-lg p-3 \${n.is_read ? 'bg-gray-50 border-gray-200' : getTypeColor(n.notification_type)}">
                         <div class="flex justify-between items-start">
-                            <h4 class="font-medium text-sm">\${n.title}</h4>
-                            \${!n.is_read ? \`<button onclick="markAsRead(\${n.id})" class="text-xs text-blue-600 hover:underline">既読にする</button>\` : ''}
+                            <div class="flex items-center gap-2">
+                                \${getTypeIcon(n.notification_type)}
+                                <h4 class="font-medium text-sm">\${n.title}</h4>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                \${n.related_id ? \`<a href="/client/\${n.related_id}" onclick="markAsRead(\${n.id})" class="text-xs text-blue-600 hover:underline">詳細</a>\` : ''}
+                                \${!n.is_read ? \`<button onclick="markAsRead(\${n.id})" class="text-xs text-gray-600 hover:underline">既読</button>\` : ''}
+                            </div>
                         </div>
                         <p class="text-xs text-gray-600 mt-1 whitespace-pre-wrap">\${n.message}</p>
                         <div class="text-xs text-gray-400 mt-2">\${new Date(n.created_at).toLocaleString('ja-JP')}</div>
                     </div>
                 \`).join('');
+            }
+            
+            async function markAllAsRead(filterType) {
+                try {
+                    await axios.put('/api/admin/notifications/read-all', {
+                        notification_type: filterType || null,
+                        read_by: localStorage.getItem('admin_name') || 'admin'
+                    });
+                    showNotifications(currentNotificationFilter);
+                    loadUnreadCount();
+                    if (typeof loadNotificationSummary === 'function') {
+                        loadNotificationSummary();
+                    }
+                } catch (error) {
+                    console.error('Error marking all as read:', error);
+                }
             }
 
             function closeNotificationsModal() {
@@ -15255,8 +16623,11 @@ app.get('/admin/guidelines', (c) => {
                 await axios.put(\`/api/admin/notifications/\${id}/read\`, {
                     read_by: localStorage.getItem('admin_name') || 'admin'
                 });
-                showNotifications();
+                showNotifications(currentNotificationFilter);
                 loadUnreadCount();
+                if (typeof loadNotificationSummary === 'function') {
+                    loadNotificationSummary();
+                }
             }
 
             // 更新チェック実行
@@ -15367,6 +16738,25 @@ app.get('/admin/guidelines', (c) => {
                 document.getElementById('editGuidelineSourceUrl').value = g.source_url || '';
                 document.getElementById('editGuidelinePdfUrl').value = g.pdf_url || '';
                 document.getElementById('editGuidelineStatus').value = g.status || 'active';
+                
+                // 対象者・要件と対象経費
+                let eligibility = '';
+                let expenses = '';
+                try {
+                    if (g.eligibility_requirements) {
+                        const parsed = typeof g.eligibility_requirements === 'string' ? JSON.parse(g.eligibility_requirements) : g.eligibility_requirements;
+                        eligibility = Array.isArray(parsed) ? parsed.join('、') : (parsed.toString() || '');
+                    }
+                } catch { eligibility = g.eligibility_requirements || ''; }
+                try {
+                    if (g.target_expenses) {
+                        const parsed = typeof g.target_expenses === 'string' ? JSON.parse(g.target_expenses) : g.target_expenses;
+                        expenses = Array.isArray(parsed) ? parsed.join('、') : (parsed.toString() || '');
+                    }
+                } catch { expenses = g.target_expenses || ''; }
+                document.getElementById('editGuidelineEligibility').value = eligibility;
+                document.getElementById('editGuidelineExpenses').value = expenses;
+                
                 document.getElementById('editGuidelineModal').classList.remove('hidden');
             }
             function closeEditGuidelineModal() {
@@ -15470,7 +16860,7 @@ app.get('/admin/backup', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>バックアップ管理 - 助成金申請管理システム</title>
+        <title>バックアップ管理 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -16110,6 +17500,104 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3): Pr
   throw lastError || new Error('Gemini API failed after retries')
 }
 
+// マルチモーダルGemini API呼び出し（画像/PDF対応）
+async function callGeminiAPIWithFile(prompt: string, fileData: ArrayBuffer, mimeType: string, apiKey: string): Promise<string> {
+  if (!apiKey) {
+    return `【デモモード】書類解析はAPIキーが必要です。`
+  }
+  
+  // ArrayBufferをBase64に変換
+  const base64Data = btoa(
+    new Uint8Array(fileData).reduce((data, byte) => data + String.fromCharCode(byte), '')
+  )
+  
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64Data
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.2, // 書類解析は精度重視で低温度
+          maxOutputTokens: 8192,
+        }
+      })
+    }
+  )
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Gemini multimodal API error:', response.status, errorText)
+    throw new Error(`Gemini API error: ${response.status}`)
+  }
+  
+  const data = await response.json()
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+}
+
+// 書類からテキストを抽出する関数
+async function extractTextFromDocument(
+  r2: R2Bucket,
+  filePath: string,
+  documentType: string,
+  fileName: string,
+  apiKey: string
+): Promise<string> {
+  try {
+    const object = await r2.get(filePath)
+    if (!object) {
+      return ''
+    }
+    
+    const arrayBuffer = await object.arrayBuffer()
+    const mimeType = object.httpMetadata?.contentType || 'application/octet-stream'
+    
+    // サポートされるファイル形式をチェック
+    const supportedMimeTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp'
+    ]
+    
+    if (!supportedMimeTypes.some(t => mimeType.includes(t.split('/')[1]))) {
+      return `【${documentType}】ファイル形式（${mimeType}）はテキスト抽出に対応していません。`
+    }
+    
+    const extractionPrompt = `この書類（${documentType}: ${fileName}）の内容を詳細にテキスト化してください。
+
+【抽出すべき情報】
+- 会社情報（会社名、住所、代表者名など）
+- 数値情報（売上、利益、従業員数、資本金など）
+- 日付情報（設立日、決算期など）
+- 事業内容や業種
+- その他重要な情報
+
+【出力形式】
+- 重要な項目は「項目名: 値」の形式で
+- 箇条書きで整理
+- 不明瞭な部分は「（読み取り困難）」と記載
+- マークダウン記法は使用しないでください`
+
+    return await callGeminiAPIWithFile(extractionPrompt, arrayBuffer, mimeType, apiKey)
+  } catch (error) {
+    console.error(`Document extraction error for ${filePath}:`, error)
+    return `【${documentType}】テキスト抽出に失敗しました。`
+  }
+}
+
 // ===============================
 // ヒアリング質問API
 // ===============================
@@ -16520,8 +18008,37 @@ app.post('/api/clients/:clientId/ai-chat', async (c) => {
     WHERE ha.client_id = ?
   `).bind(clientId).all()
   
-  // プロンプト構築
-  const systemPrompt = `あなたは補助金申請を支援する親切なアドバイザーです。
+  // プロンプト構築（モードに応じて切り替え）
+  let systemPrompt = ''
+  
+  if (data.context_type === 'review' && data.document_content) {
+    // 文書添削モード
+    systemPrompt = `あなたは補助金申請書の添削を行う専門家です。
+
+【重要な回答ルール】
+- マークダウン記法（**太字**、# 見出し、- 箇条書き）は使わないでください
+- 自然な日本語の文章で回答してください
+- 箇条書きが必要な場合は「・」や「1. 2. 3.」を使ってください
+- 具体的な改善案を提示してください
+- 修正後の文章例も示してください
+
+【顧客情報】
+顧客名: ${client?.name || '未設定'}
+会社名: ${client?.company_name || '未設定'}
+申請予定の補助金: ${client?.subsidy_name || '未設定'}
+
+【添削対象の文書】
+タイトル: ${data.document_title || '無題'}
+内容:
+${data.document_content}
+
+【直近の会話履歴】
+${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`).join('\n')}
+
+上記の文書について、ユーザーの指示に従って添削・改善提案を行ってください。`
+  } else {
+    // 通常のヒアリングモード
+    systemPrompt = `あなたは補助金申請を支援する親切なアドバイザーです。
 
 【重要な回答ルール】
 - マークダウン記法（**太字**、# 見出し、- 箇条書き）は使わないでください
@@ -16542,6 +18059,7 @@ ${(answers.results || []).map((a: any) => `Q: ${a.question_text}\nA: ${a.answer_
 ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`).join('\n')}
 
 上記を踏まえて、ユーザーの質問に分かりやすく回答してください。`
+  }
 
   const prompt = `${systemPrompt}\n\nユーザー: ${data.message}`
   
@@ -16771,6 +18289,45 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
     LIMIT 3
   `).bind(client.subsidy_type_id).all()
   
+  // 提出書類の取得とテキスト抽出
+  const { R2 } = c.env
+  const uploadedDocs = await DB.prepare(`
+    SELECT id, document_type, file_name, file_path, status
+    FROM documents 
+    WHERE client_id = ? AND status IN ('pending', 'approved')
+    ORDER BY uploaded_at DESC
+  `).bind(clientId).all()
+  
+  // 重要書類のテキスト抽出（並列処理で高速化）
+  const documentExtractions: string[] = []
+  const importantDocTypes = ['決算書', '登記簿謄本', '財務諸表', '会社概要', '事業計画', '見積書', '貸借対照表', '損益計算書']
+  
+  if (uploadedDocs.results && uploadedDocs.results.length > 0) {
+    const extractionPromises = (uploadedDocs.results as any[])
+      .filter((doc: any) => {
+        // 重要書類のみ抽出対象
+        return importantDocTypes.some(t => doc.document_type?.includes(t)) || doc.file_name?.endsWith('.pdf')
+      })
+      .slice(0, 5) // 最大5件まで
+      .map(async (doc: any) => {
+        const extracted = await extractTextFromDocument(
+          R2,
+          doc.file_path,
+          doc.document_type,
+          doc.file_name,
+          GEMINI_API_KEY
+        )
+        return `【${doc.document_type}（${doc.file_name}）】\n${extracted}`
+      })
+    
+    const results = await Promise.allSettled(extractionPromises)
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value) {
+        documentExtractions.push(result.value)
+      }
+    })
+  }
+  
   const sections = JSON.parse(template.sections)
   const generatedSections: Record<string, string> = {}
   
@@ -16806,6 +18363,9 @@ ${(answers.results || []).map((a: any) => `【${a.category}】${a.question_text}
 【採択事例の成功ポイント（参考）】
 ${(successCases.results || []).map((c: any, i: number) => `事例${i+1}: ${c.success_summary}`).join('\n')}
 
+【提出書類から抽出した情報】
+${documentExtractions.length > 0 ? documentExtractions.join('\n\n') : '（書類未提出または抽出対象なし）'}
+
 【生成するセクション】
 セクション名: ${section.title}
 説明: ${section.description}
@@ -16821,7 +18381,8 @@ ${(successCases.results || []).map((c: any, i: number) => `事例${i+1}: ${c.suc
 - 補助率や補助上限額などの補助金制度情報を適切に文書に反映してください
 - 審査員が納得できる論理的な説明を心がけてください
 - 文字数は${section.max_chars}文字以内に収めてください
-- 自然な日本語のビジネス文書として出力してください`
+- 自然な日本語のビジネス文書として出力してください
+- 提出書類から抽出した具体的な数値や情報があれば、積極的に活用してください`
 
     try {
       const content = await callGeminiAPI(sectionPrompt, GEMINI_API_KEY)
@@ -18270,7 +19831,7 @@ app.get('/api/backup/export', async (c) => {
     const backupData = {
       version: '1.0',
       exported_at: new Date().toISOString(),
-      app_name: '助成金申請管理システム',
+      app_name: '申請革命',
       tables: {
         admin_users: adminUsers.results || [],
         subsidy_types: subsidyTypes.results || [],
@@ -19647,6 +21208,89 @@ app.put('/api/pipeline-tasks/:taskId', async (c) => {
   })
 })
 
+// パイプラインにタスクを追加
+app.post('/api/pipeline-tasks', async (c) => {
+  try {
+    const { DB } = c.env
+    const data = await c.req.json()
+    
+    if (!data.pipeline_id || !data.task_name) {
+      return c.json({ error: 'pipeline_id と task_name は必須です' }, 400)
+    }
+    
+    // パイプラインが存在するか確認
+    const pipeline = await DB.prepare(`
+      SELECT * FROM client_pipelines WHERE id = ?
+    `).bind(data.pipeline_id).first()
+    
+    if (!pipeline) {
+      return c.json({ error: 'パイプラインが見つかりません' }, 404)
+    }
+    
+    // 挿入位置を計算
+    const insertAfter = parseInt(data.insert_after) || 0
+    let newSortOrder: number
+    
+    if (insertAfter === 0) {
+      // 先頭に挿入: 既存タスクのsort_orderを全て+1
+      await DB.prepare(`
+        UPDATE client_pipeline_tasks 
+        SET sort_order = sort_order + 1 
+        WHERE pipeline_id = ?
+      `).bind(data.pipeline_id).run()
+      newSortOrder = 1
+    } else {
+      // 指定位置の後に挿入: insertAfterより大きいsort_orderを+1
+      await DB.prepare(`
+        UPDATE client_pipeline_tasks 
+        SET sort_order = sort_order + 1 
+        WHERE pipeline_id = ? AND sort_order > ?
+      `).bind(data.pipeline_id, insertAfter).run()
+      newSortOrder = insertAfter + 1
+    }
+    
+    // タスクを追加
+    const result = await DB.prepare(`
+      INSERT INTO client_pipeline_tasks 
+      (pipeline_id, task_name, task_type, description, sort_order, start_date, end_date, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+    `).bind(
+      data.pipeline_id,
+      data.task_name,
+      data.task_type || 'internal',
+      data.description || '',
+      newSortOrder,
+      data.start_date || null,
+      data.end_date || null
+    ).run()
+    
+    // パイプラインの進捗を再計算
+    const pipelineTasks = await DB.prepare(`
+      SELECT status FROM client_pipeline_tasks WHERE pipeline_id = ?
+    `).bind(data.pipeline_id).all()
+    
+    const totalTasks = pipelineTasks.results?.length || 1
+    const completedTasks = pipelineTasks.results?.filter((t: any) => t.status === 'completed').length || 0
+    const progressPercentage = Math.round((completedTasks / totalTasks) * 100)
+    
+    await DB.prepare(`
+      UPDATE client_pipelines SET 
+      progress_percentage = ?,
+      updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(progressPercentage, data.pipeline_id).run()
+    
+    return c.json({ 
+      success: true,
+      id: result.meta.last_row_id,
+      message: 'タスクを追加しました'
+    })
+  } catch (error: any) {
+    console.error('Error adding pipeline task:', error)
+    return c.json({ error: error.message || 'タスクの追加に失敗しました' }, 500)
+  }
+})
+
 // 顧客がタスクを完了する（顧客ポータル用）
 app.post('/api/portal/tasks/:taskId/complete', async (c) => {
   const { DB } = c.env
@@ -19808,6 +21452,661 @@ app.post('/api/announcements/:id/read', async (c) => {
 })
 
 // ===============================
+// マスター管理ダッシュボード
+// ===============================
+
+app.get('/admin/master', async (c) => {
+  const { DB } = c.env
+  
+  // 各カテゴリの件数を取得
+  const subsidyCount = await DB.prepare(`SELECT COUNT(*) as count FROM subsidy_types WHERE category = '行政書士管轄'`).first() as any
+  const grantCount = await DB.prepare(`SELECT COUNT(*) as count FROM subsidy_types WHERE category = '社労士管轄'`).first() as any
+  const licenseCount = await DB.prepare(`SELECT COUNT(*) as count FROM subsidy_types WHERE category = '許認可'`).first() as any
+  const pipelineCount = await DB.prepare(`SELECT COUNT(*) as count FROM pipeline_templates`).first() as any
+  const pipelineTaskCount = await DB.prepare(`SELECT COUNT(*) as count FROM pipeline_template_tasks`).first() as any
+  const guidelineCount = await DB.prepare(`SELECT COUNT(*) as count FROM subsidy_guidelines`).first() as any
+  const questionCount = await DB.prepare(`SELECT COUNT(*) as count FROM hearing_questions`).first() as any
+  
+  // 案件統計（マスターデータ活用状況）
+  const caseStats = await DB.prepare(`
+    SELECT 
+      COUNT(*) as total_cases,
+      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_cases,
+      SUM(CASE WHEN result = 'approved' THEN 1 ELSE 0 END) as approved_cases,
+      SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) as archived_cases
+    FROM cases
+  `).first() as any
+  
+  // 申請種別ごとの利用状況
+  const subsidyUsage = await DB.prepare(`
+    SELECT st.name, st.category, COUNT(c.id) as case_count
+    FROM subsidy_types st
+    LEFT JOIN cases c ON c.subsidy_type_id = st.id
+    GROUP BY st.id
+    ORDER BY case_count DESC
+    LIMIT 10
+  `).all()
+  
+  // 最近追加された補助金種別を取得
+  const recentSubsidies = await DB.prepare(`
+    SELECT id, name, category, description, created_at 
+    FROM subsidy_types 
+    WHERE id > 0 
+    ORDER BY id DESC 
+    LIMIT 10
+  `).all()
+  
+  // パイプラインテンプレート一覧
+  const pipelineTemplates = await DB.prepare(`
+    SELECT pt.*, 
+           (SELECT COUNT(*) FROM pipeline_template_tasks WHERE template_id = pt.id) as task_count
+    FROM pipeline_templates pt 
+    ORDER BY pt.name
+  `).all()
+  
+  // ヒアリング質問（申請種別ごと）
+  const questionsBySubsidy = await DB.prepare(`
+    SELECT st.name as subsidy_name, st.category, COUNT(hq.id) as question_count
+    FROM subsidy_types st
+    LEFT JOIN hearing_questions hq ON hq.subsidy_type_id = st.id
+    GROUP BY st.id
+    HAVING question_count > 0
+    ORDER BY question_count DESC
+    LIMIT 15
+  `).all()
+  
+  // 月別案件数の推移（直近6か月）
+  const monthlyStats = await DB.prepare(`
+    SELECT 
+      strftime('%Y-%m', created_at) as month,
+      COUNT(*) as count
+    FROM cases
+    WHERE created_at >= date('now', '-6 months')
+    GROUP BY strftime('%Y-%m', created_at)
+    ORDER BY month ASC
+  `).all()
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>マスター管理 - 申請革命</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            ${sidebarStyles}
+        </style>
+    </head>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex">
+            ${generateSidebar('master')}
+            
+            <main class="flex-1 min-h-screen">
+                <header class="bg-gradient-to-r from-purple-700 to-indigo-700 text-white shadow-sm sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <div class="flex items-center gap-4">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-white hover:text-gray-200">
+                                <i class="fas fa-bars text-xl"></i>
+                            </button>
+                            <h2 class="text-lg font-semibold">
+                                <i class="fas fa-database mr-2"></i>マスター管理
+                            </h2>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="p-4 lg:p-6">
+                    <!-- メインサマリーカード -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
+                        <a href="/subsidy-types?category=subsidy" class="bg-white rounded-xl shadow-sm p-3 hover:shadow-md transition border-l-4 border-emerald-500">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                    <i class="fas fa-file-signature text-emerald-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-gray-900">${subsidyCount?.count || 0}</div>
+                                    <div class="text-xs text-gray-500">補助金</div>
+                                </div>
+                            </div>
+                        </a>
+                        <a href="/subsidy-types?category=grant" class="bg-white rounded-xl shadow-sm p-3 hover:shadow-md transition border-l-4 border-blue-500">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <i class="fas fa-users text-blue-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-gray-900">${grantCount?.count || 0}</div>
+                                    <div class="text-xs text-gray-500">助成金</div>
+                                </div>
+                            </div>
+                        </a>
+                        <a href="/subsidy-types?category=license" class="bg-white rounded-xl shadow-sm p-3 hover:shadow-md transition border-l-4 border-indigo-500">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                    <i class="fas fa-stamp text-indigo-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-gray-900">${licenseCount?.count || 0}</div>
+                                    <div class="text-xs text-gray-500">許認可</div>
+                                </div>
+                            </div>
+                        </a>
+                        <a href="/admin/pipelines" class="bg-white rounded-xl shadow-sm p-3 hover:shadow-md transition border-l-4 border-orange-500">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                                    <i class="fas fa-project-diagram text-orange-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-gray-900">${pipelineCount?.count || 0}</div>
+                                    <div class="text-xs text-gray-500">パイプライン</div>
+                                </div>
+                            </div>
+                        </a>
+                        <div class="bg-white rounded-xl shadow-sm p-3 border-l-4 border-yellow-500">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                                    <i class="fas fa-tasks text-yellow-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-gray-900">${pipelineTaskCount?.count || 0}</div>
+                                    <div class="text-xs text-gray-500">タスク定義</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-3 border-l-4 border-cyan-500">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center">
+                                    <i class="fas fa-question-circle text-cyan-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-gray-900">${questionCount?.count || 0}</div>
+                                    <div class="text-xs text-gray-500">質問</div>
+                                </div>
+                            </div>
+                        </div>
+                        <a href="/admin/guidelines" class="bg-white rounded-xl shadow-sm p-3 hover:shadow-md transition border-l-4 border-pink-500">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center">
+                                    <i class="fas fa-book-open text-pink-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-gray-900">${guidelineCount?.count || 0}</div>
+                                    <div class="text-xs text-gray-500">公募要領</div>
+                                </div>
+                            </div>
+                        </a>
+                        <a href="/cases" class="bg-white rounded-xl shadow-sm p-3 hover:shadow-md transition border-l-4 border-gray-500">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                                    <i class="fas fa-folder-open text-gray-600 text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="text-xl font-bold text-gray-900">${caseStats?.total_cases || 0}</div>
+                                    <div class="text-xs text-gray-500">総案件</div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+
+                    <!-- データ活用状況 -->
+                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-sm p-6 mb-6 text-white">
+                        <h3 class="font-bold mb-4">
+                            <i class="fas fa-chart-pie mr-2"></i>データ活用状況サマリー
+                        </h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="bg-white/20 rounded-lg p-4 text-center">
+                                <div class="text-3xl font-bold">${caseStats?.completed_cases || 0}</div>
+                                <div class="text-sm opacity-90">完了案件</div>
+                            </div>
+                            <div class="bg-white/20 rounded-lg p-4 text-center">
+                                <div class="text-3xl font-bold">${caseStats?.approved_cases || 0}</div>
+                                <div class="text-sm opacity-90">採択案件</div>
+                            </div>
+                            <div class="bg-white/20 rounded-lg p-4 text-center">
+                                <div class="text-3xl font-bold">${caseStats?.archived_cases || 0}</div>
+                                <div class="text-sm opacity-90">アーカイブ</div>
+                            </div>
+                            <div class="bg-white/20 rounded-lg p-4 text-center">
+                                <div class="text-3xl font-bold">${caseStats?.total_cases && caseStats?.approved_cases ? Math.round((caseStats.approved_cases / caseStats.total_cases) * 100) : 0}%</div>
+                                <div class="text-sm opacity-90">採択率</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 申請種別別利用状況 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h3 class="font-bold text-gray-900 mb-4">
+                            <i class="fas fa-chart-bar mr-2 text-blue-600"></i>申請種別別利用状況 TOP10
+                        </h3>
+                        <div class="space-y-3">
+                            ${(subsidyUsage.results || []).map((s: any, index: number) => {
+                              const maxCount = Math.max(...(subsidyUsage.results || []).map((x: any) => x.case_count || 1))
+                              const percentage = maxCount > 0 ? ((s.case_count || 0) / maxCount) * 100 : 0
+                              const categoryColor = s.category === '行政書士管轄' ? 'emerald' : s.category === '社労士管轄' ? 'blue' : 'indigo'
+                              return '<div class="flex items-center gap-3">' +
+                                '<span class="w-6 text-center text-sm font-bold text-gray-500">' + (index + 1) + '</span>' +
+                                '<div class="flex-1">' +
+                                '<div class="flex justify-between items-center mb-1">' +
+                                '<span class="text-sm font-medium text-gray-700">' + s.name + '</span>' +
+                                '<span class="text-sm text-gray-500">' + (s.case_count || 0) + '件</span>' +
+                                '</div>' +
+                                '<div class="w-full bg-gray-200 rounded-full h-2">' +
+                                '<div class="bg-' + categoryColor + '-500 h-2 rounded-full" style="width: ' + percentage + '%"></div>' +
+                                '</div>' +
+                                '</div>' +
+                                '</div>'
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- 補助金・助成金・許認可管理 -->
+                        <div class="bg-white rounded-xl shadow-sm">
+                            <div class="p-4 border-b flex items-center justify-between">
+                                <h3 class="font-bold text-gray-900">
+                                    <i class="fas fa-list-alt mr-2 text-purple-600"></i>申請種別管理
+                                </h3>
+                                <button onclick="openNewSubsidyModal()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 text-sm">
+                                    <i class="fas fa-plus mr-1"></i>新規追加
+                                </button>
+                            </div>
+                            <div class="p-4">
+                                <!-- タブ -->
+                                <div class="flex border-b mb-4">
+                                    <button onclick="switchSubsidyTab('all')" id="tab-all" class="px-4 py-2 text-sm font-medium border-b-2 border-purple-600 text-purple-600">すべて</button>
+                                    <button onclick="switchSubsidyTab('subsidy')" id="tab-subsidy" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">補助金</button>
+                                    <button onclick="switchSubsidyTab('grant')" id="tab-grant" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">助成金</button>
+                                    <button onclick="switchSubsidyTab('license')" id="tab-license" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">許認可</button>
+                                </div>
+                                <!-- 検索 -->
+                                <div class="mb-4">
+                                    <input type="text" id="subsidySearch" placeholder="名称で検索..." 
+                                           class="w-full px-3 py-2 border rounded-lg text-sm" onkeyup="filterSubsidies()">
+                                </div>
+                                <!-- リスト -->
+                                <div id="subsidyList" class="space-y-2 max-h-96 overflow-y-auto">
+                                    ${(recentSubsidies.results || []).map((s: any) => {
+                                      const categoryColor = s.category === '行政書士管轄' ? 'emerald' : s.category === '社労士管轄' ? 'blue' : 'indigo'
+                                      const categoryLabel = s.category === '行政書士管轄' ? '補助金' : s.category === '社労士管轄' ? '助成金' : '許認可'
+                                      return `
+                                        <div class="subsidy-item flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition" 
+                                             data-category="${s.category}" data-name="${s.name}">
+                                            <div class="flex-1">
+                                                <div class="font-medium text-gray-900">${s.name}</div>
+                                                <div class="text-xs text-gray-500">${s.description || '説明なし'}</div>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="px-2 py-1 rounded text-xs bg-${categoryColor}-100 text-${categoryColor}-700">${categoryLabel}</span>
+                                                <a href="/subsidy-types" class="text-gray-400 hover:text-blue-600">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                      `
+                                    }).join('')}
+                                </div>
+                                <div class="mt-4 text-center">
+                                    <a href="/subsidy-types" class="text-purple-600 hover:text-purple-800 text-sm">
+                                        すべて表示 <i class="fas fa-arrow-right ml-1"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- パイプラインテンプレート管理 -->
+                        <div class="bg-white rounded-xl shadow-sm">
+                            <div class="p-4 border-b flex items-center justify-between">
+                                <h3 class="font-bold text-gray-900">
+                                    <i class="fas fa-project-diagram mr-2 text-orange-600"></i>パイプラインテンプレート
+                                </h3>
+                                <a href="/admin/pipelines" class="bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 text-sm">
+                                    <i class="fas fa-cog mr-1"></i>管理
+                                </a>
+                            </div>
+                            <div class="p-4">
+                                <!-- カテゴリフィルタ -->
+                                <div class="flex gap-2 mb-4 flex-wrap">
+                                    <button onclick="filterPipelines('all')" class="pipeline-filter-btn px-3 py-1 rounded-full text-xs bg-gray-800 text-white">すべて</button>
+                                    <button onclick="filterPipelines('subsidy')" class="pipeline-filter-btn px-3 py-1 rounded-full text-xs bg-gray-200 text-gray-700 hover:bg-gray-300">補助金</button>
+                                    <button onclick="filterPipelines('grant')" class="pipeline-filter-btn px-3 py-1 rounded-full text-xs bg-gray-200 text-gray-700 hover:bg-gray-300">助成金</button>
+                                    <button onclick="filterPipelines('license')" class="pipeline-filter-btn px-3 py-1 rounded-full text-xs bg-gray-200 text-gray-700 hover:bg-gray-300">許認可</button>
+                                </div>
+                                <!-- リスト -->
+                                <div id="pipelineList" class="space-y-2 max-h-96 overflow-y-auto">
+                                    ${(pipelineTemplates.results || []).map((p: any) => {
+                                      const categoryColor = p.category === 'subsidy' ? 'emerald' : p.category === 'grant' ? 'blue' : 'indigo'
+                                      const categoryLabel = p.category === 'subsidy' ? '補助金' : p.category === 'grant' ? '助成金' : '許認可'
+                                      return `
+                                        <div class="pipeline-item flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition" 
+                                             data-category="${p.category}">
+                                            <div class="flex-1">
+                                                <div class="font-medium text-gray-900">${p.name}</div>
+                                                <div class="text-xs text-gray-500">${p.description || '説明なし'}</div>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
+                                                    <i class="fas fa-tasks mr-1"></i>${p.task_count || 0}タスク
+                                                </span>
+                                                <span class="px-2 py-1 rounded text-xs bg-${categoryColor}-100 text-${categoryColor}-700">${categoryLabel}</span>
+                                            </div>
+                                        </div>
+                                      `
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ヒアリング質問管理 -->
+                    <div class="bg-white rounded-xl shadow-sm mb-6">
+                        <div class="p-4 border-b flex items-center justify-between">
+                            <h3 class="font-bold text-gray-900">
+                                <i class="fas fa-question-circle mr-2 text-cyan-600"></i>ヒアリング質問（申請種別別）
+                            </h3>
+                        </div>
+                        <div class="p-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
+                                ${(questionsBySubsidy.results || []).map((q: any) => {
+                                  const categoryColor = q.category === '行政書士管轄' ? 'emerald' : q.category === '社労士管轄' ? 'blue' : 'indigo'
+                                  return '<div class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">' +
+                                    '<div class="flex-1 min-w-0">' +
+                                    '<div class="font-medium text-gray-900 text-sm truncate">' + q.subsidy_name + '</div>' +
+                                    '</div>' +
+                                    '<span class="px-2 py-1 rounded text-xs bg-' + categoryColor + '-100 text-' + categoryColor + '-700 ml-2">' +
+                                    q.question_count + '問</span>' +
+                                    '</div>'
+                                }).join('')}
+                            </div>
+                            ${(questionsBySubsidy.results || []).length === 0 ? '<p class="text-center text-gray-500 py-4">ヒアリング質問が登録されていません</p>' : ''}
+                        </div>
+                    </div>
+
+                    <!-- クイックアクション -->
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h3 class="font-bold text-gray-900 mb-4">
+                            <i class="fas fa-bolt mr-2 text-yellow-500"></i>クイックアクション
+                        </h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            <button onclick="openNewSubsidyModal()" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition">
+                                <i class="fas fa-plus-circle text-2xl text-purple-500 mb-2"></i>
+                                <span class="text-sm text-gray-700">新規申請種別</span>
+                            </button>
+                            <a href="/admin/pipelines" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-orange-400 hover:bg-orange-50 transition">
+                                <i class="fas fa-project-diagram text-2xl text-orange-500 mb-2"></i>
+                                <span class="text-sm text-gray-700">パイプライン編集</span>
+                            </a>
+                            <a href="/admin/guidelines" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-pink-400 hover:bg-pink-50 transition">
+                                <i class="fas fa-book-open text-2xl text-pink-500 mb-2"></i>
+                                <span class="text-sm text-gray-700">公募要領管理</span>
+                            </a>
+                            <a href="/admin/statistics" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition">
+                                <i class="fas fa-chart-bar text-2xl text-blue-500 mb-2"></i>
+                                <span class="text-sm text-gray-700">統計レポート</span>
+                            </a>
+                            <button onclick="exportMasterData()" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-400 hover:bg-green-50 transition">
+                                <i class="fas fa-download text-2xl text-green-500 mb-2"></i>
+                                <span class="text-sm text-gray-700">データ出力</span>
+                            </button>
+                            <a href="/admin/settings" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition">
+                                <i class="fas fa-cog text-2xl text-gray-500 mb-2"></i>
+                                <span class="text-sm text-gray-700">システム設定</span>
+                            </a>
+                        </div>
+                        
+                        <!-- データ整備ツール -->
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <p class="text-sm text-gray-500 mb-3"><i class="fas fa-tools mr-1"></i>データ整備ツール（管理者用）</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="migrateHearingQuestions()" id="migrateHQBtn" class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition text-sm">
+                                    <i class="fas fa-question-circle mr-1"></i>ヒアリング質問プリセット追加
+                                </button>
+                                <button onclick="migrateRequiredDocs()" id="migrateDocsBtn" class="px-4 py-2 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 transition text-sm">
+                                    <i class="fas fa-file-alt mr-1"></i>必要書類プリセット追加
+                                </button>
+                            </div>
+                            <p id="migrateResult" class="text-sm mt-2 hidden"></p>
+                        </div>
+                    </div>
+
+                    <!-- 月別案件推移 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="font-bold text-gray-900 mb-4">
+                            <i class="fas fa-chart-line mr-2 text-indigo-600"></i>月別案件数推移（直近6ヶ月）
+                        </h3>
+                        <div class="flex items-end gap-2 h-40">
+                            ${(monthlyStats.results || []).map((m: any) => {
+                              const maxCount = Math.max(...(monthlyStats.results || []).map((x: any) => x.count || 1), 1)
+                              const height = Math.max((m.count / maxCount) * 100, 5)
+                              return '<div class="flex-1 flex flex-col items-center">' +
+                                '<div class="w-full bg-indigo-500 rounded-t" style="height: ' + height + '%"></div>' +
+                                '<div class="text-xs text-gray-500 mt-2 transform -rotate-45 origin-top-left">' + (m.month || '').slice(5) + '</div>' +
+                                '<div class="text-xs font-bold text-gray-700">' + (m.count || 0) + '</div>' +
+                                '</div>'
+                            }).join('')}
+                            ${(monthlyStats.results || []).length === 0 ? '<p class="text-center text-gray-500 w-full">データがありません</p>' : ''}
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- 新規申請種別モーダル -->
+        <div id="newSubsidyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div class="bg-white rounded-lg p-8 max-w-lg w-full mx-4 my-8">
+                <h3 class="text-xl font-bold mb-4">新しい申請種別を作成</h3>
+                <form id="newSubsidyForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">名称 *</label>
+                        <input type="text" name="name" required class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">カテゴリ *</label>
+                        <select name="category" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="行政書士管轄">補助金（行政書士管轄）</option>
+                            <option value="社労士管轄">助成金（社労士管轄）</option>
+                            <option value="許認可">許認可</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">説明</label>
+                        <textarea name="description" rows="2" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                    </div>
+                    <div class="flex gap-2 pt-4">
+                        <button type="submit" class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">作成</button>
+                        <button type="button" onclick="closeNewSubsidyModal()" class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            ${sidebarScripts}
+            
+            let currentSubsidyTab = 'all';
+            let currentPipelineFilter = 'all';
+            
+            function switchSubsidyTab(tab) {
+                currentSubsidyTab = tab;
+                document.querySelectorAll('[id^="tab-"]').forEach(el => {
+                    el.classList.remove('border-b-2', 'border-purple-600', 'text-purple-600');
+                    el.classList.add('text-gray-500');
+                });
+                document.getElementById('tab-' + tab).classList.add('border-b-2', 'border-purple-600', 'text-purple-600');
+                document.getElementById('tab-' + tab).classList.remove('text-gray-500');
+                filterSubsidies();
+            }
+            
+            function filterSubsidies() {
+                const searchTerm = document.getElementById('subsidySearch').value.toLowerCase();
+                document.querySelectorAll('.subsidy-item').forEach(item => {
+                    const category = item.dataset.category;
+                    const name = item.dataset.name.toLowerCase();
+                    
+                    let categoryMatch = currentSubsidyTab === 'all';
+                    if (currentSubsidyTab === 'subsidy') categoryMatch = category === '行政書士管轄';
+                    if (currentSubsidyTab === 'grant') categoryMatch = category === '社労士管轄';
+                    if (currentSubsidyTab === 'license') categoryMatch = category === '許認可';
+                    
+                    const searchMatch = name.includes(searchTerm);
+                    
+                    item.style.display = (categoryMatch && searchMatch) ? 'flex' : 'none';
+                });
+            }
+            
+            function filterPipelines(filter) {
+                currentPipelineFilter = filter;
+                document.querySelectorAll('.pipeline-filter-btn').forEach(btn => {
+                    btn.classList.remove('bg-gray-800', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                });
+                event.target.classList.remove('bg-gray-200', 'text-gray-700');
+                event.target.classList.add('bg-gray-800', 'text-white');
+                
+                document.querySelectorAll('.pipeline-item').forEach(item => {
+                    const category = item.dataset.category;
+                    const show = filter === 'all' || category === filter;
+                    item.style.display = show ? 'flex' : 'none';
+                });
+            }
+            
+            function openNewSubsidyModal() {
+                document.getElementById('newSubsidyModal').classList.remove('hidden');
+            }
+            
+            function closeNewSubsidyModal() {
+                document.getElementById('newSubsidyModal').classList.add('hidden');
+            }
+            
+            document.getElementById('newSubsidyForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                try {
+                    await axios.post('/api/subsidy-types', {
+                        name: formData.get('name'),
+                        category: formData.get('category'),
+                        description: formData.get('description')
+                    });
+                    alert('作成しました');
+                    location.reload();
+                } catch (error) {
+                    alert('エラーが発生しました');
+                }
+            });
+            
+            async function exportMasterData() {
+                if (!confirm('マスターデータをCSV形式でエクスポートしますか？')) return;
+                
+                try {
+                    const response = await axios.get('/api/master/export');
+                    const data = response.data;
+                    
+                    // 申請種別のCSV
+                    let subsidyCsv = 'ID,名称,カテゴリ,説明\\n';
+                    data.subsidyTypes.forEach(s => {
+                        subsidyCsv += s.id + ',"' + (s.name || '').replace(/"/g, '""') + '","' + (s.category || '') + '","' + (s.description || '').replace(/"/g, '""') + '"\\n';
+                    });
+                    
+                    // パイプラインのCSV
+                    let pipelineCsv = 'ID,名称,カテゴリ,説明,タスク数\\n';
+                    data.pipelineTemplates.forEach(p => {
+                        pipelineCsv += p.id + ',"' + (p.name || '').replace(/"/g, '""') + '","' + (p.category || '') + '","' + (p.description || '').replace(/"/g, '""') + '",' + (p.task_count || 0) + '\\n';
+                    });
+                    
+                    // BlobでZIPを作成（簡易版：別々にダウンロード）
+                    const blob1 = new Blob([subsidyCsv], { type: 'text/csv;charset=utf-8;' });
+                    const url1 = URL.createObjectURL(blob1);
+                    const a1 = document.createElement('a');
+                    a1.href = url1;
+                    a1.download = 'subsidy_types_' + new Date().toISOString().split('T')[0] + '.csv';
+                    a1.click();
+                    
+                    setTimeout(() => {
+                        const blob2 = new Blob([pipelineCsv], { type: 'text/csv;charset=utf-8;' });
+                        const url2 = URL.createObjectURL(blob2);
+                        const a2 = document.createElement('a');
+                        a2.href = url2;
+                        a2.download = 'pipeline_templates_' + new Date().toISOString().split('T')[0] + '.csv';
+                        a2.click();
+                    }, 500);
+                    
+                    alert('エクスポートが完了しました');
+                } catch (error) {
+                    console.error(error);
+                    alert('エクスポート中にエラーが発生しました');
+                }
+            }
+            
+            // ヒアリング質問プリセット追加
+            async function migrateHearingQuestions() {
+                if (!confirm('ヒアリング質問のプリセットを追加しますか？\\n（質問が設定されていない申請種別に自動で追加します）')) return;
+                
+                const btn = document.getElementById('migrateHQBtn');
+                const resultEl = document.getElementById('migrateResult');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>処理中...';
+                
+                try {
+                    const response = await axios.post('/api/master/migrate-hearing-questions');
+                    const data = response.data;
+                    
+                    resultEl.className = 'text-sm mt-2 text-green-600';
+                    resultEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>' + data.message + 
+                        ' (追加数: ' + data.totalAdded + '件)';
+                    resultEl.classList.remove('hidden');
+                    
+                    // ページをリロード
+                    setTimeout(() => location.reload(), 2000);
+                } catch (error) {
+                    console.error(error);
+                    resultEl.className = 'text-sm mt-2 text-red-600';
+                    resultEl.innerHTML = '<i class="fas fa-exclamation-circle mr-1"></i>エラーが発生しました';
+                    resultEl.classList.remove('hidden');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-question-circle mr-1"></i>ヒアリング質問プリセット追加';
+                }
+            }
+            
+            // 必要書類プリセット追加
+            async function migrateRequiredDocs() {
+                if (!confirm('必要書類のプリセットを追加しますか？\\n（必要書類が未設定の申請種別に自動で追加します）')) return;
+                
+                const btn = document.getElementById('migrateDocsBtn');
+                const resultEl = document.getElementById('migrateResult');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>処理中...';
+                
+                try {
+                    const response = await axios.post('/api/master/migrate-required-documents');
+                    const data = response.data;
+                    
+                    resultEl.className = 'text-sm mt-2 text-green-600';
+                    resultEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>' + data.message + 
+                        ' (更新数: ' + data.results.filter(r => r.updated).length + '件)';
+                    resultEl.classList.remove('hidden');
+                    
+                    // ページをリロード
+                    setTimeout(() => location.reload(), 2000);
+                } catch (error) {
+                    console.error(error);
+                    resultEl.className = 'text-sm mt-2 text-red-600';
+                    resultEl.innerHTML = '<i class="fas fa-exclamation-circle mr-1"></i>エラーが発生しました';
+                    resultEl.classList.remove('hidden');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-file-alt mr-1"></i>必要書類プリセット追加';
+                }
+            }
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// ===============================
 // パイプライン管理ページ
 // ===============================
 
@@ -19818,7 +22117,7 @@ app.get('/admin/pipelines', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>パイプライン管理 - 助成金申請管理システム</title>
+        <title>パイプライン管理 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
@@ -19836,9 +22135,9 @@ app.get('/admin/pipelines', (c) => {
                 <div class="p-4 border-b border-blue-700 flex-shrink-0">
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
-                        <span>助成金管理</span>
+                        <span>申請革命</span>
                     </h1>
-                    <p class="text-xs text-blue-300 mt-1">Subsidy Manager</p>
+                    <p class="text-xs text-blue-300 mt-1">Shinsei Kakumei</p>
                 </div>
                 
                 <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
@@ -20013,10 +22312,6 @@ app.get('/admin/pipelines', (c) => {
                             <label class="flex items-center gap-3">
                                 <input type="checkbox" name="progress_reflection" checked class="rounded text-blue-600">
                                 <span class="text-sm">進捗反映</span>
-                            </label>
-                            <label class="flex items-center gap-3">
-                                <input type="checkbox" name="allow_external_tasks" class="rounded text-blue-600">
-                                <span class="text-sm">外部タスクを許可</span>
                             </label>
                             <label class="flex items-center gap-3">
                                 <input type="checkbox" name="requires_approval" class="rounded text-blue-600">
@@ -20324,9 +22619,6 @@ app.get('/admin/pipelines', (c) => {
                                 <span class="text-sm \${template.progress_reflection ? 'text-green-600' : 'text-gray-400'}">
                                     <i class="fas fa-\${template.progress_reflection ? 'check' : 'times'} mr-1"></i>進捗反映
                                 </span>
-                                <span class="text-sm \${template.allow_external_tasks ? 'text-green-600' : 'text-gray-400'}">
-                                    <i class="fas fa-\${template.allow_external_tasks ? 'check' : 'times'} mr-1"></i>外部タスク
-                                </span>
                                 <span class="text-sm \${template.requires_approval ? 'text-green-600' : 'text-gray-400'}">
                                     <i class="fas fa-\${template.requires_approval ? 'check' : 'times'} mr-1"></i>承認必要
                                 </span>
@@ -20544,8 +22836,6 @@ app.get('/admin/pipelines', (c) => {
                     
                     const progressReflection = document.querySelector('input[name="progress_reflection"]');
                     if (progressReflection) progressReflection.checked = template.progress_reflection;
-                    const allowExternal = document.querySelector('input[name="allow_external_tasks"]');
-                    if (allowExternal) allowExternal.checked = template.allow_external_tasks;
                     const requiresApproval = document.querySelector('input[name="requires_approval"]');
                     if (requiresApproval) requiresApproval.checked = template.requires_approval;
                     
@@ -20610,7 +22900,7 @@ app.get('/admin/pipelines', (c) => {
                     service_start_offset: parseInt(formData.get('service_start_offset')) || 0,
                     service_end_offset: parseInt(formData.get('service_end_offset')) || 30,
                     progress_reflection: formData.get('progress_reflection') === 'on',
-                    allow_external_tasks: formData.get('allow_external_tasks') === 'on',
+                    allow_external_tasks: true,  // デフォルトで許可
                     requires_approval: formData.get('requires_approval') === 'on',
                     created_by: formData.get('created_by'),
                     subsidy_type_ids: subsidyTypeIds.length > 0 ? subsidyTypeIds : null,
@@ -20693,35 +22983,29 @@ app.get('/admin/pipelines', (c) => {
 app.get('/privacy-policy', async (c) => {
   const { DB } = c.env
   
-  let privacyPolicy = ''
-  let privacyPolicyUrl = ''
-  let companyName = ''
-  let footerText = ''
+  const settings: any = {}
   
   try {
-    const settings = await DB.prepare(`
-      SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key IN ('privacy_policy', 'privacy_policy_url', 'company_name', 'footer_text')
-    `).all()
-    
-    for (const s of (settings.results || [])) {
-      if ((s as any).setting_key === 'privacy_policy') privacyPolicy = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'privacy_policy_url') privacyPolicyUrl = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'company_name') companyName = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'footer_text') footerText = (s as any).setting_value || ''
+    const result = await DB.prepare(`SELECT setting_key, setting_value FROM site_settings`).all()
+    for (const s of (result.results || [])) {
+      settings[(s as any).setting_key] = (s as any).setting_value || ''
     }
   } catch (e) {
     // テーブルがない場合はデフォルト値を使用
   }
   
   // 外部URLが設定されている場合はリダイレクト
-  if (privacyPolicyUrl && privacyPolicyUrl.trim()) {
-    return c.redirect(privacyPolicyUrl)
+  if (settings.privacy_policy_url && settings.privacy_policy_url.trim()) {
+    return c.redirect(settings.privacy_policy_url)
   }
+  
+  const companyName = settings.company_name || '申請革命'
+  const footerText = settings.footer_text || ''
+  const privacyContent = settings.privacy_policy || ''
   
   // Markdownを簡易的にHTMLに変換
   const markdownToHtml = (text: string) => {
-    if (!text) return '<p class="text-gray-500">プライバシーポリシーが設定されていません。</p>'
+    if (!text) return ''
     return text
       .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-6 mb-3 text-gray-800">$1</h3>')
       .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">$1</h2>')
@@ -20731,7 +23015,59 @@ app.get('/privacy-policy', async (c) => {
       .replace(/\n/g, '<br>')
   }
   
-  const contentHtml = markdownToHtml(privacyPolicy)
+  // デフォルトのプライバシーポリシーテンプレート
+  const defaultPrivacy = `
+    <h2 class="text-xl font-bold mb-4 text-gray-800">1. 個人情報の取得</h2>
+    <p class="text-gray-700 mb-4">${companyName}（以下「当社」といいます）は、本サービスの提供にあたり、以下の個人情報を取得することがあります。</p>
+    <ul class="list-disc ml-6 text-gray-700 mb-4">
+      <li>氏名、会社名、所属部署</li>
+      <li>メールアドレス、電話番号</li>
+      <li>住所</li>
+      <li>サービス利用履歴、アクセスログ</li>
+      <li>その他、本サービスの提供に必要な情報</li>
+    </ul>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">2. 個人情報の利用目的</h2>
+    <p class="text-gray-700 mb-4">当社は、取得した個人情報を以下の目的で利用します。</p>
+    <ul class="list-disc ml-6 text-gray-700 mb-4">
+      <li>本サービスの提供・運営</li>
+      <li>ユーザーからのお問い合わせへの対応</li>
+      <li>サービス改善のための分析</li>
+      <li>新機能・更新情報等のお知らせ</li>
+      <li>利用規約に違反したユーザーへの対応</li>
+    </ul>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">3. 個人情報の第三者提供</h2>
+    <p class="text-gray-700 mb-4">当社は、以下の場合を除き、ユーザーの同意なく個人情報を第三者に提供しません。</p>
+    <ul class="list-disc ml-6 text-gray-700 mb-4">
+      <li>法令に基づく場合</li>
+      <li>人の生命、身体または財産の保護のために必要な場合</li>
+      <li>公衆衛生の向上または児童の健全な育成の推進のために特に必要な場合</li>
+      <li>国の機関等への協力が必要な場合</li>
+    </ul>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">4. 個人情報の安全管理</h2>
+    <p class="text-gray-700 mb-4">当社は、個人情報の漏洩、滅失、毀損の防止その他の安全管理のために、必要かつ適切な措置を講じます。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">5. 個人情報の開示・訂正・削除</h2>
+    <p class="text-gray-700 mb-4">ユーザーは、当社に対して、自己の個人情報の開示、訂正、削除を請求することができます。請求をされる場合は、下記のお問い合わせ先までご連絡ください。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">6. Cookieの使用</h2>
+    <p class="text-gray-700 mb-4">当社は、本サービスにおいてCookieを使用することがあります。Cookieはブラウザの設定により無効化することができますが、一部のサービスが利用できなくなる場合があります。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">7. プライバシーポリシーの変更</h2>
+    <p class="text-gray-700 mb-4">当社は、必要に応じて本ポリシーを変更することがあります。変更後のプライバシーポリシーは、本ページに掲載した時点から効力を生じます。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">8. お問い合わせ先</h2>
+    <p class="text-gray-700 mb-4">本ポリシーに関するお問い合わせは、以下までお願いいたします。</p>
+    <p class="text-gray-700 mb-4">
+      ${companyName}<br>
+      メール: ${settings.company_email || '（メールアドレス）'}<br>
+      電話: ${settings.company_phone || '（電話番号）'}
+    </p>
+  `
+  
+  const contentHtml = privacyContent ? markdownToHtml(privacyContent) : defaultPrivacy
   
   return c.html(`
     <!DOCTYPE html>
@@ -20739,37 +23075,43 @@ app.get('/privacy-policy', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>プライバシーポリシー - ${companyName || '助成金申請管理システム'}</title>
+        <title>プライバシーポリシー - ${companyName}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
     <body class="bg-gray-50">
         <div class="min-h-screen flex flex-col">
-            <header class="bg-blue-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
+            <header class="bg-gradient-to-r from-green-600 to-green-800 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-6">
+                    <a href="/" class="text-green-200 hover:text-white text-sm mb-2 inline-block">
+                        <i class="fas fa-arrow-left mr-1"></i>トップに戻る
+                    </a>
                     <h1 class="text-2xl font-bold">
                         <i class="fas fa-shield-alt mr-2"></i>
                         プライバシーポリシー
                     </h1>
-                    ${companyName ? `<p class="text-blue-100 text-sm mt-1">${companyName}</p>` : ''}
                 </div>
             </header>
             
             <div class="container mx-auto px-4 py-8 max-w-4xl flex-1">
-                <div class="bg-white rounded-lg shadow p-6 md:p-8 prose max-w-none">
+                <div class="bg-white rounded-xl shadow-sm p-6 md:p-8">
                     ${contentHtml}
                 </div>
                 
-                <div class="mt-6 text-center">
-                    <button onclick="window.close()" class="text-blue-600 hover:text-blue-700">
-                        <i class="fas fa-times mr-1"></i>このタブを閉じる
-                    </button>
+                <div class="mt-8 flex justify-center gap-4">
+                    <a href="/legal" class="text-green-600 hover:text-green-800">
+                        <i class="fas fa-balance-scale mr-1"></i>特定商取引法に基づく表記
+                    </a>
+                    <span class="text-gray-300">|</span>
+                    <a href="/terms" class="text-green-600 hover:text-green-800">
+                        <i class="fas fa-file-contract mr-1"></i>利用規約
+                    </a>
                 </div>
             </div>
             
-            <footer class="bg-gray-100 border-t py-4 mt-8">
-                <div class="container mx-auto px-4 text-center text-sm text-gray-600">
-                    ${footerText || ''}
+            <footer class="bg-gray-800 text-gray-400 py-6 mt-8">
+                <div class="container mx-auto px-4 text-center text-sm">
+                    <p>${footerText || '© ' + new Date().getFullYear() + ' ' + companyName}</p>
                 </div>
             </footer>
         </div>
@@ -20785,45 +23127,24 @@ app.get('/privacy-policy', async (c) => {
 app.get('/legal', async (c) => {
   const { DB } = c.env
   
-  let legalNotice = ''
-  let legalNoticeUrl = ''
-  let companyName = ''
-  let footerText = ''
+  const settings: any = {}
   
   try {
-    const settings = await DB.prepare(`
-      SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key IN ('legal_notice', 'legal_notice_url', 'company_name', 'footer_text')
-    `).all()
-    
-    for (const s of (settings.results || [])) {
-      if ((s as any).setting_key === 'legal_notice') legalNotice = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'legal_notice_url') legalNoticeUrl = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'company_name') companyName = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'footer_text') footerText = (s as any).setting_value || ''
+    const result = await DB.prepare(`SELECT setting_key, setting_value FROM site_settings`).all()
+    for (const s of (result.results || [])) {
+      settings[(s as any).setting_key] = (s as any).setting_value || ''
     }
   } catch (e) {
     // テーブルがない場合はデフォルト値を使用
   }
   
   // 外部URLが設定されている場合はリダイレクト
-  if (legalNoticeUrl && legalNoticeUrl.trim()) {
-    return c.redirect(legalNoticeUrl)
+  if (settings.legal_notice_url && settings.legal_notice_url.trim()) {
+    return c.redirect(settings.legal_notice_url)
   }
   
-  // Markdownを簡易的にHTMLに変換
-  const markdownToHtml = (text: string) => {
-    if (!text) return '<p class="text-gray-500">特定商取引法に基づく表記が設定されていません。</p>'
-    return text
-      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-6 mb-3 text-gray-800">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-gray-800">$1</h1>')
-      .replace(/^- (.+)$/gm, '<li class="ml-4 text-gray-700">$1</li>')
-      .replace(/\n\n/g, '</p><p class="text-gray-700 mb-4">')
-      .replace(/\n/g, '<br>')
-  }
-  
-  const contentHtml = markdownToHtml(legalNotice)
+  const companyName = settings.company_name || '（未設定）'
+  const footerText = settings.footer_text || ''
   
   return c.html(`
     <!DOCTYPE html>
@@ -20831,37 +23152,113 @@ app.get('/legal', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>特定商取引法に基づく表記 - ${companyName || '助成金申請管理システム'}</title>
+        <title>特定商取引法に基づく表記 - ${companyName}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
     <body class="bg-gray-50">
         <div class="min-h-screen flex flex-col">
-            <header class="bg-blue-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
+            <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-6">
+                    <a href="/" class="text-blue-200 hover:text-white text-sm mb-2 inline-block">
+                        <i class="fas fa-arrow-left mr-1"></i>トップに戻る
+                    </a>
                     <h1 class="text-2xl font-bold">
                         <i class="fas fa-balance-scale mr-2"></i>
                         特定商取引法に基づく表記
                     </h1>
-                    ${companyName ? `<p class="text-blue-100 text-sm mt-1">${companyName}</p>` : ''}
                 </div>
             </header>
             
             <div class="container mx-auto px-4 py-8 max-w-4xl flex-1">
-                <div class="bg-white rounded-lg shadow p-6 md:p-8 prose max-w-none">
-                    ${contentHtml}
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <table class="w-full">
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700 w-1/3">事業者名</th>
+                                <td class="px-6 py-4 text-gray-900">${companyName}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">代表者</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.company_representative || '（未設定）'}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">所在地</th>
+                                <td class="px-6 py-4 text-gray-900">
+                                    ${settings.postal_code ? '〒' + settings.postal_code + '<br>' : ''}
+                                    ${settings.company_address || '（未設定）'}
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">電話番号</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.company_phone || '（未設定）'}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">メールアドレス</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.company_email || '（未設定）'}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">営業時間</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.business_hours || '（未設定）'}</td>
+                            </tr>
+                            ${settings.invoice_registration_number ? `
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">適格請求書発行事業者<br>登録番号</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.invoice_registration_number}</td>
+                            </tr>
+                            ` : ''}
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">販売価格</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.legal_price_info || 'サービス料金は各プランページに記載の通りです。表示価格は税込みです。'}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">支払方法</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.legal_payment_method || 'クレジットカード決済、銀行振込'}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">支払時期</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.legal_payment_timing || 'クレジットカード：お申込み時に決済 / 銀行振込：請求書発行後14日以内'}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">サービス提供時期</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.legal_service_start || 'お申込み手続き完了後、即時ご利用いただけます。'}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">返品・キャンセル</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.legal_cancel_policy || '月額プランは解約申請月の末日までご利用可能です。日割り返金は行っておりません。'}</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">追加費用</th>
+                                <td class="px-6 py-4 text-gray-900">${settings.legal_additional_cost || '別途通信費等がかかる場合があります。'}</td>
+                            </tr>
+                            ${settings.bank_name ? `
+                            <tr class="hover:bg-gray-50">
+                                <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">振込先</th>
+                                <td class="px-6 py-4 text-gray-900">
+                                    ${settings.bank_name} ${settings.bank_branch || ''}支店<br>
+                                    ${settings.bank_account_type || '普通'} ${settings.bank_account_number || ''}<br>
+                                    口座名義: ${settings.bank_account_holder || ''}
+                                </td>
+                            </tr>
+                            ` : ''}
+                        </tbody>
+                    </table>
                 </div>
                 
-                <div class="mt-6 text-center">
-                    <button onclick="window.close()" class="text-blue-600 hover:text-blue-700">
-                        <i class="fas fa-times mr-1"></i>このタブを閉じる
-                    </button>
+                <div class="mt-8 flex justify-center gap-4">
+                    <a href="/terms" class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-file-contract mr-1"></i>利用規約
+                    </a>
+                    <span class="text-gray-300">|</span>
+                    <a href="/privacy-policy" class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-shield-alt mr-1"></i>プライバシーポリシー
+                    </a>
                 </div>
             </div>
             
-            <footer class="bg-gray-100 border-t py-4 mt-8">
-                <div class="container mx-auto px-4 text-center text-sm text-gray-600">
-                    ${footerText || ''}
+            <footer class="bg-gray-800 text-gray-400 py-6 mt-8">
+                <div class="container mx-auto px-4 text-center text-sm">
+                    <p>${footerText || '© ' + new Date().getFullYear() + ' ' + companyName}</p>
                 </div>
             </footer>
         </div>
@@ -20877,35 +23274,29 @@ app.get('/legal', async (c) => {
 app.get('/terms', async (c) => {
   const { DB } = c.env
   
-  let termsOfService = ''
-  let termsUrl = ''
-  let companyName = ''
-  let footerText = ''
+  const settings: any = {}
   
   try {
-    const settings = await DB.prepare(`
-      SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key IN ('terms_of_service', 'terms_url', 'company_name', 'footer_text')
-    `).all()
-    
-    for (const s of (settings.results || [])) {
-      if ((s as any).setting_key === 'terms_of_service') termsOfService = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'terms_url') termsUrl = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'company_name') companyName = (s as any).setting_value || ''
-      if ((s as any).setting_key === 'footer_text') footerText = (s as any).setting_value || ''
+    const result = await DB.prepare(`SELECT setting_key, setting_value FROM site_settings`).all()
+    for (const s of (result.results || [])) {
+      settings[(s as any).setting_key] = (s as any).setting_value || ''
     }
   } catch (e) {
     // テーブルがない場合はデフォルト値を使用
   }
   
   // 外部URLが設定されている場合はリダイレクト
-  if (termsUrl && termsUrl.trim()) {
-    return c.redirect(termsUrl)
+  if (settings.terms_url && settings.terms_url.trim()) {
+    return c.redirect(settings.terms_url)
   }
+  
+  const companyName = settings.company_name || '申請革命'
+  const footerText = settings.footer_text || ''
+  const termsContent = settings.terms_of_service || ''
   
   // Markdownを簡易的にHTMLに変換
   const markdownToHtml = (text: string) => {
-    if (!text) return '<p class="text-gray-500">利用規約が設定されていません。</p>'
+    if (!text) return ''
     return text
       .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-6 mb-3 text-gray-800">$1</h3>')
       .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">$1</h2>')
@@ -20915,7 +23306,44 @@ app.get('/terms', async (c) => {
       .replace(/\n/g, '<br>')
   }
   
-  const contentHtml = markdownToHtml(termsOfService)
+  // デフォルトの利用規約テンプレート
+  const defaultTerms = `
+    <h2 class="text-xl font-bold mb-4 text-gray-800">第1条（適用）</h2>
+    <p class="text-gray-700 mb-4">本規約は、${companyName}（以下「当社」といいます）が提供するサービス「申請革命」（以下「本サービス」といいます）の利用に関する条件を定めるものです。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第2条（利用登録）</h2>
+    <p class="text-gray-700 mb-4">登録希望者が当社の定める方法によって利用登録を申請し、当社がこれを承認することによって、利用登録が完了するものとします。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第3条（ユーザーIDおよびパスワードの管理）</h2>
+    <p class="text-gray-700 mb-4">ユーザーは、自己の責任において、本サービスのユーザーIDおよびパスワードを適切に管理するものとします。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第4条（禁止事項）</h2>
+    <p class="text-gray-700 mb-4">ユーザーは、本サービスの利用にあたり、以下の行為をしてはなりません。</p>
+    <ul class="list-disc ml-6 text-gray-700 mb-4">
+      <li>法令または公序良俗に違反する行為</li>
+      <li>犯罪行為に関連する行為</li>
+      <li>当社のサービスの運営を妨害するおそれのある行為</li>
+      <li>他のユーザーに関する個人情報等を収集または蓄積する行為</li>
+      <li>不正アクセスをし、またはこれを試みる行為</li>
+    </ul>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第5条（本サービスの提供の停止等）</h2>
+    <p class="text-gray-700 mb-4">当社は、以下のいずれかの事由があると判断した場合、ユーザーに事前に通知することなく本サービスの全部または一部の提供を停止または中断することができるものとします。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第6条（免責事項）</h2>
+    <p class="text-gray-700 mb-4">当社は、本サービスに関して、ユーザーと他のユーザーまたは第三者との間において生じた取引、連絡または紛争等について一切責任を負いません。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第7条（サービス内容の変更等）</h2>
+    <p class="text-gray-700 mb-4">当社は、ユーザーに通知することなく、本サービスの内容を変更しまたは本サービスの提供を中止することができるものとし、これによってユーザーに生じた損害について一切の責任を負いません。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第8条（利用規約の変更）</h2>
+    <p class="text-gray-700 mb-4">当社は、必要と判断した場合には、ユーザーに通知することなくいつでも本規約を変更することができるものとします。</p>
+    
+    <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第9条（準拠法・裁判管轄）</h2>
+    <p class="text-gray-700 mb-4">本規約の解釈にあたっては、日本法を準拠法とします。本サービスに関して紛争が生じた場合には、当社の本店所在地を管轄する裁判所を専属的合意管轄とします。</p>
+  `
+  
+  const contentHtml = termsContent ? markdownToHtml(termsContent) : defaultTerms
   
   return c.html(`
     <!DOCTYPE html>
@@ -20923,37 +23351,43 @@ app.get('/terms', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>利用規約 - ${companyName || '助成金申請管理システム'}</title>
+        <title>利用規約 - ${companyName}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
     <body class="bg-gray-50">
         <div class="min-h-screen flex flex-col">
-            <header class="bg-purple-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-4">
+            <header class="bg-gradient-to-r from-purple-600 to-purple-800 text-white shadow-lg">
+                <div class="container mx-auto px-4 py-6">
+                    <a href="/" class="text-purple-200 hover:text-white text-sm mb-2 inline-block">
+                        <i class="fas fa-arrow-left mr-1"></i>トップに戻る
+                    </a>
                     <h1 class="text-2xl font-bold">
-                        <i class="fas fa-scroll mr-2"></i>
+                        <i class="fas fa-file-contract mr-2"></i>
                         利用規約
                     </h1>
-                    ${companyName ? `<p class="text-purple-100 text-sm mt-1">${companyName}</p>` : ''}
                 </div>
             </header>
             
             <div class="container mx-auto px-4 py-8 max-w-4xl flex-1">
-                <div class="bg-white rounded-lg shadow p-6 md:p-8 prose max-w-none">
+                <div class="bg-white rounded-xl shadow-sm p-6 md:p-8">
                     ${contentHtml}
                 </div>
                 
-                <div class="mt-6 text-center">
-                    <button onclick="window.close()" class="text-purple-600 hover:text-purple-700">
-                        <i class="fas fa-times mr-1"></i>このタブを閉じる
-                    </button>
+                <div class="mt-8 flex justify-center gap-4">
+                    <a href="/legal" class="text-purple-600 hover:text-purple-800">
+                        <i class="fas fa-balance-scale mr-1"></i>特定商取引法に基づく表記
+                    </a>
+                    <span class="text-gray-300">|</span>
+                    <a href="/privacy-policy" class="text-purple-600 hover:text-purple-800">
+                        <i class="fas fa-shield-alt mr-1"></i>プライバシーポリシー
+                    </a>
                 </div>
             </div>
             
-            <footer class="bg-gray-100 border-t py-4 mt-8">
-                <div class="container mx-auto px-4 text-center text-sm text-gray-600">
-                    ${footerText || ''}
+            <footer class="bg-gray-800 text-gray-400 py-6 mt-8">
+                <div class="container mx-auto px-4 text-center text-sm">
+                    <p>${footerText || '© ' + new Date().getFullYear() + ' ' + companyName}</p>
                 </div>
             </footer>
         </div>
@@ -21105,6 +23539,21 @@ app.post('/api/clients/:clientId/report-transfer', async (c) => {
         WHERE client_id = ?
       `).bind(clientId).run()
     }
+    
+    // 管理者に入金報告の通知を作成
+    const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(clientId).first()
+    const clientName = client?.company_name || client?.name || '顧客'
+    const amountFormatted = amount ? `${amount.toLocaleString()}円` : ''
+    await DB.prepare(`
+      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(
+      'payment_report',
+      '入金報告がありました',
+      `${clientName}様から入金報告がありました${amountFormatted ? `（${amountFormatted}）` : ''}。確認をお願いします。`,
+      clientId,
+      'clients'
+    ).run()
     
     return c.json({ success: true, message: '振込完了報告を送信しました。確認まで少々お待ちください。' })
   } catch (error: any) {
@@ -21351,7 +23800,7 @@ app.get('/admin/subscription', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>プラン・枠管理 - 助成金申請管理システム</title>
+        <title>プラン・枠管理 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -21398,9 +23847,16 @@ app.get('/admin/subscription', async (c) => {
                             <p id="nextResetDate" class="text-lg font-bold text-purple-600">-</p>
                         </div>
                     </div>
-                    <div id="scheduledPlanInfo" class="hidden mt-3 text-xs bg-yellow-50 border border-yellow-200 rounded p-2">
-                        <i class="fas fa-clock text-yellow-600 mr-1"></i>
-                        <span id="scheduledPlanText"></span>
+                    <div id="scheduledPlanInfo" class="hidden mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-clock text-yellow-600"></i>
+                                <span id="scheduledPlanText" class="text-sm text-yellow-800"></span>
+                            </div>
+                            <button onclick="cancelScheduledPlan()" class="px-3 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded text-xs font-medium transition-colors">
+                                <i class="fas fa-times mr-1"></i>キャンセル
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -21539,8 +23995,10 @@ app.get('/admin/subscription', async (c) => {
             let currentSubscription = null;
             
             async function loadAll() {
+                // loadStatusを先に実行してcurrentSubscriptionとscheduledPlanDataを設定
+                await loadStatus();
+                // その後に他のデータを並列で読み込み
                 await Promise.all([
-                    loadStatus(),
                     loadPlans(),
                     loadPackages(),
                     loadHistory()
@@ -21803,7 +24261,8 @@ app.get('/admin/subscription', async (c) => {
                         } else if (isScheduled) {
                             statusBadge = '<div class="text-xs font-bold text-yellow-600 mb-2"><i class="fas fa-clock mr-1"></i>変更予約済み（' + new Date(nextResetDateData).toLocaleDateString('ja-JP') + 'から適用）</div>';
                             borderClass = 'border-yellow-500 bg-yellow-50';
-                            buttonHtml = '<button onclick="cancelScheduledPlan()" class="w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">予約をキャンセル</button>';
+                            // キャンセルボタンは上部の通知エリアにあるので、ここではボタンを表示しない
+                            buttonHtml = '';
                         }
                         
                         // 無制限プランかどうか
@@ -21926,9 +24385,17 @@ app.get('/admin/subscription', async (c) => {
                 
                 try {
                     await axios.post('/api/subscription/cancel-scheduled-plan');
+                    
+                    // 即座にUIを更新
+                    document.getElementById('scheduledPlanInfo').classList.add('hidden');
+                    scheduledPlanData = null;
+                    
                     alert('プラン変更の予約をキャンセルしました');
-                    loadAll();
+                    
+                    // 全データを再読み込み
+                    await loadAll();
                 } catch (error) {
+                    console.error('Cancel error:', error);
                     alert('キャンセルに失敗しました');
                 }
             }
@@ -21959,7 +24426,7 @@ app.get('/admin/settings', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>システム設定 - 助成金申請管理システム</title>
+        <title>システム設定 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -22422,7 +24889,7 @@ app.get('/admin/payments', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>支払い確認 - 助成金申請管理システム</title>
+        <title>支払い確認 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -22647,7 +25114,7 @@ app.get('/clients', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>顧客管理 - 助成金申請管理システム</title>
+        <title>顧客管理 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -22760,12 +25227,14 @@ app.get('/clients', async (c) => {
 app.get('/cases', async (c) => {
   try {
     const { DB } = c.env
+    const showArchived = c.req.query('archived') === 'true'
     
     // casesテーブルから案件を取得
-    const query = `
+    let query = `
       SELECT 
         cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
         cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
+        cs.is_archived, cs.result, cs.approved_amount, cs.result_date,
         cl.id as client_id, cl.name as client_name, cl.company_name,
         st.name as subsidy_type_name, st.category as subsidy_category,
         au.name as assigned_to_name
@@ -22773,11 +25242,37 @@ app.get('/cases', async (c) => {
       LEFT JOIN clients cl ON cs.client_id = cl.id
       LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
       LEFT JOIN admin_users au ON cs.assigned_to = au.username
+      WHERE (cs.is_archived = 0 OR cs.is_archived IS NULL)
       ORDER BY cs.created_at DESC
     `
     
+    // アーカイブ表示の場合はアーカイブされた案件のみ表示
+    if (showArchived) {
+      query = `
+        SELECT 
+          cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
+          cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
+          cs.is_archived, cs.result, cs.approved_amount, cs.result_date,
+          cl.id as client_id, cl.name as client_name, cl.company_name,
+          st.name as subsidy_type_name, st.category as subsidy_category,
+          au.name as assigned_to_name
+        FROM cases cs
+        LEFT JOIN clients cl ON cs.client_id = cl.id
+        LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+        LEFT JOIN admin_users au ON cs.assigned_to = au.username
+        WHERE cs.is_archived = 1
+        ORDER BY cs.created_at DESC
+      `
+    }
+    
     const casesResult = await DB.prepare(query).all()
     const allCases = casesResult.results || []
+    
+    // アーカイブ数を取得
+    const archivedCountResult = await DB.prepare(`
+      SELECT COUNT(*) as count FROM cases WHERE is_archived = 1
+    `).first() as any
+    const archivedCount = archivedCountResult?.count || 0
     
     // ステータス定義
     const STATUSES = [
@@ -22812,28 +25307,41 @@ app.get('/cases', async (c) => {
       
       const cardsHtml = statusCases.length === 0 
         ? '<div class="text-center py-6 text-gray-400 text-sm">案件なし</div>'
-        : statusCases.map((c: any) => `
+        : statusCases.map((c: any) => {
+          // 採択/不採択バッジ
+          let resultBadge = ''
+          if (c.result === 'approved') {
+            resultBadge = '<span class="px-2 py-0.5 rounded text-xs bg-blue-500 text-white"><i class="fas fa-check mr-1"></i>採択</span>'
+          } else if (c.result === 'rejected') {
+            resultBadge = '<span class="px-2 py-0.5 rounded text-xs bg-red-500 text-white"><i class="fas fa-times mr-1"></i>不採択</span>'
+          } else if (c.status === 'completed' && !c.result) {
+            resultBadge = '<span class="px-2 py-0.5 rounded text-xs bg-gray-300 text-gray-700"><i class="fas fa-clock mr-1"></i>結果待ち</span>'
+          }
+          
+          return `
           <a href="/case/${c.id}" class="block bg-white rounded-lg shadow-sm border hover:shadow-md hover:border-blue-300 transition-all cursor-pointer">
             <div class="p-3">
               <div class="flex items-center justify-between mb-2">
                 <span class="font-mono text-xs text-gray-500">${c.case_number || '#' + c.id}</span>
-                ${c.deposit_required && !c.deposit_paid ? '<span class="text-yellow-600 text-xs" title="手付金未払"><i class="fas fa-yen-sign"></i></span>' : ''}
+                <div class="flex items-center gap-1">
+                  ${c.deposit_required && !c.deposit_paid ? '<span class="text-yellow-600 text-xs" title="手付金未払"><i class="fas fa-yen-sign"></i></span>' : ''}
+                  ${c.is_archived ? '<span class="text-gray-400 text-xs" title="アーカイブ済み"><i class="fas fa-archive"></i></span>' : ''}
+                </div>
               </div>
               <div class="font-bold text-gray-900 mb-1">${c.client_name || '名称未設定'}</div>
               ${c.company_name ? '<div class="text-xs text-gray-500 mb-2">' + c.company_name + '</div>' : ''}
-              ${c.subsidy_type_name ? '<div class="inline-block px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800 mb-2">' + c.subsidy_type_name + '</div>' : ''}
+              <div class="flex flex-wrap gap-1 mb-2">
+                ${c.subsidy_type_name ? '<span class="inline-block px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800">' + c.subsidy_type_name + '</span>' : ''}
+                ${resultBadge}
+              </div>
+              ${c.approved_amount ? '<div class="text-xs text-blue-600 mb-2"><i class="fas fa-check-circle mr-1"></i>採択額: ¥' + c.approved_amount.toLocaleString() + '</div>' : ''}
               <div class="flex items-center gap-2 text-xs text-gray-500 mt-2">
                 ${c.assigned_to_name ? '<span><i class="fas fa-user mr-1"></i>' + c.assigned_to_name + '</span>' : ''}
               </div>
-              ${c.deposit_required ? `
-                <div class="mt-2 text-xs ${c.deposit_paid ? 'text-green-600' : 'text-yellow-600'}">
-                  <i class="fas fa-yen-sign mr-1"></i>¥${(c.deposit_amount || 0).toLocaleString()}
-                  ${c.deposit_paid ? '<span class="ml-1">✓支払済</span>' : '<span class="ml-1">未払</span>'}
-                </div>
-              ` : ''}
+              ${c.deposit_required ? '<div class="mt-2 text-xs ' + (c.deposit_paid ? 'text-green-600' : 'text-yellow-600') + '"><i class="fas fa-yen-sign mr-1"></i>¥' + (c.deposit_amount || 0).toLocaleString() + (c.deposit_paid ? '<span class="ml-1">✓支払済</span>' : '<span class="ml-1">未払</span>') + '</div>' : ''}
             </div>
           </a>
-        `).join('')
+        `}).join('')
       
       return `
         <div class="flex flex-col rounded-lg ${colors.bg} border ${colors.border} overflow-hidden min-w-[280px]">
@@ -22857,7 +25365,7 @@ app.get('/cases', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>案件一覧 - 助成金申請管理システム</title>
+        <title>案件一覧 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -22899,13 +25407,24 @@ app.get('/cases', async (c) => {
                                 <i class="fas fa-bars text-xl"></i>
                             </button>
                             <h2 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-folder-open mr-2"></i>案件一覧
+                                <i class="fas fa-folder-open mr-2"></i>${showArchived ? 'アーカイブ済み案件' : '案件一覧'}
                             </h2>
                             <span class="text-sm text-gray-500">${allCases.length}件</span>
                         </div>
-                        <a href="/?openNewCase=true" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                            <i class="fas fa-plus mr-2"></i>新規案件登録
-                        </a>
+                        <div class="flex items-center gap-3">
+                            ${showArchived ? `
+                                <a href="/cases" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border hover:bg-gray-50 text-sm">
+                                    <i class="fas fa-arrow-left mr-2"></i>戻る
+                                </a>
+                            ` : `
+                                <a href="/cases?archived=true" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border hover:bg-gray-50 text-sm" title="アーカイブ済み案件を表示">
+                                    <i class="fas fa-archive mr-2"></i>アーカイブ${archivedCount > 0 ? ' (' + archivedCount + ')' : ''}
+                                </a>
+                            `}
+                            <a href="/?openNewCase=true" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-plus mr-2"></i>新規案件登録
+                            </a>
+                        </div>
                     </div>
                 </header>
 
@@ -23018,7 +25537,7 @@ app.get('/admin/statistics', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>統計情報 - 助成金申請管理システム</title>
+        <title>統計情報 - 申請革命</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -23772,8 +26291,12 @@ function generateMasterSidebar(activePage: string = '') {
             </a>
             
             <div class="pt-4 pb-2">
-                <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">システム</p>
+                <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">設定</p>
             </div>
+            <a href="/master/legal-settings" class="sidebar-link ${isActive('legal')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-balance-scale w-5"></i>
+                <span>法的表記・会社情報</span>
+            </a>
             <a href="/master/admins" class="sidebar-link ${isActive('admins')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
                 <i class="fas fa-user-shield w-5"></i>
                 <span>マスター管理者</span>
@@ -24071,7 +26594,364 @@ app.get('/master', async (c) => {
   `)
 })
 
+// ===============================
+// サイト設定API
+// ===============================
+
+// サイト設定取得
+app.get('/api/site-settings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings
+    `).all()
+    
+    const result: Record<string, string> = {}
+    for (const s of (settings.results || []) as any[]) {
+      result[s.setting_key] = s.setting_value || ''
+    }
+    
+    return c.json(result)
+  } catch (e) {
+    return c.json({})
+  }
+})
+
+// サイト設定更新
+app.post('/api/site-settings', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    for (const [key, value] of Object.entries(data)) {
+      // 既存のキーがあれば更新、なければ挿入
+      await DB.prepare(`
+        INSERT INTO site_settings (setting_key, setting_value, updated_at) 
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(setting_key) DO UPDATE SET 
+          setting_value = excluded.setting_value,
+          updated_at = CURRENT_TIMESTAMP
+      `).bind(key, value).run()
+    }
+    
+    return c.json({ success: true, message: '設定を保存しました' })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
 // マスターダッシュボードAPI
+// マスターデータエクスポートAPI
+app.get('/api/master/export', async (c) => {
+  const { DB } = c.env
+  
+  const subsidyTypes = await DB.prepare(`
+    SELECT id, name, category, description FROM subsidy_types ORDER BY id
+  `).all()
+  
+  const pipelineTemplates = await DB.prepare(`
+    SELECT pt.*, 
+           (SELECT COUNT(*) FROM pipeline_template_tasks WHERE template_id = pt.id) as task_count
+    FROM pipeline_templates pt 
+    ORDER BY pt.id
+  `).all()
+  
+  const hearingQuestions = await DB.prepare(`
+    SELECT hq.*, st.name as subsidy_name
+    FROM hearing_questions hq
+    LEFT JOIN subsidy_types st ON hq.subsidy_type_id = st.id
+    ORDER BY hq.id
+  `).all()
+  
+  return c.json({
+    subsidyTypes: subsidyTypes.results || [],
+    pipelineTemplates: pipelineTemplates.results || [],
+    hearingQuestions: hearingQuestions.results || []
+  })
+})
+
+// ヒアリング質問プリセット追加API
+app.post('/api/master/migrate-hearing-questions', async (c) => {
+  const { DB } = c.env
+  
+  // 質問がない申請種別を取得
+  const missingQuestions = await DB.prepare(`
+    SELECT st.id, st.name, st.category,
+           (SELECT COUNT(*) FROM hearing_questions WHERE subsidy_type_id = st.id) as question_count
+    FROM subsidy_types st
+    WHERE (SELECT COUNT(*) FROM hearing_questions WHERE subsidy_type_id = st.id) = 0
+    ORDER BY st.category, st.id
+  `).all()
+  
+  const results: { id: number; name: string; added: number }[] = []
+  
+  // プリセット質問の定義
+  const presetQuestions: { [key: number]: { key: string; text: string; type: string; options: string | null; required: number; order: number }[] } = {
+    // キャリアアップ助成金（正社員化コース）ID:45
+    45: [
+      { key: 'cu_seishain_count', text: '正社員転換を予定している有期契約労働者は何名ですか？', type: 'number', options: null, required: 1, order: 1 },
+      { key: 'cu_seishain_type', text: '転換予定者の現在の雇用形態を教えてください', type: 'select', options: '["有期契約社員","パート・アルバイト","派遣社員","その他"]', required: 1, order: 2 },
+      { key: 'cu_seishain_term', text: '転換予定者の勤続期間はどのくらいですか？', type: 'select', options: '["6ヶ月未満","6ヶ月以上1年未満","1年以上2年未満","2年以上3年未満","3年以上"]', required: 1, order: 3 },
+      { key: 'cu_seishain_rule', text: '就業規則に正社員転換制度は規定されていますか？', type: 'select', options: '["規定済み","規定予定","規定なし","わからない"]', required: 1, order: 4 },
+      { key: 'cu_seishain_wage', text: '転換後の賃金は転換前と比較して何%以上増加予定ですか？', type: 'select', options: '["3%以上","5%以上","10%以上","未定"]', required: 1, order: 5 }
+    ],
+    // 中途採用等支援助成金 ID:38
+    38: [
+      { key: 'chuto_plan', text: '中途採用を積極的に行う計画はありますか？', type: 'select', options: '["ある","検討中","まだない"]', required: 1, order: 1 },
+      { key: 'chuto_count', text: '中途採用者の予定人数を教えてください', type: 'number', options: null, required: 1, order: 2 },
+      { key: 'chuto_age', text: '中途採用者の想定年齢層を教えてください', type: 'checkbox', options: '["35歳未満","35歳以上45歳未満","45歳以上"]', required: 1, order: 3 },
+      { key: 'chuto_ratio', text: '中途採用比率の目標値はありますか？', type: 'select', options: '["ある","設定予定","ない"]', required: 0, order: 4 },
+      { key: 'chuto_training', text: '中途採用者向けの研修制度はありますか？', type: 'select', options: '["ある","導入予定","ない"]', required: 0, order: 5 }
+    ],
+    // 介護離職防止支援助成金 ID:40
+    40: [
+      { key: 'kaigo_rule', text: '介護休業制度は就業規則に規定されていますか？', type: 'select', options: '["規定済み","規定予定","規定なし"]', required: 1, order: 1 },
+      { key: 'kaigo_employee', text: '介護休業を取得予定または取得した従業員はいますか？', type: 'select', options: '["いる","予定あり","いない"]', required: 1, order: 2 },
+      { key: 'kaigo_flexible', text: '介護のための柔軟な働き方制度はありますか？', type: 'checkbox', options: '["短時間勤務","フレックスタイム","在宅勤務","時差出勤","なし"]', required: 1, order: 3 },
+      { key: 'kaigo_return', text: '介護休業からの復帰支援制度はありますか？', type: 'select', options: '["ある","導入予定","ない"]', required: 0, order: 4 },
+      { key: 'kaigo_consult', text: '従業員の介護に関する相談窓口はありますか？', type: 'select', options: '["ある","設置予定","ない"]', required: 0, order: 5 }
+    ],
+    // 出生時両立支援コース ID:42
+    42: [
+      { key: 'papa_record', text: '男性従業員の育児休業取得実績はありますか？', type: 'select', options: '["ある","ない"]', required: 1, order: 1 },
+      { key: 'papa_plan', text: '育児休業取得予定の男性従業員はいますか？', type: 'select', options: '["いる","予定あり","いない"]', required: 1, order: 2 },
+      { key: 'papa_days', text: '育児休業の取得日数の目標を教えてください', type: 'select', options: '["5日以上","2週間以上","1ヶ月以上","未設定"]', required: 1, order: 3 },
+      { key: 'papa_env', text: '育児休業を取得しやすい職場環境づくりに取り組んでいますか？', type: 'select', options: '["取り組んでいる","取り組む予定","特に取り組んでいない"]', required: 1, order: 4 },
+      { key: 'papa_system', text: '産後パパ育休（出生時育児休業）制度を導入していますか？', type: 'select', options: '["導入済み","導入予定","未導入"]', required: 1, order: 5 }
+    ],
+    // 育児休業等支援コース ID:41
+    41: [
+      { key: 'ikukyu_employee', text: '育児休業取得予定または取得中の従業員はいますか？', type: 'select', options: '["いる","予定あり","いない"]', required: 1, order: 1 },
+      { key: 'ikukyu_return', text: '育児休業からの円滑な復帰支援制度はありますか？', type: 'select', options: '["ある","導入予定","ない"]', required: 1, order: 2 },
+      { key: 'ikukyu_substitute', text: '代替要員の確保方法を教えてください', type: 'select', options: '["新規雇用","社内配置転換","派遣社員活用","未定"]', required: 1, order: 3 },
+      { key: 'ikukyu_contact', text: '育休取得者への情報提供や面談は行っていますか？', type: 'select', options: '["行っている","行う予定","行っていない"]', required: 1, order: 4 },
+      { key: 'ikukyu_short', text: '短時間勤務制度は整備されていますか？', type: 'select', options: '["整備済み","整備予定","未整備"]', required: 1, order: 5 }
+    ],
+    // 障害者雇用安定助成金 ID:39
+    39: [
+      { key: 'shogai_record', text: '障害者の雇用実績はありますか？', type: 'select', options: '["ある","ない"]', required: 1, order: 1 },
+      { key: 'shogai_type', text: '雇用予定の障害者の障害種別を教えてください', type: 'checkbox', options: '["身体障害","知的障害","精神障害","発達障害","その他"]', required: 1, order: 2 },
+      { key: 'shogai_env', text: '障害者が働きやすい職場環境の整備は行っていますか？', type: 'select', options: '["行っている","行う予定","行っていない"]', required: 1, order: 3 },
+      { key: 'shogai_counselor', text: '障害者職業生活相談員は配置していますか？', type: 'select', options: '["配置済み","配置予定","未配置"]', required: 0, order: 4 },
+      { key: 'shogai_coach', text: 'ジョブコーチ支援を受けたことはありますか？', type: 'select', options: '["ある","受ける予定","ない"]', required: 0, order: 5 }
+    ],
+    // 地域雇用開発助成金 ID:37
+    37: [
+      { key: 'chiiki_location', text: '事業所の所在地（都道府県・市区町村）を教えてください', type: 'text', options: null, required: 1, order: 1 },
+      { key: 'chiiki_area', text: '雇用機会が不足している地域での事業ですか？', type: 'select', options: '["はい","いいえ","わからない"]', required: 1, order: 2 },
+      { key: 'chiiki_hire', text: '新規雇用予定の人数を教えてください', type: 'number', options: null, required: 1, order: 3 },
+      { key: 'chiiki_invest', text: '設備投資の予定金額を教えてください', type: 'select', options: '["300万円未満","300万円以上1000万円未満","1000万円以上"]', required: 1, order: 4 },
+      { key: 'chiiki_local', text: '地域の求職者を積極的に雇用する計画はありますか？', type: 'select', options: '["ある","検討中","ない"]', required: 1, order: 5 }
+    ],
+    // 勤務間インターバル導入コース ID:43
+    43: [
+      { key: 'interval_status', text: '勤務間インターバル制度を導入していますか？', type: 'select', options: '["導入済み","導入予定","未導入"]', required: 1, order: 1 },
+      { key: 'interval_hours', text: '導入予定のインターバル時間を教えてください', type: 'select', options: '["9時間以上11時間未満","11時間以上","未定"]', required: 1, order: 2 },
+      { key: 'interval_count', text: '対象となる従業員数を教えてください', type: 'number', options: null, required: 1, order: 3 },
+      { key: 'interval_current', text: '現在の平均的な勤務終了から翌日勤務開始までの時間は？', type: 'select', options: '["8時間未満","8時間以上11時間未満","11時間以上"]', required: 1, order: 4 },
+      { key: 'interval_overtime', text: '残業が多い部署や職種はありますか？', type: 'text', options: null, required: 0, order: 5 }
+    ],
+    // 労働時間短縮・年休促進支援コース ID:44
+    44: [
+      { key: 'worktime_current', text: '現在の所定労働時間を教えてください', type: 'select', options: '["週40時間以上","週40時間未満","不明"]', required: 1, order: 1 },
+      { key: 'worktime_leave', text: '年次有給休暇の平均取得日数を教えてください', type: 'select', options: '["5日未満","5日以上10日未満","10日以上"]', required: 1, order: 2 },
+      { key: 'worktime_hour', text: '時間単位の年次有給休暇制度はありますか？', type: 'select', options: '["ある","導入予定","ない"]', required: 1, order: 3 },
+      { key: 'worktime_special', text: '特別休暇制度はありますか？', type: 'checkbox', options: '["病気休暇","ボランティア休暇","教育訓練休暇","その他","なし"]', required: 0, order: 4 },
+      { key: 'worktime_goal', text: '労働時間の削減目標はありますか？', type: 'text', options: null, required: 0, order: 5 }
+    ],
+    // ものづくり補助金（グリーン枠）ID:35
+    35: [
+      { key: 'mono_green_plan', text: '温室効果ガス削減に資する設備投資を予定していますか？', type: 'select', options: '["予定している","検討中","予定なし"]', required: 1, order: 1 },
+      { key: 'mono_green_amount', text: '投資予定金額を教えてください', type: 'select', options: '["1000万円未満","1000万円以上3000万円未満","3000万円以上"]', required: 1, order: 2 },
+      { key: 'mono_green_co2', text: 'CO2削減目標はありますか？', type: 'select', options: '["ある","設定予定","ない"]', required: 1, order: 3 },
+      { key: 'mono_green_equip', text: 'どのような設備を導入予定ですか？', type: 'checkbox', options: '["省エネ設備","再生可能エネルギー設備","電気自動車","その他"]', required: 1, order: 4 },
+      { key: 'mono_green_cert', text: '環境認証（ISO14001等）の取得状況を教えてください', type: 'select', options: '["取得済み","取得予定","未取得"]', required: 0, order: 5 }
+    ],
+    // 中小企業デジタル化応援隊事業 ID:31
+    31: [
+      { key: 'digital_issue', text: 'デジタル化に関する課題を教えてください', type: 'checkbox', options: '["業務効率化","テレワーク導入","EC・ネット販売","顧客管理","その他"]', required: 1, order: 1 },
+      { key: 'digital_staff', text: 'IT専門人材は社内にいますか？', type: 'select', options: '["いる","いない"]', required: 1, order: 2 },
+      { key: 'digital_tools', text: '現在利用しているITツールはありますか？', type: 'checkbox', options: '["会計ソフト","勤怠管理","顧客管理","グループウェア","なし"]', required: 1, order: 3 },
+      { key: 'digital_budget', text: 'デジタル化の予算規模を教えてください', type: 'select', options: '["50万円未満","50万円以上100万円未満","100万円以上"]', required: 0, order: 4 },
+      { key: 'digital_support', text: '外部専門家の支援を受けたいですか？', type: 'select', options: '["受けたい","検討中","必要ない"]', required: 1, order: 5 }
+    ],
+    // 中小企業経営強化税制 ID:36
+    36: [
+      { key: 'tax_amount', text: '設備投資の予定金額を教えてください', type: 'select', options: '["160万円未満","160万円以上1000万円未満","1000万円以上"]', required: 1, order: 1 },
+      { key: 'tax_type', text: '投資予定の設備の種類を教えてください', type: 'checkbox', options: '["機械装置","工具","器具備品","建物附属設備","ソフトウェア"]', required: 1, order: 2 },
+      { key: 'tax_plan', text: '経営力向上計画の認定を受けていますか？', type: 'select', options: '["受けている","申請予定","受けていない"]', required: 1, order: 3 },
+      { key: 'tax_goal', text: '生産性向上の具体的な目標はありますか？', type: 'text', options: null, required: 0, order: 4 },
+      { key: 'tax_timing', text: '投資予定時期を教えてください', type: 'select', options: '["3ヶ月以内","6ヶ月以内","1年以内","未定"]', required: 1, order: 5 }
+    ],
+    // 事業再構築補助金 ID:32
+    32: [
+      { key: 'saikouchiku_type', text: '新分野展開・事業転換・業種転換のいずれを検討していますか？', type: 'select', options: '["新分野展開","事業転換","業種転換","業態転換","事業再編"]', required: 1, order: 1 },
+      { key: 'saikouchiku_sales', text: 'コロナ以降の売上状況を教えてください', type: 'select', options: '["10%以上減少","10%未満の減少","変化なし","増加"]', required: 1, order: 2 },
+      { key: 'saikouchiku_plan', text: '新事業の具体的な計画はありますか？', type: 'select', options: '["具体的にある","構想段階","まだない"]', required: 1, order: 3 },
+      { key: 'saikouchiku_amount', text: '投資予定金額を教えてください', type: 'select', options: '["1000万円未満","1000万円以上5000万円未満","5000万円以上"]', required: 1, order: 4 },
+      { key: 'saikouchiku_support', text: '認定経営革新等支援機関との連携はありますか？', type: 'select', options: '["連携済み","連携予定","まだない"]', required: 1, order: 5 }
+    ],
+    // 創業助成金 ID:33
+    33: [
+      { key: 'sougyo_timing', text: '創業予定時期を教えてください', type: 'select', options: '["すでに創業済み","3ヶ月以内","6ヶ月以内","1年以内"]', required: 1, order: 1 },
+      { key: 'sougyo_business', text: '創業予定の業種を教えてください', type: 'text', options: null, required: 1, order: 2 },
+      { key: 'sougyo_fund', text: '創業に必要な資金の調達状況を教えてください', type: 'select', options: '["自己資金のみ","融資予定あり","出資予定あり","未定"]', required: 1, order: 3 },
+      { key: 'sougyo_plan', text: '事業計画書は作成していますか？', type: 'select', options: '["作成済み","作成中","未作成"]', required: 1, order: 4 },
+      { key: 'sougyo_training', text: '創業に関する研修やセミナーを受講しましたか？', type: 'select', options: '["受講済み","受講予定","受講していない"]', required: 0, order: 5 }
+    ],
+    // 販路開拓助成金 ID:34
+    34: [
+      { key: 'hanro_method', text: '販路開拓の方法を教えてください', type: 'checkbox', options: '["展示会出展","ECサイト構築","広告宣伝","海外展開","その他"]', required: 1, order: 1 },
+      { key: 'hanro_amount', text: '販路開拓の投資予定金額を教えてください', type: 'select', options: '["50万円未満","50万円以上200万円未満","200万円以上"]', required: 1, order: 2 },
+      { key: 'hanro_goal', text: '新規顧客獲得の目標はありますか？', type: 'select', options: '["具体的にある","検討中","ない"]', required: 1, order: 3 },
+      { key: 'hanro_exp', text: '展示会等への出展経験はありますか？', type: 'select', options: '["ある","ない"]', required: 0, order: 4 },
+      { key: 'hanro_area', text: '販路開拓の対象地域を教えてください', type: 'checkbox', options: '["国内（地域限定）","国内（全国）","海外"]', required: 1, order: 5 }
+    ],
+    // 一般建設業許可 ID:58
+    58: [
+      { key: 'ippan_type', text: '許可を受けたい業種を教えてください', type: 'checkbox', options: '["土木一式","建築一式","大工","左官","とび・土工","電気","管","その他"]', required: 1, order: 1 },
+      { key: 'ippan_keiei', text: '経営業務管理責任者の要件を満たす方はいますか？', type: 'select', options: '["いる","採用予定","いない"]', required: 1, order: 2 },
+      { key: 'ippan_sennin', text: '専任技術者の要件を満たす方はいますか？', type: 'select', options: '["いる","採用予定","いない"]', required: 1, order: 3 },
+      { key: 'ippan_shisan', text: '財産的基礎（500万円以上）を満たしていますか？', type: 'select', options: '["満たしている","満たす予定","わからない"]', required: 1, order: 4 },
+      { key: 'ippan_kekkaku', text: '欠格要件に該当する方はいませんか？', type: 'select', options: '["該当者なし","確認が必要","わからない"]', required: 1, order: 5 }
+    ],
+    // 電気工事業登録 ID:47
+    47: [
+      { key: 'denki_chief', text: '主任電気工事士の資格保有者はいますか？', type: 'select', options: '["いる","採用予定","いない"]', required: 1, order: 1 },
+      { key: 'denki_type', text: '電気工事の種類を教えてください', type: 'checkbox', options: '["一般用電気工作物","自家用電気工作物","両方"]', required: 1, order: 2 },
+      { key: 'denki_office', text: '営業所の所在地を教えてください', type: 'text', options: null, required: 1, order: 3 },
+      { key: 'denki_kensetsu', text: '他の建設業許可を取得していますか？', type: 'select', options: '["取得済み","取得予定","取得していない"]', required: 0, order: 4 },
+      { key: 'denki_exp', text: '電気工事の実務経験年数を教えてください', type: 'select', options: '["3年未満","3年以上5年未満","5年以上"]', required: 1, order: 5 }
+    ],
+    // 解体工事業登録 ID:48
+    48: [
+      { key: 'kaitai_tech', text: '技術管理者の要件を満たす方はいますか？', type: 'select', options: '["いる","採用予定","いない"]', required: 1, order: 1 },
+      { key: 'kaitai_amount', text: '解体工事の請負金額の想定を教えてください', type: 'select', options: '["500万円未満","500万円以上"]', required: 1, order: 2 },
+      { key: 'kaitai_kensetsu', text: '建設業許可（土木・建築・解体）を取得していますか？', type: 'select', options: '["取得済み","取得予定","取得していない"]', required: 1, order: 3 },
+      { key: 'kaitai_exp', text: '解体工事の実務経験はありますか？', type: 'select', options: '["8年以上","1年以上","なし"]', required: 1, order: 4 },
+      { key: 'kaitai_sanpai', text: '産業廃棄物収集運搬業の許可はありますか？', type: 'select', options: '["ある","取得予定","ない"]', required: 0, order: 5 }
+    ],
+    // 警備業認定 ID:49
+    49: [
+      { key: 'keibi_type', text: '警備業務の種類を教えてください', type: 'checkbox', options: '["施設警備","交通誘導","運搬警備","身辺警備"]', required: 1, order: 1 },
+      { key: 'keibi_shidou', text: '警備員指導教育責任者の資格保有者はいますか？', type: 'select', options: '["いる","採用予定","いない"]', required: 1, order: 2 },
+      { key: 'keibi_kekkaku', text: '欠格事由に該当する方はいませんか？', type: 'select', options: '["該当者なし","確認が必要","わからない"]', required: 1, order: 3 },
+      { key: 'keibi_count', text: '警備員の採用予定人数を教えてください', type: 'number', options: null, required: 1, order: 4 },
+      { key: 'keibi_office', text: '営業所の確保状況を教えてください', type: 'select', options: '["確保済み","確保予定","未定"]', required: 1, order: 5 }
+    ],
+    // 有料職業紹介事業許可 ID:50
+    50: [
+      { key: 'shokukai_koushu', text: '職業紹介責任者講習を受講しましたか？', type: 'select', options: '["受講済み","受講予定","未受講"]', required: 1, order: 1 },
+      { key: 'shokukai_gyoshu', text: '紹介予定の職種を教えてください', type: 'text', options: null, required: 1, order: 2 },
+      { key: 'shokukai_area', text: '事業所の面積は20㎡以上ありますか？', type: 'select', options: '["20㎡以上","20㎡未満","確認が必要"]', required: 1, order: 3 },
+      { key: 'shokukai_shisan', text: '資産要件（基準資産500万円以上）を満たしていますか？', type: 'select', options: '["満たしている","満たす予定","わからない"]', required: 1, order: 4 },
+      { key: 'shokukai_privacy', text: '個人情報保護の体制は整備していますか？', type: 'select', options: '["整備済み","整備予定","未整備"]', required: 1, order: 5 }
+    ],
+    // 倉庫業登録 ID:52
+    52: [
+      { key: 'souko_type', text: '倉庫の種類を教えてください', type: 'select', options: '["普通倉庫","冷蔵倉庫","水面倉庫","その他"]', required: 1, order: 1 },
+      { key: 'souko_area', text: '倉庫の面積を教えてください', type: 'select', options: '["100㎡未満","100㎡以上500㎡未満","500㎡以上"]', required: 1, order: 2 },
+      { key: 'souko_own', text: '倉庫の所有形態を教えてください', type: 'select', options: '["自己所有","賃借","取得予定"]', required: 1, order: 3 },
+      { key: 'souko_manager', text: '倉庫管理主任者の選任予定はありますか？', type: 'select', options: '["選任済み","選任予定","未定"]', required: 1, order: 4 },
+      { key: 'souko_cargo', text: '保管予定の貨物の種類を教えてください', type: 'text', options: null, required: 1, order: 5 }
+    ]
+  }
+  
+  // 各申請種別に質問を追加
+  for (const item of missingQuestions.results || []) {
+    const subsidyId = item.id as number
+    const questions = presetQuestions[subsidyId]
+    
+    if (questions && questions.length > 0) {
+      let addedCount = 0
+      for (const q of questions) {
+        try {
+          await DB.prepare(`
+            INSERT INTO hearing_questions (subsidy_type_id, question_key, question_text, question_type, options, is_required, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).bind(subsidyId, q.key, q.text, q.type, q.options, q.required, q.order).run()
+          addedCount++
+        } catch (e) {
+          // 重複キーなどのエラーは無視
+        }
+      }
+      results.push({ id: subsidyId, name: item.name as string, added: addedCount })
+    }
+  }
+  
+  return c.json({
+    success: true,
+    message: 'ヒアリング質問のプリセットを追加しました',
+    results,
+    totalAdded: results.reduce((sum, r) => sum + r.added, 0)
+  })
+})
+
+// 必要書類プリセット追加API
+app.post('/api/master/migrate-required-documents', async (c) => {
+  const { DB } = c.env
+  
+  // 必要書類の定義
+  const requiredDocs: { [key: number]: string } = {
+    // 社労士管轄の助成金
+    45: '雇用契約書（転換前・転換後）,就業規則,賃金台帳,労働条件通知書,転換制度に関する規定,キャリアアップ計画書,出勤簿,タイムカード,社会保険加入証明',
+    38: '中途採用計画書,雇用契約書,労働条件通知書,採用選考記録,ハローワーク求人票,中途採用比率の算定資料',
+    40: '介護休業申出書,介護休業取扱通知書,就業規則（介護休業規定）,労働条件通知書,出勤簿,介護状況を証明する書類',
+    42: '育児休業申出書,育児休業取扱通知書,出生届受理証明書,就業規則,出勤簿,賃金台帳',
+    41: '育児休業申出書,復帰支援プラン,就業規則,代替要員の雇用契約書,出勤簿,面談記録',
+    39: '障害者手帳の写し,雇用契約書,就業規則,職場環境整備計画,出勤簿,賃金台帳',
+    37: '事業計画書,雇用契約書,設備投資の見積書・契約書,事業所の登記簿謄本,土地・建物の賃貸契約書',
+    43: '勤務間インターバル制度導入計画,就業規則,勤怠管理記録,労働時間の記録',
+    44: '就業規則,年次有給休暇管理簿,労働時間の記録,特別休暇制度に関する規定',
+    // 行政書士管轄の補助金
+    35: '事業計画書,設備投資の見積書,CO2削減計画,環境認証の写し,決算書（直近2期分）,法人登記簿謄本',
+    31: 'IT導入計画書,見積書,決算書,法人登記簿謄本,IT専門家との契約書',
+    36: '経営力向上計画認定書,設備投資の見積書・契約書,決算書,法人登記簿謄本',
+    32: '事業計画書,認定経営革新等支援機関の確認書,決算書（直近2期分）,法人登記簿謄本,投資の見積書',
+    33: '創業計画書,資金調達計画,本人確認書類,住民票,法人の場合は登記簿謄本',
+    34: '販路開拓計画書,見積書,決算書,法人登記簿謄本,展示会の申込書・請求書',
+    // 許認可
+    58: '登記簿謄本,役員の身分証明書,役員の登記されていないことの証明書,経営業務管理責任者の経歴書,専任技術者の資格証明書,財務諸表,営業所の賃貸契約書',
+    47: '主任電気工事士の免状,登記簿謄本,営業所の図面,電気工事業届出書',
+    48: '技術管理者の資格証明書,登記簿謄本,営業所の図面,解体工事業登録申請書',
+    49: '警備員指導教育責任者の資格者証,登記簿謄本,役員の身分証明書,営業所の賃貸契約書,警備業認定申請書',
+    50: '職業紹介責任者講習修了証,登記簿謄本,事務所の図面,資産に関する調書,個人情報適正管理規程',
+    52: '倉庫明細書,建物登記簿謄本,火災保険証書,倉庫管理主任者の資格証明,倉庫業登録申請書',
+    51: '運行管理者資格証,整備管理者資格証,車両の車検証,営業所・車庫の図面,資金計画書',
+    53: '登記簿謄本,財務諸表,役員の履歴書,コンプライアンス規程,内部管理体制の概要',
+    54: '宅地建物取引業免許証,宅地建物取引士の資格証,専任性を証する書面,財務諸表',
+    55: '営業所の平面図,用途地域証明書,周辺地図,管理者の住民票,風俗営業許可申請書',
+    56: '営業所の平面図,用途地域証明書,食品衛生責任者の資格証,深夜酒類提供飲食店届出書',
+    57: '監理技術者資格者証,登記簿謄本,財務諸表,経営業務管理責任者の経歴書,特定建設業許可申請書',
+    59: '測量士または測量士補の登録証,登記簿謄本,営業所の図面,測量業者登録申請書',
+    60: '管理建築士の一級/二級建築士免許証,管理建築士講習修了証,登記簿謄本,事務所の図面',
+    61: '薬剤師免許証または登録販売者登録証,店舗の図面,医薬品販売業許可申請書,構造設備の概要'
+  }
+  
+  const results: { id: number; name: string; updated: boolean }[] = []
+  
+  for (const [idStr, docs] of Object.entries(requiredDocs)) {
+    const id = parseInt(idStr)
+    try {
+      await DB.prepare(`
+        UPDATE subsidy_types SET required_documents = ? WHERE id = ? AND (required_documents IS NULL OR required_documents = '')
+      `).bind(docs, id).run()
+      
+      const updated = await DB.prepare(`SELECT name FROM subsidy_types WHERE id = ?`).bind(id).first()
+      results.push({ id, name: (updated?.name as string) || '', updated: true })
+    } catch (e) {
+      results.push({ id, name: '', updated: false })
+    }
+  }
+  
+  return c.json({
+    success: true,
+    message: '必要書類のプリセットを追加しました',
+    results
+  })
+})
+
 app.get('/api/master/dashboard', async (c) => {
   const { DB } = c.env
   
@@ -25649,6 +28529,256 @@ app.post('/api/master/impersonate/:id', async (c) => {
     role: admin.role || 'admin',
     organization_id: orgId
   })
+})
+
+// ===============================
+// 法的表記・会社情報設定ページ
+// ===============================
+app.get('/master/legal-settings', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>法的表記・会社情報設定 - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('legal')}
+            
+            <main class="flex-1 p-8">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800">法的表記・会社情報設定</h1>
+                    <p class="text-gray-600 mt-1">特定商取引法に基づく表記、プライバシーポリシー等の設定</p>
+                </div>
+                
+                <!-- プレビューリンク -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <span class="text-blue-800 font-medium">プレビュー:</span>
+                        <a href="/legal" target="_blank" class="text-blue-600 hover:text-blue-800 underline">
+                            <i class="fas fa-external-link-alt mr-1"></i>特定商取引法に基づく表記
+                        </a>
+                        <a href="/terms" target="_blank" class="text-blue-600 hover:text-blue-800 underline">
+                            <i class="fas fa-external-link-alt mr-1"></i>利用規約
+                        </a>
+                        <a href="/privacy-policy" target="_blank" class="text-blue-600 hover:text-blue-800 underline">
+                            <i class="fas fa-external-link-alt mr-1"></i>プライバシーポリシー
+                        </a>
+                    </div>
+                </div>
+                
+                <form id="settingsForm" class="space-y-6">
+                    <!-- 事業者情報 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">
+                            <i class="fas fa-building text-blue-600 mr-2"></i>事業者情報
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">事業者名（会社名/屋号）*</label>
+                                <input type="text" name="company_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">代表者名 *</label>
+                                <input type="text" name="company_representative" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">郵便番号</label>
+                                <input type="text" name="postal_code" placeholder="000-0000" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">所在地 *</label>
+                                <input type="text" name="company_address" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">電話番号 *</label>
+                                <input type="text" name="company_phone" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス *</label>
+                                <input type="email" name="company_email" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">営業時間</label>
+                                <input type="text" name="business_hours" placeholder="平日 9:00〜18:00" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">適格請求書発行事業者登録番号</label>
+                                <input type="text" name="invoice_registration_number" placeholder="T0000000000000" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 振込先情報 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">
+                            <i class="fas fa-university text-green-600 mr-2"></i>振込先情報
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">銀行名</label>
+                                <input type="text" name="bank_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">支店名</label>
+                                <input type="text" name="bank_branch" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">口座種別</label>
+                                <select name="bank_account_type" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="普通">普通</option>
+                                    <option value="当座">当座</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">口座番号</label>
+                                <input type="text" name="bank_account_number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">口座名義</label>
+                                <input type="text" name="bank_account_holder" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 特定商取引法表記詳細 -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">
+                            <i class="fas fa-balance-scale text-purple-600 mr-2"></i>特定商取引法表記詳細
+                        </h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">販売価格について</label>
+                                <textarea name="legal_price_info" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">支払方法</label>
+                                <input type="text" name="legal_payment_method" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">支払時期</label>
+                                <textarea name="legal_payment_timing" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">サービス提供時期</label>
+                                <input type="text" name="legal_service_start" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">返品・キャンセルについて</label>
+                                <textarea name="legal_cancel_policy" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">追加費用について</label>
+                                <input type="text" name="legal_additional_cost" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 利用規約・プライバシーポリシー -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">
+                            <i class="fas fa-file-contract text-orange-600 mr-2"></i>利用規約・プライバシーポリシー
+                        </h2>
+                        <p class="text-sm text-gray-500 mb-4">空欄の場合はデフォルトのテンプレートが表示されます。外部URLを指定するとそちらにリダイレクトします。</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">利用規約（外部URL）</label>
+                                <input type="url" name="terms_url" placeholder="https://example.com/terms" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">利用規約（カスタム内容 - Markdown可）</label>
+                                <textarea name="terms_of_service" rows="6" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">プライバシーポリシー（外部URL）</label>
+                                <input type="url" name="privacy_policy_url" placeholder="https://example.com/privacy" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">プライバシーポリシー（カスタム内容 - Markdown可）</label>
+                                <textarea name="privacy_policy" rows="6" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- フッター -->
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">
+                            <i class="fas fa-window-minimize text-gray-600 mr-2"></i>フッター設定
+                        </h2>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">フッターテキスト</label>
+                            <input type="text" name="footer_text" placeholder="© 2024 会社名 All Rights Reserved." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    
+                    <!-- 保存ボタン -->
+                    <div class="flex justify-end gap-4">
+                        <button type="button" onclick="loadSettings()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-undo mr-2"></i>リセット
+                        </button>
+                        <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-save mr-2"></i>保存
+                        </button>
+                    </div>
+                </form>
+            </main>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            ${masterSidebarScripts}
+            
+            async function loadSettings() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/site-settings', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const settings = response.data;
+                    
+                    // フォームに値をセット
+                    Object.keys(settings).forEach(key => {
+                        const input = document.querySelector('[name="' + key + '"]');
+                        if (input) {
+                            input.value = settings[key] || '';
+                        }
+                    });
+                } catch (error) {
+                    console.error('Settings load error:', error);
+                }
+            }
+            
+            document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(e.target);
+                const data = {};
+                formData.forEach((value, key) => {
+                    data[key] = value;
+                });
+                
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.post('/api/site-settings', data, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    alert('設定を保存しました');
+                } catch (error) {
+                    console.error('Save error:', error);
+                    alert('保存に失敗しました');
+                }
+            });
+            
+            // ページ読み込み時に設定を取得
+            loadSettings();
+        </script>
+    </body>
+    </html>
+  `)
 })
 
 // ===============================
