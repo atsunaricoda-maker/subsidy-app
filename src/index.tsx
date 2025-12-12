@@ -8764,12 +8764,20 @@ app.get('/case/:id', async (c) => {
                     
                     <!-- 手付金・契約タブ -->
                     <div id="content-payment" class="tab-content hidden">
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div class="bg-white rounded-xl shadow-sm p-6">
                                 <h3 class="text-lg font-bold mb-4">
                                     <i class="fas fa-yen-sign mr-2 text-yellow-600"></i>手付金情報
                                 </h3>
                                 <div id="depositInfo">
+                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-sm p-6">
+                                <h3 class="text-lg font-bold mb-4">
+                                    <i class="fas fa-percentage mr-2 text-purple-600"></i>成果報酬情報
+                                </h3>
+                                <div id="successFeeInfo">
                                     <div class="text-center py-4 text-gray-500">読み込み中...</div>
                                 </div>
                             </div>
@@ -9211,6 +9219,7 @@ app.get('/case/:id', async (c) => {
                     const caseData = response.data;
                     
                     const depositContainer = document.getElementById('depositInfo');
+                    const successFeeContainer = document.getElementById('successFeeInfo');
                     const contractContainer = document.getElementById('contractInfo');
                     
                     // 手付金
@@ -9232,6 +9241,34 @@ app.get('/case/:id', async (c) => {
                                     <button onclick="markDepositPaid()" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
                                         <i class="fas fa-check mr-2"></i>支払い済みにする
                                     </button>
+                                \` : ''}
+                            </div>
+                        \`;
+                    }
+                    
+                    // 成果報酬
+                    if (!caseData.success_fee_enabled) {
+                        successFeeContainer.innerHTML = '<div class="text-gray-500">成果報酬は設定されていません</div>';
+                    } else {
+                        const rate = caseData.success_fee_rate || 0;
+                        const amount = caseData.success_fee_amount || 0;
+                        const hasWithholding = caseData.withholding_tax;
+                        
+                        successFeeContainer.innerHTML = \`
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-2xl font-bold">\${rate > 0 ? rate + '%' : '¥' + amount.toLocaleString()}</span>
+                                    <span class="px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-700">
+                                        成果報酬あり
+                                    </span>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    \${rate > 0 ? '採択金額の' + rate + '%を成果報酬としていただきます' : '成果報酬として¥' + amount.toLocaleString() + 'をいただきます'}
+                                </div>
+                                \${hasWithholding ? \`
+                                    <div class="text-sm text-orange-600">
+                                        <i class="fas fa-calculator mr-1"></i>源泉徴収が適用されます
+                                    </div>
                                 \` : ''}
                             </div>
                         \`;
@@ -9596,6 +9633,18 @@ app.get('/portal/:token', async (c) => {
                                 
                                 <div id="depositContent" class="space-y-3">
                                     <!-- 手付金情報が表示される -->
+                                </div>
+                            </div>
+                            
+                            <!-- 成果報酬・契約セクション -->
+                            <div id="successFeeSection" class="mt-4 pt-4 border-t hidden">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="text-sm font-medium text-gray-700">
+                                        <i class="fas fa-percentage mr-1 text-purple-600"></i>成果報酬・契約
+                                    </h3>
+                                </div>
+                                <div id="successFeeContent" class="space-y-3">
+                                    <!-- 成果報酬・契約情報が表示される -->
                                 </div>
                             </div>
                         </div>
@@ -10639,6 +10688,82 @@ app.get('/portal/:token', async (c) => {
                     }
                 } catch (error) {
                     console.error('Error loading deposit info:', error);
+                }
+            }
+            
+            // 成果報酬・契約情報を読み込む
+            async function loadSuccessFeeInfo() {
+                try {
+                    let caseData = null;
+                    if (CASE_ID) {
+                        const caseResponse = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                        caseData = caseResponse.data;
+                    } else {
+                        const clientResponse = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
+                        caseData = clientResponse.data;
+                    }
+                    
+                    const section = document.getElementById('successFeeSection');
+                    const content = document.getElementById('successFeeContent');
+                    
+                    if (!section) return;
+                    
+                    // 成果報酬が有効な場合、または契約URLがある場合は表示
+                    const hasSuccessFee = caseData.success_fee_enabled;
+                    const hasContract = caseData.contract_url;
+                    
+                    if (!hasSuccessFee && !hasContract) {
+                        section.classList.add('hidden');
+                        return;
+                    }
+                    
+                    section.classList.remove('hidden');
+                    
+                    let html = '';
+                    
+                    // 成果報酬情報
+                    if (hasSuccessFee) {
+                        const rate = caseData.success_fee_rate || 0;
+                        const amount = caseData.success_fee_amount || 0;
+                        const hasWithholding = caseData.withholding_tax;
+                        
+                        html += \`
+                            <div class="bg-purple-50 rounded-lg p-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center">
+                                        <i class="fas fa-percentage text-white"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs text-purple-600">成果報酬</div>
+                                        <div class="font-bold text-purple-800">
+                                            \${rate > 0 ? rate + '%' : '¥' + amount.toLocaleString()}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-600 mt-2">
+                                    <i class="fas fa-info-circle text-purple-500 mr-1"></i>
+                                    補助金・助成金の採択後、\${rate > 0 ? '採択金額の' + rate + '%を成果報酬として' : '成果報酬として¥' + amount.toLocaleString() + 'を'}お支払いいただきます。
+                                    \${hasWithholding ? '<br><span class="text-orange-600"><i class="fas fa-calculator mr-1"></i>源泉徴収が適用されます</span>' : ''}
+                                </div>
+                            </div>
+                        \`;
+                    }
+                    
+                    // 電子契約情報
+                    if (hasContract) {
+                        html += \`
+                            <a href="\${caseData.contract_url}" target="_blank" class="flex items-center gap-2 p-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100 mt-3">
+                                <i class="fas fa-file-signature"></i>
+                                <span class="text-sm font-medium">電子契約書を確認</span>
+                                <i class="fas fa-external-link-alt ml-auto text-xs"></i>
+                            </a>
+                        \`;
+                    }
+                    
+                    content.innerHTML = html;
+                    
+                } catch (error) {
+                    console.error('Error loading success fee info:', error);
                 }
             }
             
@@ -12549,6 +12674,7 @@ app.get('/portal/:token', async (c) => {
                 loadPipelineProgress();
                 loadServiceProgress();
                 loadDepositInfo();
+                loadSuccessFeeInfo();
                 loadHearingQuestions();
                 loadChecklist();
                 loadDocuments();
