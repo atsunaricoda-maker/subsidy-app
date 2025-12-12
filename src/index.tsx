@@ -19377,38 +19377,90 @@ app.get('/admin/pipelines', (c) => {
                         return;
                     }
                     
-                    const categoryLabels = {
-                        'subsidy': { label: '行政書士管轄', color: 'bg-emerald-100 text-emerald-800' },
-                        'grant': { label: '社労士管轄', color: 'bg-blue-100 text-blue-800' },
-                        'license': { label: '許認可', color: 'bg-indigo-100 text-indigo-800' },
-                        '行政書士管轄': { label: '行政書士管轄', color: 'bg-emerald-100 text-emerald-800' },
-                        '社労士管轄': { label: '社労士管轄', color: 'bg-blue-100 text-blue-800' },
-                        '許認可': { label: '許認可', color: 'bg-indigo-100 text-indigo-800' }
+                    const categoryConfig = {
+                        'subsidy': { 
+                            label: '補助金（行政書士管轄）', 
+                            icon: 'fa-file-signature',
+                            headerClass: 'bg-emerald-50 border-emerald-500',
+                            iconClass: 'text-emerald-600',
+                            titleClass: 'text-emerald-800',
+                            countClass: 'text-emerald-600',
+                            itemBgClass: 'bg-emerald-100',
+                            itemIconClass: 'text-emerald-600'
+                        },
+                        'grant': { 
+                            label: '助成金（社労士管轄）', 
+                            icon: 'fa-users',
+                            headerClass: 'bg-blue-50 border-blue-500',
+                            iconClass: 'text-blue-600',
+                            titleClass: 'text-blue-800',
+                            countClass: 'text-blue-600',
+                            itemBgClass: 'bg-blue-100',
+                            itemIconClass: 'text-blue-600'
+                        },
+                        'license': { 
+                            label: '許認可申請', 
+                            icon: 'fa-stamp',
+                            headerClass: 'bg-indigo-50 border-indigo-500',
+                            iconClass: 'text-indigo-600',
+                            titleClass: 'text-indigo-800',
+                            countClass: 'text-indigo-600',
+                            itemBgClass: 'bg-indigo-100',
+                            itemIconClass: 'text-indigo-600'
+                        }
                     };
                     
-                    container.innerHTML = templates.map(t => {
-                        const cat = categoryLabels[t.category] || categoryLabels['license'];
-                        return \`
-                            <div class="p-4 hover:bg-gray-50 cursor-pointer" onclick="showTemplateDetail(\${t.id})">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-                                            <i class="fas fa-project-diagram"></i>
+                    // カテゴリ別にグループ化
+                    const grouped = {};
+                    templates.forEach(t => {
+                        const cat = t.category || 'license';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(t);
+                    });
+                    
+                    // カテゴリ順序
+                    const categoryOrder = ['subsidy', 'grant', 'license'];
+                    
+                    let html = '';
+                    categoryOrder.forEach(catKey => {
+                        const items = grouped[catKey];
+                        if (!items || items.length === 0) return;
+                        
+                        const config = categoryConfig[catKey] || categoryConfig['license'];
+                        
+                        html += \`
+                            <div class="mb-6">
+                                <div class="flex items-center gap-3 px-4 py-3 \${config.headerClass} border-l-4 rounded-r-lg">
+                                    <i class="fas \${config.icon} \${config.iconClass}"></i>
+                                    <h3 class="font-bold \${config.titleClass}">\${config.label}</h3>
+                                    <span class="ml-auto text-sm \${config.countClass}">\${items.length}件</span>
+                                </div>
+                                <div class="divide-y divide-gray-100 ml-4 border-l-2 border-gray-200">
+                                    \${items.map(t => \`
+                                        <div class="p-3 hover:bg-gray-50 cursor-pointer pl-6" onclick="showTemplateDetail(\${t.id})">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
+                                                        <i class="fas fa-project-diagram text-sm"></i>
+                                                    </div>
+                                                    <div>
+                                                        <div class="font-medium text-gray-900">\${t.name}</div>
+                                                        <div class="text-xs text-gray-500 line-clamp-1">\${t.description || ''}</div>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-3">
+                                                    <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
+                                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div class="font-medium text-gray-900">\${t.name}</div>
-                                            <div class="text-sm text-gray-500">\${t.description || '説明なし'}</div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <span class="px-2 py-1 rounded-full text-xs font-medium \${cat.color}">\${cat.label}</span>
-                                        <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
-                                        <i class="fas fa-chevron-right text-gray-400"></i>
-                                    </div>
+                                    \`).join('')}
                                 </div>
                             </div>
                         \`;
-                    }).join('');
+                    });
+                    
+                    container.innerHTML = html;
                     
                 } catch (error) {
                     console.error('Error loading templates:', error);
