@@ -2252,22 +2252,54 @@ app.get('/', (c) => {
             
             // パイプラインテンプレート一覧を読み込み
             let pipelineTemplates = [];
-            async function loadPipelineTemplates() {
+            let pipelineSelectInitialized = false;
+            
+            async function loadPipelineTemplates(subsidyTypeId = null) {
                 try {
-                    const response = await axios.get('/api/pipeline-templates');
+                    // 申請種別IDが指定されている場合はフィルタリング
+                    let url = '/api/pipeline-templates';
+                    if (subsidyTypeId) {
+                        url += '?subsidy_type_id=' + subsidyTypeId;
+                    }
+                    
+                    const response = await axios.get(url);
                     pipelineTemplates = response.data;
                     const select = document.getElementById('pipelineTemplateSelect');
                     const descDiv = document.getElementById('pipelineDescription');
                     select.innerHTML = '<option value="">パイプラインなし</option>';
                     
+                    // パイプラインがない場合のメッセージ
+                    if (pipelineTemplates.length === 0) {
+                        if (subsidyTypeId) {
+                            const optInfo = document.createElement('option');
+                            optInfo.disabled = true;
+                            optInfo.textContent = '※ この申請種別用のパイプラインは未設定です';
+                            select.appendChild(optInfo);
+                        }
+                        return;
+                    }
+                    
                     const categoryGroups = {
+                        'subsidy': [],
+                        'grant': [],
+                        'license': [],
                         '行政書士管轄': [],
                         '社労士管轄': [],
                         '許認可': []
                     };
                     
+                    // カテゴリ名のマッピング
+                    const categoryLabels = {
+                        'subsidy': '補助金（行政書士管轄）',
+                        'grant': '助成金（社労士管轄）',
+                        'license': '許認可申請',
+                        '行政書士管轄': '補助金（行政書士管轄）',
+                        '社労士管轄': '助成金（社労士管轄）',
+                        '許認可': '許認可申請'
+                    };
+                    
                     pipelineTemplates.forEach(t => {
-                        const cat = t.category || '許認可';
+                        const cat = t.category || 'license';
                         if (!categoryGroups[cat]) categoryGroups[cat] = [];
                         categoryGroups[cat].push(t);
                     });
@@ -2275,7 +2307,7 @@ app.get('/', (c) => {
                     Object.entries(categoryGroups).forEach(([category, templates]) => {
                         if (templates.length > 0) {
                             const optGroup = document.createElement('optgroup');
-                            optGroup.label = category;
+                            optGroup.label = categoryLabels[category] || category;
                             templates.forEach(t => {
                                 const option = document.createElement('option');
                                 option.value = t.id;
@@ -2286,21 +2318,24 @@ app.get('/', (c) => {
                         }
                     });
                     
-                    // 選択変更時に説明を表示
-                    select.addEventListener('change', function() {
-                        const templateId = this.value;
-                        if (templateId) {
-                            const template = pipelineTemplates.find(t => t.id == templateId);
-                            if (template && template.description) {
-                                descDiv.textContent = template.description;
-                                descDiv.classList.remove('hidden');
+                    // 選択変更時に説明を表示（初回のみイベント登録）
+                    if (!pipelineSelectInitialized) {
+                        select.addEventListener('change', function() {
+                            const templateId = this.value;
+                            if (templateId) {
+                                const template = pipelineTemplates.find(t => t.id == templateId);
+                                if (template && template.description) {
+                                    descDiv.textContent = template.description;
+                                    descDiv.classList.remove('hidden');
+                                } else {
+                                    descDiv.classList.add('hidden');
+                                }
                             } else {
                                 descDiv.classList.add('hidden');
                             }
-                        } else {
-                            descDiv.classList.add('hidden');
-                        }
-                    });
+                        });
+                        pipelineSelectInitialized = true;
+                    }
                 } catch (error) {
                     console.error('Error loading pipeline templates:', error);
                 }
@@ -2929,6 +2964,9 @@ app.get('/', (c) => {
                 
                 // リストの選択状態を更新
                 renderSubsidyOptions();
+                
+                // 申請種別に紐づくパイプラインのみを読み込み
+                loadPipelineTemplates(id);
             }
             
             // 補助金検索フィルター
@@ -18353,6 +18391,7 @@ app.post('/api/backup/import-selective', async (c) => {
 app.get('/api/pipeline-templates', async (c) => {
   const { DB } = c.env
   const category = c.req.query('category')
+  const subsidyTypeId = c.req.query('subsidy_type_id')
   
   let query = `
     SELECT pt.*, 
@@ -18361,14 +18400,34 @@ app.get('/api/pipeline-templates', async (c) => {
     WHERE pt.is_active = 1
   `
   
+  // カテゴリでフィルタリング
   if (category) {
-    query += ` AND pt.category = ?`
-    const templates = await DB.prepare(query).bind(category).all()
-    return c.json(templates.results || [])
+    query += ` AND pt.category = '${category}'`
   }
   
   const templates = await DB.prepare(query).all()
-  return c.json(templates.results || [])
+  let results = templates.results || []
+  
+  // 申請種別IDが指定されている場合、紐付けられたパイプラインのみを返す
+  if (subsidyTypeId) {
+    const targetId = parseInt(subsidyTypeId)
+    results = results.filter((t: any) => {
+      // subsidy_type_idsがnullまたは空の場合はすべての申請種別で利用可能
+      if (!t.subsidy_type_ids) return true
+      
+      try {
+        const ids = JSON.parse(t.subsidy_type_ids)
+        if (Array.isArray(ids) && ids.length > 0) {
+          return ids.includes(targetId)
+        }
+        return true // 空配列の場合もすべてで利用可能
+      } catch {
+        return true // JSON解析エラーの場合もすべてで利用可能
+      }
+    })
+  }
+  
+  return c.json(results)
 })
 
 // パイプラインテンプレート詳細取得
@@ -18401,11 +18460,16 @@ app.post('/api/pipeline-templates', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
+  // subsidy_type_idsをJSON文字列に変換
+  const subsidyTypeIds = data.subsidy_type_ids 
+    ? JSON.stringify(data.subsidy_type_ids)
+    : null
+  
   const result = await DB.prepare(`
     INSERT INTO pipeline_templates 
     (name, description, category, service_start_offset, service_end_offset, 
-     requires_approval, allow_external_tasks, progress_reflection, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
     data.description || '',
@@ -18415,7 +18479,8 @@ app.post('/api/pipeline-templates', async (c) => {
     data.requires_approval ? 1 : 0,
     data.allow_external_tasks ? 1 : 0,
     data.progress_reflection !== false ? 1 : 0,
-    data.created_by || null
+    data.created_by || null,
+    subsidyTypeIds
   ).run()
   
   const templateId = result.meta.last_row_id
@@ -18456,11 +18521,17 @@ app.put('/api/pipeline-templates/:id', async (c) => {
   const templateId = c.req.param('id')
   const data = await c.req.json()
   
+  // subsidy_type_idsをJSON文字列に変換
+  const subsidyTypeIds = data.subsidy_type_ids 
+    ? JSON.stringify(data.subsidy_type_ids)
+    : null
+  
   await DB.prepare(`
     UPDATE pipeline_templates SET
     name = ?, description = ?, category = ?, 
     service_start_offset = ?, service_end_offset = ?,
     requires_approval = ?, allow_external_tasks = ?, progress_reflection = ?,
+    subsidy_type_ids = ?,
     updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).bind(
@@ -18472,6 +18543,7 @@ app.put('/api/pipeline-templates/:id', async (c) => {
     data.requires_approval ? 1 : 0,
     data.allow_external_tasks ? 1 : 0,
     data.progress_reflection !== false ? 1 : 0,
+    subsidyTypeIds,
     templateId
   ).run()
   
@@ -19059,6 +19131,21 @@ app.get('/admin/pipelines', (c) => {
                         </div>
                     </div>
                     
+                    <!-- 申請種別との紐付け -->
+                    <div class="border rounded-lg p-4 bg-blue-50">
+                        <h4 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fas fa-link text-blue-600"></i>申請種別との紐付け
+                            <span class="text-xs text-gray-500 font-normal ml-2">（空の場合はすべての申請種別で利用可能）</span>
+                        </h4>
+                        <div id="subsidyTypeCheckboxes" class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                            <!-- 申請種別のチェックボックスがここに追加される -->
+                        </div>
+                        <p class="text-xs text-gray-600 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            選択した申請種別の案件を登録する際に、このパイプラインが候補として表示されます。
+                        </p>
+                    </div>
+                    
                     <!-- 期間設定 -->
                     <div class="border rounded-lg p-4 bg-gray-50">
                         <h4 class="font-medium mb-3 flex items-center gap-2">
@@ -19378,7 +19465,36 @@ app.get('/admin/pipelines', (c) => {
                         content += '<p class="text-gray-500 text-center py-4">タスクがありません</p>';
                     }
                     
+                    // 紐づいた申請種別を表示
+                    let linkedSubsidyNames = [];
+                    if (template.subsidy_type_ids) {
+                        try {
+                            const ids = JSON.parse(template.subsidy_type_ids);
+                            if (Array.isArray(ids) && ids.length > 0 && allSubsidyTypes.length > 0) {
+                                ids.forEach(id => {
+                                    const st = allSubsidyTypes.find(s => s.id === id);
+                                    if (st) linkedSubsidyNames.push(st.name);
+                                });
+                            }
+                        } catch (e) {
+                            console.error('Error parsing subsidy_type_ids:', e);
+                        }
+                    }
+                    
                     content += \`
+                                </div>
+                            </div>
+                            
+                            <!-- 紐づいた申請種別 -->
+                            <div>
+                                <h4 class="font-medium mb-3 flex items-center gap-2">
+                                    <i class="fas fa-link text-blue-600"></i>紐づいた申請種別
+                                </h4>
+                                <div class="flex flex-wrap gap-2">
+                                    \${linkedSubsidyNames.length > 0 
+                                        ? linkedSubsidyNames.map(name => '<span class="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">' + name + '</span>').join('')
+                                        : '<span class="text-gray-500 text-sm">すべての申請種別で利用可能</span>'
+                                    }
                                 </div>
                             </div>
                             
@@ -19411,6 +19527,68 @@ app.get('/admin/pipelines', (c) => {
                 addTaskRow(); // 最初の1行を追加
                 document.getElementById('newTemplateModal').classList.remove('hidden');
                 loadUsers();
+                loadSubsidyTypesForCheckbox(); // 申請種別のチェックボックスを読み込み
+                editingTemplateId = null; // 新規作成モードに設定
+            }
+            
+            // 申請種別一覧を読み込んでチェックボックスを生成
+            let allSubsidyTypes = [];
+            async function loadSubsidyTypesForCheckbox(selectedIds = []) {
+                try {
+                    const response = await axios.get('/api/subsidy-types');
+                    allSubsidyTypes = response.data;
+                    
+                    const container = document.getElementById('subsidyTypeCheckboxes');
+                    if (!container) return;
+                    
+                    // カテゴリ別にグループ化
+                    const grouped = {
+                        'subsidy': [],
+                        'grant': [],
+                        'license': [],
+                        '行政書士管轄': [],
+                        '社労士管轄': [],
+                        '許認可': []
+                    };
+                    
+                    const categoryLabels = {
+                        'subsidy': '補助金',
+                        'grant': '助成金',
+                        'license': '許認可',
+                        '行政書士管轄': '補助金',
+                        '社労士管轄': '助成金',
+                        '許認可': '許認可'
+                    };
+                    
+                    allSubsidyTypes.forEach(type => {
+                        if (type.category === 'システム') return; // システムカテゴリは除外
+                        const cat = type.category || 'license';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(type);
+                    });
+                    
+                    let html = '';
+                    Object.entries(grouped).forEach(([category, types]) => {
+                        if (types.length === 0) return;
+                        
+                        const label = categoryLabels[category] || category;
+                        html += '<div class="col-span-full text-xs font-bold text-gray-500 mt-2 mb-1">' + label + '</div>';
+                        
+                        types.forEach(type => {
+                            const checked = selectedIds.includes(type.id) ? 'checked' : '';
+                            html += \`
+                                <label class="flex items-center gap-2 p-1.5 rounded hover:bg-blue-100 cursor-pointer text-sm">
+                                    <input type="checkbox" name="subsidy_type_ids" value="\${type.id}" \${checked} class="rounded text-blue-600">
+                                    <span class="truncate">\${type.name}</span>
+                                </label>
+                            \`;
+                        });
+                    });
+                    
+                    container.innerHTML = html || '<p class="text-gray-500 text-sm">申請種別がありません</p>';
+                } catch (error) {
+                    console.error('Error loading subsidy types:', error);
+                }
             }
             
             function closeNewTemplateModal() {
@@ -19499,6 +19677,17 @@ app.get('/admin/pipelines', (c) => {
                     closeTemplateDetailModal();
                     document.getElementById('newTemplateModal').classList.remove('hidden');
                     loadUsers();
+                    
+                    // 申請種別のチェックボックスを読み込み（選択済みのIDを渡す）
+                    let selectedSubsidyIds = [];
+                    if (template.subsidy_type_ids) {
+                        try {
+                            selectedSubsidyIds = JSON.parse(template.subsidy_type_ids);
+                        } catch (e) {
+                            console.error('Error parsing subsidy_type_ids:', e);
+                        }
+                    }
+                    loadSubsidyTypesForCheckbox(selectedSubsidyIds);
                 } catch (error) {
                     console.error('Error loading template for edit:', error);
                     alert('テンプレートの読み込みに失敗しました');
@@ -19510,6 +19699,13 @@ app.get('/admin/pipelines', (c) => {
                 e.preventDefault();
                 
                 const formData = new FormData(e.target);
+                
+                // 選択された申請種別IDを収集
+                const subsidyTypeIds = [];
+                document.querySelectorAll('input[name="subsidy_type_ids"]:checked').forEach(cb => {
+                    subsidyTypeIds.push(parseInt(cb.value));
+                });
+                
                 const data = {
                     name: formData.get('name'),
                     description: formData.get('description'),
@@ -19520,6 +19716,7 @@ app.get('/admin/pipelines', (c) => {
                     allow_external_tasks: formData.get('allow_external_tasks') === 'on',
                     requires_approval: formData.get('requires_approval') === 'on',
                     created_by: formData.get('created_by'),
+                    subsidy_type_ids: subsidyTypeIds.length > 0 ? subsidyTypeIds : null,
                     tasks: []
                 };
                 
@@ -19576,6 +19773,7 @@ app.get('/admin/pipelines', (c) => {
             
             // 初期読み込み
             loadTemplates();
+            loadSubsidyTypesForCheckbox(); // 申請種別リストを事前に読み込み
         </script>
     </body>
     </html>
