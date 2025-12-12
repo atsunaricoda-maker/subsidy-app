@@ -20331,31 +20331,32 @@ app.get('/api/payments/history', async (c) => {
   const { DB } = c.env
   const type = c.req.query('type') || 'all'
   
-  let query = `
-    SELECT 
-      ph.*,
-      c.name as client_name,
-      c.company_name,
-      cs.case_number,
-      st.name as subsidy_type_name
-    FROM payment_history ph
-    JOIN clients c ON ph.client_id = c.id
-    LEFT JOIN cases cs ON ph.case_id = cs.id
-    LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
-    WHERE ph.status = 'confirmed'
-  `
-  
-  if (type === 'deposit') {
-    query += ` AND ph.payment_type = 'deposit'`
-  } else if (type === 'success_fee') {
-    query += ` AND ph.payment_type = 'success_fee'`
+  try {
+    let query = `
+      SELECT 
+        ph.*,
+        c.name as client_name,
+        c.company_name
+      FROM payment_history ph
+      JOIN clients c ON ph.client_id = c.id
+      WHERE ph.status = 'confirmed'
+    `
+    
+    if (type === 'deposit') {
+      query += ` AND ph.payment_type = 'deposit'`
+    } else if (type === 'success_fee') {
+      query += ` AND ph.payment_type = 'success_fee'`
+    }
+    
+    query += ` ORDER BY ph.bank_transfer_confirmed_at DESC LIMIT 100`
+    
+    const payments = await DB.prepare(query).all()
+    
+    return c.json(payments.results || [])
+  } catch (error: any) {
+    console.error('Payment history error:', error)
+    return c.json({ error: error.message || 'Failed to load payment history' }, 500)
   }
-  
-  query += ` ORDER BY ph.bank_transfer_confirmed_at DESC LIMIT 100`
-  
-  const payments = await DB.prepare(query).all()
-  
-  return c.json(payments.results || [])
 })
 
 // ===============================
