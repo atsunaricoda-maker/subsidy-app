@@ -1904,15 +1904,43 @@ app.get('/', (c) => {
                                 <i class="fas fa-times-circle text-red-200 text-xl lg:text-2xl"></i>
                             </div>
                         </a>
-                        <a href="/cases?status=completed" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer block">
+                        <a href="/cases?archived=true" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer block">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <div class="text-gray-500 text-xs mb-1">完了</div>
+                                    <div class="text-gray-500 text-xs mb-1">完了済み</div>
                                     <div class="text-xl lg:text-2xl font-bold text-green-500" id="count-completed">-</div>
                                 </div>
                                 <i class="fas fa-check-circle text-green-200 text-xl lg:text-2xl"></i>
                             </div>
                         </a>
+                    </div>
+                    
+                    <!-- 統計サマリー（今月の実績） -->
+                    <div class="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg p-4 lg:p-6 mb-6 text-white">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-bold flex items-center gap-2">
+                                <i class="fas fa-chart-line"></i>今月の実績
+                            </h2>
+                            <span class="text-sm opacity-80" id="currentMonth"></span>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="bg-white/20 rounded-lg p-3 text-center">
+                                <div class="text-2xl lg:text-3xl font-bold" id="monthly-completed">-</div>
+                                <div class="text-xs opacity-90">完了件数</div>
+                            </div>
+                            <div class="bg-white/20 rounded-lg p-3 text-center">
+                                <div class="text-2xl lg:text-3xl font-bold" id="monthly-approved">-</div>
+                                <div class="text-xs opacity-90">採択件数</div>
+                            </div>
+                            <div class="bg-white/20 rounded-lg p-3 text-center">
+                                <div class="text-2xl lg:text-3xl font-bold" id="monthly-amount">-</div>
+                                <div class="text-xs opacity-90">採択総額</div>
+                            </div>
+                            <div class="bg-white/20 rounded-lg p-3 text-center">
+                                <div class="text-2xl lg:text-3xl font-bold" id="monthly-rate">-</div>
+                                <div class="text-xs opacity-90">採択率</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- 検索・フィルター -->
@@ -1925,7 +1953,6 @@ app.get('/', (c) => {
                                 <option value="applying">申請中</option>
                                 <option value="adopted">採択・入金待ち</option>
                                 <option value="rejected">不採択</option>
-                                <option value="completed">完了</option>
                             </select>
                             <div class="flex-1 relative">
                                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
@@ -2353,7 +2380,7 @@ app.get('/', (c) => {
             let pipelineTemplates = [];
             let pipelineSelectInitialized = false;
             
-            async function loadPipelineTemplates(subsidyTypeId = null) {
+            async function loadPipelineTemplates(subsidyTypeId = null, subsidyTypeName = null) {
                 try {
                     // 申請種別IDが指定されている場合はフィルタリング
                     let url = '/api/pipeline-templates';
@@ -2416,6 +2443,48 @@ app.get('/', (c) => {
                             select.appendChild(optGroup);
                         }
                     });
+                    
+                    // 申請種別が指定されている場合、パイプラインを自動選択
+                    if (subsidyTypeId && pipelineTemplates.length > 0) {
+                        let selectedPipeline = pipelineTemplates[0]; // デフォルトは最初のもの
+                        
+                        // 申請種別名が指定されている場合、名前が一致するパイプラインを優先
+                        if (subsidyTypeName) {
+                            // 完全一致を探す
+                            const exactMatch = pipelineTemplates.find(t => 
+                                t.name === subsidyTypeName || 
+                                t.name === subsidyTypeName + ' パイプライン' ||
+                                t.name === subsidyTypeName + 'パイプライン'
+                            );
+                            
+                            if (exactMatch) {
+                                selectedPipeline = exactMatch;
+                            } else {
+                                // 部分一致を探す（申請種別名がパイプライン名に含まれる）
+                                const partialMatch = pipelineTemplates.find(t => 
+                                    t.name.includes(subsidyTypeName) || subsidyTypeName.includes(t.name.replace(/パイプライン|標準|汎用/g, '').trim())
+                                );
+                                if (partialMatch) {
+                                    selectedPipeline = partialMatch;
+                                }
+                            }
+                        }
+                        
+                        // 選択を適用
+                        select.value = selectedPipeline.id;
+                        
+                        // 説明も表示
+                        if (selectedPipeline.description) {
+                            descDiv.textContent = selectedPipeline.description;
+                            descDiv.classList.remove('hidden');
+                        }
+                        
+                        // 選択されたことを視覚的に強調
+                        select.classList.add('ring-2', 'ring-blue-300');
+                        setTimeout(() => {
+                            select.classList.remove('ring-2', 'ring-blue-300');
+                        }, 1500);
+                    }
                     
                     // 選択変更時に説明を表示（初回のみイベント登録）
                     if (!pipelineSelectInitialized) {
@@ -3199,8 +3268,8 @@ app.get('/', (c) => {
                 // リストの選択状態を更新
                 renderSubsidyOptions();
                 
-                // 申請種別に紐づくパイプラインのみを読み込み
-                loadPipelineTemplates(id);
+                // 申請種別に紐づくパイプラインのみを読み込み（名前も渡して優先選択に使用）
+                loadPipelineTemplates(id, name);
             }
             
             // 補助金検索フィルター
@@ -3277,6 +3346,64 @@ app.get('/', (c) => {
                     const el = document.getElementById(\`count-\${status}\`);
                     if (el) el.textContent = counts[status];
                 });
+                
+                // 今月の実績をAPIから取得して表示
+                loadMonthlyStats();
+            }
+            
+            // 今月の実績を取得・表示
+            async function loadMonthlyStats() {
+                try {
+                    const response = await axios.get('/api/dashboard/stats');
+                    const data = response.data;
+                    
+                    // 現在の月を表示
+                    const currentMonthEl = document.getElementById('currentMonth');
+                    if (currentMonthEl && data.current_month) {
+                        const [year, month] = data.current_month.split('-');
+                        currentMonthEl.textContent = \`\${year}年\${parseInt(month)}月\`;
+                    }
+                    
+                    // 完了済み件数（全期間）をステータスカードに反映
+                    const completedEl = document.getElementById('count-completed');
+                    if (completedEl && data.monthly_cases) {
+                        completedEl.textContent = data.monthly_cases.total_archived || 0;
+                    }
+                    
+                    // 今月の完了件数
+                    const monthlyCompletedEl = document.getElementById('monthly-completed');
+                    if (monthlyCompletedEl && data.monthly_cases) {
+                        monthlyCompletedEl.textContent = data.monthly_cases.completed || 0;
+                    }
+                    
+                    // 今月の採択件数
+                    const monthlyApprovedEl = document.getElementById('monthly-approved');
+                    if (monthlyApprovedEl && data.monthly_cases) {
+                        monthlyApprovedEl.textContent = data.monthly_cases.approved || 0;
+                    }
+                    
+                    // 今月の採択総額
+                    const monthlyAmountEl = document.getElementById('monthly-amount');
+                    if (monthlyAmountEl && data.monthly_cases) {
+                        const amount = data.monthly_cases.approved_amount || 0;
+                        if (amount >= 10000) {
+                            monthlyAmountEl.textContent = '¥' + Math.round(amount / 10000) + '万';
+                        } else if (amount > 0) {
+                            monthlyAmountEl.textContent = '¥' + amount.toLocaleString();
+                        } else {
+                            monthlyAmountEl.textContent = '-';
+                        }
+                    }
+                    
+                    // 今月の採択率
+                    const monthlyRateEl = document.getElementById('monthly-rate');
+                    if (monthlyRateEl && data.monthly_cases) {
+                        const rate = data.monthly_cases.rate;
+                        monthlyRateEl.textContent = rate > 0 ? rate + '%' : '-';
+                    }
+                } catch (error) {
+                    console.error('Error loading monthly stats:', error);
+                }
             }
             // 案件一覧表示（案件ベース）
             // 展開状態を管理
@@ -4580,6 +4707,9 @@ app.put('/api/cases/:id', async (c) => {
       }
     }
     
+    // 「完了する」ボタンでis_archived: trueが明示的に指定された場合のみアーカイブする
+    // ステータス変更では自動アーカイブしない（完了前に入力された採択金額・不採択情報は保持される）
+    
     await DB.prepare(`
       UPDATE cases SET
         subsidy_type_id = COALESCE(?, subsidy_type_id),
@@ -4619,6 +4749,7 @@ app.put('/api/cases/:id', async (c) => {
       data.applied_amount !== undefined ? data.applied_amount : null,
       data.granted_amount !== undefined ? data.granted_amount : null,
       data.granted_at !== undefined ? data.granted_at : null,
+      // 明示的にis_archivedが指定された場合のみ変更
       data.is_archived !== undefined ? (data.is_archived ? 1 : 0) : null,
       data.result !== undefined ? data.result : null,
       data.approved_amount !== undefined ? data.approved_amount : null,
@@ -4847,28 +4978,134 @@ app.get('/api/cases/:id/hearing-answers', async (c) => {
   const { DB } = c.env
   const caseId = c.req.param('id')
   
-  // 案件からsubsidy_type_idを取得
-  const caseData = await DB.prepare(`SELECT subsidy_type_id, client_id FROM cases WHERE id = ?`).bind(caseId).first()
+  // 案件からsubsidy_type_idとclient_idを取得
+  const caseData = await DB.prepare(`SELECT subsidy_type_id, client_id FROM cases WHERE id = ?`).bind(caseId).first() as { subsidy_type_id: number | null, client_id: number } | null
   if (!caseData) {
     return c.json({ error: 'Case not found' }, 404)
   }
   
-  // ヒアリング質問と回答をJOIN
+  // 共通質問（subsidy_type_id = 0）と案件固有の質問を取得
+  // 共通質問の回答はclient_idで、案件固有の回答はcase_idで取得
   const result = await DB.prepare(`
     SELECT 
       hq.id as question_id,
+      hq.question_key,
       hq.question_text,
+      hq.question_type,
+      hq.options,
+      hq.category,
       hq.is_required,
-      hq.sort_order,
-      ha.answer_text,
-      ha.created_at as answered_at
+      hq.display_order as sort_order,
+      hq.help_text,
+      hq.example_answer,
+      hq.subsidy_type_id,
+      CASE 
+        WHEN hq.subsidy_type_id = 0 THEN ha_common.answer_text
+        ELSE ha_case.answer_text
+      END as answer_text,
+      CASE 
+        WHEN hq.subsidy_type_id = 0 THEN ha_common.created_at
+        ELSE ha_case.created_at
+      END as answered_at
     FROM hearing_questions hq
-    LEFT JOIN hearing_answers ha ON hq.id = ha.question_id AND ha.case_id = ?
-    WHERE hq.subsidy_type_id = ? OR hq.is_common = 1
-    ORDER BY hq.sort_order ASC
-  `).bind(caseId, caseData.subsidy_type_id).all()
+    LEFT JOIN hearing_answers ha_common ON hq.id = ha_common.question_id AND ha_common.client_id = ? AND (ha_common.case_id IS NULL OR hq.subsidy_type_id = 0)
+    LEFT JOIN hearing_answers ha_case ON hq.id = ha_case.question_id AND ha_case.case_id = ?
+    WHERE hq.subsidy_type_id = ? OR hq.subsidy_type_id = 0
+    ORDER BY hq.subsidy_type_id ASC, hq.display_order ASC
+  `).bind(caseData.client_id, caseId, caseData.subsidy_type_id || 0).all()
   
   return c.json(result.results)
+})
+
+// 案件のヒアリング回答保存（共通質問と案件固有質問を区別）
+app.post('/api/cases/:id/hearing-answers', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('id')
+  const data = await c.req.json()
+  
+  // 案件からclient_idを取得
+  const caseData = await DB.prepare(`SELECT client_id FROM cases WHERE id = ?`).bind(caseId).first() as { client_id: number } | null
+  if (!caseData) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  const clientId = caseData.client_id
+  let savedCount = 0
+  let commonSavedCount = 0
+  
+  // 回答を保存する関数
+  const saveAnswer = async (questionId: number, answerText: string) => {
+    // 質問の種別を確認（共通質問かどうか）
+    const question = await DB.prepare(`
+      SELECT subsidy_type_id FROM hearing_questions WHERE id = ?
+    `).bind(questionId).first() as { subsidy_type_id: number } | null
+    
+    if (!question) return false
+    
+    const isCommonQuestion = question.subsidy_type_id === 0
+    
+    if (isCommonQuestion) {
+      // 共通質問はclient_idのみで保存（case_id = NULL）
+      // 既存の回答を確認（client_idのみで検索）
+      const existing = await DB.prepare(`
+        SELECT id FROM hearing_answers WHERE client_id = ? AND question_id = ? AND (case_id IS NULL OR case_id = 0)
+      `).bind(clientId, questionId).first()
+      
+      if (existing) {
+        await DB.prepare(`
+          UPDATE hearing_answers 
+          SET answer_text = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(answerText, (existing as any).id).run()
+      } else {
+        await DB.prepare(`
+          INSERT INTO hearing_answers (client_id, question_id, answer_text, case_id)
+          VALUES (?, ?, ?, NULL)
+        `).bind(clientId, questionId, answerText).run()
+      }
+      commonSavedCount++
+    } else {
+      // 案件固有の質問はcase_idも含めて保存
+      const existing = await DB.prepare(`
+        SELECT id FROM hearing_answers WHERE case_id = ? AND question_id = ?
+      `).bind(caseId, questionId).first()
+      
+      if (existing) {
+        await DB.prepare(`
+          UPDATE hearing_answers 
+          SET answer_text = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(answerText, (existing as any).id).run()
+      } else {
+        await DB.prepare(`
+          INSERT INTO hearing_answers (client_id, case_id, question_id, answer_text)
+          VALUES (?, ?, ?, ?)
+        `).bind(clientId, caseId, questionId, answerText).run()
+      }
+    }
+    
+    savedCount++
+    return true
+  }
+  
+  // 複数回答の一括保存
+  if (data.answers && Array.isArray(data.answers)) {
+    for (const answer of data.answers) {
+      if (answer.answer_text && answer.answer_text.trim()) {
+        await saveAnswer(answer.question_id, answer.answer_text)
+      }
+    }
+  } else if (data.question_id && data.answer_text) {
+    // 単一回答の保存
+    await saveAnswer(data.question_id, data.answer_text)
+  }
+  
+  return c.json({ 
+    success: true, 
+    saved_count: savedCount,
+    common_saved_count: commonSavedCount,
+    message: `${savedCount}件の回答を保存しました（うち共通質問: ${commonSavedCount}件）`
+  })
 })
 
 // 案件の書類チェックリスト取得
@@ -6855,7 +7092,7 @@ app.get('/client/:id', async (c) => {
                 <form id="generateDocumentForm" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium mb-1">テンプレート <span class="text-red-500">*</span></label>
-                        <select id="templateSelect" class="w-full px-3 py-2 border rounded-lg" required>
+                        <select id="templateSelect" class="w-full px-3 py-2 border rounded-lg" required onchange="onTemplateSelectChange(this.value)">
                             <option value="">選択してください</option>
                         </select>
                         <p id="templateDescription" class="text-xs text-gray-500 mt-1"></p>
@@ -7797,7 +8034,7 @@ app.get('/client/:id', async (c) => {
                         { key: 'inquiry', label: '見込み', color: 'yellow', icon: 'fa-lightbulb' },
                         { key: 'preparing', label: '書類準備中', color: 'orange', icon: 'fa-file-alt' },
                         { key: 'applying', label: '申請中', color: 'purple', icon: 'fa-paper-plane' },
-                        { key: 'completed', label: '完了', color: 'green', icon: 'fa-check-circle' }
+                        { key: 'completed', label: '完了済み', color: 'green', icon: 'fa-check-circle' }
                     ];
                     
                     // ステータスごとに案件をグループ化
@@ -8570,9 +8807,99 @@ app.get('/client/:id', async (c) => {
                     
                     const select = document.getElementById('templateSelect');
                     select.innerHTML = '<option value="">選択してください</option>' +
-                        documentTemplates.map(t => \`<option value="\${t.id}">\${t.template_name}</option>\`).join('');
+                        documentTemplates.map(t => \`<option value="\${t.id}" data-subsidy-type-id="\${t.subsidy_type_id || ''}">\${t.template_name}</option>\`).join('');
                 } catch (error) {
                     console.error('Templates load error:', error);
+                }
+            }
+            
+            // テンプレート選択時のハンドラー
+            async function onTemplateSelectChange(templateId) {
+                const descEl = document.getElementById('templateDescription');
+                
+                if (!templateId) {
+                    descEl.textContent = '';
+                    // 全体のヒアリング状況を表示
+                    await loadHearingStatusForGeneration();
+                    return;
+                }
+                
+                // 選択されたテンプレートの情報を取得
+                const template = documentTemplates.find(t => t.id == templateId);
+                if (template) {
+                    descEl.textContent = template.description || '';
+                    
+                    // テンプレートに紐づく申請種別のヒアリング状況を取得
+                    if (template.subsidy_type_id) {
+                        await loadHearingStatusForTemplate(template.subsidy_type_id);
+                    } else {
+                        await loadHearingStatusForGeneration();
+                    }
+                }
+            }
+            
+            // テンプレートに紐づく申請種別のヒアリング状況を取得
+            async function loadHearingStatusForTemplate(subsidyTypeId) {
+                const container = document.getElementById('hearingStatus');
+                container.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 確認中...';
+                
+                try {
+                    // 顧客のヒアリング回答を取得（CLIENT_IDを使用）
+                    const answersRes = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing-answers\`);
+                    const answers = answersRes.data || [];
+                    
+                    // 申請種別に紐づくヒアリング質問を取得
+                    const questionsRes = await axios.get(\`/api/hearing-questions?subsidy_type_id=\${subsidyTypeId}\`);
+                    const questions = questionsRes.data || [];
+                    
+                    if (questions.length === 0) {
+                        container.innerHTML = \`
+                            <div class="flex items-center gap-2 text-gray-500">
+                                <i class="fas fa-info-circle"></i>
+                                <span>このテンプレートに関連するヒアリング質問は設定されていません</span>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    // 回答済みの質問をカウント
+                    const answeredQuestionIds = answers.filter(a => a.answer_text).map(a => a.question_id);
+                    const relevantAnswers = questions.filter(q => answeredQuestionIds.includes(q.id));
+                    const answeredCount = relevantAnswers.length;
+                    const totalCount = questions.length;
+                    const percentage = Math.round((answeredCount / totalCount) * 100);
+                    
+                    // カテゴリ別の回答状況
+                    const categories = {};
+                    questions.forEach(q => {
+                        const cat = q.category || 'その他';
+                        if (!categories[cat]) categories[cat] = { total: 0, answered: 0 };
+                        categories[cat].total++;
+                        if (answeredQuestionIds.includes(q.id)) {
+                            categories[cat].answered++;
+                        }
+                    });
+                    
+                    const statusColor = percentage >= 80 ? 'text-green-700' : percentage >= 50 ? 'text-yellow-700' : 'text-red-700';
+                    const statusIcon = percentage >= 80 ? 'fa-check-circle' : percentage >= 50 ? 'fa-exclamation-triangle' : 'fa-times-circle';
+                    
+                    container.innerHTML = \`
+                        <div class="flex items-center gap-2 \${statusColor} mb-2">
+                            <i class="fas \${statusIcon}"></i>
+                            <span>\${answeredCount}/\${totalCount}件のヒアリング回答が登録済み (\${percentage}%)</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            \${Object.entries(categories).map(([cat, info]) => \`
+                                <span class="px-2 py-1 bg-white rounded text-xs \${info.answered === info.total ? 'text-green-600' : 'text-gray-600'}">
+                                    \${cat}: \${info.answered}/\${info.total}件
+                                </span>
+                            \`).join('')}
+                        </div>
+                        \${percentage < 80 ? '<p class="text-xs text-yellow-600 mt-2"><i class="fas fa-lightbulb mr-1"></i>ヒアリング回答を増やすと、より精度の高い文書が生成できます</p>' : ''}
+                    \`;
+                } catch (error) {
+                    console.error('Error loading hearing status:', error);
+                    container.innerHTML = '<span class="text-gray-500">読み込みエラー</span>';
                 }
             }
             
@@ -9278,7 +9605,6 @@ app.get('/case/:id', async (c) => {
                                         <option value="applying">申請中</option>
                                         <option value="adopted">採択・入金待ち</option>
                                         <option value="rejected">不採択</option>
-                                        <option value="completed">完了</option>
                                     </select>
                                 </div>
                                 <div class="text-xs text-gray-500">
@@ -9288,8 +9614,8 @@ app.get('/case/:id', async (c) => {
                         </div>
                     </div>
                     
-                    <!-- 採択/不採択・アーカイブセクション（完了ステータスの場合のみ表示） -->
-                    <div id="resultSection" class="${caseData.status === 'completed' || caseData.status === 'adopted' || caseData.status === 'rejected' ? '' : 'hidden'} mb-6">
+                    <!-- 申請結果・完了セクション（申請中以降のステータスで表示） -->
+                    <div id="resultSection" class="${caseData.status === 'applying' || caseData.status === 'adopted' || caseData.status === 'rejected' || caseData.status === 'completed' ? '' : 'hidden'} mb-6">
                         <div class="bg-white rounded-xl shadow-sm p-6">
                             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                                 <div>
@@ -9323,19 +9649,22 @@ app.get('/case/:id', async (c) => {
                                 </div>
                                 <div class="flex items-center gap-3">
                                     ${caseData.is_archived ? `
-                                        <button onclick="unarchiveCase()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm">
-                                            <i class="fas fa-box-open mr-2"></i>アーカイブ解除
+                                        <span class="bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium">
+                                            <i class="fas fa-check-circle mr-2"></i>完了済み
+                                        </span>
+                                        <button onclick="reopenCase()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm">
+                                            <i class="fas fa-undo mr-2"></i>案件を再開
                                         </button>
                                     ` : `
-                                        <button onclick="archiveCase()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
-                                            <i class="fas fa-archive mr-2"></i>アーカイブ
+                                        <button onclick="completeCase()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium">
+                                            <i class="fas fa-check-circle mr-2"></i>完了する
                                         </button>
                                     `}
                                 </div>
                             </div>
                             ${caseData.is_archived ? `
-                                <div class="mt-3 text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
-                                    <i class="fas fa-archive mr-1"></i>この案件はアーカイブされています
+                                <div class="mt-3 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">
+                                    <i class="fas fa-check-circle mr-1"></i>この案件は完了しています（リストから非表示）
                                 </div>
                             ` : ''}
                         </div>
@@ -9600,6 +9929,7 @@ app.get('/case/:id', async (c) => {
         <script>
             const CASE_ID = ${id};
             const CLIENT_ID = ${caseData.client_id};
+            const SUBSIDY_TYPE_ID = ${caseData.subsidy_type_id || 'null'};
             const PORTAL_URL = '${new URL(c.req.url).origin}/portal/${caseData.access_token}';
             
             const STATUS_LABELS = {
@@ -9749,33 +10079,33 @@ app.get('/case/:id', async (c) => {
                 }
             }
             
-            // アーカイブ
-            async function archiveCase() {
-                if (!confirm('この案件をアーカイブしますか？\\n\\nアーカイブされた案件は案件一覧に表示されなくなりますが、「アーカイブ」ボタンから確認できます。')) {
+            // 完了する
+            async function completeCase() {
+                if (!confirm('この案件を完了しますか？\\n\\n完了した案件は案件一覧に表示されなくなりますが、「完了済み」タブから確認できます。')) {
                     return;
                 }
                 try {
-                    await axios.put(\`/api/cases/\${CASE_ID}\`, { is_archived: true });
-                    showToast('アーカイブしました');
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { is_archived: true, status: 'completed' });
+                    showToast('完了しました');
                     window.location.reload();
                 } catch (error) {
-                    console.error('Archive error:', error);
-                    alert('アーカイブに失敗しました');
+                    console.error('Complete error:', error);
+                    alert('完了に失敗しました');
                 }
             }
             
-            // アーカイブ解除
-            async function unarchiveCase() {
-                if (!confirm('この案件のアーカイブを解除しますか？')) {
+            // 完了解除（再開）
+            async function reopenCase() {
+                if (!confirm('この案件を再開しますか？\\n\\n案件一覧に表示されるようになります。')) {
                     return;
                 }
                 try {
-                    await axios.put(\`/api/cases/\${CASE_ID}\`, { is_archived: false });
-                    showToast('アーカイブを解除しました');
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { is_archived: false, status: 'applying' });
+                    showToast('案件を再開しました');
                     window.location.reload();
                 } catch (error) {
-                    console.error('Unarchive error:', error);
-                    alert('アーカイブ解除に失敗しました');
+                    console.error('Reopen error:', error);
+                    alert('案件の再開に失敗しました');
                 }
             }
             
@@ -10367,11 +10697,23 @@ app.get('/case/:id', async (c) => {
                 document.getElementById('applyPipelineModal').classList.remove('hidden');
                 
                 try {
-                    const response = await axios.get('/api/pipeline-templates');
+                    // 申請種別IDでフィルタリング
+                    let url = '/api/pipeline-templates';
+                    if (SUBSIDY_TYPE_ID) {
+                        url += '?subsidy_type_id=' + SUBSIDY_TYPE_ID;
+                    }
+                    const response = await axios.get(url);
                     const templates = response.data;
                     
                     const select = document.getElementById('pipelineTemplateSelect');
                     select.innerHTML = '<option value="">テンプレートを選択...</option>';
+                    
+                    if (templates.length === 0) {
+                        const optInfo = document.createElement('option');
+                        optInfo.disabled = true;
+                        optInfo.textContent = '※ この申請種別用のパイプラインは未設定です';
+                        select.appendChild(optInfo);
+                    }
                     
                     templates.forEach(t => {
                         const option = document.createElement('option');
@@ -12253,9 +12595,12 @@ app.get('/portal/:token', async (c) => {
                     
                     const statusLabels = {
                         inquiry: { label: '見込み', bg: 'bg-gray-100', text: 'text-gray-700' },
+                        preparing: { label: '書類準備中', bg: 'bg-yellow-100', text: 'text-yellow-800' },
                         document_prep: { label: '書類準備中', bg: 'bg-yellow-100', text: 'text-yellow-800' },
+                        applying: { label: '申請中', bg: 'bg-purple-100', text: 'text-purple-800' },
                         submitted: { label: '申請済み', bg: 'bg-blue-100', text: 'text-blue-800' },
                         under_review: { label: '審査中', bg: 'bg-purple-100', text: 'text-purple-800' },
+                        adopted: { label: '採択・入金待ち', bg: 'bg-blue-100', text: 'text-blue-800' },
                         approved: { label: '採択', bg: 'bg-green-100', text: 'text-green-800' },
                         rejected: { label: '不採択', bg: 'bg-red-100', text: 'text-red-800' },
                         completed: { label: '完了', bg: 'bg-teal-100', text: 'text-teal-800' }
@@ -12630,8 +12975,13 @@ app.get('/portal/:token', async (c) => {
                     const questionsRes = await axios.get(\`/api/hearing-questions/\${subsidyTypeId}\`);
                     hearingQuestions = questionsRes.data;
                     
-                    // 既存の回答を取得
-                    const answersRes = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing-answers\`);
+                    // 既存の回答を取得（CASE_IDがある場合は案件用API、共通質問は自動で全案件に適用）
+                    let answersRes;
+                    if (CASE_ID) {
+                        answersRes = await axios.get(\`/api/cases/\${CASE_ID}/hearing-answers\`);
+                    } else {
+                        answersRes = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing-answers\`);
+                    }
                     hearingAnswers = {};
                     (answersRes.data || []).forEach(a => {
                         hearingAnswers[a.question_id] = a.answer_text;
@@ -12964,11 +13314,25 @@ app.get('/portal/:token', async (c) => {
                         return;
                     }
                     
-                    await axios.post(\`/api/clients/\${CLIENT_ID}/hearing-answers\`, {
-                        answers: answersToSave
-                    });
-                    
-                    showMessage('success', \`\${answersToSave.length}件の回答を保存しました！\`);
+                    // CASE_IDがある場合は案件用API（共通質問を自動で全案件に適用）
+                    // ない場合は従来のクライアント用API
+                    let response;
+                    if (CASE_ID) {
+                        response = await axios.post(\`/api/cases/\${CASE_ID}/hearing-answers\`, {
+                            answers: answersToSave
+                        });
+                        const result = response.data;
+                        if (result.common_saved_count > 0) {
+                            showMessage('success', \`\${result.saved_count}件の回答を保存しました！（共通質問\${result.common_saved_count}件は全案件に適用されます）\`);
+                        } else {
+                            showMessage('success', \`\${result.saved_count}件の回答を保存しました！\`);
+                        }
+                    } else {
+                        await axios.post(\`/api/clients/\${CLIENT_ID}/hearing-answers\`, {
+                            answers: answersToSave
+                        });
+                        showMessage('success', \`\${answersToSave.length}件の回答を保存しました！\`);
+                    }
                     
                     // 質問リストを再描画して状態を更新
                     renderQuestions();
@@ -19719,6 +20083,17 @@ app.get('/api/dashboard/stats', async (c) => {
     FROM clients WHERE strftime('%Y-%m', created_at) = ?
   `).bind(thisMonth, thisMonth).first()
   
+  // 今月の案件実績（完了・採択・採択額）
+  const monthlyCaseStats = await DB.prepare(`
+    SELECT 
+      SUM(CASE WHEN is_archived = 1 AND strftime('%Y-%m', updated_at) = ? THEN 1 ELSE 0 END) as monthly_completed,
+      SUM(CASE WHEN result = 'approved' AND strftime('%Y-%m', updated_at) = ? THEN 1 ELSE 0 END) as monthly_approved,
+      SUM(CASE WHEN result = 'rejected' AND strftime('%Y-%m', updated_at) = ? THEN 1 ELSE 0 END) as monthly_rejected,
+      SUM(CASE WHEN result = 'approved' AND strftime('%Y-%m', updated_at) = ? THEN COALESCE(approved_amount, 0) ELSE 0 END) as monthly_approved_amount,
+      SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) as total_archived
+    FROM cases
+  `).bind(thisMonth, thisMonth, thisMonth, thisMonth).first() as any
+  
   // 生成文書統計
   const docStats = await DB.prepare(`
     SELECT 
@@ -19748,6 +20123,13 @@ app.get('/api/dashboard/stats', async (c) => {
     SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0
   `).first()
   
+  // 今月の採択率を計算
+  const monthlyCompleted = monthlyCaseStats?.monthly_completed || 0
+  const monthlyApproved = monthlyCaseStats?.monthly_approved || 0
+  const monthlyRejected = monthlyCaseStats?.monthly_rejected || 0
+  const monthlyTotal = monthlyApproved + monthlyRejected
+  const monthlyRate = monthlyTotal > 0 ? Math.round((monthlyApproved / monthlyTotal) * 100) : 0
+  
   return c.json({
     clients: clientStats,
     monthly: monthlyStats,
@@ -19761,6 +20143,15 @@ app.get('/api/dashboard/stats', async (c) => {
       pending_guideline_updates: pendingUpdates?.count || 0,
       unread_notifications: unreadNotifications?.count || 0
     },
+    monthly_cases: {
+      completed: monthlyCompleted,
+      approved: monthlyApproved,
+      rejected: monthlyRejected,
+      approved_amount: monthlyCaseStats?.monthly_approved_amount || 0,
+      rate: monthlyRate,
+      total_archived: monthlyCaseStats?.total_archived || 0
+    },
+    current_month: thisMonth,
     generated_at: new Date().toISOString()
   })
 })
@@ -21067,12 +21458,14 @@ app.post('/api/clients/:clientId/apply-pipeline', async (c) => {
 })
 
 // クライアントのパイプライン一覧取得
-// 顧客の案件一覧取得
+// 顧客の案件一覧取得（顧客ポータル用）
+// 完了してアーカイブされた案件は除外（サービス進捗から消える）
 app.get('/api/clients/:clientId/cases', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const showArchived = c.req.query('show_archived') === 'true'
   
-  const cases = await DB.prepare(`
+  let query = `
     SELECT 
       cases.*,
       subsidy_types.name as subsidy_type_name,
@@ -21081,25 +21474,45 @@ app.get('/api/clients/:clientId/cases', async (c) => {
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
     LEFT JOIN admin_users ON cases.assigned_to = admin_users.username
     WHERE cases.client_id = ?
-    ORDER BY cases.created_at DESC
-  `).bind(clientId).all()
+  `
+  
+  // デフォルトでアーカイブ済み（完了）案件を除外
+  if (!showArchived) {
+    query += ` AND (cases.is_archived = 0 OR cases.is_archived IS NULL)`
+  }
+  
+  query += ` ORDER BY cases.created_at DESC`
+  
+  const cases = await DB.prepare(query).bind(clientId).all()
   
   return c.json(cases.results || [])
 })
 
+// 顧客のパイプライン一覧取得（顧客ポータル用）
+// 完了してアーカイブされた案件のパイプラインは除外（サービス進捗から消える）
 app.get('/api/clients/:clientId/pipelines', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const showArchived = c.req.query('show_archived') === 'true'
   
-  const pipelines = await DB.prepare(`
+  let query = `
     SELECT cp.*, pt.name as template_name,
            (SELECT COUNT(*) FROM client_pipeline_tasks WHERE pipeline_id = cp.id) as total_tasks,
            (SELECT COUNT(*) FROM client_pipeline_tasks WHERE pipeline_id = cp.id AND status = 'completed') as completed_tasks
     FROM client_pipelines cp
     LEFT JOIN pipeline_templates pt ON cp.template_id = pt.id
+    LEFT JOIN cases ON cp.case_id = cases.id
     WHERE cp.client_id = ?
-    ORDER BY cp.created_at DESC
-  `).bind(clientId).all()
+  `
+  
+  // デフォルトでアーカイブ済み（完了）案件のパイプラインを除外
+  if (!showArchived) {
+    query += ` AND (cases.is_archived = 0 OR cases.is_archived IS NULL OR cp.case_id IS NULL)`
+  }
+  
+  query += ` ORDER BY cp.created_at DESC`
+  
+  const pipelines = await DB.prepare(query).bind(clientId).all()
   
   return c.json(pipelines.results || [])
 })
@@ -21667,7 +22080,7 @@ app.get('/admin/master', async (c) => {
                             </div>
                             <div class="bg-white/20 rounded-lg p-4 text-center">
                                 <div class="text-3xl font-bold">${caseStats?.archived_cases || 0}</div>
-                                <div class="text-sm opacity-90">アーカイブ</div>
+                                <div class="text-sm opacity-90">完了済み</div>
                             </div>
                             <div class="bg-white/20 rounded-lg p-4 text-center">
                                 <div class="text-3xl font-bold">${caseStats?.total_cases && caseStats?.approved_cases ? Math.round((caseStats.approved_cases / caseStats.total_cases) * 100) : 0}%</div>
@@ -25274,21 +25687,41 @@ app.get('/cases', async (c) => {
     `).first() as any
     const archivedCount = archivedCountResult?.count || 0
     
-    // ステータス定義
+    // ステータス定義（完了済みは別途取得）
     const STATUSES = [
       { key: 'inquiry', label: '見込み', color: 'yellow', icon: 'fa-lightbulb' },
       { key: 'preparing', label: '書類準備中', color: 'orange', icon: 'fa-file-alt' },
       { key: 'applying', label: '申請中', color: 'purple', icon: 'fa-paper-plane' },
-      { key: 'completed', label: '完了', color: 'green', icon: 'fa-check-circle' }
+      { key: 'archived', label: '完了済み', color: 'green', icon: 'fa-check-circle', isArchived: true }
     ]
+    
+    // 完了済み（アーカイブ）案件を別途取得（最新10件）
+    const archivedCasesResult = await DB.prepare(`
+      SELECT 
+        cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
+        cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
+        cs.is_archived, cs.result, cs.approved_amount, cs.result_date,
+        cl.id as client_id, cl.name as client_name, cl.company_name,
+        st.name as subsidy_type_name, st.category as subsidy_category,
+        au.name as assigned_to_name
+      FROM cases cs
+      LEFT JOIN clients cl ON cs.client_id = cl.id
+      LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+      LEFT JOIN admin_users au ON cs.assigned_to = au.username
+      WHERE cs.is_archived = 1
+      ORDER BY cs.updated_at DESC
+      LIMIT 10
+    `).all()
+    const archivedCases = archivedCasesResult.results || []
     
     // ステータスごとにグループ化
     const casesByStatus: Record<string, any[]> = {}
     STATUSES.forEach(s => casesByStatus[s.key] = [])
+    casesByStatus['archived'] = archivedCases as any[]
     allCases.forEach((c: any) => {
-      if (casesByStatus[c.status]) {
+      if (c.status && casesByStatus[c.status]) {
         casesByStatus[c.status].push(c)
-      } else {
+      } else if (!c.is_archived) {
         casesByStatus['inquiry'].push(c)
       }
     })
@@ -25325,7 +25758,7 @@ app.get('/cases', async (c) => {
                 <span class="font-mono text-xs text-gray-500">${c.case_number || '#' + c.id}</span>
                 <div class="flex items-center gap-1">
                   ${c.deposit_required && !c.deposit_paid ? '<span class="text-yellow-600 text-xs" title="手付金未払"><i class="fas fa-yen-sign"></i></span>' : ''}
-                  ${c.is_archived ? '<span class="text-gray-400 text-xs" title="アーカイブ済み"><i class="fas fa-archive"></i></span>' : ''}
+                  ${c.is_archived && status.key !== 'archived' ? '<span class="text-green-600 text-xs" title="完了済み"><i class="fas fa-check-circle"></i></span>' : ''}
                 </div>
               </div>
               <div class="font-bold text-gray-900 mb-1">${c.client_name || '名称未設定'}</div>
@@ -25343,6 +25776,25 @@ app.get('/cases', async (c) => {
           </a>
         `}).join('')
       
+      // 完了済み列の場合、採択額の合計を計算
+      const totalApprovedAmount = status.key === 'archived' 
+        ? statusCases.reduce((sum: number, c: any) => sum + (c.approved_amount || 0), 0)
+        : 0
+      
+      // 完了済み列のサブヘッダー（採択額合計と全件表示リンク）
+      const archivedSubHeader = status.key === 'archived' ? `
+        <div class="px-4 py-2 bg-green-50 border-b border-green-200 text-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-green-700">
+              <i class="fas fa-coins mr-1"></i>採択総額: <strong>¥${totalApprovedAmount.toLocaleString()}</strong>
+            </span>
+            <a href="/cases?archived=true" class="text-green-600 hover:text-green-800 text-xs">
+              全件表示 <i class="fas fa-external-link-alt ml-1"></i>
+            </a>
+          </div>
+        </div>
+      ` : ''
+      
       return `
         <div class="flex flex-col rounded-lg ${colors.bg} border ${colors.border} overflow-hidden min-w-[280px]">
           <div class="${colors.header} px-4 py-3 flex items-center justify-between">
@@ -25350,8 +25802,9 @@ app.get('/cases', async (c) => {
               <i class="fas ${status.icon}"></i>
               <span class="font-bold">${status.label}</span>
             </div>
-            <span class="${colors.badge} text-white text-xs px-2 py-0.5 rounded-full">${statusCases.length}</span>
+            <span class="${colors.badge} text-white text-xs px-2 py-0.5 rounded-full">${status.key === 'archived' ? archivedCount : statusCases.length}</span>
           </div>
+          ${archivedSubHeader}
           <div class="p-3 space-y-3 flex-1 overflow-y-auto" style="max-height: calc(100vh - 250px);">
             ${cardsHtml}
           </div>
@@ -25407,7 +25860,7 @@ app.get('/cases', async (c) => {
                                 <i class="fas fa-bars text-xl"></i>
                             </button>
                             <h2 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-folder-open mr-2"></i>${showArchived ? 'アーカイブ済み案件' : '案件一覧'}
+                                <i class="fas fa-folder-open mr-2"></i>${showArchived ? '完了済み案件' : '案件一覧'}
                             </h2>
                             <span class="text-sm text-gray-500">${allCases.length}件</span>
                         </div>
@@ -25417,8 +25870,8 @@ app.get('/cases', async (c) => {
                                     <i class="fas fa-arrow-left mr-2"></i>戻る
                                 </a>
                             ` : `
-                                <a href="/cases?archived=true" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border hover:bg-gray-50 text-sm" title="アーカイブ済み案件を表示">
-                                    <i class="fas fa-archive mr-2"></i>アーカイブ${archivedCount > 0 ? ' (' + archivedCount + ')' : ''}
+                                <a href="/cases?archived=true" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border hover:bg-gray-50 text-sm" title="完了済み案件を表示">
+                                    <i class="fas fa-check-circle mr-2"></i>完了済み${archivedCount > 0 ? ' (' + archivedCount + ')' : ''}
                                 </a>
                             `}
                             <a href="/?openNewCase=true" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
