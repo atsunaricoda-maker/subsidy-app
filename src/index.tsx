@@ -18764,13 +18764,20 @@ ${documentExtractions.length > 0 ? documentExtractions.join('\n\n') : '（書類
 目標文字数: 約${Math.floor(section.max_chars * 0.8)}文字
 絶対上限: ${section.max_chars}文字（これを超えると無効）
 
-【出力ルール】
-1. ${Math.floor(section.max_chars * 0.8)}文字前後で簡潔にまとめる
-2. セクション番号やタイトルは出力しない（内容のみ）
-3. マークダウン記法は使用禁止
-4. 箇条書きは最小限に
-5. 具体的な数値を含める
-6. 核心となる要点のみを端的に記載`
+【出力ルール - 厳守事項】
+1. 文字数は${Math.floor(section.max_chars * 0.8)}文字前後で簡潔に
+2. セクション番号やタイトルは出力しない（内容のみ出力）
+3. マークダウン記法（#, *, -など）は使用禁止
+4. 箇条書きは必要最小限に抑え、文章で記述
+5. 具体的な数値（金額、期間、割合等）を必ず含める
+6. 核心となる要点のみを端的に記載
+
+【文書品質ルール - 必須】
+・連続する空行は禁止（段落間は1行空きのみ）
+・文頭の不要な空白は入れない
+・冗長な前置きや説明を省き、本題から始める
+・「〜と考えます」「〜といえます」等の曖昧表現を避け断定的に記載
+・官公庁に提出する正式文書としてふさわしい簡潔で格調高い文体`
 
     try {
       let content = await callGeminiAPI(sectionPrompt, GEMINI_API_KEY, 2, section.max_chars)
@@ -18963,12 +18970,19 @@ ${(answers.results || []).map((a: any) => `【${a.category}】${a.question_text}
 
 ${data.additional_instructions ? `【追加指示】\n${data.additional_instructions}\n` : ''}
 
-【出力ルール】
-1. ${Math.floor(section.max_chars * 0.8)}文字前後で簡潔にまとめる
-2. セクション番号やタイトルは出力しない（内容のみ）
-3. マークダウン記法は使用禁止
-4. 箇条書きは最小限に
-5. 核心となる要点のみを端的に記載`
+【出力ルール - 厳守事項】
+1. 文字数は${Math.floor(section.max_chars * 0.8)}文字前後で簡潔に
+2. セクション番号やタイトルは出力しない（内容のみ出力）
+3. マークダウン記法（#, *, -など）は使用禁止
+4. 箇条書きは必要最小限に抑え、文章で記述
+5. 核心となる要点のみを端的に記載
+
+【文書品質ルール - 必須】
+・連続する空行は禁止（段落間は1行空きのみ）
+・文頭の不要な空白は入れない
+・冗長な前置きや説明を省き、本題から始める
+・「〜と考えます」「〜といえます」等の曖昧表現を避け断定的に記載
+・官公庁に提出する正式文書としてふさわしい簡潔で格調高い文体`
 
   try {
     let content = await callGeminiAPI(prompt, GEMINI_API_KEY, 2, section.max_chars)
@@ -19946,7 +19960,41 @@ app.get('/api/generated-documents/:id/export', async (c) => {
   const sections = JSON.parse(doc.template_sections || '[]')
   const content = JSON.parse(doc.sections_content || '{}')
   
-  // HTML形式で生成
+  // コンテンツを整形する関数（より簡潔で公式文書らしく）
+  const formatContent = (text: string): string => {
+    if (!text) return ''
+    // 警告メッセージを削除
+    let formatted = text.replace(/【文字数超過】[^\n]*\n-+\n\n/g, '')
+    // 過剰な空行を削除
+    formatted = formatted.replace(/\n{3,}/g, '\n\n')
+    formatted = formatted.trim()
+    // 各行の先頭・末尾の無駄な空白を削除
+    formatted = formatted.split('\n').map(line => line.trim()).join('\n')
+    // 連続する空行は1つだけ残す
+    formatted = formatted.replace(/\n\n+/g, '\n\n')
+    
+    const paragraphs = formatted.split(/\n\n+/)
+    return paragraphs.map(p => {
+      // 箇条書きの処理
+      if (p.match(/^[・●○▪▫‣⁃►▶■□◆◇★☆（①②③④⑤⑥⑦⑧⑨⑩]/m)) {
+        const lines = p.split('\n').filter(l => l.trim())
+        return '<ul class="doc-list">' + lines.map(line => {
+          const trimmed = line.replace(/^[・●○▪▫‣⁃►▶■□◆◇★☆]\s*/, '').replace(/^[（][0-9①②③④⑤⑥⑦⑧⑨⑩]+[）]\s*/, '').trim()
+          if (trimmed) return '<li>' + trimmed + '</li>'
+          return ''
+        }).filter(l => l).join('') + '</ul>'
+      }
+      // 通常段落
+      const cleanText = p.split('\n').filter(l => l.trim()).join('')
+      if (cleanText) return '<p>' + cleanText + '</p>'
+      return ''
+    }).filter(p => p).join('')
+  }
+  
+  const today = new Date()
+  const dateStr = '令和' + (today.getFullYear() - 2018) + '年' + (today.getMonth() + 1) + '月' + today.getDate() + '日'
+  
+  // HTML形式で生成（正式な事業計画書スタイル - 官公庁提出向け）
   const htmlContent = `
 <!DOCTYPE html>
 <html lang="ja">
@@ -19955,92 +20003,129 @@ app.get('/api/generated-documents/:id/export', async (c) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${doc.document_title}</title>
   <style>
-    @page {
-      size: A4;
-      margin: 20mm;
-    }
+    @page { size: A4; margin: 20mm 18mm 15mm 18mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      font-family: 'Yu Mincho', 'Hiragino Mincho ProN', 'MS PMincho', 'Times New Roman', serif;
       font-size: 10.5pt;
-      line-height: 1.8;
-      color: #333;
-      max-width: 800px;
+      line-height: 1.65;
+      color: #000;
+      background: #fff;
+      max-width: 210mm;
       margin: 0 auto;
-      padding: 20px;
+      padding: 12mm 15mm;
     }
-    .header {
+    .doc-header {
       text-align: center;
-      margin-bottom: 40px;
-      border-bottom: 2px solid #333;
-      padding-bottom: 20px;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #000;
     }
-    .header h1 {
+    .doc-header h1 {
       font-size: 18pt;
-      margin-bottom: 10px;
+      font-weight: bold;
+      color: #000;
+      margin-bottom: 12px;
+      letter-spacing: 0.15em;
     }
-    .header .meta {
+    .meta-table {
+      width: 100%;
+      max-width: 420px;
+      margin: 0 auto;
+      border-collapse: collapse;
       font-size: 10pt;
-      color: #666;
+    }
+    .meta-table td {
+      padding: 2px 6px;
+      vertical-align: top;
+    }
+    .meta-table td:first-child {
+      width: 95px;
+      text-align: right;
+      padding-right: 8px;
+      white-space: nowrap;
+    }
+    .meta-table td:last-child {
+      text-align: left;
     }
     .section {
-      margin-bottom: 30px;
+      margin-bottom: 16px;
       page-break-inside: avoid;
     }
-    .section h2 {
-      font-size: 14pt;
-      border-left: 4px solid #2563eb;
-      padding-left: 10px;
-      margin-bottom: 15px;
+    .section-title {
+      background: #1a365d;
+      color: #fff;
+      padding: 5px 10px;
+      margin-bottom: 6px;
+      font-size: 10.5pt;
+      font-weight: bold;
     }
-    .section .content {
+    .section-body {
+      padding: 0 3px;
       text-align: justify;
-      white-space: pre-wrap;
+      text-justify: inter-ideograph;
     }
-    .section .char-count {
+    .section-body p {
+      margin-bottom: 0.5em;
+      text-indent: 1em;
+    }
+    .section-body p:last-child { margin-bottom: 0; }
+    .doc-list {
+      margin: 0.4em 0 0.4em 1.5em;
+      padding: 0;
+      list-style: none;
+    }
+    .doc-list li {
+      margin-bottom: 0.25em;
+      padding-left: 1.2em;
+      text-indent: -1.2em;
+    }
+    .doc-list li::before {
+      content: "・";
+      margin-right: 0.15em;
+    }
+    .doc-footer {
+      margin-top: 20px;
+      padding-top: 8px;
+      border-top: 1px solid #666;
+      font-size: 9pt;
+      color: #333;
       text-align: right;
-      font-size: 9pt;
-      color: #888;
-      margin-top: 5px;
-    }
-    .footer {
-      margin-top: 50px;
-      padding-top: 20px;
-      border-top: 1px solid #ccc;
-      font-size: 9pt;
-      color: #666;
-      text-align: center;
     }
     @media print {
-      body { padding: 0; }
-      .no-print { display: none; }
+      body { padding: 0; background: #fff; }
+      .section-title {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+    @media screen {
+      body {
+        box-shadow: 0 0 8px rgba(0,0,0,0.1);
+        margin: 8px auto;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>${doc.document_title}</h1>
-    <div class="meta">
-      <p>申請者: ${doc.company_name || doc.client_name}</p>
-      <p>申請補助金: ${doc.subsidy_name || '未設定'}</p>
-      <p>作成日: ${new Date(doc.created_at).toLocaleDateString('ja-JP')}</p>
-    </div>
+  <div class="doc-header">
+    <h1>事 業 計 画 書</h1>
+    <table class="meta-table">
+      <tr><td>申請者：</td><td>${doc.company_name || doc.client_name}</td></tr>
+      <tr><td>申請補助金：</td><td>${doc.subsidy_name || '未設定'}</td></tr>
+      <tr><td>作成日：</td><td>${dateStr}</td></tr>
+    </table>
   </div>
-  
   ${sections.map((section: any) => {
     const sectionContent = content[section.id] || ''
+    const formattedContent = formatContent(sectionContent)
     return `
-    <div class="section">
-      <h2>${section.title}</h2>
-      <div class="content">${sectionContent}</div>
-      <div class="char-count">${sectionContent.length.toLocaleString()} / ${section.max_chars.toLocaleString()}文字</div>
-    </div>
-    `
+  <div class="section">
+    <div class="section-title">${section.title}</div>
+    <div class="section-body">${formattedContent}</div>
+  </div>`
   }).join('')}
-  
-  <div class="footer">
-    <p>本書類は補助金申請支援システムにより作成されました</p>
-    <p>出力日時: ${new Date().toLocaleString('ja-JP')}</p>
-  </div>
+  <div class="doc-footer">${dateStr} 作成</div>
 </body>
 </html>`
 
