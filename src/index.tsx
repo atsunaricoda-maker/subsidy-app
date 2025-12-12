@@ -4329,6 +4329,9 @@ app.put('/api/cases/:id', async (c) => {
         success_fee_rate = COALESCE(?, success_fee_rate),
         success_fee_amount = COALESCE(?, success_fee_amount),
         contract_url = COALESCE(?, contract_url),
+        applied_amount = COALESCE(?, applied_amount),
+        granted_amount = COALESCE(?, granted_amount),
+        granted_at = COALESCE(?, granted_at),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
@@ -4344,6 +4347,9 @@ app.put('/api/cases/:id', async (c) => {
       data.success_fee_rate !== undefined ? data.success_fee_rate : null,
       data.success_fee_amount !== undefined ? data.success_fee_amount : null,
       data.contract_url !== undefined ? data.contract_url : null,
+      data.applied_amount !== undefined ? data.applied_amount : null,
+      data.granted_amount !== undefined ? data.granted_amount : null,
+      data.granted_at !== undefined ? data.granted_at : null,
       id
     ).run()
     
@@ -9251,23 +9257,81 @@ app.get('/case/:id', async (c) => {
                         successFeeContainer.innerHTML = '<div class="text-gray-500">成果報酬は設定されていません</div>';
                     } else {
                         const rate = caseData.success_fee_rate || 0;
-                        const amount = caseData.success_fee_amount || 0;
+                        const fixedAmount = caseData.success_fee_amount || 0;
                         const hasWithholding = caseData.withholding_tax;
+                        const appliedAmount = caseData.applied_amount || 0;
+                        const grantedAmount = caseData.granted_amount || 0;
+                        
+                        // 成果報酬計算
+                        let calculatedFee = fixedAmount;
+                        if (rate > 0 && grantedAmount > 0) {
+                            calculatedFee = Math.floor(grantedAmount * rate / 100);
+                        }
+                        
+                        // 源泉徴収計算（10.21%）
+                        let withholdingAmount = 0;
+                        let netAmount = calculatedFee;
+                        if (hasWithholding && calculatedFee > 0) {
+                            withholdingAmount = Math.floor(calculatedFee * 0.1021);
+                            netAmount = calculatedFee - withholdingAmount;
+                        }
                         
                         successFeeContainer.innerHTML = \`
-                            <div class="space-y-3">
+                            <div class="space-y-4">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-2xl font-bold">\${rate > 0 ? rate + '%' : '¥' + amount.toLocaleString()}</span>
+                                    <span class="text-lg font-bold">\${rate > 0 ? '報酬率: ' + rate + '%' : '固定: ¥' + fixedAmount.toLocaleString()}</span>
                                     <span class="px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-700">
                                         成果報酬あり
                                     </span>
                                 </div>
-                                <div class="text-sm text-gray-600">
-                                    \${rate > 0 ? '採択金額の' + rate + '%を成果報酬としていただきます' : '成果報酬として¥' + amount.toLocaleString() + 'をいただきます'}
+                                
+                                <!-- 申請・採択金額入力 -->
+                                <div class="border-t pt-3 space-y-2">
+                                    <div>
+                                        <label class="text-xs text-gray-500">申請金額</label>
+                                        <div class="flex items-center gap-2">
+                                            <input type="number" id="appliedAmountInput" value="\${appliedAmount}" 
+                                                   class="flex-1 px-2 py-1 border rounded text-sm" placeholder="0">
+                                            <span class="text-sm text-gray-500">円</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-500">採択金額</label>
+                                        <div class="flex items-center gap-2">
+                                            <input type="number" id="grantedAmountInput" value="\${grantedAmount}" 
+                                                   class="flex-1 px-2 py-1 border rounded text-sm" placeholder="0">
+                                            <span class="text-sm text-gray-500">円</span>
+                                        </div>
+                                    </div>
+                                    <button onclick="saveGrantAmounts()" class="w-full bg-purple-600 text-white py-1.5 rounded text-sm hover:bg-purple-700">
+                                        <i class="fas fa-save mr-1"></i>金額を保存
+                                    </button>
                                 </div>
-                                \${hasWithholding ? \`
-                                    <div class="text-sm text-orange-600">
-                                        <i class="fas fa-calculator mr-1"></i>源泉徴収が適用されます
+                                
+                                \${grantedAmount > 0 ? \`
+                                    <!-- 成果報酬計算結果 -->
+                                    <div class="border-t pt-3 bg-purple-50 -mx-6 -mb-6 px-6 py-4 rounded-b-xl">
+                                        <div class="text-sm text-gray-600 mb-2">成果報酬計算</div>
+                                        <div class="space-y-1 text-sm">
+                                            <div class="flex justify-between">
+                                                <span>採択金額</span>
+                                                <span>¥\${grantedAmount.toLocaleString()}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span>成果報酬 (\${rate}%)</span>
+                                                <span class="font-bold">¥\${calculatedFee.toLocaleString()}</span>
+                                            </div>
+                                            \${hasWithholding ? \`
+                                                <div class="flex justify-between text-orange-600">
+                                                    <span>源泉徴収 (10.21%)</span>
+                                                    <span>-¥\${withholdingAmount.toLocaleString()}</span>
+                                                </div>
+                                                <div class="flex justify-between border-t pt-1 mt-1 font-bold">
+                                                    <span>お支払い額</span>
+                                                    <span class="text-purple-700">¥\${netAmount.toLocaleString()}</span>
+                                                </div>
+                                            \` : ''}
+                                        </div>
                                     </div>
                                 \` : ''}
                             </div>
@@ -9305,6 +9369,25 @@ app.get('/case/:id', async (c) => {
                     alert('更新に失敗しました');
                 }
             }
+            
+            // 申請・採択金額を保存
+            async function saveGrantAmounts() {
+                try {
+                    const appliedAmount = parseInt(document.getElementById('appliedAmountInput')?.value) || 0;
+                    const grantedAmount = parseInt(document.getElementById('grantedAmountInput')?.value) || 0;
+                    
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { 
+                        applied_amount: appliedAmount,
+                        granted_amount: grantedAmount,
+                        granted_at: grantedAmount > 0 ? new Date().toISOString() : null
+                    });
+                    showToast('金額を保存しました');
+                    loadPayment();
+                } catch (error) {
+                    alert('保存に失敗しました');
+                }
+            }
+            window.saveGrantAmounts = saveGrantAmounts;
             
             // やり取り読み込み
             async function loadCommunications() {
@@ -10724,8 +10807,23 @@ app.get('/portal/:token', async (c) => {
                     // 成果報酬情報
                     if (hasSuccessFee) {
                         const rate = caseData.success_fee_rate || 0;
-                        const amount = caseData.success_fee_amount || 0;
+                        const fixedAmount = caseData.success_fee_amount || 0;
                         const hasWithholding = caseData.withholding_tax;
+                        const grantedAmount = caseData.granted_amount || 0;
+                        
+                        // 成果報酬計算
+                        let calculatedFee = fixedAmount;
+                        if (rate > 0 && grantedAmount > 0) {
+                            calculatedFee = Math.floor(grantedAmount * rate / 100);
+                        }
+                        
+                        // 源泉徴収計算（10.21%）
+                        let withholdingAmount = 0;
+                        let netAmount = calculatedFee;
+                        if (hasWithholding && calculatedFee > 0) {
+                            withholdingAmount = Math.floor(calculatedFee * 0.1021);
+                            netAmount = calculatedFee - withholdingAmount;
+                        }
                         
                         html += \`
                             <div class="bg-purple-50 rounded-lg p-4">
@@ -10736,15 +10834,42 @@ app.get('/portal/:token', async (c) => {
                                     <div>
                                         <div class="text-xs text-purple-600">成果報酬</div>
                                         <div class="font-bold text-purple-800">
-                                            \${rate > 0 ? rate + '%' : '¥' + amount.toLocaleString()}
+                                            \${rate > 0 ? '報酬率: ' + rate + '%' : '固定: ¥' + fixedAmount.toLocaleString()}
                                         </div>
                                     </div>
                                 </div>
-                                <div class="text-xs text-gray-600 mt-2">
-                                    <i class="fas fa-info-circle text-purple-500 mr-1"></i>
-                                    補助金・助成金の採択後、\${rate > 0 ? '採択金額の' + rate + '%を成果報酬として' : '成果報酬として¥' + amount.toLocaleString() + 'を'}お支払いいただきます。
-                                    \${hasWithholding ? '<br><span class="text-orange-600"><i class="fas fa-calculator mr-1"></i>源泉徴収が適用されます</span>' : ''}
-                                </div>
+                                
+                                \${grantedAmount > 0 ? \`
+                                    <div class="border-t border-purple-200 mt-3 pt-3">
+                                        <div class="text-xs text-purple-600 mb-2">採択後の成果報酬</div>
+                                        <div class="space-y-1 text-sm">
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">採択金額</span>
+                                                <span>¥\${grantedAmount.toLocaleString()}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">成果報酬 (\${rate}%)</span>
+                                                <span class="font-bold">¥\${calculatedFee.toLocaleString()}</span>
+                                            </div>
+                                            \${hasWithholding ? \`
+                                                <div class="flex justify-between text-orange-600 text-xs">
+                                                    <span>源泉徴収 (10.21%)</span>
+                                                    <span>-¥\${withholdingAmount.toLocaleString()}</span>
+                                                </div>
+                                                <div class="flex justify-between border-t border-purple-200 pt-1 mt-1 font-bold">
+                                                    <span>お支払い金額</span>
+                                                    <span class="text-purple-700">¥\${netAmount.toLocaleString()}</span>
+                                                </div>
+                                            \` : ''}
+                                        </div>
+                                    </div>
+                                \` : \`
+                                    <div class="text-xs text-gray-600 mt-2">
+                                        <i class="fas fa-info-circle text-purple-500 mr-1"></i>
+                                        補助金・助成金の採択後、\${rate > 0 ? '採択金額の' + rate + '%を成果報酬として' : '成果報酬として¥' + fixedAmount.toLocaleString() + 'を'}お支払いいただきます。
+                                        \${hasWithholding ? '<br><span class="text-orange-600"><i class="fas fa-calculator mr-1"></i>源泉徴収が適用されます</span>' : ''}
+                                    </div>
+                                \`}
                             </div>
                         \`;
                     }
