@@ -19097,9 +19097,9 @@ app.get('/admin/pipelines', (c) => {
                             <h3 class="text-base font-bold text-gray-800">パイプラインテンプレート</h3>
                             <select id="filterCategory" onchange="loadTemplates()" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm">
                                 <option value="">すべてのカテゴリ</option>
-                                <option value="行政書士管轄">行政書士管轄</option>
-                                <option value="社労士管轄">社労士管轄</option>
-                                <option value="許認可">許認可</option>
+                                <option value="subsidy">行政書士管轄</option>
+                                <option value="grant">社労士管轄</option>
+                                <option value="license">許認可</option>
                             </select>
                         </div>
                         <div id="templatesList" class="divide-y divide-gray-100">
@@ -19138,9 +19138,9 @@ app.get('/admin/pipelines', (c) => {
                         <div>
                             <label class="block text-sm font-medium mb-1">カテゴリ *</label>
                             <select name="category" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="行政書士管轄">行政書士管轄</option>
-                                <option value="社労士管轄">社労士管轄</option>
-                                <option value="許認可">許認可</option>
+                                <option value="subsidy">行政書士管轄（補助金）</option>
+                                <option value="grant">社労士管轄（助成金）</option>
+                                <option value="license">許認可</option>
                             </select>
                         </div>
                         <div>
@@ -19362,13 +19362,16 @@ app.get('/admin/pipelines', (c) => {
                     }
                     
                     const categoryLabels = {
+                        'subsidy': { label: '行政書士管轄', color: 'bg-emerald-100 text-emerald-800' },
+                        'grant': { label: '社労士管轄', color: 'bg-blue-100 text-blue-800' },
+                        'license': { label: '許認可', color: 'bg-indigo-100 text-indigo-800' },
                         '行政書士管轄': { label: '行政書士管轄', color: 'bg-emerald-100 text-emerald-800' },
                         '社労士管轄': { label: '社労士管轄', color: 'bg-blue-100 text-blue-800' },
                         '許認可': { label: '許認可', color: 'bg-indigo-100 text-indigo-800' }
                     };
                     
                     container.innerHTML = templates.map(t => {
-                        const cat = categoryLabels[t.category] || categoryLabels['許認可'];
+                        const cat = categoryLabels[t.category] || categoryLabels['license'];
                         return \`
                             <div class="p-4 hover:bg-gray-50 cursor-pointer" onclick="showTemplateDetail(\${t.id})">
                                 <div class="flex items-center justify-between">
@@ -19411,6 +19414,9 @@ app.get('/admin/pipelines', (c) => {
                     document.getElementById('templateDetailTitle').textContent = template.name;
                     
                     const categoryLabels = {
+                        'subsidy': { label: '行政書士管轄', color: 'bg-emerald-100 text-emerald-800' },
+                        'grant': { label: '社労士管轄', color: 'bg-blue-100 text-blue-800' },
+                        'license': { label: '許認可', color: 'bg-indigo-100 text-indigo-800' },
                         '行政書士管轄': { label: '行政書士管轄', color: 'bg-emerald-100 text-emerald-800' },
                         '社労士管轄': { label: '社労士管轄', color: 'bg-blue-100 text-blue-800' },
                         '許認可': { label: '許認可', color: 'bg-indigo-100 text-indigo-800' }
@@ -19661,7 +19667,7 @@ app.get('/admin/pipelines', (c) => {
                     // フォームに値を設定
                     document.querySelector('input[name="name"]').value = template.name;
                     document.querySelector('textarea[name="description"]').value = template.description || '';
-                    document.querySelector('select[name="category"]').value = template.category || '許認可';
+                    document.querySelector('select[name="category"]').value = template.category || 'license';
                     document.querySelector('input[name="service_start_offset"]').value = template.service_start_offset || 0;
                     document.querySelector('input[name="service_end_offset"]').value = template.service_end_offset || 30;
                     
@@ -19757,19 +19763,28 @@ app.get('/admin/pipelines', (c) => {
                 });
                 
                 try {
+                    let response;
                     if (editingTemplateId) {
-                        await axios.put('/api/pipeline-templates/' + editingTemplateId, data);
-                        alert('テンプレートを更新しました');
-                        editingTemplateId = null;
+                        response = await axios.put('/api/pipeline-templates/' + editingTemplateId, data);
                     } else {
-                        await axios.post('/api/pipeline-templates', data);
-                        alert('テンプレートを作成しました');
+                        response = await axios.post('/api/pipeline-templates', data);
                     }
+                    
+                    // APIからのレスポンスを確認
+                    if (response.data && response.data.success === false) {
+                        console.error('API error:', response.data.error);
+                        alert('保存に失敗しました: ' + (response.data.error || '不明なエラー'));
+                        return;
+                    }
+                    
+                    alert(editingTemplateId ? 'テンプレートを更新しました' : 'テンプレートを作成しました');
+                    editingTemplateId = null;
                     closeNewTemplateModal();
                     loadTemplates();
                 } catch (error) {
                     console.error('Error saving template:', error);
-                    alert('保存に失敗しました');
+                    const errorMsg = error.response?.data?.error || error.message || '不明なエラー';
+                    alert('保存に失敗しました: ' + errorMsg);
                 }
             });
             
