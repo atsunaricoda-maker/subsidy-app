@@ -18457,125 +18457,145 @@ app.get('/api/pipeline-templates/:id', async (c) => {
 
 // パイプラインテンプレート作成
 app.post('/api/pipeline-templates', async (c) => {
-  const { DB } = c.env
-  const data = await c.req.json()
-  
-  // subsidy_type_idsをJSON文字列に変換
-  const subsidyTypeIds = data.subsidy_type_ids 
-    ? JSON.stringify(data.subsidy_type_ids)
-    : null
-  
-  const result = await DB.prepare(`
-    INSERT INTO pipeline_templates 
-    (name, description, category, service_start_offset, service_end_offset, 
-     requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    data.name,
-    data.description || '',
-    data.category || '許認可',
-    data.service_start_offset || 0,
-    data.service_end_offset || 30,
-    data.requires_approval ? 1 : 0,
-    data.allow_external_tasks ? 1 : 0,
-    data.progress_reflection !== false ? 1 : 0,
-    data.created_by || null,
-    subsidyTypeIds
-  ).run()
-  
-  const templateId = result.meta.last_row_id
-  
-  // タスクがある場合は追加
-  if (data.tasks && Array.isArray(data.tasks)) {
-    for (let i = 0; i < data.tasks.length; i++) {
-      const task = data.tasks[i]
-      await DB.prepare(`
-        INSERT INTO pipeline_template_tasks 
-        (template_id, task_name, task_type, description, sort_order, 
-         days_offset_start, days_offset_end, is_required, default_assignee_role)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        templateId,
-        task.task_name,
-        task.task_type || 'internal',
-        task.description || '',
-        i + 1,
-        task.days_offset_start || 0,
-        task.days_offset_end || 7,
-        task.is_required !== false ? 1 : 0,
-        task.default_assignee_role || null
-      ).run()
+  try {
+    const { DB } = c.env
+    const data = await c.req.json()
+    
+    // subsidy_type_idsをJSON文字列に変換
+    const subsidyTypeIds = data.subsidy_type_ids && Array.isArray(data.subsidy_type_ids) && data.subsidy_type_ids.length > 0
+      ? JSON.stringify(data.subsidy_type_ids)
+      : null
+    
+    const result = await DB.prepare(`
+      INSERT INTO pipeline_templates 
+      (name, description, category, service_start_offset, service_end_offset, 
+       requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.name,
+      data.description || '',
+      data.category || 'license',
+      parseInt(data.service_start_offset) || 0,
+      parseInt(data.service_end_offset) || 30,
+      data.requires_approval ? 1 : 0,
+      data.allow_external_tasks ? 1 : 0,
+      data.progress_reflection !== false ? 1 : 0,
+      data.created_by || null,
+      subsidyTypeIds
+    ).run()
+    
+    const templateId = result.meta.last_row_id
+    
+    // タスクがある場合は追加
+    if (data.tasks && Array.isArray(data.tasks)) {
+      for (let i = 0; i < data.tasks.length; i++) {
+        const task = data.tasks[i]
+        if (!task.task_name) continue // タスク名がない場合はスキップ
+        
+        await DB.prepare(`
+          INSERT INTO pipeline_template_tasks 
+          (template_id, task_name, task_type, description, sort_order, 
+           days_offset_start, days_offset_end, is_required, default_assignee_role)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          templateId,
+          task.task_name,
+          task.task_type || 'internal',
+          task.description || '',
+          i + 1,
+          parseInt(task.days_offset_start) || 0,
+          parseInt(task.days_offset_end) || 7,
+          task.is_required !== false ? 1 : 0,
+          task.default_assignee_role || null
+        ).run()
+      }
     }
+    
+    return c.json({ 
+      success: true, 
+      id: templateId,
+      message: 'パイプラインテンプレートを作成しました' 
+    })
+  } catch (error: any) {
+    console.error('Pipeline template create error:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message || 'パイプラインテンプレートの作成に失敗しました'
+    }, 500)
   }
-  
-  return c.json({ 
-    success: true, 
-    id: templateId,
-    message: 'パイプラインテンプレートを作成しました' 
-  })
 })
 
 // パイプラインテンプレート更新
 app.put('/api/pipeline-templates/:id', async (c) => {
-  const { DB } = c.env
-  const templateId = c.req.param('id')
-  const data = await c.req.json()
-  
-  // subsidy_type_idsをJSON文字列に変換
-  const subsidyTypeIds = data.subsidy_type_ids 
-    ? JSON.stringify(data.subsidy_type_ids)
-    : null
-  
-  await DB.prepare(`
-    UPDATE pipeline_templates SET
-    name = ?, description = ?, category = ?, 
-    service_start_offset = ?, service_end_offset = ?,
-    requires_approval = ?, allow_external_tasks = ?, progress_reflection = ?,
-    subsidy_type_ids = ?,
-    updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).bind(
-    data.name,
-    data.description || '',
-    data.category || '許認可',
-    data.service_start_offset || 0,
-    data.service_end_offset || 30,
-    data.requires_approval ? 1 : 0,
-    data.allow_external_tasks ? 1 : 0,
-    data.progress_reflection !== false ? 1 : 0,
-    subsidyTypeIds,
-    templateId
-  ).run()
-  
-  // タスクを更新（一旦削除して再作成）
-  if (data.tasks && Array.isArray(data.tasks)) {
-    await DB.prepare(`DELETE FROM pipeline_template_tasks WHERE template_id = ?`).bind(templateId).run()
+  try {
+    const { DB } = c.env
+    const templateId = c.req.param('id')
+    const data = await c.req.json()
     
-    for (let i = 0; i < data.tasks.length; i++) {
-      const task = data.tasks[i]
-      await DB.prepare(`
-        INSERT INTO pipeline_template_tasks 
-        (template_id, task_name, task_type, description, sort_order, 
-         days_offset_start, days_offset_end, is_required, default_assignee_role)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        templateId,
-        task.task_name,
-        task.task_type || 'internal',
-        task.description || '',
-        i + 1,
-        task.days_offset_start || 0,
-        task.days_offset_end || 7,
-        task.is_required !== false ? 1 : 0,
-        task.default_assignee_role || null
-      ).run()
+    // subsidy_type_idsをJSON文字列に変換
+    const subsidyTypeIds = data.subsidy_type_ids && Array.isArray(data.subsidy_type_ids) && data.subsidy_type_ids.length > 0
+      ? JSON.stringify(data.subsidy_type_ids)
+      : null
+    
+    await DB.prepare(`
+      UPDATE pipeline_templates SET
+      name = ?, description = ?, category = ?, 
+      service_start_offset = ?, service_end_offset = ?,
+      requires_approval = ?, allow_external_tasks = ?, progress_reflection = ?,
+      subsidy_type_ids = ?,
+      updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      data.name,
+      data.description || '',
+      data.category || 'license',
+      parseInt(data.service_start_offset) || 0,
+      parseInt(data.service_end_offset) || 30,
+      data.requires_approval ? 1 : 0,
+      data.allow_external_tasks ? 1 : 0,
+      data.progress_reflection !== false ? 1 : 0,
+      subsidyTypeIds,
+      templateId
+    ).run()
+    
+    // タスクを更新（一旦削除して再作成）
+    if (data.tasks && Array.isArray(data.tasks)) {
+      await DB.prepare(`DELETE FROM pipeline_template_tasks WHERE template_id = ?`).bind(templateId).run()
+      
+      for (let i = 0; i < data.tasks.length; i++) {
+        const task = data.tasks[i]
+        if (!task.task_name) continue // タスク名がない場合はスキップ
+        
+        await DB.prepare(`
+          INSERT INTO pipeline_template_tasks 
+          (template_id, task_name, task_type, description, sort_order, 
+           days_offset_start, days_offset_end, is_required, default_assignee_role)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          templateId,
+          task.task_name,
+          task.task_type || 'internal',
+          task.description || '',
+          i + 1,
+          parseInt(task.days_offset_start) || 0,
+          parseInt(task.days_offset_end) || 7,
+          task.is_required !== false ? 1 : 0,
+          task.default_assignee_role || null
+        ).run()
+      }
     }
+    
+    return c.json({ 
+      success: true,
+      message: 'パイプラインテンプレートを更新しました' 
+    })
+  } catch (error: any) {
+    console.error('Pipeline template update error:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message || 'パイプラインテンプレートの更新に失敗しました'
+    }, 500)
   }
-  
-  return c.json({ 
-    success: true,
-    message: 'パイプラインテンプレートを更新しました' 
-  })
 })
 
 // パイプラインテンプレート削除
