@@ -9878,6 +9878,23 @@ app.get('/portal/:token', async (c) => {
                     </div>
                 </div>
                 
+                <!-- 案件一覧セクション -->
+                <div id="casesListSection" class="mb-4">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h2 class="text-lg font-bold">
+                                <i class="fas fa-folder-open mr-2 text-green-600"></i>申請中の案件
+                            </h2>
+                            <button onclick="openNewApplicationModal()" class="text-sm text-green-600 hover:text-green-800">
+                                <i class="fas fa-plus mr-1"></i>新規申込
+                            </button>
+                        </div>
+                        <div id="portalCasesList" class="space-y-2">
+                            <div class="text-sm text-gray-500 py-2">読み込み中...</div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- お知らせバナー -->
                 <div id="announcementBanner" class="hidden mb-4">
                     <!-- お知らせが動的に挿入される -->
@@ -11565,6 +11582,68 @@ app.get('/portal/:token', async (c) => {
             window.openCommonDocUploadModal = openCommonDocUploadModal;
             window.closeCommonDocUploadModal = closeCommonDocUploadModal;
             window.uploadCommonDocument = uploadCommonDocument;
+            
+            // 案件一覧を読み込む（顧客の全案件を表示）
+            async function loadPortalCases() {
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/cases\`);
+                    const cases = response.data || [];
+                    
+                    const container = document.getElementById('portalCasesList');
+                    
+                    if (cases.length === 0) {
+                        container.innerHTML = '<div class="text-sm text-gray-500 py-4 text-center">現在申請中の案件はありません</div>';
+                        return;
+                    }
+                    
+                    const statusLabels = {
+                        inquiry: { label: '見込み', bg: 'bg-gray-100', text: 'text-gray-700' },
+                        document_prep: { label: '書類準備中', bg: 'bg-yellow-100', text: 'text-yellow-800' },
+                        submitted: { label: '申請済み', bg: 'bg-blue-100', text: 'text-blue-800' },
+                        under_review: { label: '審査中', bg: 'bg-purple-100', text: 'text-purple-800' },
+                        approved: { label: '採択', bg: 'bg-green-100', text: 'text-green-800' },
+                        rejected: { label: '不採択', bg: 'bg-red-100', text: 'text-red-800' },
+                        completed: { label: '完了', bg: 'bg-teal-100', text: 'text-teal-800' }
+                    };
+                    
+                    container.innerHTML = cases.map(c => {
+                        const statusInfo = statusLabels[c.status] || { label: c.status, bg: 'bg-gray-100', text: 'text-gray-700' };
+                        const isCurrentCase = c.id === CASE_ID;
+                        
+                        return \`
+                            <div class="flex items-center gap-3 p-3 rounded-lg border \${isCurrentCase ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'} cursor-pointer hover:shadow-md transition"
+                                 onclick="switchCase(\${c.id}, '\${c.access_token}')">
+                                <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center \${isCurrentCase ? 'bg-green-500' : 'bg-gray-400'}">
+                                    <i class="fas fa-file-alt text-white"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium text-sm \${isCurrentCase ? 'text-green-800' : 'text-gray-800'}">\${c.subsidy_type_name || '申請種別未設定'}</span>
+                                        \${isCurrentCase ? '<span class="text-xs bg-green-600 text-white px-2 py-0.5 rounded">現在表示中</span>' : ''}
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-0.5">
+                                        \${c.case_number || ''} 
+                                        <span class="inline-block px-2 py-0.5 rounded \${statusInfo.bg} \${statusInfo.text} ml-1">\${statusInfo.label}</span>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-400"></i>
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading portal cases:', error);
+                    document.getElementById('portalCasesList').innerHTML = '<div class="text-sm text-red-500 py-2">案件の読み込みに失敗しました</div>';
+                }
+            }
+            
+            // 案件を切り替える
+            function switchCase(caseId, accessToken) {
+                if (caseId === CASE_ID) return; // 同じ案件なら何もしない
+                window.location.href = '/portal/' + accessToken;
+            }
+            
+            window.switchCase = switchCase;
+            window.loadPortalCases = loadPortalCases;
 
             async function loadDocuments() {
                 const response = await axios.get(\`/api/clients/\${CLIENT_ID}/documents\`);
@@ -13237,6 +13316,9 @@ app.get('/portal/:token', async (c) => {
             async function initPortal() {
                 // まずステータスを読み込む（見込みステータスの判定に必要）
                 await loadStatus();
+                
+                // 案件一覧を読み込む
+                loadPortalCases();
                 
                 // ステータス読み込み後に他の機能を並列で読み込む
                 loadAnnouncements();
