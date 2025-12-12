@@ -4023,7 +4023,7 @@ app.get('/api/cases', async (c) => {
     FROM cases
     LEFT JOIN clients ON cases.client_id = clients.id
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
-    LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.username
     WHERE cases.organization_id = ?
   `
   
@@ -4055,7 +4055,7 @@ app.get('/api/cases/:id', async (c) => {
     FROM cases
     LEFT JOIN clients ON cases.client_id = clients.id
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
-    LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.username
     WHERE cases.id = ?
   `).bind(id).first()
   
@@ -8542,7 +8542,7 @@ app.get('/case/:id', async (c) => {
     FROM cases
     LEFT JOIN clients ON cases.client_id = clients.id
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
-    LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.username
     WHERE cases.id = ?
   `).bind(id).first()
   
@@ -18715,7 +18715,7 @@ app.get('/api/clients/:clientId/cases', async (c) => {
       admin_users.name as assigned_to_name
     FROM cases
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
-    LEFT JOIN admin_users ON cases.assigned_to = admin_users.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.username
     WHERE cases.client_id = ?
     ORDER BY cases.created_at DESC
   `).bind(clientId).all()
@@ -20297,6 +20297,15 @@ app.put('/api/payments/:paymentId/confirm', async (c) => {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(payment.client_id).run()
+    
+    // 案件テーブルの支払いステータスも更新
+    await DB.prepare(`
+      UPDATE cases 
+      SET deposit_paid = 1, 
+          deposit_paid_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE client_id = ? AND deposit_required = 1 AND deposit_paid = 0
+    `).bind(payment.client_id).run()
   }
   
   return c.json({ success: true, message: '支払いを確認しました' })
@@ -20313,6 +20322,38 @@ app.get('/api/payments/pending', async (c) => {
     WHERE ph.status = 'reported'
     ORDER BY ph.bank_transfer_reported_at ASC
   `).all()
+  
+  return c.json(payments.results || [])
+})
+
+// 支払い履歴一覧（管理者用）
+app.get('/api/payments/history', async (c) => {
+  const { DB } = c.env
+  const type = c.req.query('type') || 'all'
+  
+  let query = `
+    SELECT 
+      ph.*,
+      c.name as client_name,
+      c.company_name,
+      cs.case_number,
+      st.name as subsidy_type_name
+    FROM payment_history ph
+    JOIN clients c ON ph.client_id = c.id
+    LEFT JOIN cases cs ON ph.case_id = cs.id
+    LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+    WHERE ph.status = 'confirmed'
+  `
+  
+  if (type === 'deposit') {
+    query += ` AND ph.payment_type = 'deposit'`
+  } else if (type === 'success_fee') {
+    query += ` AND ph.payment_type = 'success_fee'`
+  }
+  
+  query += ` ORDER BY ph.bank_transfer_confirmed_at DESC LIMIT 100`
+  
+  const payments = await DB.prepare(query).all()
   
   return c.json(payments.results || [])
 })
@@ -21549,22 +21590,46 @@ app.get('/admin/payments', async (c) => {
                     </div>
                 </header>
 
-                <div class="p-4 lg:p-6">
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-4 border-b flex justify-between items-center">
-                    <h2 class="text-lg font-bold">振込確認待ち</h2>
-                    <button onclick="loadPayments()" class="text-blue-600 hover:text-blue-800">
-                        <i class="fas fa-sync-alt"></i> 更新
-                    </button>
-                </div>
-                <div id="paymentsList" class="divide-y">
-                    <div class="p-8 text-center text-gray-500">
-                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                        <p>読み込み中...</p>
+                <div class="p-4 lg:p-6 space-y-6">
+                    <!-- 振込確認待ち -->
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="p-4 border-b flex justify-between items-center">
+                            <h2 class="text-lg font-bold">
+                                <i class="fas fa-clock text-yellow-500 mr-2"></i>振込確認待ち
+                            </h2>
+                            <span id="pendingCount" class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-sm">0件</span>
+                        </div>
+                        <div id="paymentsList" class="divide-y">
+                            <div class="p-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>読み込み中...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 支払い履歴 -->
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="p-4 border-b flex justify-between items-center">
+                            <h2 class="text-lg font-bold">
+                                <i class="fas fa-history text-blue-500 mr-2"></i>支払い履歴
+                            </h2>
+                            <div class="flex items-center gap-2">
+                                <select id="historyFilter" onchange="loadPaymentHistory()" class="text-sm border rounded px-2 py-1">
+                                    <option value="all">すべて</option>
+                                    <option value="deposit">手付金のみ</option>
+                                    <option value="success_fee">成功報酬のみ</option>
+                                </select>
+                                <span id="historyCount" class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">0件</span>
+                            </div>
+                        </div>
+                        <div id="paymentHistory" class="divide-y max-h-96 overflow-y-auto">
+                            <div class="p-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>読み込み中...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
         
         <script>
             const token = localStorage.getItem('admin_token');
@@ -21575,6 +21640,8 @@ app.get('/admin/payments', async (c) => {
                 try {
                     const response = await axios.get('/api/payments/pending');
                     const payments = response.data;
+                    
+                    document.getElementById('pendingCount').textContent = payments.length + '件';
                     
                     if (payments.length === 0) {
                         document.getElementById('paymentsList').innerHTML = \`
@@ -21616,6 +21683,65 @@ app.get('/admin/payments', async (c) => {
                 }
             }
             
+            async function loadPaymentHistory() {
+                try {
+                    const filter = document.getElementById('historyFilter').value;
+                    const response = await axios.get('/api/payments/history?type=' + filter);
+                    const payments = response.data;
+                    
+                    document.getElementById('historyCount').textContent = payments.length + '件';
+                    
+                    if (payments.length === 0) {
+                        document.getElementById('paymentHistory').innerHTML = \`
+                            <div class="p-8 text-center text-gray-500">
+                                <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+                                <p>支払い履歴がありません</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    document.getElementById('paymentHistory').innerHTML = payments.map(p => \`
+                        <div class="p-4 hover:bg-gray-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                                        <i class="fas fa-check text-green-600"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-medium">\${p.client_name}</div>
+                                        <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
+                                        <div class="text-xs text-gray-400">
+                                            案件: \${p.case_number || '-'} | 
+                                            \${p.subsidy_type_name || '申請種別未設定'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-bold text-lg text-green-600">¥\${(p.amount || 0).toLocaleString()}</div>
+                                    <div class="text-xs text-gray-500">
+                                        <span class="px-1.5 py-0.5 rounded \${p.payment_type === 'deposit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">
+                                            \${p.payment_type === 'deposit' ? '手付金' : '成功報酬'}
+                                        </span>
+                                    </div>
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        \${p.confirmed_at ? new Date(p.confirmed_at).toLocaleDateString('ja-JP') : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Error:', error);
+                    document.getElementById('paymentHistory').innerHTML = \`
+                        <div class="p-8 text-center text-gray-500">
+                            <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-3"></i>
+                            <p>読み込みに失敗しました</p>
+                        </div>
+                    \`;
+                }
+            }
+            
             async function confirmPayment(paymentId) {
                 if (!confirm('この支払いを確認済みにしますか？')) return;
                 
@@ -21623,6 +21749,7 @@ app.get('/admin/payments', async (c) => {
                     await axios.put(\`/api/payments/\${paymentId}/confirm\`);
                     alert('支払いを確認しました');
                     loadPayments();
+                    loadPaymentHistory();
                 } catch (error) {
                     alert('エラーが発生しました');
                 }
@@ -21630,9 +21757,11 @@ app.get('/admin/payments', async (c) => {
             
             // グローバルスコープに関数を公開（onclick対応）
             window.loadPayments = loadPayments;
+            window.loadPaymentHistory = loadPaymentHistory;
             window.confirmPayment = confirmPayment;
             
             loadPayments();
+            loadPaymentHistory();
         </script>
     </body>
     </html>
