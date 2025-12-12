@@ -1287,6 +1287,58 @@ app.put('/api/settings', async (c) => {
   }
 })
 
+// Claude API接続テスト
+app.post('/api/test-claude-api', async (c) => {
+  const { api_key } = await c.req.json()
+  
+  if (!api_key) {
+    return c.json({ success: false, error: 'APIキーが指定されていません' })
+  }
+  
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': api_key,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20241022',
+        max_tokens: 100,
+        messages: [
+          {
+            role: 'user',
+            content: 'こんにちは。接続テストです。「接続成功」とだけ返答してください。'
+          }
+        ]
+      })
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Claude API test failed:', response.status, errorText)
+      return c.json({ 
+        success: false, 
+        error: response.status === 401 ? 'APIキーが無効です' : 
+               response.status === 429 ? 'レート制限に達しました。しばらく待ってから再試行してください' :
+               'API接続エラー: ' + response.status
+      })
+    }
+    
+    const data = await response.json()
+    return c.json({ 
+      success: true, 
+      message: '接続成功',
+      response: data.content?.[0]?.text || ''
+    })
+    
+  } catch (error) {
+    console.error('Claude API test error:', error)
+    return c.json({ success: false, error: '接続テストに失敗しました' })
+  }
+})
+
 // 法務文書テンプレートを取得
 app.get('/api/legal-templates', async (c) => {
   // SaaS事業者に有利な法務文書テンプレート
@@ -18011,6 +18063,105 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
   throw lastError || new Error('Gemini API failed after retries')
 }
 
+// Claude API呼び出しヘルパー（Claude Haiku 4.5対応）
+async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number): Promise<string> {
+  if (!apiKey) {
+    return `【デモモード】\n\nClaude APIキーが設定されていないため、実際のAI生成は行われません。\n\nシステム設定からClaude APIキーを設定してください。`
+  }
+  
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // レート制限対策：リトライ時は待機（指数バックオフ）
+      if (attempt > 0) {
+        const waitTime = Math.min(3000 * Math.pow(2, attempt), 15000)
+        console.log(`Claude API retry ${attempt}/${maxRetries}, waiting ${waitTime}ms...`)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+      
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20241022',
+          max_tokens: maxChars ? Math.min(maxChars * 2, 8192) : 4096,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        })
+      })
+      
+      // 429（レート制限）または5xx（サーバーエラー）の場合はリトライ
+      if (response.status === 429 || response.status >= 500) {
+        const errorBody = await response.text().catch(() => '')
+        lastError = new Error(`Claude API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+        console.error(`Claude API attempt ${attempt + 1}/${maxRetries} failed: ${response.status}`, errorBody.substring(0, 500))
+        continue
+      }
+      
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '')
+        if (errorBody.includes('rate_limit') || errorBody.includes('overloaded')) {
+          lastError = new Error(`Claude API rate limited: ${response.status}`)
+          console.error(`Claude API rate limited, attempt ${attempt + 1}/${maxRetries}`)
+          continue
+        }
+        throw new Error(`Claude API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+      }
+      
+      const data = await response.json()
+      return data.content?.[0]?.text || ''
+      
+    } catch (error) {
+      lastError = error as Error
+      console.error(`Claude API attempt ${attempt + 1}/${maxRetries} error:`, error)
+    }
+  }
+  
+  throw lastError || new Error('Claude API failed after retries')
+}
+
+// 統合AI API呼び出し（設定に応じてGemini/Claudeを切り替え）
+async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: number): Promise<string> {
+  const { DB, GEMINI_API_KEY, CLAUDE_API_KEY } = env
+  
+  // DB設定から使用するAIモデルを取得
+  let aiProvider = 'gemini' // デフォルトはGemini
+  let claudeApiKey = CLAUDE_API_KEY || ''
+  
+  try {
+    const aiSettings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key IN ('ai_provider', 'claude_api_key')
+    `).all()
+    
+    for (const setting of (aiSettings.results || [])) {
+      if ((setting as any).setting_key === 'ai_provider') {
+        aiProvider = (setting as any).setting_value || 'gemini'
+      }
+      if ((setting as any).setting_key === 'claude_api_key' && (setting as any).setting_value) {
+        claudeApiKey = (setting as any).setting_value
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load AI settings:', e)
+  }
+  
+  if (aiProvider === 'claude' && claudeApiKey) {
+    return callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars)
+  } else {
+    return callGeminiAPI(prompt, GEMINI_API_KEY, maxRetries, maxChars)
+  }
+}
+
 // マルチモーダルGemini API呼び出し（画像/PDF対応）
 async function callGeminiAPIWithFile(prompt: string, fileData: ArrayBuffer, mimeType: string, apiKey: string): Promise<string> {
   if (!apiKey) {
@@ -18734,7 +18885,8 @@ app.get('/api/generated-documents/:id', async (c) => {
 
 // AI文書生成
 app.post('/api/clients/:clientId/generate-document', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
+  const { DB, GEMINI_API_KEY, CLAUDE_API_KEY } = c.env
+  const env = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
   
@@ -19002,7 +19154,7 @@ ${sectionSpecific}
 ・断定的な文体で記載`
 
     try {
-      let content = await callGeminiAPI(sectionPrompt, GEMINI_API_KEY, 2, section.max_chars)
+      let content = await callAI(sectionPrompt, env, 2, section.max_chars)
       
       // マークダウン記法を除去
       if (content) {
@@ -19146,7 +19298,8 @@ app.put('/api/generated-documents/:id/status', async (c) => {
 
 // セクション再生成
 app.post('/api/generated-documents/:id/regenerate-section', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
+  const { DB, GEMINI_API_KEY, CLAUDE_API_KEY } = c.env
+  const env = c.env
   const docId = c.req.param('id')
   const data = await c.req.json()
   
@@ -19333,7 +19486,7 @@ ${data.additional_instructions}
 ・断定的な文体で記載`
 
   try {
-    let content = await callGeminiAPI(prompt, GEMINI_API_KEY, 2, section.max_chars)
+    let content = await callAI(prompt, env, 2, section.max_chars)
     
     // マークダウン記法を除去
     if (content) {
@@ -25475,6 +25628,95 @@ app.get('/admin/settings', async (c) => {
                 </div>
             </div>
             
+            <!-- AI設定 -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="p-4 border-b bg-gradient-to-r from-green-50 to-teal-50">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fas fa-robot text-green-600"></i>
+                        AI設定
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">文書生成に使用するAIモデルを設定します</p>
+                </div>
+                <div class="p-4 space-y-4">
+                    <!-- AIプロバイダー選択 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">使用するAIモデル</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <label class="relative flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition" id="ai_provider_gemini_label">
+                                <input type="radio" name="ai_provider" value="gemini" id="ai_provider_gemini" class="sr-only" onchange="updateAIProviderUI()">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                        <i class="fas fa-gem text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-medium">Gemini 2.5 Flash</div>
+                                        <div class="text-xs text-gray-500">Google AI（デフォルト）</div>
+                                    </div>
+                                </div>
+                                <div class="absolute top-2 right-2 hidden" id="gemini_check">
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                </div>
+                            </label>
+                            <label class="relative flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition" id="ai_provider_claude_label">
+                                <input type="radio" name="ai_provider" value="claude" id="ai_provider_claude" class="sr-only" onchange="updateAIProviderUI()">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                                        <i class="fas fa-brain text-orange-600"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-medium">Claude Haiku 4.5</div>
+                                        <div class="text-xs text-gray-500">Anthropic（2025年最新）</div>
+                                    </div>
+                                </div>
+                                <div class="absolute top-2 right-2 hidden" id="claude_check">
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Claude API Key入力 -->
+                    <div id="claude_api_key_section" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-key text-orange-500 mr-1"></i>Claude API Key
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="password" id="claude_api_key" class="flex-1 px-3 py-2 border rounded-lg" placeholder="sk-ant-api03-...">
+                            <button type="button" onclick="toggleClaudeKeyVisibility()" class="px-3 py-2 border rounded-lg hover:bg-gray-50">
+                                <i class="fas fa-eye" id="claude_key_eye"></i>
+                            </button>
+                            <button type="button" onclick="testClaudeAPI()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+                                <i class="fas fa-vial mr-1"></i>テスト
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">
+                            <a href="https://console.anthropic.com/settings/keys" target="_blank" class="text-blue-600 hover:underline">
+                                Anthropic Console <i class="fas fa-external-link-alt"></i>
+                            </a>
+                            でAPIキーを取得してください
+                        </p>
+                        <div id="claude_test_result" class="mt-2 hidden"></div>
+                    </div>
+                    
+                    <!-- Gemini API Key情報 -->
+                    <div id="gemini_api_key_section">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                                <div class="text-sm text-blue-800">
+                                    <p class="font-medium">Gemini APIキーについて</p>
+                                    <p class="mt-1">Gemini APIキーは環境変数（wrangler.toml）で設定してください：</p>
+                                    <code class="block mt-2 bg-blue-100 p-2 rounded text-xs">
+                                        [vars]<br>
+                                        GEMINI_API_KEY = "AIza..."
+                                    </code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 法務設定 -->
             <div class="bg-white rounded-lg shadow mb-6">
                 <div class="p-4 border-b bg-gradient-to-r from-indigo-50 to-purple-50">
@@ -25667,8 +25909,75 @@ app.get('/admin/settings', async (c) => {
                     // Stripe
                     const stripeEnabled = getSettingValue(settings, 'stripe_enabled');
                     document.getElementById('stripe_enabled').checked = stripeEnabled === 'true' || stripeEnabled === true;
+                    
+                    // AI設定
+                    const aiProvider = getSettingValue(settings, 'ai_provider') || 'gemini';
+                    document.getElementById('ai_provider_' + aiProvider).checked = true;
+                    document.getElementById('claude_api_key').value = getSettingValue(settings, 'claude_api_key');
+                    updateAIProviderUI();
                 } catch (error) {
                     console.error('Error loading settings:', error);
+                }
+            }
+            
+            // AIプロバイダーUI更新
+            function updateAIProviderUI() {
+                const isGemini = document.getElementById('ai_provider_gemini').checked;
+                const isClaude = document.getElementById('ai_provider_claude').checked;
+                
+                // 選択状態のスタイル更新
+                document.getElementById('ai_provider_gemini_label').classList.toggle('border-green-500', isGemini);
+                document.getElementById('ai_provider_gemini_label').classList.toggle('bg-green-50', isGemini);
+                document.getElementById('ai_provider_claude_label').classList.toggle('border-green-500', isClaude);
+                document.getElementById('ai_provider_claude_label').classList.toggle('bg-green-50', isClaude);
+                
+                // チェックマーク表示
+                document.getElementById('gemini_check').classList.toggle('hidden', !isGemini);
+                document.getElementById('claude_check').classList.toggle('hidden', !isClaude);
+                
+                // Claude API Key入力欄の表示切り替え
+                document.getElementById('claude_api_key_section').classList.toggle('hidden', !isClaude);
+                document.getElementById('gemini_api_key_section').classList.toggle('hidden', isClaude);
+            }
+            
+            // Claude APIキー表示切り替え
+            function toggleClaudeKeyVisibility() {
+                const input = document.getElementById('claude_api_key');
+                const eye = document.getElementById('claude_key_eye');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    eye.classList.remove('fa-eye');
+                    eye.classList.add('fa-eye-slash');
+                } else {
+                    input.type = 'password';
+                    eye.classList.remove('fa-eye-slash');
+                    eye.classList.add('fa-eye');
+                }
+            }
+            
+            // Claude API接続テスト
+            async function testClaudeAPI() {
+                const apiKey = document.getElementById('claude_api_key').value;
+                const resultDiv = document.getElementById('claude_test_result');
+                
+                if (!apiKey) {
+                    resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-exclamation-circle mr-1"></i>APIキーを入力してください</div>';
+                    resultDiv.classList.remove('hidden');
+                    return;
+                }
+                
+                resultDiv.innerHTML = '<div class="p-2 bg-gray-100 text-gray-700 rounded text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>接続テスト中...</div>';
+                resultDiv.classList.remove('hidden');
+                
+                try {
+                    const response = await axios.post('/api/test-claude-api', { api_key: apiKey });
+                    if (response.data.success) {
+                        resultDiv.innerHTML = '<div class="p-2 bg-green-100 text-green-700 rounded text-sm"><i class="fas fa-check-circle mr-1"></i>接続成功！Claude Haiku 4.5が利用可能です</div>';
+                    } else {
+                        resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-times-circle mr-1"></i>' + (response.data.error || '接続に失敗しました') + '</div>';
+                    }
+                } catch (error) {
+                    resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-times-circle mr-1"></i>接続テストに失敗しました</div>';
                 }
             }
             
@@ -25700,7 +26009,10 @@ app.get('/admin/settings', async (c) => {
                         terms_of_service: document.getElementById('terms_of_service').value,
                         footer_text: document.getElementById('footer_text').value,
                         // Stripe
-                        stripe_enabled: document.getElementById('stripe_enabled').checked ? 'true' : 'false'
+                        stripe_enabled: document.getElementById('stripe_enabled').checked ? 'true' : 'false',
+                        // AI設定
+                        ai_provider: document.querySelector('input[name="ai_provider"]:checked')?.value || 'gemini',
+                        claude_api_key: document.getElementById('claude_api_key').value
                     };
                     
                     await axios.put('/api/settings', settings);
@@ -25799,6 +26111,9 @@ app.get('/admin/settings', async (c) => {
             window.closePreview = closePreview;
             window.saveSettings = saveSettings;
             window.applyLegalTemplates = applyLegalTemplates;
+            window.updateAIProviderUI = updateAIProviderUI;
+            window.toggleClaudeKeyVisibility = toggleClaudeKeyVisibility;
+            window.testClaudeAPI = testClaudeAPI;
             
             loadSettings();
         </script>
