@@ -4534,9 +4534,19 @@ app.get('/api/cases/:id/communications', async (c) => {
   const { DB } = c.env
   const caseId = c.req.param('id')
   
+  // まず案件からclient_idを取得
+  const caseData = await DB.prepare(`SELECT client_id FROM cases WHERE id = ?`).bind(caseId).first() as any
+  
+  if (!caseData) {
+    return c.json([])
+  }
+  
+  // case_idまたはclient_id（case_idがnullの場合）でやり取りを取得
   const result = await DB.prepare(`
-    SELECT * FROM communications WHERE case_id = ? ORDER BY created_at ASC
-  `).bind(caseId).all()
+    SELECT * FROM communications 
+    WHERE case_id = ? OR (case_id IS NULL AND client_id = ?)
+    ORDER BY created_at ASC
+  `).bind(caseId, caseData.client_id).all()
   
   return c.json(result.results)
 })
