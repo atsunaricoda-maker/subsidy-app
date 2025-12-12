@@ -17836,7 +17836,7 @@ app.get('/admin/backup', (c) => {
 // ===============================
 
 // Gemini API呼び出しヘルパー（リトライ機能付き）
-async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 2, maxChars?: number): Promise<string> {
+async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number): Promise<string> {
   if (!apiKey) {
     // デモモード：APIキーがない場合はダミーレスポンス
     return `【デモモード】\n\nAPIキーが設定されていないため、実際のAI生成は行われません。\n\n本番環境では、以下のプロンプトに基づいてAIが文章を生成します：\n\n${prompt.substring(0, 200)}...`
@@ -17846,9 +17846,9 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 2, max
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // レート制限対策：リトライ時は待機（指数バックオフ - Cloudflare 30秒タイムアウト対策で短縮）
+      // レート制限対策：リトライ時は待機（指数バックオフ）
       if (attempt > 0) {
-        const waitTime = Math.min(2000 * Math.pow(2, attempt), 8000) // 2秒, 4秒, 8秒, 最大8秒
+        const waitTime = Math.min(3000 * Math.pow(2, attempt), 15000) // 3秒, 6秒, 12秒, 最大15秒
         console.log(`Gemini API retry ${attempt}/${maxRetries}, waiting ${waitTime}ms...`)
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
@@ -17871,13 +17871,21 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 2, max
       
       // 429（レート制限）または5xx（サーバーエラー）の場合はリトライ
       if (response.status === 429 || response.status >= 500) {
-        lastError = new Error(`Gemini API error: ${response.status}`)
-        console.error(`Gemini API attempt ${attempt + 1}/${maxRetries} failed: ${response.status}`)
+        const errorBody = await response.text().catch(() => '')
+        lastError = new Error(`Gemini API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+        console.error(`Gemini API attempt ${attempt + 1}/${maxRetries} failed: ${response.status}`, errorBody.substring(0, 500))
         continue
       }
       
       if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`)
+        const errorBody = await response.text().catch(() => '')
+        // RESOURCE_EXHAUSTED（クォータ超過）もリトライ対象にする
+        if (errorBody.includes('RESOURCE_EXHAUSTED') || errorBody.includes('quota')) {
+          lastError = new Error(`Gemini API quota exceeded: ${response.status}`)
+          console.error(`Gemini API quota exceeded, attempt ${attempt + 1}/${maxRetries}`)
+          continue
+        }
+        throw new Error(`Gemini API error: ${response.status} - ${errorBody.substring(0, 200)}`)
       }
       
       const data = await response.json()
@@ -18725,9 +18733,9 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
   // 各セクションをAIで生成（レート制限回避のため間隔を空ける）
   let sectionIndex = 0
   for (const section of sections) {
-    // 2番目以降のセクションは2秒待機（Cloudflare Workers 30秒タイムアウト対策）
+    // 2番目以降のセクションは3秒待機（レート制限回避）
     if (sectionIndex > 0) {
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise(resolve => setTimeout(resolve, 3000))
     }
     sectionIndex++
     
