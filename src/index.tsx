@@ -3532,7 +3532,7 @@ app.get('/', (c) => {
                             \${clientData.cases.map(caseItem => {
                                 const portalUrl = \`\${window.location.origin}/portal/\${caseItem.access_token}\`;
                                 const deadlineInfo = getDeadlineInfo(caseItem.application_end_date);
-                                const caseNumber = caseItem.case_number || \`案件#\${caseItem.id}\`;
+                                const caseNo = 'No.' + String(caseItem.id).padStart(4, '0');
                                 
                                 return \`
                                 <div class="py-2.5 px-4 pl-10 border-b last:border-b-0 hover:bg-blue-50 transition-colors \${deadlineInfo?.urgent ? 'bg-red-50' : ''}">
@@ -3540,7 +3540,7 @@ app.get('/', (c) => {
                                         <!-- 左側: 案件情報（クリックで詳細へ） -->
                                         <a href="/case/\${caseItem.id}" class="flex-1 min-w-0 group">
                                             <div class="flex items-center gap-2 flex-wrap">
-                                                <span class="text-xs text-gray-400 font-mono group-hover:text-blue-600">\${caseNumber}</span>
+                                                <span class="px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-700 font-mono font-bold group-hover:bg-blue-200 group-hover:text-blue-700">\${caseNo}</span>
                                                 <span class="px-2 py-0.5 rounded-full text-xs font-medium \${STATUS_COLORS[caseItem.status]}">\${STATUS_LABELS[caseItem.status]}</span>
                                                 \${caseItem.subsidy_type_name ? \`<span class="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800">\${caseItem.subsidy_type_name}</span>\` : ''}
                                                 \${deadlineInfo ? \`<span class="px-2 py-0.5 rounded text-xs font-bold \${deadlineInfo.class}"><i class="fas fa-clock mr-1"></i>\${deadlineInfo.text}</span>\` : ''}
@@ -3567,7 +3567,7 @@ app.get('/', (c) => {
                                                 <i class="fas fa-external-link-alt text-sm"></i>
                                             </a>
                                             \${localStorage.getItem('admin_role') === 'admin' ? \`
-                                            <button onclick="deleteCase(\${caseItem.id}, '\${clientData.clientName}', '\${caseNumber}')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-red-100 hover:text-red-600" title="削除">
+                                            <button onclick="deleteCase(\${caseItem.id}, '\${clientData.clientName}', '\${caseNo}')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-red-100 hover:text-red-600" title="削除">
                                                 <i class="fas fa-trash text-sm"></i>
                                             </button>
                                             \` : ''}
@@ -7447,12 +7447,13 @@ app.get('/client/:id', async (c) => {
                     const casesHtml = cases.length > 0 ? cases.map(c => {
                         const caseSubsidy = subsidyTypes.find(s => s.id === c.subsidy_type_id);
                         const caseAssignee = allUsers.find(u => u.username === c.assigned_to);
+                        const caseNo = 'No.' + String(c.id).padStart(4, '0');
                         return \`
                             <a href="/case/\${c.id}" class="block p-3 bg-gray-50 rounded-lg border mb-2 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer">
                                 <div class="flex justify-between items-start">
                                     <div>
-                                        <span class="text-xs text-gray-500">\${c.case_number || '案件'}</span>
-                                        <div class="font-medium text-sm">\${caseSubsidy ? caseSubsidy.name : '未設定'}</div>
+                                        <span class="px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-700 font-mono font-bold">\${caseNo}</span>
+                                        <div class="font-medium text-sm mt-1">\${caseSubsidy ? caseSubsidy.name : '未設定'}</div>
                                     </div>
                                     <span class="text-xs px-2 py-1 rounded \${STATUS_COLORS[c.status] || 'bg-gray-100'}">\${STATUS_LABELS[c.status] || c.status}</span>
                                 </div>
@@ -8116,7 +8117,7 @@ app.get('/client/:id', async (c) => {
                                         <div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer" onclick="window.location.href='/case/\${c.id}'">
                                             <div class="p-3">
                                                 <div class="flex items-start justify-between gap-2 mb-2">
-                                                    <span class="font-mono text-xs text-gray-500">\${c.case_number || '#' + c.id}</span>
+                                                    <span class="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-700 font-mono font-bold">No.\${String(c.id).padStart(4, '0')}</span>
                                                     \${c.deposit_required && !c.deposit_paid ? '<span class="text-yellow-600 text-xs"><i class="fas fa-yen-sign"></i></span>' : ''}
                                                 </div>
                                                 \${c.subsidy_type_name ? \`
@@ -9701,7 +9702,7 @@ app.get('/case/:id', async (c) => {
                             </button>
                             <div>
                                 <div class="text-sm text-gray-500">案件詳細</div>
-                                <h2 class="text-lg font-bold text-gray-800">${caseData.case_number}</h2>
+                                <h2 class="text-lg font-bold text-gray-800">No.${String(caseData.id).padStart(4, '0')} ${caseData.subsidy_type_name || ''}</h2>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
