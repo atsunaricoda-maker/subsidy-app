@@ -9024,7 +9024,7 @@ app.get('/client/:id', async (c) => {
                     select.innerHTML = '<option value="">選択してください</option>' + 
                         cases.map(c => {
                             const caseNo = 'No.' + String(c.id).padStart(4, '0');
-                            const subsidyName = c.subsidy_name || '補助金';
+                            const subsidyName = c.subsidy_type_name || '補助金種別未設定';
                             const status = statusMap[c.status] || c.status;
                             const createdDate = c.created_at ? new Date(c.created_at).toLocaleDateString('ja-JP') : '';
                             return \`<option value="\${c.id}">[\${caseNo}] \${subsidyName}（\${status}）\${createdDate ? ' - ' + createdDate + '作成' : ''}</option>\`;
