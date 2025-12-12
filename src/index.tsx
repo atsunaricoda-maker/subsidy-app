@@ -18815,45 +18815,51 @@ app.put('/api/generated-documents/:id/sections/:sectionId', async (c) => {
   const { DB } = c.env
   const docId = c.req.param('id')
   const sectionId = c.req.param('sectionId')
-  const data = await c.req.json()
   
-  // 現在の文書取得
-  const doc = await DB.prepare(`
-    SELECT * FROM generated_documents WHERE id = ?
-  `).bind(docId).first()
-  
-  if (!doc) {
-    return c.json({ error: '文書が見つかりません' }, 404)
+  try {
+    const data = await c.req.json()
+    
+    // 現在の文書取得
+    const doc = await DB.prepare(`
+      SELECT * FROM generated_documents WHERE id = ?
+    `).bind(docId).first()
+    
+    if (!doc) {
+      return c.json({ error: '文書が見つかりません' }, 404)
+    }
+    
+    const sectionsContent = JSON.parse(doc.sections_content || '{}')
+    const previousContent = sectionsContent[sectionId] || ''
+    
+    // 編集履歴を保存
+    await DB.prepare(`
+      INSERT INTO document_section_edits 
+      (document_id, section_id, previous_content, new_content, edit_type, editor_name, editor_comment)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      docId,
+      sectionId,
+      previousContent,
+      data.content || '',
+      data.edit_type || 'manual',
+      data.editor_name || null,
+      data.editor_comment || null
+    ).run()
+    
+    // セクション内容を更新
+    sectionsContent[sectionId] = data.content
+    
+    await DB.prepare(`
+      UPDATE generated_documents 
+      SET sections_content = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(JSON.stringify(sectionsContent), docId).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Section update error:', error)
+    return c.json({ error: `保存に失敗しました: ${error?.message || '不明なエラー'}` }, 500)
   }
-  
-  const sectionsContent = JSON.parse(doc.sections_content || '{}')
-  const previousContent = sectionsContent[sectionId]
-  
-  // 編集履歴を保存
-  await DB.prepare(`
-    INSERT INTO document_section_edits 
-    (document_id, section_id, previous_content, new_content, edit_type, editor_name, editor_comment)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    docId,
-    sectionId,
-    previousContent,
-    data.content,
-    data.edit_type || 'manual',
-    data.editor_name,
-    data.editor_comment
-  ).run()
-  
-  // セクション内容を更新
-  sectionsContent[sectionId] = data.content
-  
-  await DB.prepare(`
-    UPDATE generated_documents 
-    SET sections_content = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).bind(JSON.stringify(sectionsContent), docId).run()
-  
-  return c.json({ success: true })
 })
 
 // 文書削除
