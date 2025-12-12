@@ -6260,10 +6260,21 @@ app.get('/client/:id', async (c) => {
                             </button>
                         </div>
 
-                        <!-- 書類進捗 -->
+                        <!-- 共通書類 -->
+                        <div class="bg-white rounded-lg shadow p-6 mb-6">
+                            <h2 class="text-lg font-bold mb-3">
+                                <i class="fas fa-building mr-2 text-blue-600"></i>共通書類
+                                <span class="text-xs text-gray-500 font-normal ml-1">（全申請で共通利用）</span>
+                            </h2>
+                            <div id="commonDocumentsListAdmin" class="space-y-2">
+                                <div class="text-sm text-gray-500 py-2">読み込み中...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 案件別書類進捗 -->
                         <div class="bg-white rounded-lg shadow p-6">
                             <h2 class="text-lg font-bold mb-2">
-                                <i class="fas fa-folder-open mr-2 text-blue-600"></i>必要書類
+                                <i class="fas fa-folder-open mr-2 text-green-600"></i>案件別書類
                             </h2>
                             <div id="documentProgress" class="mb-3"></div>
                             <div id="documentChecklist" class="space-y-2 mb-4"></div>
@@ -7174,6 +7185,91 @@ app.get('/client/:id', async (c) => {
                     console.error('Document status update error:', error);
                 }
             };
+            
+            // 共通書類を読み込む（管理画面用）
+            async function loadCommonDocumentsAdmin() {
+                try {
+                    const [typesRes, docsRes] = await Promise.all([
+                        axios.get('/api/common-document-types'),
+                        axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`)
+                    ]);
+                    
+                    const documentTypes = typesRes.data;
+                    const uploadedDocs = docsRes.data;
+                    
+                    // アップロード済みドキュメントタイプのマップを作成
+                    const uploadedByType = {};
+                    uploadedDocs.forEach(doc => {
+                        if (!uploadedByType[doc.document_type]) {
+                            uploadedByType[doc.document_type] = [];
+                        }
+                        uploadedByType[doc.document_type].push(doc);
+                    });
+                    
+                    const container = document.getElementById('commonDocumentsListAdmin');
+                    
+                    if (documentTypes.length === 0) {
+                        container.innerHTML = '<div class="text-sm text-gray-500 py-2">共通書類タイプが設定されていません</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = documentTypes.map(type => {
+                        const docs = uploadedByType[type.name] || [];
+                        const hasDoc = docs.length > 0;
+                        const latestDoc = hasDoc ? docs[0] : null;
+                        
+                        // 有効期限チェック
+                        let validityBadge = '';
+                        if (latestDoc && type.validity_months) {
+                            const uploadDate = new Date(latestDoc.uploaded_at);
+                            const expiryDate = new Date(uploadDate);
+                            expiryDate.setMonth(expiryDate.getMonth() + type.validity_months);
+                            const now = new Date();
+                            const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                            
+                            if (daysUntilExpiry <= 0) {
+                                validityBadge = '<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">期限切れ</span>';
+                            } else if (daysUntilExpiry <= 30) {
+                                validityBadge = '<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">残 ' + daysUntilExpiry + '日</span>';
+                            } else {
+                                validityBadge = '<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">有効</span>';
+                            }
+                        }
+                        
+                        return \`
+                            <div class="flex items-center gap-3 p-3 rounded-lg border \${hasDoc ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}">
+                                <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center \${hasDoc ? 'bg-blue-500' : 'bg-gray-300'}">
+                                    <i class="fas \${hasDoc ? 'fa-check' : 'fa-file-alt'} text-white text-sm"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center">
+                                        <span class="font-medium text-sm \${hasDoc ? 'text-blue-800' : 'text-gray-700'}">\${type.name}</span>
+                                        \${validityBadge}
+                                    </div>
+                                    \${hasDoc ? \`
+                                        <div class="text-xs text-gray-600 mt-0.5">
+                                            \${latestDoc.fiscal_year ? latestDoc.fiscal_year + '年度 - ' : ''}\${latestDoc.file_name}
+                                            <span class="text-gray-400 ml-1">\${new Date(latestDoc.uploaded_at).toLocaleDateString('ja-JP')}</span>
+                                        </div>
+                                    \` : '<div class="text-xs text-gray-500 mt-0.5">未アップロード</div>'}
+                                </div>
+                                \${hasDoc ? \`
+                                    <a href="/api/common-documents/\${latestDoc.id}/download" 
+                                       class="text-blue-600 hover:text-blue-800 text-sm">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                \` : ''}
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading common documents:', error);
+                    const container = document.getElementById('commonDocumentsListAdmin');
+                    if (container) {
+                        container.innerHTML = '<div class="text-sm text-red-500 py-2">共通書類の読み込みに失敗しました</div>';
+                    }
+                }
+            }
 
             async function loadCommunications() {
                 const response = await axios.get(\`/api/clients/\${CLIENT_ID}/communications\`);
@@ -8685,6 +8781,7 @@ app.get('/client/:id', async (c) => {
                 console.log('Initial data loaded, now loading client data...');
                 loadClient();
                 loadDocuments();
+                loadCommonDocumentsAdmin();
                 loadCommunications();
             }).catch(error => {
                 console.error('Error during initial load:', error);
