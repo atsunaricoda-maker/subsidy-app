@@ -2521,7 +2521,7 @@ app.get('/', (c) => {
                             deposit_amount: parseInt(formData.get('deposit_amount')) || 0,
                             withholding_tax: document.getElementById('withholdingTax')?.checked ? 1 : 0,
                             success_fee_enabled: document.getElementById('successFeeEnabled')?.checked ? 1 : 0,
-                            success_fee_rate: parseFloat(formData.get('success_fee_rate')) || 0,
+                            success_fee_rate: parseFloat(formData.get('success_fee_percentage')) || 0,
                             success_fee_amount: parseInt(formData.get('success_fee_amount')) || 0,
                             pipeline_template_id: pipelineTemplateId ? parseInt(pipelineTemplateId) : null
                         };
