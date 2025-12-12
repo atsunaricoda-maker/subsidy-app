@@ -19926,15 +19926,16 @@ app.get('/api/generated-documents/:id/export', async (c) => {
   const id = c.req.param('id')
   const format = c.req.query('format') || 'html'
   
-  // 文書取得
+  // 文書取得（テンプレートの補助金タイプから補助金名を取得）
   const doc = await DB.prepare(`
     SELECT gd.*, dt.template_name, dt.sections as template_sections,
            c.name as client_name, c.company_name,
-           st.name as subsidy_name
+           COALESCE(st_template.name, st_client.name) as subsidy_name
     FROM generated_documents gd
     JOIN document_templates dt ON gd.template_id = dt.id
     JOIN clients c ON gd.client_id = c.id
-    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    LEFT JOIN subsidy_types st_template ON dt.subsidy_type_id = st_template.id
+    LEFT JOIN subsidy_types st_client ON c.subsidy_type_id = st_client.id
     WHERE gd.id = ?
   `).bind(id).first()
   
