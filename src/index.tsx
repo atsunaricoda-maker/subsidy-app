@@ -17836,7 +17836,7 @@ app.get('/admin/backup', (c) => {
 // ===============================
 
 // Gemini API呼び出しヘルパー（リトライ機能付き）
-async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 2): Promise<string> {
+async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 2, maxChars?: number): Promise<string> {
   if (!apiKey) {
     // デモモード：APIキーがない場合はダミーレスポンス
     return `【デモモード】\n\nAPIキーが設定されていないため、実際のAI生成は行われません。\n\n本番環境では、以下のプロンプトに基づいてAIが文章を生成します：\n\n${prompt.substring(0, 200)}...`
@@ -17862,6 +17862,7 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 2): Pr
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.7,
+              // maxOutputTokensは制限しない（プロンプトで文字数を指示）
               maxOutputTokens: 4096,
             }
           })
@@ -18750,23 +18751,28 @@ ${documentExtractions.length > 0 ? documentExtractions.join('\n\n') : '（書類
 【生成するセクション】
 セクション名: ${section.title}
 説明: ${section.description}
-文字数上限: ${section.max_chars}文字
 
-上記の情報を基に、このセクションの内容を生成してください。
+★★★ 文字数制限：${Math.floor(section.max_chars * 0.8)}〜${section.max_chars}文字 ★★★
+目標文字数: 約${Math.floor(section.max_chars * 0.8)}文字
+絶対上限: ${section.max_chars}文字（これを超えると無効）
 
-【重要な出力ルール】
-- マークダウン記法（太字、見出し、箇条書き記号、コードブロック等）は絶対に使用しないでください
-- 箇条書きが必要な場合は「・」や「（1）」「①」などの記号を使用してください
-- 改行と段落で構造化してください
-- 具体的な数値を含めてください
-- 補助率や補助上限額などの補助金制度情報を適切に文書に反映してください
-- 審査員が納得できる論理的な説明を心がけてください
-- 文字数は${section.max_chars}文字以内に収めてください
-- 自然な日本語のビジネス文書として出力してください
-- 提出書類から抽出した具体的な数値や情報があれば、積極的に活用してください`
+【出力ルール】
+1. ${Math.floor(section.max_chars * 0.8)}文字前後で簡潔にまとめる
+2. セクション番号やタイトルは出力しない（内容のみ）
+3. マークダウン記法は使用禁止
+4. 箇条書きは最小限に
+5. 具体的な数値を含める
+6. 核心となる要点のみを端的に記載`
 
     try {
-      const content = await callGeminiAPI(sectionPrompt, GEMINI_API_KEY)
+      let content = await callGeminiAPI(sectionPrompt, GEMINI_API_KEY, 2, section.max_chars)
+      
+      // 文字数チェック：超過している場合は警告を追加
+      if (content && content.length > section.max_chars) {
+        const overCount = content.length - section.max_chars
+        content = `【文字数超過】現在${content.length}文字（上限${section.max_chars}文字を${overCount}文字超過）\n編集して${section.max_chars}文字以内に収めてください。\n\n---\n\n${content}`
+      }
+      
       generatedSections[section.id] = content || `【生成エラー】セクション「${section.title}」の生成結果が空でした。再生成をお試しください。`
     } catch (error: any) {
       console.error(`Section ${section.id} generation error:`, error)
@@ -18936,20 +18942,28 @@ ${(answers.results || []).map((a: any) => `【${a.category}】${a.question_text}
 【生成するセクション】
 セクション名: ${section.title}
 説明: ${section.description}
-文字数上限: ${section.max_chars}文字
+
+★★★ 文字数制限：${Math.floor(section.max_chars * 0.8)}〜${section.max_chars}文字 ★★★
+目標文字数: 約${Math.floor(section.max_chars * 0.8)}文字
+絶対上限: ${section.max_chars}文字（これを超えると無効）
 
 ${data.additional_instructions ? `【追加指示】\n${data.additional_instructions}\n` : ''}
 
-上記の情報を基に、このセクションの内容を再生成してください。
-
-【重要な出力ルール】
-- マークダウン記法（太字、見出し、箇条書き記号、コードブロック等）は絶対に使用しないでください
-- 箇条書きが必要な場合は「・」や「（1）」「①」などの記号を使用してください
-- 改行と段落で構造化してください
-- 自然な日本語のビジネス文書として出力してください`
+【出力ルール】
+1. ${Math.floor(section.max_chars * 0.8)}文字前後で簡潔にまとめる
+2. セクション番号やタイトルは出力しない（内容のみ）
+3. マークダウン記法は使用禁止
+4. 箇条書きは最小限に
+5. 核心となる要点のみを端的に記載`
 
   try {
-    const content = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    let content = await callGeminiAPI(prompt, GEMINI_API_KEY, 2, section.max_chars)
+    
+    // 文字数チェック：超過している場合は警告を追加
+    if (content && content.length > section.max_chars) {
+      const overCount = content.length - section.max_chars
+      content = `【文字数超過】現在${content.length}文字（上限${section.max_chars}文字を${overCount}文字超過）\n編集して${section.max_chars}文字以内に収めてください。\n\n---\n\n${content}`
+    }
     
     // セクション内容を更新
     const sectionsContent = JSON.parse(doc.sections_content || '{}')
