@@ -4752,6 +4752,176 @@ app.put('/api/documents/:id/status', async (c) => {
 })
 
 // ===============================
+// API: 共通書類（顧客単位、全案件で共有）
+// ===============================
+
+// 共通書類タイプ一覧取得
+app.get('/api/common-document-types', async (c) => {
+  const { DB } = c.env
+  
+  const result = await DB.prepare(`
+    SELECT * FROM common_document_types ORDER BY display_order ASC
+  `).all()
+  
+  return c.json(result.results || [])
+})
+
+// 顧客の共通書類一覧取得
+app.get('/api/clients/:clientId/common-documents', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId')
+  
+  const result = await DB.prepare(`
+    SELECT cd.*, cdt.validity_months, cdt.max_versions, cdt.description as type_description
+    FROM client_common_documents cd
+    LEFT JOIN common_document_types cdt ON cd.document_type = cdt.name
+    WHERE cd.client_id = ? AND cd.status = 'active'
+    ORDER BY cdt.display_order ASC, cd.uploaded_at DESC
+  `).bind(clientId).all()
+  
+  return c.json(result.results || [])
+})
+
+// 共通書類アップロード
+app.post('/api/clients/:clientId/common-documents', async (c) => {
+  const { DB, R2 } = c.env
+  const clientId = c.req.param('clientId')
+  
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    const documentType = formData.get('document_type') as string
+    const fiscalYear = formData.get('fiscal_year') as string || null
+    const notes = formData.get('notes') as string || null
+    
+    if (!file || !documentType) {
+      return c.json({ error: 'ファイルと書類種別は必須です' }, 400)
+    }
+    
+    // 書類タイプの設定を取得
+    const docTypeConfig = await DB.prepare(`
+      SELECT * FROM common_document_types WHERE name = ?
+    `).bind(documentType).first() as any
+    
+    // 有効期限を計算
+    let validUntil = null
+    if (docTypeConfig?.validity_months) {
+      const date = new Date()
+      date.setMonth(date.getMonth() + docTypeConfig.validity_months)
+      validUntil = date.toISOString().split('T')[0]
+    }
+    
+    // 最大バージョン数を超える場合、古いものを置換
+    if (docTypeConfig?.max_versions) {
+      const existingDocs = await DB.prepare(`
+        SELECT id FROM client_common_documents 
+        WHERE client_id = ? AND document_type = ? AND status = 'active'
+        ORDER BY uploaded_at ASC
+      `).bind(clientId, documentType).all()
+      
+      const docs = existingDocs.results || []
+      if (docs.length >= docTypeConfig.max_versions) {
+        // 古いドキュメントを置換済みにする
+        const toReplace = docs.slice(0, docs.length - docTypeConfig.max_versions + 1)
+        for (const doc of toReplace) {
+          await DB.prepare(`
+            UPDATE client_common_documents SET status = 'replaced' WHERE id = ?
+          `).bind((doc as any).id).run()
+        }
+      }
+    }
+    
+    // R2にアップロード
+    const fileName = file.name
+    const arrayBuffer = await file.arrayBuffer()
+    const filePath = `common-docs/${clientId}/${Date.now()}_${fileName}`
+    
+    await R2.put(filePath, arrayBuffer, {
+      httpMetadata: { contentType: file.type }
+    })
+    
+    // DBに登録
+    const result = await DB.prepare(`
+      INSERT INTO client_common_documents 
+      (client_id, document_type, file_name, file_path, file_size, fiscal_year, valid_until, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      clientId,
+      documentType,
+      fileName,
+      filePath,
+      file.size,
+      fiscalYear,
+      validUntil,
+      notes
+    ).run()
+    
+    return c.json({ 
+      success: true, 
+      id: result.meta.last_row_id,
+      valid_until: validUntil
+    })
+  } catch (error: any) {
+    console.error('Common document upload error:', error)
+    return c.json({ error: error.message || 'アップロードに失敗しました' }, 500)
+  }
+})
+
+// 共通書類ダウンロード
+app.get('/api/common-documents/:id/download', async (c) => {
+  const { DB, R2 } = c.env
+  const id = c.req.param('id')
+  
+  const doc = await DB.prepare(`
+    SELECT * FROM client_common_documents WHERE id = ?
+  `).bind(id).first() as any
+  
+  if (!doc) {
+    return c.json({ error: 'Document not found' }, 404)
+  }
+  
+  const object = await R2.get(doc.file_path)
+  
+  if (!object) {
+    return c.json({ error: 'File not found in storage' }, 404)
+  }
+  
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': object.httpMetadata?.contentType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${doc.file_name}"`
+    }
+  })
+})
+
+// 共通書類削除（ステータスをinactiveに）
+app.delete('/api/common-documents/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  await DB.prepare(`
+    UPDATE client_common_documents SET status = 'replaced' WHERE id = ?
+  `).bind(id).run()
+  
+  return c.json({ success: true })
+})
+
+// 共通書類の有効期限チェック・更新
+app.post('/api/clients/:clientId/common-documents/check-validity', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId')
+  
+  // 期限切れの書類を expired に更新
+  await DB.prepare(`
+    UPDATE client_common_documents 
+    SET status = 'expired' 
+    WHERE client_id = ? AND status = 'active' AND valid_until IS NOT NULL AND valid_until < date('now')
+  `).bind(clientId).run()
+  
+  return c.json({ success: true })
+})
+
+// ===============================
 // API: やり取り記録
 // ===============================
 
@@ -9779,9 +9949,21 @@ app.get('/portal/:token', async (c) => {
                                 
                                 <!-- 書類アップロードタブ -->
                                 <div id="panelDocuments" class="p-4">
+                                    <!-- 共通書類セクション -->
+                                    <div class="mb-4 pb-3 border-b border-gray-200">
+                                        <h3 class="text-sm font-medium mb-2">
+                                            <i class="fas fa-building mr-1 text-blue-600"></i>共通書類
+                                            <span class="text-xs text-gray-500 font-normal ml-1">（全申請で使える書類）</span>
+                                        </h3>
+                                        <div id="commonDocumentsList" class="space-y-1.5">
+                                            <div class="text-xs text-gray-500 py-2">読み込み中...</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 案件別必要書類セクション -->
                                     <div class="mb-3">
                                         <h3 class="text-sm font-medium mb-2">
-                                            <i class="fas fa-folder-open mr-1 text-green-600"></i>必要書類
+                                            <i class="fas fa-folder-open mr-1 text-green-600"></i>案件別必要書類
                                             <span class="text-xs text-gray-500 font-normal ml-1">（タップでアップロード）</span>
                                         </h3>
                                         <div id="checklistItems" class="space-y-1.5"></div>
@@ -9840,6 +10022,44 @@ app.get('/portal/:token', async (c) => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 共通書類アップロードモーダル -->
+            <div id="commonDocUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl w-full max-w-sm shadow-xl">
+                    <div class="flex items-center justify-between p-4 border-b bg-blue-600 text-white rounded-t-xl">
+                        <h3 id="commonDocModalTitle" class="font-bold text-sm">
+                            <i class="fas fa-upload mr-2"></i>共通書類アップロード
+                        </h3>
+                        <button onclick="closeCommonDocUploadModal()" class="text-white hover:text-blue-200">
+                            <i class="fas fa-times text-lg"></i>
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">年度（任意）</label>
+                            <input type="text" id="commonDocFiscalYear" placeholder="例: 2024" 
+                                   class="w-full px-3 py-2 border rounded-lg text-sm">
+                            <p class="text-xs text-gray-500 mt-1">決算書や確定申告書など、年度がある書類の場合は入力してください</p>
+                        </div>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-blue-500 hover:bg-blue-50 cursor-pointer">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                            <p class="text-sm text-gray-600 mb-3">ファイルをドラッグ&ドロップ</p>
+                            <input type="file" id="commonDocFileInput" class="hidden">
+                            <button onclick="document.getElementById('commonDocFileInput').click()" 
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-folder-open mr-1"></i>ファイルを選択
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-3 text-center">
+                            対応形式: PDF, Word, Excel, 画像ファイル
+                        </p>
+                        <button onclick="uploadCommonDocument()" 
+                                class="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+                            <i class="fas fa-upload mr-1"></i>アップロード
+                        </button>
                     </div>
                 </div>
             </div>
@@ -11120,6 +11340,134 @@ app.get('/portal/:token', async (c) => {
                 document.getElementById('documentUploadModal').classList.add('hidden');
                 document.getElementById('fileInput').value = '';
             }
+            
+            // 共通書類の読み込み
+            async function loadCommonDocuments() {
+                try {
+                    const [typesRes, docsRes] = await Promise.all([
+                        axios.get('/api/common-document-types'),
+                        axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`)
+                    ]);
+                    
+                    const documentTypes = typesRes.data;
+                    const uploadedDocs = docsRes.data;
+                    
+                    // アップロード済みドキュメントタイプのマップを作成
+                    const uploadedByType = {};
+                    uploadedDocs.forEach(doc => {
+                        if (!uploadedByType[doc.document_type]) {
+                            uploadedByType[doc.document_type] = [];
+                        }
+                        uploadedByType[doc.document_type].push(doc);
+                    });
+                    
+                    const container = document.getElementById('commonDocumentsList');
+                    
+                    if (documentTypes.length === 0) {
+                        container.innerHTML = '<div class="text-xs text-gray-500 py-2">共通書類タイプが設定されていません</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = documentTypes.map(type => {
+                        const docs = uploadedByType[type.name] || [];
+                        const hasDoc = docs.length > 0;
+                        const latestDoc = hasDoc ? docs[0] : null;
+                        
+                        // 有効期限チェック
+                        let validityStatus = '';
+                        if (latestDoc && type.validity_months) {
+                            const uploadDate = new Date(latestDoc.uploaded_at);
+                            const expiryDate = new Date(uploadDate);
+                            expiryDate.setMonth(expiryDate.getMonth() + type.validity_months);
+                            const now = new Date();
+                            const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                            
+                            if (daysUntilExpiry <= 0) {
+                                validityStatus = '<span class="ml-1 text-xs text-red-500 font-medium">期限切れ</span>';
+                            } else if (daysUntilExpiry <= 30) {
+                                validityStatus = '<span class="ml-1 text-xs text-orange-500">残 ' + daysUntilExpiry + '日</span>';
+                            }
+                        }
+                        
+                        return \`
+                            <div onclick="openCommonDocUploadModal('\${type.name.replace(/'/g, "\\\\'")}', \${type.id}, \${hasDoc})" 
+                                 class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all \${hasDoc ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200 hover:bg-blue-50 hover:border-blue-300'}">
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center \${hasDoc ? 'bg-blue-500' : 'bg-gray-300'}">
+                                    <i class="fas \${hasDoc ? 'fa-check' : 'fa-plus'} text-white text-xs"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <span class="text-sm \${hasDoc ? 'text-blue-700 font-medium' : 'text-gray-700'}">\${type.name}</span>
+                                    \${validityStatus}
+                                    \${hasDoc ? '<span class="block text-xs text-gray-500 truncate">' + (latestDoc.fiscal_year ? latestDoc.fiscal_year + '年度 - ' : '') + latestDoc.file_name + '</span>' : ''}
+                                </div>
+                                <i class="fas fa-chevron-right text-xs \${hasDoc ? 'text-blue-400' : 'text-gray-400'}"></i>
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading common documents:', error);
+                    document.getElementById('commonDocumentsList').innerHTML = '<div class="text-xs text-red-500 py-2">共通書類の読み込みに失敗しました</div>';
+                }
+            }
+            
+            // 共通書類アップロードモーダルを開く
+            let selectedCommonDocType = null;
+            let selectedCommonDocTypeId = null;
+            
+            function openCommonDocUploadModal(typeName, typeId, hasDoc) {
+                selectedCommonDocType = typeName;
+                selectedCommonDocTypeId = typeId;
+                
+                document.getElementById('commonDocModalTitle').innerHTML = \`
+                    <i class="fas fa-\${hasDoc ? 'sync-alt' : 'upload'} mr-2"></i>\${typeName}
+                \`;
+                document.getElementById('commonDocUploadModal').classList.remove('hidden');
+            }
+            
+            function closeCommonDocUploadModal() {
+                document.getElementById('commonDocUploadModal').classList.add('hidden');
+                document.getElementById('commonDocFileInput').value = '';
+                document.getElementById('commonDocFiscalYear').value = '';
+                selectedCommonDocType = null;
+                selectedCommonDocTypeId = null;
+            }
+            
+            async function uploadCommonDocument() {
+                const fileInput = document.getElementById('commonDocFileInput');
+                const fiscalYear = document.getElementById('commonDocFiscalYear').value;
+                
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    showMessage('error', 'ファイルを選択してください');
+                    return;
+                }
+                
+                const file = fileInput.files[0];
+                showMessage('info', 'アップロード中...');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('document_type', selectedCommonDocType);
+                    if (fiscalYear) {
+                        formData.append('fiscal_year', fiscalYear);
+                    }
+                    
+                    await axios.post(\`/api/clients/\${CLIENT_ID}/common-documents\`, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                    
+                    showMessage('success', '共通書類をアップロードしました');
+                    closeCommonDocUploadModal();
+                    loadCommonDocuments();
+                } catch (error) {
+                    console.error('Error uploading common document:', error);
+                    showMessage('error', 'アップロードに失敗しました');
+                }
+            }
+            
+            window.openCommonDocUploadModal = openCommonDocUploadModal;
+            window.closeCommonDocUploadModal = closeCommonDocUploadModal;
+            window.uploadCommonDocument = uploadCommonDocument;
 
             async function loadDocuments() {
                 const response = await axios.get(\`/api/clients/\${CLIENT_ID}/documents\`);
@@ -12803,6 +13151,7 @@ app.get('/portal/:token', async (c) => {
                 loadHearingQuestions();
                 loadChecklist();
                 loadDocuments();
+                loadCommonDocuments();
                 loadCommunications();
                 loadPortalAiChat();
             }
