@@ -17822,7 +17822,7 @@ app.get('/admin/backup', (c) => {
 // ===============================
 
 // Gemini API呼び出しヘルパー（リトライ機能付き）
-async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3): Promise<string> {
+async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 4): Promise<string> {
   if (!apiKey) {
     // デモモード：APIキーがない場合はダミーレスポンス
     return `【デモモード】\n\nAPIキーが設定されていないため、実際のAI生成は行われません。\n\n本番環境では、以下のプロンプトに基づいてAIが文章を生成します：\n\n${prompt.substring(0, 200)}...`
@@ -17832,9 +17832,10 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3): Pr
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // レート制限対策：リトライ時は待機
+      // レート制限対策：リトライ時は待機（指数バックオフ）
       if (attempt > 0) {
-        const waitTime = Math.min(1000 * Math.pow(2, attempt), 10000) // 2秒, 4秒, 最大10秒
+        const waitTime = Math.min(1500 * Math.pow(2, attempt), 15000) // 3秒, 6秒, 12秒, 最大15秒
+        console.log(`Gemini API retry ${attempt}/${maxRetries}, waiting ${waitTime}ms...`)
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
       
@@ -18706,8 +18707,15 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
 - 補助金名: ${client.subsidy_name}
 - その他詳細情報: 未登録`
   
-  // 各セクションをAIで生成
+  // 各セクションをAIで生成（レート制限回避のため間隔を空ける）
+  let sectionIndex = 0
   for (const section of sections) {
+    // 2番目以降のセクションは1.5秒待機（レート制限回避）
+    if (sectionIndex > 0) {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+    }
+    sectionIndex++
+    
     const sectionPrompt = `${template.ai_prompt_base}
 
 【顧客情報】
