@@ -7655,26 +7655,37 @@ app.get('/client/:id', async (c) => {
 
             async function loadDocuments() {
                 console.log('loadDocuments called for CLIENT_ID:', CLIENT_ID);
-                // 必要書類チェックリストと既にアップロードされた書類を取得
-                const [checklistRes, docsRes] = await Promise.all([
-                    axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`),
-                    axios.get(\`/api/clients/\${CLIENT_ID}/documents?t=\${Date.now()}\`)
-                ]);
                 
-                const checklist = checklistRes.data;
-                const docs = docsRes.data;
-                console.log('Documents loaded:', docs.map(d => ({id: d.id, type: d.document_type, status: d.status})));
-                const uploadedTypes = new Set(docs.map(d => d.document_type));
-                
-                // 必須書類のカウント
-                const requiredDocs = checklist.filter(item => item.is_required);
-                const uploadedRequired = requiredDocs.filter(item => uploadedTypes.has(item.document_type)).length;
-                const totalRequired = requiredDocs.length;
-                const progressPercent = totalRequired > 0 ? Math.round((uploadedRequired / totalRequired) * 100) : 0;
-                
-                // 進捗表示
+                // 要素の存在確認
                 const progressContainer = document.getElementById('documentProgress');
-                progressContainer.innerHTML = \`
+                const checklistContainer = document.getElementById('documentChecklist');
+                const container = document.getElementById('documentsList');
+                
+                if (!progressContainer || !checklistContainer || !container) {
+                    console.log('Document containers not found, skipping loadDocuments');
+                    return;
+                }
+                
+                try {
+                    // 必要書類チェックリストと既にアップロードされた書類を取得
+                    const [checklistRes, docsRes] = await Promise.all([
+                        axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`),
+                        axios.get(\`/api/clients/\${CLIENT_ID}/documents?t=\${Date.now()}\`)
+                    ]);
+                    
+                    const checklist = checklistRes.data || [];
+                    const docs = docsRes.data || [];
+                    console.log('Documents loaded:', docs.map(d => ({id: d.id, type: d.document_type, status: d.status})));
+                    const uploadedTypes = new Set(docs.map(d => d.document_type));
+                    
+                    // 必須書類のカウント
+                    const requiredDocs = checklist.filter(item => item.is_required);
+                    const uploadedRequired = requiredDocs.filter(item => uploadedTypes.has(item.document_type)).length;
+                    const totalRequired = requiredDocs.length;
+                    const progressPercent = totalRequired > 0 ? Math.round((uploadedRequired / totalRequired) * 100) : 0;
+                    
+                    // 進捗表示
+                    progressContainer.innerHTML = \`
                     <div class="flex items-center justify-between text-sm mb-1">
                         <span class="text-gray-600">必須書類の提出状況</span>
                         <span class="font-bold \${progressPercent === 100 ? 'text-green-600' : 'text-blue-600'}">\${uploadedRequired}/\${totalRequired}</span>
@@ -7750,6 +7761,9 @@ app.get('/client/:id', async (c) => {
                         </div>
                     </div>
                 \`).join('');
+                } catch (error) {
+                    console.error('loadDocuments error:', error);
+                }
             }
             
             window.updateDocumentStatus = async function(docId, status) {
@@ -17822,7 +17836,7 @@ app.get('/admin/backup', (c) => {
 // ===============================
 
 // Gemini API呼び出しヘルパー（リトライ機能付き）
-async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 4): Promise<string> {
+async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 2): Promise<string> {
   if (!apiKey) {
     // デモモード：APIキーがない場合はダミーレスポンス
     return `【デモモード】\n\nAPIキーが設定されていないため、実際のAI生成は行われません。\n\n本番環境では、以下のプロンプトに基づいてAIが文章を生成します：\n\n${prompt.substring(0, 200)}...`
@@ -17832,9 +17846,9 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 4): Pr
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // レート制限対策：リトライ時は待機（指数バックオフ）
+      // レート制限対策：リトライ時は待機（指数バックオフ - Cloudflare 30秒タイムアウト対策で短縮）
       if (attempt > 0) {
-        const waitTime = Math.min(1500 * Math.pow(2, attempt), 15000) // 3秒, 6秒, 12秒, 最大15秒
+        const waitTime = Math.min(2000 * Math.pow(2, attempt), 8000) // 2秒, 4秒, 8秒, 最大8秒
         console.log(`Gemini API retry ${attempt}/${maxRetries}, waiting ${waitTime}ms...`)
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
@@ -18710,9 +18724,9 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
   // 各セクションをAIで生成（レート制限回避のため間隔を空ける）
   let sectionIndex = 0
   for (const section of sections) {
-    // 2番目以降のセクションは1.5秒待機（レート制限回避）
+    // 2番目以降のセクションは2秒待機（Cloudflare Workers 30秒タイムアウト対策）
     if (sectionIndex > 0) {
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
     sectionIndex++
     
@@ -18756,7 +18770,14 @@ ${documentExtractions.length > 0 ? documentExtractions.join('\n\n') : '（書類
       generatedSections[section.id] = content || `【生成エラー】セクション「${section.title}」の生成結果が空でした。再生成をお試しください。`
     } catch (error: any) {
       console.error(`Section ${section.id} generation error:`, error)
-      generatedSections[section.id] = `【生成エラー】セクション「${section.title}」の生成に失敗しました。\n\n原因: ${error?.message || '不明なエラー'}\n\nヒアリング回答を追加してから再度お試しいただくか、手動で内容を入力してください。`
+      const errorMessage = error?.message || '不明なエラー'
+      const isRateLimited = errorMessage.includes('429')
+      
+      if (isRateLimited) {
+        generatedSections[section.id] = `【API制限】このセクションは一時的に生成できませんでした。\n\n「再生成」ボタンをクリックするか、数分後に再度お試しください。\n\n以下に手動で内容を入力することもできます：\n\n《${section.title}》\n・${section.description}\n・推奨文字数: ${section.max_chars}文字以内`
+      } else {
+        generatedSections[section.id] = `【生成エラー】セクション「${section.title}」の生成に失敗しました。\n\n原因: ${errorMessage}\n\nヒアリング回答を追加してから再度お試しいただくか、手動で内容を入力してください。`
+      }
     }
   }
   
@@ -18949,8 +18970,19 @@ ${data.additional_instructions ? `【追加指示】\n${data.additional_instruct
     `).bind(JSON.stringify(sectionsContent), docId).run()
     
     return c.json({ content })
-  } catch (error) {
-    return c.json({ error: '再生成に失敗しました' }, 500)
+  } catch (error: any) {
+    console.error('Regenerate section error:', error)
+    const errorMessage = error?.message || '不明なエラー'
+    const isRateLimited = errorMessage.includes('429')
+    
+    if (isRateLimited) {
+      return c.json({ 
+        error: 'API制限に達しました。数分後に再度お試しください。',
+        fallback: `【API制限】このセクションは一時的に生成できませんでした。\n\n「再生成」ボタンをクリックするか、数分後に再度お試しください。`
+      }, 200)
+    }
+    
+    return c.json({ error: `再生成に失敗しました: ${errorMessage}` }, 500)
   }
 })
 
