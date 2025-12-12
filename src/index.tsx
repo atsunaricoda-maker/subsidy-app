@@ -18456,102 +18456,80 @@ ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? '
 
 // AI回答提案API
 app.post('/api/clients/:clientId/ai-suggest', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
-  const clientId = c.req.param('clientId')
-  const data = await c.req.json()
-  
-  // 顧客情報と既存回答を取得
-  const client = await DB.prepare(`
-    SELECT c.*, st.name as subsidy_name
-    FROM clients c
-    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-    WHERE c.id = ?
-  `).bind(clientId).first() as any
-  
-  const answers = await DB.prepare(`
-    SELECT hq.question_text, ha.answer_text
-    FROM hearing_answers ha
-    JOIN hearing_questions hq ON ha.question_id = hq.id
-    WHERE ha.client_id = ?
-  `).bind(clientId).all()
-  
-  // 提出書類から抽出したデータを取得
-  const profile = await DB.prepare(`
-    SELECT * FROM client_profiles WHERE client_id = ?
-  `).bind(clientId).first() as any
-  
-  // 財務データを取得
-  const financialData = await DB.prepare(`
-    SELECT * FROM client_financial_data WHERE client_id = ? ORDER BY fiscal_year DESC LIMIT 2
-  `).bind(clientId).all()
-  
-  // プロファイル情報を整形
-  let profileInfo = ''
-  if (profile) {
-    const profileItems = []
-    if (profile.company_name) profileItems.push(`会社名: ${profile.company_name}`)
-    if (profile.representative_name) profileItems.push(`代表者名: ${profile.representative_name}`)
-    if (profile.establishment_date) profileItems.push(`設立日: ${profile.establishment_date}`)
-    if (profile.capital_amount) profileItems.push(`資本金: ${Number(profile.capital_amount).toLocaleString()}円`)
-    if (profile.employee_count) profileItems.push(`従業員数: ${profile.employee_count}名`)
-    if (profile.business_description) profileItems.push(`事業内容: ${profile.business_description}`)
-    if (profile.main_products) profileItems.push(`主要製品・サービス: ${profile.main_products}`)
-    if (profile.address) profileItems.push(`所在地: ${profile.address}`)
-    if (profileItems.length > 0) {
-      profileInfo = `\n【登記簿・会社情報（書類から抽出）】\n${profileItems.join('\n')}`
+  try {
+    const { DB, GEMINI_API_KEY } = c.env
+    const clientId = c.req.param('clientId')
+    const data = await c.req.json()
+    
+    // APIキーがない場合はデモモードで回答
+    if (!GEMINI_API_KEY) {
+      return c.json({ 
+        suggestion: `【デモモード】\n\nAI APIキーが設定されていないため、自動提案は利用できません。\n\n質問「${data.question_text}」に対して、以下のような情報を入力してください：\n\n・具体的な数字（従業員数、売上高など）\n・現在の状況や課題\n・今後の目標や計画\n\n手動で回答を入力してください。`
+      })
     }
-  }
-  
-  // 財務情報を整形
-  let financialInfo = ''
-  if (financialData.results && financialData.results.length > 0) {
-    const financialItems = (financialData.results as any[]).map(fd => {
-      const items = []
-      if (fd.fiscal_year) items.push(`会計年度: ${fd.fiscal_year}`)
-      if (fd.revenue) items.push(`売上高: ${Number(fd.revenue).toLocaleString()}円`)
-      if (fd.operating_income) items.push(`営業利益: ${Number(fd.operating_income).toLocaleString()}円`)
-      if (fd.ordinary_income) items.push(`経常利益: ${Number(fd.ordinary_income).toLocaleString()}円`)
-      if (fd.net_income) items.push(`当期純利益: ${Number(fd.net_income).toLocaleString()}円`)
-      if (fd.total_assets) items.push(`総資産: ${Number(fd.total_assets).toLocaleString()}円`)
-      return items.join(', ')
-    }).filter(s => s)
-    if (financialItems.length > 0) {
-      financialInfo = `\n【財務情報（決算書から抽出）】\n${financialItems.join('\n')}`
+    
+    // 顧客情報と既存回答を取得
+    const client = await DB.prepare(`
+      SELECT c.*, st.name as subsidy_name
+      FROM clients c
+      LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+      WHERE c.id = ?
+    `).bind(clientId).first() as any
+    
+    const answers = await DB.prepare(`
+      SELECT hq.question_text, ha.answer_text
+      FROM hearing_answers ha
+      JOIN hearing_questions hq ON ha.question_id = hq.id
+      WHERE ha.client_id = ?
+    `).bind(clientId).all()
+    
+    // プロファイル情報を取得
+    const profile = await DB.prepare(`
+      SELECT * FROM client_profiles WHERE client_id = ?
+    `).bind(clientId).first() as any
+    
+    // プロファイル情報を整形
+    let profileInfo = ''
+    if (profile) {
+      const profileItems = []
+      if (profile.company_name) profileItems.push(`会社名: ${profile.company_name}`)
+      if (profile.representative_name) profileItems.push(`代表者名: ${profile.representative_name}`)
+      if (profile.employee_count) profileItems.push(`従業員数: ${profile.employee_count}名`)
+      if (profile.business_description) profileItems.push(`事業内容: ${profile.business_description}`)
+      if (profileItems.length > 0) {
+        profileInfo = `\n【会社情報】\n${profileItems.join('\n')}`
+      }
     }
-  }
-  
-  const prompt = `あなたは補助金申請の回答作成を支援するアシスタントです。
+    
+    const prompt = `あなたは補助金申請の回答作成を支援するアシスタントです。
 
 【重要なルール】
 - マークダウン記法は使わないでください
 - 自然な日本語の文章で回答してください
 - 補助金申請に適した具体的で説得力のある文章を書いてください
-- 提出書類から抽出した情報（会社情報、財務データ）を積極的に活用してください
 - 200〜300字程度で簡潔に回答してください
+- 〇〇や△△などのプレースホルダーは使用せず、一般的な例を入れてください
 
 【顧客基本情報】
 会社名: ${client?.company_name || '未設定'}
 申請予定の補助金: ${client?.subsidy_name || '未設定'}
 ${profileInfo}
-${financialInfo}
 
 【既存の回答】
 ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text || '未回答'}`).join('\n')}
 
-以下の質問に対する回答例を作成してください。上記の会社情報や財務データを参考に、具体的な数字や事実を盛り込んでください。〇〇や△△などの箇所は、ユーザーが後で具体的な内容に置き換えられるようにしてください。
+以下の質問に対する回答例を作成してください。
 
 質問: ${data.question_text}`
 
-  try {
     const suggestion = await callGeminiAPI(prompt, GEMINI_API_KEY)
     return c.json({ suggestion })
+    
   } catch (error: any) {
     console.error('AI suggest error:', error)
     return c.json({ 
-      error: '提案の生成に失敗しました', 
-      details: error?.message || 'Unknown error',
-      suggestion: `【エラー】AI提案の生成に失敗しました。\n\nAPIキーが設定されているか確認してください。\n\n手動で回答を入力するか、後でもう一度お試しください。`
-    }, 200) // エラーでもUIに表示できるよう200で返す
+      suggestion: `【エラー】AI提案の生成に失敗しました。\n\n原因: ${error?.message || '不明なエラー'}\n\n手動で回答を入力するか、後でもう一度お試しください。`
+    })
   }
 })
 
