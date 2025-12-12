@@ -9010,8 +9010,24 @@ app.get('/client/:id', async (c) => {
                     const response = await axios.get(\`/api/clients/\${CLIENT_ID}/cases\`);
                     const cases = response.data || [];
                     
+                    const statusMap = {
+                        'preparing': '準備中',
+                        'submitted': '申請済',
+                        'under_review': '審査中',
+                        'approved': '採択',
+                        'rejected': '不採択',
+                        'completed': '完了',
+                        'cancelled': 'キャンセル'
+                    };
+                    
                     select.innerHTML = '<option value="">選択してください</option>' + 
-                        cases.map(c => \`<option value="\${c.id}">\${c.subsidy_name || '補助金'} - \${c.status === 'completed' ? '完了' : c.status === 'preparing' ? '準備中' : c.status}</option>\`).join('');
+                        cases.map(c => {
+                            const caseNo = 'No.' + String(c.id).padStart(4, '0');
+                            const subsidyName = c.subsidy_name || '補助金';
+                            const status = statusMap[c.status] || c.status;
+                            const createdDate = c.created_at ? new Date(c.created_at).toLocaleDateString('ja-JP') : '';
+                            return \`<option value="\${c.id}">[\${caseNo}] \${subsidyName}（\${status}）\${createdDate ? ' - ' + createdDate + '作成' : ''}</option>\`;
+                        }).join('');
                     
                     // 案件が1つだけなら自動選択
                     if (cases.length === 1) {
