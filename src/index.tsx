@@ -4962,10 +4962,11 @@ app.post('/api/clients/:id/communications', async (c) => {
   const data = await c.req.json()
   
   const result = await DB.prepare(`
-    INSERT INTO communications (client_id, message, sender_type, sender_name)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO communications (client_id, case_id, message, sender_type, sender_name)
+    VALUES (?, ?, ?, ?, ?)
   `).bind(
     id,
+    data.case_id || null,
     data.message,
     data.sender_type,
     data.sender_name
@@ -11703,7 +11704,11 @@ app.get('/portal/:token', async (c) => {
             }
 
             async function loadCommunications() {
-                const response = await axios.get(\`/api/clients/\${CLIENT_ID}/communications\`);
+                // 案件IDがある場合は案件別、なければ顧客全体のやり取りを取得
+                const url = CASE_ID 
+                    ? \`/api/cases/\${CASE_ID}/communications\`
+                    : \`/api/clients/\${CLIENT_ID}/communications\`;
+                const response = await axios.get(url);
                 const comms = response.data;
                 
                 const container = document.getElementById('clientCommunications');
@@ -11733,6 +11738,7 @@ app.get('/portal/:token', async (c) => {
                 
                 await axios.post(\`/api/clients/\${CLIENT_ID}/communications\`, {
                     message,
+                    case_id: CASE_ID || null,
                     sender_type: 'client',
                     sender_name: '${client.name}'
                 });
