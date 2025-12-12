@@ -9606,7 +9606,7 @@ app.get('/portal/:token', async (c) => {
                                 <h2 class="text-lg font-bold">
                                     <i class="fas fa-clipboard-list mr-2 text-indigo-600"></i>ヒアリング質問
                                 </h2>
-                                <button onclick="saveAllHearingAnswers()" 
+                                <button id="hearingSaveButton" onclick="saveAllHearingAnswers()" 
                                         class="bg-indigo-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-indigo-700">
                                     <i class="fas fa-save mr-1"></i>保存
                                 </button>
@@ -11149,6 +11149,11 @@ app.get('/portal/:token', async (c) => {
                 try {
                     // 見込みステータスの場合は制限メッセージを表示
                     if (isInquiryStatus) {
+                        // カテゴリタブと保存ボタンを非表示
+                        document.getElementById('hearingCategoryTabs').innerHTML = '';
+                        const saveBtn = document.getElementById('hearingSaveButton');
+                        if (saveBtn) saveBtn.style.display = 'none';
+                        
                         document.getElementById('hearingQuestionsList').innerHTML = \`
                             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
                                 <i class="fas fa-lock text-yellow-500 text-3xl mb-3"></i>
@@ -11158,6 +11163,10 @@ app.get('/portal/:token', async (c) => {
                         \`;
                         return;
                     }
+                    
+                    // 保存ボタンを表示（見込みでない場合）
+                    const saveBtn = document.getElementById('hearingSaveButton');
+                    if (saveBtn) saveBtn.style.display = '';
                     
                     // 案件の助成金種別を取得（CASE_IDがある場合はcasesテーブルから）
                     let subsidyTypeId = null;
@@ -12529,17 +12538,24 @@ app.get('/portal/:token', async (c) => {
             // 初期化
             // ===============================
             
-            loadStatus();
-            loadAnnouncements();
-            loadNextActions();
-            loadPipelineProgress();
-            loadServiceProgress();
-            loadDepositInfo();
-            loadHearingQuestions();
-            loadChecklist();
-            loadDocuments();
-            loadCommunications();
-            loadPortalAiChat();
+            // 初期化処理（ステータス読み込み後に他の機能を読み込む）
+            async function initPortal() {
+                // まずステータスを読み込む（見込みステータスの判定に必要）
+                await loadStatus();
+                
+                // ステータス読み込み後に他の機能を並列で読み込む
+                loadAnnouncements();
+                loadNextActions();
+                loadPipelineProgress();
+                loadServiceProgress();
+                loadDepositInfo();
+                loadHearingQuestions();
+                loadChecklist();
+                loadDocuments();
+                loadCommunications();
+                loadPortalAiChat();
+            }
+            initPortal();
         </script>
     </body>
     </html>
