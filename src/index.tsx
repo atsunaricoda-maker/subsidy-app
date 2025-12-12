@@ -1694,17 +1694,17 @@ app.get('/', (c) => {
                     <div class="pt-4 pb-2">
                         <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
                     </div>
-                    <a href="/subsidy-types?category=行政書士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=subsidy" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-file-signature w-5"></i>
                         <span>補助金一覧</span>
                         <span class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
                     </a>
-                    <a href="/subsidy-types?category=社労士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=grant" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-users w-5"></i>
                         <span>助成金一覧</span>
                         <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
                     </a>
-                    <a href="/subsidy-types?category=許認可" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=license" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-stamp w-5"></i>
                         <span>許認可申請</span>
                         <span class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
@@ -19039,17 +19039,17 @@ app.get('/admin/pipelines', (c) => {
                     <div class="pt-4 pb-2">
                         <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
                     </div>
-                    <a href="/subsidy-types?category=行政書士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=subsidy" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-file-signature w-5"></i>
                         <span>補助金一覧</span>
                         <span class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
                     </a>
-                    <a href="/subsidy-types?category=社労士管轄" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=grant" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-users w-5"></i>
                         <span>助成金一覧</span>
                         <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
                     </a>
-                    <a href="/subsidy-types?category=許認可" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
+                    <a href="/subsidy-types?category=license" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
                         <i class="fas fa-stamp w-5"></i>
                         <span>許認可申請</span>
                         <span class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
