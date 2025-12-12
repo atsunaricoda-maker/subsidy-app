@@ -20332,13 +20332,18 @@ app.get('/api/payments/history', async (c) => {
   const type = c.req.query('type') || 'all'
   
   try {
+    // 支払い履歴を取得（クライアントに紐づく最新の案件から申請種別を取得）
     let query = `
       SELECT 
         ph.*,
         c.name as client_name,
-        c.company_name
+        c.company_name,
+        cs.case_number,
+        st.name as subsidy_type_name
       FROM payment_history ph
       JOIN clients c ON ph.client_id = c.id
+      LEFT JOIN cases cs ON cs.client_id = ph.client_id
+      LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
       WHERE ph.status = 'confirmed'
     `
     
@@ -20348,7 +20353,7 @@ app.get('/api/payments/history', async (c) => {
       query += ` AND ph.payment_type = 'success_fee'`
     }
     
-    query += ` ORDER BY ph.bank_transfer_confirmed_at DESC LIMIT 100`
+    query += ` GROUP BY ph.id ORDER BY ph.bank_transfer_confirmed_at DESC LIMIT 100`
     
     const payments = await DB.prepare(query).all()
     
