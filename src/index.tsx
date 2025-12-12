@@ -9202,7 +9202,7 @@ app.get('/client/:id', async (c) => {
                                 const charColor = charPercentage > 90 ? 'text-red-600' : charPercentage > 70 ? 'text-yellow-600' : 'text-green-600';
                                 
                                 return \`
-                                <div class="border rounded-lg p-4">
+                                <div class="border rounded-lg p-4" data-max-chars="\${section.max_chars}">
                                     <div class="flex justify-between items-center mb-2">
                                         <h3 class="font-bold text-lg">\${section.title}</h3>
                                         <div class="flex gap-2">
@@ -9230,7 +9230,8 @@ app.get('/client/:id', async (c) => {
                                         \${sectionContent || '<span class="text-gray-400">未生成</span>'}
                                     </div>
                                     <div id="section-edit-\${section.id}" class="hidden">
-                                        <textarea class="w-full border rounded p-3 text-sm" rows="10">\${sectionContent}</textarea>
+                                        <textarea class="w-full border rounded p-3 text-sm" rows="10" 
+                                            oninput="document.getElementById('edit-char-count-\${section.id}').textContent = this.value.length + '文字'">\${sectionContent}</textarea>
                                         <div class="flex justify-between items-center mt-2">
                                             <span id="edit-char-count-\${section.id}" class="text-xs text-gray-500">\${charCount}文字</span>
                                             <div class="flex gap-2">
@@ -9421,6 +9422,29 @@ app.get('/client/:id', async (c) => {
                 document.getElementById('section-edit-' + sectionId).classList.add('hidden');
             }
             
+            // 文字数表示を更新する関数
+            function updateCharCount(sectionId, content, maxChars) {
+                const charCount = content.length;
+                const charPercentage = Math.min(100, Math.round((charCount / maxChars) * 100));
+                const charColor = charPercentage > 90 ? 'text-red-600' : charPercentage > 70 ? 'text-yellow-600' : 'text-green-600';
+                
+                // セクションヘッダーの文字数表示を更新
+                const sectionDiv = document.getElementById('section-content-' + sectionId)?.closest('.border.rounded-lg');
+                if (sectionDiv) {
+                    const charSpan = sectionDiv.querySelector('.text-xs.text-red-600, .text-xs.text-yellow-600, .text-xs.text-green-600');
+                    if (charSpan) {
+                        charSpan.className = 'text-xs ' + charColor;
+                        charSpan.textContent = charCount.toLocaleString() + ' / ' + maxChars.toLocaleString() + '文字 (' + charPercentage + '%)';
+                    }
+                }
+                
+                // 編集中の文字数表示も更新
+                const editCharCount = document.getElementById('edit-char-count-' + sectionId);
+                if (editCharCount) {
+                    editCharCount.textContent = charCount + '文字';
+                }
+            }
+            
             async function saveSection(docId, sectionId) {
                 const textarea = document.querySelector('#section-edit-' + sectionId + ' textarea');
                 const content = textarea.value;
@@ -9433,6 +9457,12 @@ app.get('/client/:id', async (c) => {
                     });
                     
                     document.getElementById('section-content-' + sectionId).textContent = content;
+                    
+                    // 文字数表示を更新（max_charsはdata属性から取得）
+                    const sectionDiv = document.getElementById('section-content-' + sectionId)?.closest('.border.rounded-lg');
+                    const maxChars = parseInt(sectionDiv?.dataset?.maxChars || '1000');
+                    updateCharCount(sectionId, content, maxChars);
+                    
                     cancelEditSection(sectionId);
                     showToast('保存しました');
                 } catch (error) {
@@ -9442,6 +9472,7 @@ app.get('/client/:id', async (c) => {
             
             async function regenerateSection(docId, sectionId) {
                 const instruction = prompt('追加の指示があれば入力してください（空欄可）:');
+                if (instruction === null) return; // キャンセルされた場合
                 
                 const container = document.getElementById('section-content-' + sectionId);
                 container.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 再生成中...';
@@ -9453,12 +9484,21 @@ app.get('/client/:id', async (c) => {
                         editor_name: localStorage.getItem('admin_name') || 'admin'
                     });
                     
-                    container.textContent = response.data.content;
+                    const newContent = response.data.content;
+                    container.textContent = newContent;
+                    
+                    // 文字数表示を更新
+                    const sectionDiv = container.closest('.border.rounded-lg');
+                    const maxChars = parseInt(sectionDiv?.dataset?.maxChars || '1000');
+                    updateCharCount(sectionId, newContent, maxChars);
+                    
                     showToast('再生成しました');
                 } catch (error) {
                     container.innerHTML = '<span class="text-red-500">再生成に失敗しました</span>';
                 }
             }
+            
+            window.updateCharCount = updateCharCount;
 
             // グローバルスコープに関数を公開（onclick対応）
             window.logout = logout;
@@ -18858,9 +18898,10 @@ ${sectionSpecific}
 【出力ルール - 厳守】
 1. 文字数は${Math.floor(section.max_chars * 0.8)}文字前後
 2. セクション番号やタイトルは出力しない（内容のみ）
-3. マークダウン記法禁止
-4. 上記「記載禁止事項」に該当する内容は絶対に書かない
-5. 他セクションとの重複を避け、このセクション固有の内容のみ記載
+3. ★マークダウン記法は絶対禁止★（*、**、#、-、などの記号を装飾目的で使わない）
+4. 箇条書きは「・」のみ使用可（*, -, などは禁止）
+5. 上記「記載禁止事項」に該当する内容は絶対に書かない
+6. 他セクションとの重複を避け、このセクション固有の内容のみ記載
 
 【文書品質】
 ・連続する空行禁止
@@ -18869,6 +18910,17 @@ ${sectionSpecific}
 
     try {
       let content = await callGeminiAPI(sectionPrompt, GEMINI_API_KEY, 2, section.max_chars)
+      
+      // マークダウン記法を除去
+      if (content) {
+        content = content
+          .replace(/\*\*([^*]+)\*\*/g, '$1')  // **太字** → 太字
+          .replace(/\*([^*]+)\*/g, '$1')      // *斜体* → 斜体
+          .replace(/^#+\s*/gm, '')            // # 見出し → 見出し
+          .replace(/^[-*]\s+/gm, '・')        // - や * の箇条書き → ・
+          .replace(/^\d+\.\s+/gm, '')         // 1. 番号付き → 削除
+          .trim()
+      }
       
       // 文字数チェック：超過している場合は警告を追加
       if (content && content.length > section.max_chars) {
@@ -19146,16 +19198,22 @@ ${(answers.results || []).map((a: any) => `【${a.category}】${a.question_text}
 
 ${sectionSpecific}
 
-${data.additional_instructions ? `【追加指示】\n${data.additional_instructions}\n` : ''}
+${data.additional_instructions ? `
+########################################
+【ユーザーからの追加指示 - 最優先で反映】
+${data.additional_instructions}
+########################################
+` : ''}
 
 ★★★ 文字数制限：${Math.floor(section.max_chars * 0.8)}〜${section.max_chars}文字 ★★★
 
 【出力ルール - 厳守】
 1. 文字数は${Math.floor(section.max_chars * 0.8)}文字前後
 2. セクション番号やタイトルは出力しない（内容のみ）
-3. マークダウン記法禁止
-4. 上記「記載禁止事項」に該当する内容は絶対に書かない
-5. 他セクションとの重複を避け、このセクション固有の内容のみ記載
+3. ★マークダウン記法は絶対禁止★（*、**、#、-、などの記号を装飾目的で使わない）
+4. 箇条書きは「・」のみ使用可（*, -, などは禁止）
+5. 上記「記載禁止事項」に該当する内容は絶対に書かない
+6. 他セクションとの重複を避け、このセクション固有の内容のみ記載
 
 【文書品質】
 ・連続する空行禁止
@@ -19164,6 +19222,17 @@ ${data.additional_instructions ? `【追加指示】\n${data.additional_instruct
 
   try {
     let content = await callGeminiAPI(prompt, GEMINI_API_KEY, 2, section.max_chars)
+    
+    // マークダウン記法を除去
+    if (content) {
+      content = content
+        .replace(/\*\*([^*]+)\*\*/g, '$1')  // **太字** → 太字
+        .replace(/\*([^*]+)\*/g, '$1')      // *斜体* → 斜体
+        .replace(/^#+\s*/gm, '')            // # 見出し → 見出し
+        .replace(/^[-*]\s+/gm, '・')        // - や * の箇条書き → ・
+        .replace(/^\d+\.\s+/gm, '')         // 1. 番号付き → 削除
+        .trim()
+    }
     
     // 文字数チェック：超過している場合は警告を追加
     if (content && content.length > section.max_chars) {
