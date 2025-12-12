@@ -8942,8 +8942,8 @@ app.get('/client/:id', async (c) => {
                         <div class="border rounded-lg p-4 hover:shadow-md transition">
                             <div class="flex justify-between items-start mb-2">
                                 <div>
-                                    <h3 class="font-medium">\${doc.document_title}</h3>
-                                    <p class="text-sm text-gray-500">\${doc.template_name}</p>
+                                    <h3 class="font-medium">\${doc.document_title || '無題の文書'}</h3>
+                                    <p class="text-sm text-gray-500">\${doc.template_name || 'テンプレート未設定'}</p>
                                 </div>
                                 <span class="px-2 py-1 rounded text-xs \${statusLabels[doc.status]?.class || ''}">\${statusLabels[doc.status]?.label || doc.status}</span>
                             </div>
@@ -8958,7 +8958,7 @@ app.get('/client/:id', async (c) => {
                                 <button onclick="deleteGeneratedDocument(\${doc.id})" 
                                         class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-sm"
                                         title="削除"
-                                        data-title="\${doc.document_title}">
+                                        data-title="\${doc.document_title || '無題の文書'}">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -9112,7 +9112,7 @@ app.get('/client/:id', async (c) => {
                     const response = await axios.get(\`/api/generated-documents/\${docId}\`);
                     const doc = response.data;
                     
-                    document.getElementById('documentDetailTitle').textContent = doc.document_title;
+                    document.getElementById('documentDetailTitle').textContent = doc.document_title || '無題の文書';
                     
                     const sections = JSON.parse(doc.template_sections || '[]');
                     const content = JSON.parse(doc.sections_content || '{}');
@@ -18745,13 +18745,18 @@ ${documentExtractions.length > 0 ? documentExtractions.join('\n\n') : '（書類
 
     try {
       const content = await callGeminiAPI(sectionPrompt, GEMINI_API_KEY)
-      generatedSections[section.id] = content
-    } catch (error) {
-      generatedSections[section.id] = `【生成エラー】このセクションの生成に失敗しました。`
+      generatedSections[section.id] = content || `【生成エラー】セクション「${section.title}」の生成結果が空でした。再生成をお試しください。`
+    } catch (error: any) {
+      console.error(`Section ${section.id} generation error:`, error)
+      generatedSections[section.id] = `【生成エラー】セクション「${section.title}」の生成に失敗しました。\n\n原因: ${error?.message || '不明なエラー'}\n\nヒアリング回答を追加してから再度お試しいただくか、手動で内容を入力してください。`
     }
   }
   
   // 生成文書を保存
+  const subsidyName = (client as any).subsidy_name || '補助金'
+  const companyName = (client as any).company_name || (client as any).name || '未設定'
+  const documentTitle = `${subsidyName} 事業計画書 - ${companyName}`
+  
   const result = await DB.prepare(`
     INSERT INTO generated_documents 
     (client_id, template_id, document_title, sections_content, ai_model_used)
@@ -18759,7 +18764,7 @@ ${documentExtractions.length > 0 ? documentExtractions.join('\n\n') : '（書類
   `).bind(
     clientId,
     data.template_id,
-    `${client.subsidy_name} 事業計画書 - ${client.company_name || client.name}`,
+    documentTitle,
     JSON.stringify(generatedSections),
     'gemini-2.5-flash'
   ).run()
