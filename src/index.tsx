@@ -2209,85 +2209,85 @@ app.get('/', (c) => {
                         </div>
                         
                         <!-- 右側：お知らせ・クイックアクション -->
-                        <div class="space-y-6">
+                        <div class="space-y-4">
                             <!-- 最近の活動 -->
-                            <div class="bg-white rounded-xl shadow-sm p-4">
-                                <h2 class="text-base font-bold mb-4 flex items-center gap-2">
+                            <div class="bg-white rounded-xl shadow-sm p-3">
+                                <h2 class="text-sm font-bold mb-2 flex items-center gap-2 text-gray-700">
                                     <i class="fas fa-history text-purple-600"></i>最近の活動
                                 </h2>
-                                <div id="recentActivity" class="space-y-3 text-sm">
+                                <div id="recentActivity" class="space-y-2 text-sm max-h-32 overflow-y-auto">
                                     <!-- スケルトンローダー -->
-                                    <div class="animate-pulse space-y-3">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
-                                            <div class="flex-1 space-y-2">
+                                    <div class="animate-pulse space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-6 h-6 bg-gray-200 rounded-full"></div>
+                                            <div class="flex-1 space-y-1">
                                                 <div class="h-3 bg-gray-200 rounded w-3/4"></div>
-                                                <div class="h-2 bg-gray-200 rounded w-1/2"></div>
                                             </div>
                                         </div>
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
-                                            <div class="flex-1 space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-6 h-6 bg-gray-200 rounded-full"></div>
+                                            <div class="flex-1 space-y-1">
                                                 <div class="h-3 bg-gray-200 rounded w-2/3"></div>
-                                                <div class="h-2 bg-gray-200 rounded w-1/3"></div>
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
-                                            <div class="flex-1 space-y-2">
-                                                <div class="h-3 bg-gray-200 rounded w-4/5"></div>
-                                                <div class="h-2 bg-gray-200 rounded w-2/5"></div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- 担当者別タスク -->
-                            <div class="bg-white rounded-xl shadow-sm p-4">
-                                <h2 class="text-base font-bold mb-4 flex items-center gap-2">
-                                    <i class="fas fa-user-check text-indigo-600"></i>担当者別タスク
-                                </h2>
-                                <div id="tasksByAssignee" class="space-y-2 text-sm">
-                                    <div class="animate-pulse space-y-2">
-                                        <div class="h-10 bg-gray-200 rounded"></div>
-                                        <div class="h-10 bg-gray-200 rounded"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 今週のToDo -->
-                            <div class="bg-white rounded-xl shadow-sm p-4">
-                                <h2 class="text-base font-bold mb-4 flex items-center gap-2">
-                                    <i class="fas fa-calendar-week text-green-600"></i>今週のToDo
-                                </h2>
-                                <div id="weeklyTodos" class="space-y-2 text-sm">
-                                    <div class="animate-pulse space-y-2">
-                                        <div class="h-8 bg-gray-200 rounded"></div>
-                                        <div class="h-8 bg-gray-200 rounded"></div>
-                                        <div class="h-8 bg-gray-200 rounded"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- クイックアクション -->
-                            <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl shadow-sm p-4 text-white">
-                                <h2 class="text-base font-bold mb-3 flex items-center gap-2">
-                                    <i class="fas fa-bolt"></i>クイックアクション
-                                </h2>
-                                <div class="space-y-2">
-                                    <button onclick="openNewCaseModal()" class="w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm text-left flex items-center gap-2">
-                                        <i class="fas fa-plus-circle w-5"></i>新規案件登録
+                            <!-- タブ切り替えパネル -->
+                            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                                <!-- タブヘッダー -->
+                                <div class="flex border-b bg-gray-50">
+                                    <button onclick="switchRightTab('assignee')" id="rightTab-assignee" class="right-tab flex-1 px-3 py-2 text-xs font-medium text-gray-600 hover:text-blue-600 border-b-2 border-transparent">
+                                        <i class="fas fa-user-check mr-1"></i>担当者
                                     </button>
-                                    <a href="/clients" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                                        <i class="fas fa-users w-5"></i>顧客管理
-                                    </a>
-                                    <a href="/subsidy-types" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                                        <i class="fas fa-list w-5"></i>申請種別一覧
-                                    </a>
-                                    <a href="/admin/statistics" class="block w-full bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                                        <i class="fas fa-chart-line w-5"></i>統計情報
-                                    </a>
+                                    <button onclick="switchRightTab('todo')" id="rightTab-todo" class="right-tab flex-1 px-3 py-2 text-xs font-medium text-gray-600 hover:text-blue-600 border-b-2 border-transparent">
+                                        <i class="fas fa-calendar-week mr-1"></i>ToDo
+                                    </button>
+                                    <button onclick="switchRightTab('action')" id="rightTab-action" class="right-tab flex-1 px-3 py-2 text-xs font-medium text-gray-600 hover:text-blue-600 border-b-2 border-transparent">
+                                        <i class="fas fa-bolt mr-1"></i>操作
+                                    </button>
+                                </div>
+                                
+                                <!-- タブコンテンツ -->
+                                <div class="p-4">
+                                    <!-- 担当者別タスク -->
+                                    <div id="rightContent-assignee" class="right-content">
+                                        <div id="tasksByAssignee" class="space-y-2 text-sm max-h-48 overflow-y-auto">
+                                            <div class="animate-pulse space-y-2">
+                                                <div class="h-10 bg-gray-200 rounded"></div>
+                                                <div class="h-10 bg-gray-200 rounded"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 今週のToDo -->
+                                    <div id="rightContent-todo" class="right-content hidden">
+                                        <div id="weeklyTodos" class="space-y-2 text-sm max-h-48 overflow-y-auto">
+                                            <div class="animate-pulse space-y-2">
+                                                <div class="h-8 bg-gray-200 rounded"></div>
+                                                <div class="h-8 bg-gray-200 rounded"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- クイックアクション -->
+                                    <div id="rightContent-action" class="right-content hidden">
+                                        <div class="space-y-2">
+                                            <button onclick="openNewCaseModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm text-left flex items-center gap-2">
+                                                <i class="fas fa-plus-circle w-5"></i>新規案件登録
+                                            </button>
+                                            <a href="/clients" class="block w-full bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                                                <i class="fas fa-users w-5 text-gray-500"></i>顧客管理
+                                            </a>
+                                            <a href="/subsidy-types" class="block w-full bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                                                <i class="fas fa-list w-5 text-gray-500"></i>申請種別一覧
+                                            </a>
+                                            <a href="/admin/statistics" class="block w-full bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                                                <i class="fas fa-chart-line w-5 text-gray-500"></i>統計情報
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3220,19 +3220,17 @@ app.get('/', (c) => {
                         'document_rejected': { icon: 'fa-times-circle', color: 'text-red-500', bg: 'bg-red-100' }
                     };
                     
-                    container.innerHTML = activities.slice(0, 10).map(activity => {
+                    container.innerHTML = activities.slice(0, 5).map(activity => {
                         const actStyle = activityIcons[activity.type] || { icon: 'fa-circle', color: 'text-gray-500', bg: 'bg-gray-100' };
                         const timeAgo = formatTimeAgo(activity.created_at);
                         
                         return \`
-                            <div class="flex items-start gap-3 p-2 rounded hover:bg-gray-50 transition">
-                                <div class="w-8 h-8 rounded-full \${actStyle.bg} flex items-center justify-center flex-shrink-0">
-                                    <i class="fas \${actStyle.icon} \${actStyle.color} text-xs"></i>
+                            <div class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition">
+                                <div class="w-5 h-5 rounded-full \${actStyle.bg} flex items-center justify-center flex-shrink-0">
+                                    <i class="fas \${actStyle.icon} \${actStyle.color}" style="font-size: 9px;"></i>
                                 </div>
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-gray-700 leading-tight">\${activity.description}</p>
-                                    <p class="text-xs text-gray-400 mt-0.5">\${timeAgo}</p>
-                                </div>
+                                <div class="flex-1 min-w-0 truncate text-xs text-gray-600">\${activity.description}</div>
+                                <span class="text-xs text-gray-400 flex-shrink-0">\${timeAgo}</span>
                             </div>
                         \`;
                     }).join('');
@@ -4085,6 +4083,38 @@ app.get('/', (c) => {
                 renderCases(clients);
             }
             
+            // 右サイドパネルのタブ切り替え
+            function switchRightTab(tabName) {
+                // すべてのタブを非アクティブに
+                document.querySelectorAll('.right-tab').forEach(tab => {
+                    tab.classList.remove('text-blue-600', 'border-blue-600');
+                    tab.classList.add('text-gray-600', 'border-transparent');
+                });
+                document.querySelectorAll('.right-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                // 選択したタブをアクティブに
+                const activeTab = document.getElementById('rightTab-' + tabName);
+                const activeContent = document.getElementById('rightContent-' + tabName);
+                if (activeTab) {
+                    activeTab.classList.remove('text-gray-600', 'border-transparent');
+                    activeTab.classList.add('text-blue-600', 'border-blue-600');
+                }
+                if (activeContent) {
+                    activeContent.classList.remove('hidden');
+                }
+                
+                // 選択を保存
+                localStorage.setItem('dashboard_right_tab', tabName);
+            }
+            
+            // 保存されたタブを復元
+            function restoreRightTab() {
+                const savedTab = localStorage.getItem('dashboard_right_tab') || 'assignee';
+                switchRightTab(savedTab);
+            }
+            
             // ポータルURLコピー機能
             function copyPortalUrl(url, clientName) {
                 navigator.clipboard.writeText(url).then(() => {
@@ -4301,6 +4331,7 @@ app.get('/', (c) => {
             loadSubsidyTypes();
             loadUsers();
             loadData();
+            restoreRightTab();
         </script>
     </body>
     </html>
