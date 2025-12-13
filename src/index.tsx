@@ -1304,7 +1304,7 @@ app.post('/api/test-claude-api', async (c) => {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 100,
         messages: [
           {
@@ -18063,7 +18063,7 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-3-5-haiku-20241022',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: maxChars ? Math.min(maxChars * 2, 8192) : 4096,
           messages: [
             {
@@ -18157,7 +18157,7 @@ async function callClaudeAPIWithFile(prompt: string, fileData: ArrayBuffer, mime
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 8192,
       messages: [{
         role: 'user',
