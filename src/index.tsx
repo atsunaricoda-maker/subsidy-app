@@ -1231,7 +1231,7 @@ app.delete('/api/admin/users/:id', async (c) => {
 
 // 設定一覧取得
 app.get('/api/settings', async (c) => {
-  const { DB } = c.env
+  const { DB, CLAUDE_API_KEY } = c.env
   
   try {
     const settings = await DB.prepare(`
@@ -1248,6 +1248,12 @@ app.get('/api/settings', async (c) => {
         type: (s as any).setting_type,
         description: (s as any).description
       }
+    }
+    
+    // 環境変数の状態を追加（値は隠す）
+    settingsObj['_env_status'] = {
+      claude_api_key_set: !!CLAUDE_API_KEY,
+      claude_api_key_preview: CLAUDE_API_KEY ? `${CLAUDE_API_KEY.substring(0, 12)}...（環境変数で設定済み）` : null
     }
     
     return c.json(settingsObj)
@@ -1330,6 +1336,58 @@ app.post('/api/test-claude-api', async (c) => {
     return c.json({ 
       success: true, 
       message: '接続成功',
+      response: data.content?.[0]?.text || ''
+    })
+    
+  } catch (error) {
+    console.error('Claude API test error:', error)
+    return c.json({ success: false, error: '接続テストに失敗しました' })
+  }
+})
+
+// 環境変数のClaude API接続テスト
+app.post('/api/test-claude-env', async (c) => {
+  const { CLAUDE_API_KEY } = c.env
+  
+  if (!CLAUDE_API_KEY) {
+    return c.json({ success: false, error: '環境変数 CLAUDE_API_KEY が設定されていません' })
+  }
+  
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 100,
+        messages: [
+          {
+            role: 'user',
+            content: 'こんにちは。接続テストです。「接続成功」とだけ返答してください。'
+          }
+        ]
+      })
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Claude API test failed:', response.status, errorText)
+      return c.json({ 
+        success: false, 
+        error: response.status === 401 ? 'APIキーが無効です' : 
+               response.status === 429 ? 'レート制限に達しました' :
+               'API接続エラー: ' + response.status
+      })
+    }
+    
+    const data = await response.json()
+    return c.json({ 
+      success: true, 
+      message: '環境変数のClaude APIキーで接続成功',
       response: data.content?.[0]?.text || ''
     })
     
@@ -25690,27 +25748,59 @@ app.get('/admin/settings', async (c) => {
                         </div>
                     </div>
                     
-                    <!-- Claude API Key入力（常に表示） -->
+                    <!-- Claude API Key状態表示 -->
                     <div id="claude_api_key_section">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
-                            <i class="fas fa-key text-orange-500 mr-1"></i>Claude API Key <span class="text-xs text-gray-500">（フォールバック用 / Claude使用時は必須）</span>
+                            <i class="fas fa-key text-orange-500 mr-1"></i>Claude API Key
                         </label>
-                        <div class="flex gap-2">
-                            <input type="password" id="claude_api_key" class="flex-1 px-3 py-2 border rounded-lg" placeholder="sk-ant-api03-...">
-                            <button type="button" onclick="toggleClaudeKeyVisibility()" class="px-3 py-2 border rounded-lg hover:bg-gray-50">
-                                <i class="fas fa-eye" id="claude_key_eye"></i>
+                        
+                        <!-- 環境変数設定済みの場合 -->
+                        <div id="claude_env_status" class="hidden">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-2">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-check-circle text-green-600"></i>
+                                    <span class="text-green-800 font-medium">環境変数で設定済み</span>
+                                </div>
+                                <p id="claude_env_preview" class="text-sm text-green-700 mt-1 font-mono"></p>
+                                <p class="text-xs text-green-600 mt-2">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    すべてのAI機能が自動的にこのAPIキーを使用します。ユーザーによる設定は不要です。
+                                </p>
+                            </div>
+                            <button type="button" onclick="testClaudeEnvAPI()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                                <i class="fas fa-vial mr-1"></i>接続テスト
                             </button>
-                            <button type="button" onclick="testClaudeAPI()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
-                                <i class="fas fa-vial mr-1"></i>テスト
-                            </button>
+                            <div id="claude_env_test_result" class="mt-2 hidden"></div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">
-                            <a href="https://console.anthropic.com/settings/keys" target="_blank" class="text-blue-600 hover:underline">
-                                Anthropic Console <i class="fas fa-external-link-alt"></i>
-                            </a>
-                            でAPIキーを取得してください
-                        </p>
-                        <div id="claude_test_result" class="mt-2 hidden"></div>
+                        
+                        <!-- 環境変数未設定の場合（手動入力） -->
+                        <div id="claude_manual_input" class="hidden">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-2">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                                    <span class="text-yellow-800 font-medium">環境変数が未設定です</span>
+                                </div>
+                                <p class="text-xs text-yellow-700 mt-1">
+                                    下記でAPIキーを入力するか、Cloudflareダッシュボードで環境変数 <code class="bg-yellow-100 px-1 rounded">CLAUDE_API_KEY</code> を設定してください。
+                                </p>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="password" id="claude_api_key" class="flex-1 px-3 py-2 border rounded-lg" placeholder="sk-ant-api03-...">
+                                <button type="button" onclick="toggleClaudeKeyVisibility()" class="px-3 py-2 border rounded-lg hover:bg-gray-50">
+                                    <i class="fas fa-eye" id="claude_key_eye"></i>
+                                </button>
+                                <button type="button" onclick="testClaudeAPI()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+                                    <i class="fas fa-vial mr-1"></i>テスト
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">
+                                <a href="https://console.anthropic.com/settings/keys" target="_blank" class="text-blue-600 hover:underline">
+                                    Anthropic Console <i class="fas fa-external-link-alt"></i>
+                                </a>
+                                でAPIキーを取得してください
+                            </p>
+                            <div id="claude_test_result" class="mt-2 hidden"></div>
+                        </div>
                     </div>
                     
                     <!-- AI使用説明 -->
@@ -25719,20 +25809,28 @@ app.get('/admin/settings', async (c) => {
                             <div class="flex items-start gap-2">
                                 <i class="fas fa-robot text-green-600 mt-0.5"></i>
                                 <div class="text-sm">
-                                    <p class="font-medium text-gray-800">AI機能の使い分け</p>
-                                    <div class="mt-2 space-y-2">
+                                    <p class="font-medium text-gray-800">Claude Haiku 4.5 を使用</p>
+                                    <div class="mt-2 space-y-1">
                                         <div class="flex items-start gap-2">
-                                            <span class="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded">Claude</span>
-                                            <span class="text-gray-700 text-xs">文書生成、書類解析（PDF/画像）、マッチング分析</span>
+                                            <i class="fas fa-check text-green-600 text-xs mt-0.5"></i>
+                                            <span class="text-gray-700 text-xs">文書生成・セクション再生成</span>
                                         </div>
                                         <div class="flex items-start gap-2">
-                                            <span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded">Gemini</span>
-                                            <span class="text-gray-700 text-xs">AIチャット、回答提案（軽量・高速）</span>
+                                            <i class="fas fa-check text-green-600 text-xs mt-0.5"></i>
+                                            <span class="text-gray-700 text-xs">書類解析（PDF/画像からのテキスト抽出）</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-check text-green-600 text-xs mt-0.5"></i>
+                                            <span class="text-gray-700 text-xs">補助金マッチング分析</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <i class="fas fa-check text-green-600 text-xs mt-0.5"></i>
+                                            <span class="text-gray-700 text-xs">公募要領の自動抽出</span>
                                         </div>
                                     </div>
                                     <p class="mt-2 text-xs text-gray-500">
                                         <i class="fas fa-info-circle mr-1"></i>
-                                        Claude APIキーは上記で設定、Gemini APIキーは環境変数（wrangler.toml）で設定してください
+                                        APIキーが環境変数で設定されている場合、すべてのユーザーが自動的にAI機能を利用できます
                                     </p>
                                 </div>
                             </div>
@@ -25937,7 +26035,23 @@ app.get('/admin/settings', async (c) => {
                     // AI設定
                     const aiProvider = getSettingValue(settings, 'ai_provider') || 'gemini';
                     document.getElementById('ai_provider_' + aiProvider).checked = true;
-                    document.getElementById('claude_api_key').value = getSettingValue(settings, 'claude_api_key');
+                    
+                    // Claude APIキー環境変数の状態を確認
+                    const envStatus = settings['_env_status'];
+                    if (envStatus && envStatus.claude_api_key_set) {
+                        // 環境変数が設定されている
+                        document.getElementById('claude_env_status').classList.remove('hidden');
+                        document.getElementById('claude_manual_input').classList.add('hidden');
+                        document.getElementById('claude_env_preview').textContent = envStatus.claude_api_key_preview || '';
+                    } else {
+                        // 環境変数が未設定 - 手動入力を表示
+                        document.getElementById('claude_env_status').classList.add('hidden');
+                        document.getElementById('claude_manual_input').classList.remove('hidden');
+                        const claudeKeyInput = document.getElementById('claude_api_key');
+                        if (claudeKeyInput) {
+                            claudeKeyInput.value = getSettingValue(settings, 'claude_api_key');
+                        }
+                    }
                     updateAIProviderUI();
                 } catch (error) {
                     console.error('Error loading settings:', error);
@@ -25967,6 +26081,7 @@ app.get('/admin/settings', async (c) => {
             function toggleClaudeKeyVisibility() {
                 const input = document.getElementById('claude_api_key');
                 const eye = document.getElementById('claude_key_eye');
+                if (!input || !eye) return;
                 if (input.type === 'password') {
                     input.type = 'text';
                     eye.classList.remove('fa-eye');
@@ -25975,6 +26090,26 @@ app.get('/admin/settings', async (c) => {
                     input.type = 'password';
                     eye.classList.remove('fa-eye-slash');
                     eye.classList.add('fa-eye');
+                }
+            }
+            
+            // 環境変数Claude API接続テスト
+            async function testClaudeEnvAPI() {
+                const resultDiv = document.getElementById('claude_env_test_result');
+                if (!resultDiv) return;
+                
+                resultDiv.innerHTML = '<div class="p-2 bg-gray-100 text-gray-700 rounded text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>接続テスト中...</div>';
+                resultDiv.classList.remove('hidden');
+                
+                try {
+                    const response = await axios.post('/api/test-claude-env');
+                    if (response.data.success) {
+                        resultDiv.innerHTML = '<div class="p-2 bg-green-100 text-green-700 rounded text-sm"><i class="fas fa-check-circle mr-1"></i>' + response.data.message + '</div>';
+                    } else {
+                        resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-times-circle mr-1"></i>' + (response.data.error || '接続に失敗しました') + '</div>';
+                    }
+                } catch (error) {
+                    resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-times-circle mr-1"></i>接続テストに失敗しました</div>';
                 }
             }
             
@@ -26046,9 +26181,14 @@ app.get('/admin/settings', async (c) => {
                         // Stripe
                         stripe_enabled: document.getElementById('stripe_enabled').checked ? 'true' : 'false',
                         // AI設定
-                        ai_provider: document.querySelector('input[name="ai_provider"]:checked')?.value || 'gemini',
-                        claude_api_key: document.getElementById('claude_api_key').value
+                        ai_provider: document.querySelector('input[name="ai_provider"]:checked')?.value || 'gemini'
                     };
+                    
+                    // 環境変数が未設定の場合のみ手動入力のAPIキーを保存
+                    const claudeKeyInput = document.getElementById('claude_api_key');
+                    if (claudeKeyInput && !document.getElementById('claude_env_status').classList.contains('hidden') === false) {
+                        settings.claude_api_key = claudeKeyInput.value;
+                    }
                     
                     await axios.put('/api/settings', settings);
                     alert('設定を保存しました');
