@@ -1397,6 +1397,61 @@ app.post('/api/test-claude-env', async (c) => {
   }
 })
 
+// AIモデル設定取得API
+app.get('/api/master/ai-models', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key LIKE 'ai_model_%'
+    `).all()
+    
+    const models: Record<string, string> = {
+      // デフォルト値
+      ai_model_claude: 'claude-haiku-4-5-20251001',
+      ai_model_claude_multimodal: 'claude-haiku-4-5-20251001'
+    }
+    
+    for (const s of (settings.results || [])) {
+      models[(s as any).setting_key] = (s as any).setting_value
+    }
+    
+    return c.json(models)
+  } catch (error) {
+    console.error('Error getting AI models:', error)
+    return c.json({
+      ai_model_claude: 'claude-haiku-4-5-20251001',
+      ai_model_claude_multimodal: 'claude-haiku-4-5-20251001'
+    })
+  }
+})
+
+// AIモデル設定更新API
+app.put('/api/master/ai-models', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    for (const [key, value] of Object.entries(data)) {
+      if (key.startsWith('ai_model_')) {
+        await DB.prepare(`
+          INSERT INTO site_settings (setting_key, setting_value, updated_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = CURRENT_TIMESTAMP
+        `).bind(key, value).run()
+      }
+    }
+    
+    return c.json({ success: true, message: 'AIモデル設定を保存しました' })
+  } catch (error) {
+    console.error('Error saving AI models:', error)
+    return c.json({ error: 'AIモデル設定の保存に失敗しました' }, 500)
+  }
+})
+
 // 法務文書テンプレートを取得
 app.get('/api/legal-templates', async (c) => {
   // SaaS事業者に有利な法務文書テンプレート
@@ -18020,6 +18075,25 @@ app.get('/admin/backup', (c) => {
 // AI機能 API
 // ===============================
 
+// DBからAIモデル名を取得するヘルパー関数
+async function getAIModelName(DB: any, modelKey: string = 'ai_model_claude'): Promise<string> {
+  const defaultModels: Record<string, string> = {
+    'ai_model_claude': 'claude-haiku-4-5-20251001',
+    'ai_model_claude_multimodal': 'claude-haiku-4-5-20251001'
+  }
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT setting_value FROM site_settings WHERE setting_key = ?
+    `).bind(modelKey).first()
+    
+    return (result as any)?.setting_value || defaultModels[modelKey] || defaultModels['ai_model_claude']
+  } catch (e) {
+    console.error('Failed to get AI model name:', e)
+    return defaultModels[modelKey] || defaultModels['ai_model_claude']
+  }
+}
+
 // Gemini API呼び出しヘルパー（リトライ機能付き）
 async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number): Promise<string> {
   if (!apiKey) {
@@ -18096,8 +18170,8 @@ async function callGeminiForChat(prompt: string, env: any): Promise<string> {
   return callGeminiAPI(prompt, GEMINI_API_KEY, 3)
 }
 
-// Claude API呼び出しヘルパー（Claude Haiku 4.5対応）
-async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number): Promise<string> {
+// Claude API呼び出しヘルパー（モデル名を指定可能）
+async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number, modelName: string = 'claude-haiku-4-5-20251001'): Promise<string> {
   if (!apiKey) {
     return `【デモモード】\n\nClaude APIキーが設定されていないため、実際のAI生成は行われません。\n\nシステム設定からClaude APIキーを設定してください。`
   }
@@ -18121,7 +18195,7 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: modelName,
           max_tokens: maxChars ? Math.min(maxChars * 2, 8192) : 4096,
           messages: [
             {
@@ -18189,11 +18263,14 @@ async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: numbe
     throw new Error('Claude APIキーが設定されていません。システム設定からAPIキーを設定してください。')
   }
   
-  return callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars)
+  // DBからモデル名を取得
+  const modelName = await getAIModelName(DB, 'ai_model_claude')
+  
+  return callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars, modelName)
 }
 
-// マルチモーダルClaude API呼び出し（画像/PDF対応）
-async function callClaudeAPIWithFile(prompt: string, fileData: ArrayBuffer, mimeType: string, apiKey: string): Promise<string> {
+// マルチモーダルClaude API呼び出し（画像/PDF対応、モデル名指定可能）
+async function callClaudeAPIWithFile(prompt: string, fileData: ArrayBuffer, mimeType: string, apiKey: string, modelName: string = 'claude-haiku-4-5-20251001'): Promise<string> {
   if (!apiKey) {
     return `【デモモード】書類解析はAPIキーが必要です。システム設定からClaude APIキーを設定してください。`
   }
@@ -18215,7 +18292,7 @@ async function callClaudeAPIWithFile(prompt: string, fileData: ArrayBuffer, mime
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: modelName,
       max_tokens: 8192,
       messages: [{
         role: 'user',
@@ -18253,7 +18330,8 @@ async function extractTextFromDocument(
   filePath: string,
   documentType: string,
   fileName: string,
-  claudeApiKey: string
+  claudeApiKey: string,
+  modelName: string = 'claude-haiku-4-5-20251001'
 ): Promise<string> {
   try {
     const object = await r2.get(filePath)
@@ -18292,7 +18370,7 @@ async function extractTextFromDocument(
 - 不明瞭な部分は「（読み取り困難）」と記載
 - マークダウン記法は使用しないでください`
 
-    return await callClaudeAPIWithFile(extractionPrompt, arrayBuffer, mimeType, claudeApiKey)
+    return await callClaudeAPIWithFile(extractionPrompt, arrayBuffer, mimeType, claudeApiKey, modelName)
   } catch (error) {
     console.error(`Document extraction error for ${filePath}:`, error)
     return `【${documentType}】テキスト抽出に失敗しました。`
@@ -19009,8 +19087,9 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
       })
       .slice(0, 5) // 最大5件まで
       .map(async (doc: any) => {
-        // DB設定からClaude APIキーを取得
+        // DB設定からClaude APIキーとモデル名を取得
         let claudeKey = CLAUDE_API_KEY || ''
+        let multimodalModel = 'claude-haiku-4-5-20251001'
         try {
           const keyResult = await DB.prepare(`
             SELECT setting_value FROM site_settings WHERE setting_key = 'claude_api_key'
@@ -19018,6 +19097,7 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
           if (keyResult?.setting_value) {
             claudeKey = (keyResult as any).setting_value
           }
+          multimodalModel = await getAIModelName(DB, 'ai_model_claude_multimodal')
         } catch (e) {
           console.error('Failed to get Claude API key:', e)
         }
@@ -19027,7 +19107,8 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
           doc.file_path,
           doc.document_type,
           doc.file_name,
-          claudeKey
+          claudeKey,
+          multimodalModel
         )
         return `【${doc.document_type}（${doc.file_name}）】\n${extracted}`
       })
@@ -27484,8 +27565,12 @@ function generateMasterSidebar(activePage: string = '') {
             </a>
             
             <div class="pt-4 pb-2">
-                <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">設定</p>
+                <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">システム設定</p>
             </div>
+            <a href="/master/ai-models" class="sidebar-link ${isActive('ai-models')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-brain w-5"></i>
+                <span>AIモデル設定</span>
+            </a>
             <a href="/master/legal-settings" class="sidebar-link ${isActive('legal')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
                 <i class="fas fa-balance-scale w-5"></i>
                 <span>法的表記・会社情報</span>
@@ -31160,6 +31245,196 @@ app.delete('/api/master/hearing-questions/:id', async (c) => {
   const id = c.req.param('id')
   await DB.prepare('DELETE FROM hearing_questions WHERE id = ?').bind(id).run()
   return c.json({ success: true })
+})
+
+// AIモデル設定ページ
+app.get('/master/ai-models', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>AIモデル設定 - マスター管理</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    </head>
+    <body class="bg-gray-100">
+        <div class="flex min-h-screen">
+            ${generateMasterSidebar('ai-models')}
+            
+            <main class="flex-1 p-8">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800">AIモデル設定</h1>
+                    <p class="text-gray-600 mt-1">文書生成や書類解析に使用するAIモデルを設定します</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-brain text-purple-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold">Claude API モデル</h2>
+                            <p class="text-sm text-gray-500">Anthropic Claude APIで使用するモデル名を指定します</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <!-- テキスト生成モデル -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-file-alt text-blue-500 mr-1"></i>
+                                テキスト生成モデル
+                            </label>
+                            <input type="text" id="ai_model_claude" 
+                                class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono"
+                                placeholder="claude-haiku-4-5-20251001">
+                            <p class="text-xs text-gray-500 mt-1">
+                                文書生成、AIチャット、マッチング分析などに使用されます
+                            </p>
+                        </div>
+                        
+                        <!-- マルチモーダルモデル -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-images text-green-500 mr-1"></i>
+                                マルチモーダルモデル（書類解析用）
+                            </label>
+                            <input type="text" id="ai_model_claude_multimodal" 
+                                class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono"
+                                placeholder="claude-haiku-4-5-20251001">
+                            <p class="text-xs text-gray-500 mt-1">
+                                PDF/画像からのテキスト抽出に使用されます（通常はテキスト生成と同じモデル）
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- モデル名の例 -->
+                    <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
+                            利用可能なモデル名の例
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm font-mono">
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600">•</span>
+                                <code class="bg-white px-2 py-1 rounded border">claude-haiku-4-5-20251001</code>
+                                <span class="text-xs text-gray-500">（高速・低コスト）</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600">•</span>
+                                <code class="bg-white px-2 py-1 rounded border">claude-3-5-sonnet-20241022</code>
+                                <span class="text-xs text-gray-500">（バランス型）</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600">•</span>
+                                <code class="bg-white px-2 py-1 rounded border">claude-sonnet-4-20250514</code>
+                                <span class="text-xs text-gray-500">（高性能）</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600">•</span>
+                                <code class="bg-white px-2 py-1 rounded border">claude-opus-4-20250514</code>
+                                <span class="text-xs text-gray-500">（最高性能）</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-3">
+                            <i class="fas fa-external-link-alt mr-1"></i>
+                            最新のモデル名は 
+                            <a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" class="text-blue-600 hover:underline">
+                                Anthropic公式ドキュメント
+                            </a>
+                            で確認できます
+                        </p>
+                    </div>
+                    
+                    <!-- 保存ボタン -->
+                    <div class="mt-6 flex items-center justify-between">
+                        <button onclick="testAIModel()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
+                            <i class="fas fa-vial"></i>
+                            接続テスト
+                        </button>
+                        <button onclick="saveAIModels()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2">
+                            <i class="fas fa-save"></i>
+                            設定を保存
+                        </button>
+                    </div>
+                    
+                    <div id="testResult" class="mt-4 hidden"></div>
+                </div>
+                
+                <!-- 注意事項 -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-exclamation-triangle text-amber-500 mt-1"></i>
+                        <div class="text-sm text-amber-800">
+                            <p class="font-medium">モデル変更時の注意</p>
+                            <ul class="mt-2 space-y-1 list-disc list-inside text-amber-700">
+                                <li>モデル名を変更すると、すべてのAI機能に即座に反映されます</li>
+                                <li>存在しないモデル名を設定するとAI機能がエラーになります</li>
+                                <li>高性能モデル（Sonnet/Opus）はコストが高くなります</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+        
+        <script>
+            // 設定読み込み
+            async function loadAIModels() {
+                try {
+                    const response = await axios.get('/api/master/ai-models');
+                    const models = response.data;
+                    
+                    document.getElementById('ai_model_claude').value = models.ai_model_claude || 'claude-haiku-4-5-20251001';
+                    document.getElementById('ai_model_claude_multimodal').value = models.ai_model_claude_multimodal || 'claude-haiku-4-5-20251001';
+                } catch (error) {
+                    console.error('Error loading AI models:', error);
+                }
+            }
+            
+            // 設定保存
+            async function saveAIModels() {
+                try {
+                    const models = {
+                        ai_model_claude: document.getElementById('ai_model_claude').value,
+                        ai_model_claude_multimodal: document.getElementById('ai_model_claude_multimodal').value
+                    };
+                    
+                    await axios.put('/api/master/ai-models', models);
+                    alert('AIモデル設定を保存しました');
+                } catch (error) {
+                    console.error('Error saving AI models:', error);
+                    alert('保存に失敗しました');
+                }
+            }
+            
+            // 接続テスト
+            async function testAIModel() {
+                const resultDiv = document.getElementById('testResult');
+                resultDiv.innerHTML = '<div class="p-3 bg-gray-100 rounded-lg"><i class="fas fa-spinner fa-spin mr-2"></i>テスト中...</div>';
+                resultDiv.classList.remove('hidden');
+                
+                try {
+                    const response = await axios.post('/api/test-claude-env');
+                    if (response.data.success) {
+                        resultDiv.innerHTML = '<div class="p-3 bg-green-100 text-green-800 rounded-lg"><i class="fas fa-check-circle mr-2"></i>' + response.data.message + '</div>';
+                    } else {
+                        resultDiv.innerHTML = '<div class="p-3 bg-red-100 text-red-800 rounded-lg"><i class="fas fa-times-circle mr-2"></i>' + (response.data.error || 'テスト失敗') + '</div>';
+                    }
+                } catch (error) {
+                    resultDiv.innerHTML = '<div class="p-3 bg-red-100 text-red-800 rounded-lg"><i class="fas fa-times-circle mr-2"></i>接続テストに失敗しました</div>';
+                }
+            }
+            
+            // 初期読み込み
+            loadAIModels();
+        </script>
+    </body>
+    </html>
+  `)
 })
 
 // AIプロンプト管理ページ
