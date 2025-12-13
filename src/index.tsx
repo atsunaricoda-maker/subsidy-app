@@ -16,121 +16,126 @@ app.use('/api/*', cors())
 // ===============================
 function generateSidebar(activePage: string = '') {
   const isActive = (page: string) => activePage === page ? 'active' : '';
+  const isSectionActive = (pages: string[]) => pages.includes(activePage);
   
   return `
-    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
-        <div class="p-4 border-b border-blue-700 flex-shrink-0">
-            <h1 class="text-xl font-bold flex items-center gap-2">
-                <i class="fas fa-file-invoice-dollar"></i>
+    <aside id="sidebar" class="fixed inset-y-0 left-0 w-48 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+        <div class="p-2 border-b border-blue-700 flex-shrink-0">
+            <h1 class="text-sm font-bold flex items-center gap-1.5">
+                <i class="fas fa-file-invoice-dollar text-xs"></i>
                 <span>申請らくらく君</span>
             </h1>
-            <p class="text-xs text-blue-300 mt-1">Shinsei Rakuraku-kun</p>
         </div>
         
-        <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
-            <a href="/" class="sidebar-link ${isActive('dashboard')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-home w-5"></i>
+        <nav class="p-1.5 space-y-0.5 flex-1 overflow-y-auto text-xs">
+            <!-- ダッシュボード - 常時表示 -->
+            <a href="/" class="sidebar-link ${isActive('dashboard')} flex items-center gap-1.5 px-2 py-1.5 rounded text-xs">
+                <i class="fas fa-home w-3.5 text-center text-xs"></i>
                 <span>ダッシュボード</span>
             </a>
             
-            <div class="pt-4 pb-2">
-                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">案件管理</p>
+            <!-- 案件管理セクション - 折りたたみ可能、デフォルト展開 -->
+            <div class="sidebar-section" data-section="cases">
+                <button onclick="toggleSidebarSection('cases')" class="w-full flex items-center justify-between px-2 py-1 text-blue-300 hover:text-white text-xs mt-1">
+                    <span class="font-semibold uppercase">案件管理</span>
+                    <i class="fas fa-chevron-down section-icon transition-transform text-xs"></i>
+                </button>
+                <div class="section-content space-y-0.5 pl-1">
+                    <a href="/cases" class="sidebar-link ${isActive('cases')} flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-folder-open w-3.5 text-center text-xs"></i>
+                        <span>案件一覧</span>
+                    </a>
+                    <a href="/clients" class="sidebar-link ${isActive('clients')} flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-address-book w-3.5 text-center text-xs"></i>
+                        <span>顧客一覧</span>
+                    </a>
+                    <a href="/?openNewCase=true" class="sidebar-link flex items-center gap-1.5 px-2 py-1 rounded text-xs text-green-300 hover:text-white">
+                        <i class="fas fa-plus w-3.5 text-center text-xs"></i>
+                        <span>新規登録</span>
+                    </a>
+                </div>
             </div>
-            <a href="/cases" class="sidebar-link ${isActive('cases')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-folder-open w-5"></i>
-                <span>案件一覧</span>
-            </a>
-            <a href="/clients" class="sidebar-link ${isActive('clients')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-address-book w-5"></i>
-                <span>顧客一覧</span>
-            </a>
-            <a href="/?openNewCase=true" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-plus-circle w-5"></i>
-                <span>新規案件登録</span>
-            </a>
             
-            <div class="pt-4 pb-2">
-                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
+            <!-- 申請種別セクション - 折りたたみ可能 -->
+            <div class="sidebar-section" data-section="subsidy">
+                <button onclick="toggleSidebarSection('subsidy')" class="w-full flex items-center justify-between px-2 py-1 text-blue-300 hover:text-white text-xs mt-1">
+                    <span class="font-semibold uppercase">申請種別</span>
+                    <i class="fas fa-chevron-down section-icon transition-transform text-xs"></i>
+                </button>
+                <div class="section-content space-y-0.5 pl-1">
+                    <a href="/subsidy-types" id="sidebarSubsidyLink" class="sidebar-link ${isSectionActive(['subsidy-gyosei', 'subsidy-sharoshi', 'subsidy-kyoninka']) ? 'active' : ''} flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-list w-3.5 text-center text-xs"></i>
+                        <span>種別一覧</span>
+                    </a>
+                    <a href="/admin/pipelines" class="sidebar-link ${isActive('pipelines')} flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-project-diagram w-3.5 text-center text-xs"></i>
+                        <span>パイプライン</span>
+                    </a>
+                    <a href="/admin/guidelines" class="sidebar-link ${isActive('guidelines')} flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-book-open w-3.5 text-center text-xs"></i>
+                        <span>公募要領</span>
+                    </a>
+                    <a href="/admin/statistics" class="sidebar-link ${isActive('statistics')} flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-chart-line w-3.5 text-center text-xs"></i>
+                        <span>統計</span>
+                    </a>
+                </div>
             </div>
-            <a href="/subsidy-types?category=subsidy" id="sidebarSubsidyLink" class="sidebar-link ${isActive('subsidy-gyosei')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-file-signature w-5" id="sidebarSubsidyIcon"></i>
-                <span>補助金一覧</span>
-                <span id="sidebarSubsidyBadge" class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
-            </a>
-            <a href="/subsidy-types?category=grant" id="sidebarGrantLink" class="sidebar-link ${isActive('subsidy-sharoshi')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-users w-5" id="sidebarGrantIcon"></i>
-                <span>助成金一覧</span>
-                <span id="sidebarGrantBadge" class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
-            </a>
-            <a href="/subsidy-types?category=license" id="sidebarLicenseLink" class="sidebar-link ${isActive('subsidy-kyoninka')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-stamp w-5" id="sidebarLicenseIcon"></i>
-                <span>許認可申請</span>
-                <span id="sidebarLicenseBadge" class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
-            </a>
-            <a href="/admin/statistics" class="sidebar-link ${isActive('statistics')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-chart-line w-5"></i>
-                <span>統計情報</span>
-            </a>
             
-            <div class="pt-4 pb-2">
-                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">マスター管理</p>
+            <!-- 設定セクション - 折りたたみ可能、デフォルト閉じ -->
+            <div class="sidebar-section" data-section="settings">
+                <button onclick="toggleSidebarSection('settings')" class="w-full flex items-center justify-between px-2 py-1 text-blue-300 hover:text-white text-xs mt-1">
+                    <span class="font-semibold uppercase">設定</span>
+                    <i class="fas fa-chevron-down section-icon transition-transform text-xs"></i>
+                </button>
+                <div class="section-content space-y-0.5 pl-1">
+                    <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link ${isActive('users')} hidden flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-users-cog w-3.5 text-center text-xs"></i>
+                        <span>従業員</span>
+                    </a>
+                    <a href="/admin/payments" id="sidebarPaymentsLink" class="sidebar-link ${isActive('payments')} hidden flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-credit-card w-3.5 text-center text-xs"></i>
+                        <span>支払い</span>
+                        <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-1 py-0.5 rounded-full text-xs">0</span>
+                    </a>
+                    <a href="/admin/subscription" class="sidebar-link ${isActive('subscription')} flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-ticket-alt w-3.5 text-center text-xs"></i>
+                        <span>プラン</span>
+                        <span id="slotsBadge" class="ml-auto bg-gray-500 text-white text-xs px-1 py-0.5 rounded-full text-xs">...</span>
+                    </a>
+                    <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link ${isActive('settings')} hidden flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-cog w-3.5 text-center text-xs"></i>
+                        <span>設定</span>
+                    </a>
+                    <a href="/admin/backup" id="sidebarBackupLink" class="sidebar-link ${isActive('backup')} hidden flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                        <i class="fas fa-database w-3.5 text-center text-xs"></i>
+                        <span>バックアップ</span>
+                    </a>
+                </div>
             </div>
-            <a href="/admin/pipelines" class="sidebar-link ${isActive('pipelines')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-project-diagram w-5"></i>
-                <span>パイプライン管理</span>
-            </a>
-            <a href="/admin/guidelines" class="sidebar-link ${isActive('guidelines')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-book-open w-5"></i>
-                <span>公募要領管理</span>
-            </a>
-            
-            <div class="pt-4 pb-2">
-                <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">設定</p>
-            </div>
-            <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link ${isActive('users')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-users-cog w-5"></i>
-                <span>従業員管理</span>
-            </a>
-            <a href="/admin/payments" id="sidebarPaymentsLink" class="sidebar-link ${isActive('payments')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-credit-card w-5"></i>
-                <span>支払い確認</span>
-                <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
-            </a>
-            <a href="/admin/subscription" class="sidebar-link ${isActive('subscription')} flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-ticket-alt w-5"></i>
-                <span>プラン・枠管理</span>
-                <span id="slotsBadge" class="ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full">...</span>
-            </a>
-            <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link ${isActive('settings')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-cog w-5"></i>
-                <span>システム設定</span>
-            </a>
-            <a href="/admin/backup" id="sidebarBackupLink" class="sidebar-link ${isActive('backup')} hidden flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-database w-5"></i>
-                <span>バックアップ</span>
-            </a>
         </nav>
         
-        <!-- 法的リンク -->
-        <div class="px-4 py-2 border-t border-blue-700/50">
-            <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-300">
-                <a href="/terms" target="_blank" class="hover:text-white transition-colors">利用規約</a>
-                <a href="/privacy-policy" target="_blank" class="hover:text-white transition-colors">プライバシー</a>
-                <a href="/legal" target="_blank" class="hover:text-white transition-colors">特商法</a>
+        <!-- 法的リンク - 1行に収める -->
+        <div class="px-2 py-1 border-t border-blue-700/50">
+            <div class="flex gap-1.5 text-xs text-blue-300">
+                <a href="/terms" target="_blank" class="hover:text-white">規約</a>
+                <span class="text-blue-500">|</span>
+                <a href="/privacy-policy" target="_blank" class="hover:text-white">個人情報</a>
+                <span class="text-blue-500">|</span>
+                <a href="/legal" target="_blank" class="hover:text-white">特商法</a>
             </div>
         </div>
         
-        <!-- ユーザー情報 -->
-        <div class="p-4 border-t border-blue-700 bg-blue-900">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                    <i class="fas fa-user"></i>
+        <!-- ユーザー情報 - コンパクト化 -->
+        <div class="p-1.5 border-t border-blue-700 bg-blue-900">
+            <div class="flex items-center gap-1.5">
+                <div class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs">
+                    <i class="fas fa-user text-xs"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p id="sidebarAdminName" class="text-sm font-medium truncate">管理者</p>
-                    <p class="text-xs text-blue-300">管理者モード</p>
+                    <p id="sidebarAdminName" class="text-xs font-medium truncate">管理者</p>
                 </div>
-                <button onclick="logout()" class="text-blue-300 hover:text-white" title="ログアウト">
+                <button onclick="logout()" class="text-blue-300 hover:text-white text-xs" title="ログアウト">
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
             </div>
@@ -146,7 +151,19 @@ function generateSidebar(activePage: string = '') {
 const sidebarStyles = `
     .sidebar-link { transition: all 0.2s; }
     .sidebar-link:hover { background-color: rgba(255,255,255,0.1); }
-    .sidebar-link.active { background-color: rgba(255,255,255,0.2); border-left: 3px solid white; }
+    .sidebar-link.active { background-color: rgba(255,255,255,0.2); border-left: 2px solid white; }
+    .sidebar-section .section-content { 
+        max-height: 500px; 
+        overflow: hidden; 
+        transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+    }
+    .sidebar-section.collapsed .section-content { 
+        max-height: 0; 
+        opacity: 0;
+    }
+    .sidebar-section.collapsed .section-icon { 
+        transform: rotate(-90deg); 
+    }
 `;
 
 // 共通のサイドバー用JavaScript
@@ -169,6 +186,34 @@ const sidebarScripts = `
             window.location.href = '/login';
         }
     }
+    
+    // サイドバーセクション折りたたみ機能
+    function toggleSidebarSection(sectionName) {
+        const section = document.querySelector('[data-section="' + sectionName + '"]');
+        if (section) {
+            section.classList.toggle('collapsed');
+            // 状態を保存
+            const collapsedSections = JSON.parse(localStorage.getItem('sidebar_collapsed') || '{}');
+            collapsedSections[sectionName] = section.classList.contains('collapsed');
+            localStorage.setItem('sidebar_collapsed', JSON.stringify(collapsedSections));
+        }
+    }
+    
+    // サイドバー初期状態の復元
+    function initSidebarSections() {
+        const collapsedSections = JSON.parse(localStorage.getItem('sidebar_collapsed') || '{"settings": true}');
+        Object.keys(collapsedSections).forEach(sectionName => {
+            if (collapsedSections[sectionName]) {
+                const section = document.querySelector('[data-section="' + sectionName + '"]');
+                if (section) {
+                    section.classList.add('collapsed');
+                }
+            }
+        });
+    }
+    
+    // ページ読み込み時にサイドバー状態を復元
+    document.addEventListener('DOMContentLoaded', initSidebarSections);
     
     function toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
@@ -1856,103 +1901,91 @@ app.get('/', (c) => {
     <body class="bg-gray-100">
         <div class="min-h-screen flex">
             <!-- 左サイドバー -->
-            <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
-                <div class="p-4 border-b border-blue-700 flex-shrink-0">
-                    <h1 class="text-xl font-bold flex items-center gap-2">
+            <aside id="sidebar" class="fixed inset-y-0 left-0 w-56 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+                <div class="p-3 border-b border-blue-700 flex-shrink-0">
+                    <h1 class="text-base font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
                         <span>申請らくらく君</span>
                     </h1>
-                    <p class="text-xs text-blue-300 mt-1">Shinsei Rakuraku-kun</p>
                 </div>
                 
-                <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
-                    <a href="/" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-home w-5"></i>
+                <nav class="p-2 space-y-0.5 flex-1 overflow-y-auto pb-16">
+                    <a href="/" class="sidebar-link active flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-home w-4 text-center"></i>
                         <span>ダッシュボード</span>
                     </a>
                     
-                    <div class="pt-4 pb-2">
-                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">案件管理</p>
+                    <div class="pt-3 pb-1">
+                        <p class="px-3 text-xs font-semibold text-blue-400 uppercase">案件</p>
                     </div>
-                    <a href="/cases" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-folder-open w-5"></i>
+                    <a href="/cases" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-folder-open w-4 text-center"></i>
                         <span>案件一覧</span>
                     </a>
-                    <a href="/clients" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-address-book w-5"></i>
+                    <a href="/clients" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-address-book w-4 text-center"></i>
                         <span>顧客一覧</span>
                     </a>
-                    <a href="#" onclick="openNewCaseModal(); return false;" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-plus-circle w-5"></i>
-                        <span>新規案件登録</span>
+                    <a href="#" onclick="openNewCaseModal(); return false;" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-green-300 hover:text-white">
+                        <i class="fas fa-plus-circle w-4 text-center"></i>
+                        <span>新規登録</span>
                     </a>
                     
-                    <div class="pt-4 pb-2">
-                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">申請種別</p>
+                    <div class="pt-3 pb-1">
+                        <p class="px-3 text-xs font-semibold text-blue-400 uppercase">申請種別</p>
                     </div>
-                    <a href="/subsidy-types?category=subsidy" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-file-signature w-5"></i>
-                        <span>補助金一覧</span>
-                        <span class="ml-auto text-xs bg-emerald-600 px-2 py-0.5 rounded">行政書士</span>
+                    <a href="/subsidy-types" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-list w-4 text-center"></i>
+                        <span>申請種別一覧</span>
                     </a>
-                    <a href="/subsidy-types?category=grant" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-users w-5"></i>
-                        <span>助成金一覧</span>
-                        <span class="ml-auto text-xs bg-blue-600 px-2 py-0.5 rounded">社労士</span>
+                    <a href="/admin/pipelines" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-project-diagram w-4 text-center"></i>
+                        <span>パイプライン</span>
                     </a>
-                    <a href="/subsidy-types?category=license" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-stamp w-5"></i>
-                        <span>許認可申請</span>
-                        <span class="ml-auto text-xs bg-indigo-600 px-2 py-0.5 rounded">許認可</span>
-                    </a>
-                    <a href="/admin/pipelines" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-project-diagram w-5"></i>
-                        <span>パイプライン管理</span>
-                    </a>
-                    <a href="/admin/statistics" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-chart-line w-5"></i>
-                        <span>統計情報</span>
+                    <a href="/admin/statistics" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-chart-line w-4 text-center"></i>
+                        <span>統計</span>
                     </a>
                     
-                    <div class="pt-4 pb-2">
-                        <p class="px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">設定</p>
+                    <div class="pt-3 pb-1">
+                        <p class="px-3 text-xs font-semibold text-blue-400 uppercase">設定</p>
                     </div>
-                    <a href="/admin/guidelines" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-book-open w-5"></i>
-                        <span>公募要領管理</span>
+                    <a href="/admin/guidelines" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-book-open w-4 text-center"></i>
+                        <span>公募要領</span>
                     </a>
-                    <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-users-cog w-5"></i>
-                        <span>従業員管理</span>
+                    <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-users-cog w-4 text-center"></i>
+                        <span>従業員</span>
                     </a>
-                    <a href="/admin/payments" id="sidebarPaymentsLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-credit-card w-5"></i>
-                        <span>支払い確認</span>
-                        <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
+                    <a href="/admin/payments" id="sidebarPaymentsLink" class="sidebar-link hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-credit-card w-4 text-center"></i>
+                        <span>支払い</span>
+                        <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full text-xs">0</span>
                     </a>
-                    <a href="/admin/subscription" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-ticket-alt w-5"></i>
-                        <span>プラン・枠管理</span>
-                        <span id="slotsBadge" class="ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full">...</span>
+                    <a href="/admin/subscription" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-ticket-alt w-4 text-center"></i>
+                        <span>プラン</span>
+                        <span id="slotsBadge" class="ml-auto bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded-full">...</span>
                     </a>
-                    <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-cog w-5"></i>
-                        <span>システム設定</span>
+                    <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-cog w-4 text-center"></i>
+                        <span>設定</span>
                     </a>
-                    <a href="/admin/backup" id="sidebarBackupLink" class="sidebar-link hidden flex items-center gap-3 px-4 py-3 rounded-lg">
-                        <i class="fas fa-database w-5"></i>
+                    <a href="/admin/backup" id="sidebarBackupLink" class="sidebar-link hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-database w-4 text-center"></i>
                         <span>バックアップ</span>
                     </a>
                 </nav>
                 
                 <!-- ユーザー情報 -->
-                <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-blue-700 bg-blue-900">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                <div class="absolute bottom-0 left-0 right-0 p-2 border-t border-blue-700 bg-blue-900">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm">
                             <i class="fas fa-user"></i>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <p id="sidebarAdminName" class="text-sm font-medium truncate">管理者</p>
+                            <p id="sidebarAdminName" class="text-xs font-medium truncate">管理者</p>
                             <p class="text-xs text-blue-300">管理者モード</p>
                         </div>
                         <button onclick="logout()" class="text-blue-300 hover:text-white" title="ログアウト">
