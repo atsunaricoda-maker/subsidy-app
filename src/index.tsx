@@ -26511,6 +26511,19 @@ app.get('/cases', async (c) => {
   try {
     const { DB } = c.env
     const showArchived = c.req.query('archived') === 'true'
+    const assignedTo = c.req.query('assigned_to') || ''
+    const filterStatus = c.req.query('status') || ''
+    
+    // 担当者フィルター用：担当者名を取得
+    let assignedToName = ''
+    if (assignedTo) {
+      if (assignedTo === '未割り当て') {
+        assignedToName = '未割り当て'
+      } else {
+        const userResult = await DB.prepare('SELECT name FROM admin_users WHERE username = ?').bind(assignedTo).first() as any
+        assignedToName = userResult?.name || assignedTo
+      }
+    }
     
     // casesテーブルから案件を取得
     let query = `
@@ -26518,6 +26531,7 @@ app.get('/cases', async (c) => {
         cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
         cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
         cs.is_archived, cs.result, cs.approved_amount, cs.result_date,
+        cs.assigned_to,
         cl.id as client_id, cl.name as client_name, cl.company_name,
         st.name as subsidy_type_name, st.category as subsidy_category,
         au.name as assigned_to_name
@@ -26536,6 +26550,7 @@ app.get('/cases', async (c) => {
           cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
           cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
           cs.is_archived, cs.result, cs.approved_amount, cs.result_date,
+          cs.assigned_to,
           cl.id as client_id, cl.name as client_name, cl.company_name,
           st.name as subsidy_type_name, st.category as subsidy_category,
           au.name as assigned_to_name
@@ -26548,14 +26563,34 @@ app.get('/cases', async (c) => {
       `
     }
     
-    const casesResult = await DB.prepare(query).all()
-    const allCases = casesResult.results || []
+    let casesResult = await DB.prepare(query).all()
+    let allCases = casesResult.results || []
+    
+    // 担当者フィルター適用
+    if (assignedTo) {
+      if (assignedTo === '未割り当て') {
+        allCases = allCases.filter((c: any) => !c.assigned_to || c.assigned_to === '')
+      } else {
+        allCases = allCases.filter((c: any) => c.assigned_to === assignedTo)
+      }
+    }
+    
+    // ステータスフィルター適用
+    if (filterStatus) {
+      allCases = allCases.filter((c: any) => c.status === filterStatus)
+    }
+    
+    const filteredCount = allCases.length
     
     // アーカイブ数を取得
     const archivedCountResult = await DB.prepare(`
       SELECT COUNT(*) as count FROM cases WHERE is_archived = 1
     `).first() as any
     const archivedCount = archivedCountResult?.count || 0
+    
+    // 担当者リスト取得（フィルター用）
+    const adminUsersResult = await DB.prepare('SELECT username, name FROM admin_users ORDER BY name').all()
+    const adminUsers = adminUsersResult.results || []
     
     // ステータス定義（完了済みは別途取得）
     const STATUSES = [
@@ -26566,11 +26601,12 @@ app.get('/cases', async (c) => {
     ]
     
     // 完了済み（アーカイブ）案件を別途取得（最新10件）
-    const archivedCasesResult = await DB.prepare(`
+    let archivedCasesQuery = `
       SELECT 
         cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
         cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
         cs.is_archived, cs.result, cs.approved_amount, cs.result_date,
+        cs.assigned_to,
         cl.id as client_id, cl.name as client_name, cl.company_name,
         st.name as subsidy_type_name, st.category as subsidy_category,
         au.name as assigned_to_name
@@ -26581,8 +26617,18 @@ app.get('/cases', async (c) => {
       WHERE cs.is_archived = 1
       ORDER BY cs.updated_at DESC
       LIMIT 10
-    `).all()
-    const archivedCases = archivedCasesResult.results || []
+    `
+    const archivedCasesResult = await DB.prepare(archivedCasesQuery).all()
+    let archivedCases = archivedCasesResult.results || []
+    
+    // 担当者フィルターをアーカイブにも適用
+    if (assignedTo) {
+      if (assignedTo === '未割り当て') {
+        archivedCases = archivedCases.filter((c: any) => !c.assigned_to || c.assigned_to === '')
+      } else {
+        archivedCases = archivedCases.filter((c: any) => c.assigned_to === assignedTo)
+      }
+    }
     
     // ステータスごとにグループ化
     const casesByStatus: Record<string, any[]> = {}
@@ -26732,15 +26778,26 @@ app.get('/cases', async (c) => {
                             <h2 class="text-lg font-semibold text-gray-800">
                                 <i class="fas fa-folder-open mr-2"></i>${showArchived ? '完了済み案件' : '案件一覧'}
                             </h2>
-                            <span class="text-sm text-gray-500">${allCases.length}件</span>
+                            <span class="text-sm text-gray-500">${filteredCount}件</span>
+                            ${assignedTo || filterStatus ? `
+                                <a href="/cases${showArchived ? '?archived=true' : ''}" class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full hover:bg-gray-300">
+                                    <i class="fas fa-times mr-1"></i>フィルター解除
+                                </a>
+                            ` : ''}
                         </div>
                         <div class="flex items-center gap-3">
+                            <!-- 担当者フィルター -->
+                            <select id="assignedToFilter" onchange="filterByAssignee()" class="border rounded-lg px-3 py-2 text-sm bg-white">
+                                <option value="">全担当者</option>
+                                <option value="未割り当て" ${assignedTo === '未割り当て' ? 'selected' : ''}>未割り当て</option>
+                                ${(adminUsers as any[]).map((u: any) => `<option value="${u.username}" ${assignedTo === u.username ? 'selected' : ''}>${u.name || u.username}</option>`).join('')}
+                            </select>
                             ${showArchived ? `
                                 <a href="/cases" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border hover:bg-gray-50 text-sm">
                                     <i class="fas fa-arrow-left mr-2"></i>戻る
                                 </a>
                             ` : `
-                                <a href="/cases?archived=true" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border hover:bg-gray-50 text-sm" title="完了済み案件を表示">
+                                <a href="/cases?archived=true${assignedTo ? '&assigned_to=' + encodeURIComponent(assignedTo) : ''}" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border hover:bg-gray-50 text-sm" title="完了済み案件を表示">
                                     <i class="fas fa-check-circle mr-2"></i>完了済み${archivedCount > 0 ? ' (' + archivedCount + ')' : ''}
                                 </a>
                             `}
@@ -26749,6 +26806,15 @@ app.get('/cases', async (c) => {
                             </a>
                         </div>
                     </div>
+                    ${assignedTo ? `
+                        <div class="px-4 pb-3 border-t">
+                            <div class="flex items-center gap-2 text-sm mt-2">
+                                <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full">
+                                    <i class="fas fa-user mr-1"></i>${assignedToName}の案件
+                                </span>
+                            </div>
+                        </div>
+                    ` : ''}
                 </header>
 
                 <div class="p-4 lg:p-6 flex-1 overflow-auto">
@@ -26762,6 +26828,21 @@ app.get('/cases', async (c) => {
         
         <script>
             ${sidebarScripts}
+            
+            function filterByAssignee() {
+                const select = document.getElementById('assignedToFilter');
+                const assignedTo = select.value;
+                const urlParams = new URLSearchParams(window.location.search);
+                
+                if (assignedTo) {
+                    urlParams.set('assigned_to', assignedTo);
+                } else {
+                    urlParams.delete('assigned_to');
+                }
+                
+                const newUrl = '/cases' + (urlParams.toString() ? '?' + urlParams.toString() : '');
+                window.location.href = newUrl;
+            }
         </script>
     </body>
     </html>
