@@ -18027,6 +18027,17 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
   throw lastError || new Error('Gemini API failed after retries')
 }
 
+// チャット用Gemini API呼び出し（軽量・高速なチャット向け）
+async function callGeminiForChat(prompt: string, env: any): Promise<string> {
+  const { GEMINI_API_KEY } = env
+  
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini APIキーが設定されていません。環境変数 GEMINI_API_KEY を設定してください。')
+  }
+  
+  return callGeminiAPI(prompt, GEMINI_API_KEY, 3)
+}
+
 // Claude API呼び出しヘルパー（Claude Haiku 4.5対応）
 async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number): Promise<string> {
   if (!apiKey) {
@@ -18697,7 +18708,8 @@ ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? '
   const prompt = `${systemPrompt}\n\nユーザー: ${data.message}`
   
   try {
-    const aiResponse = await callAI(prompt, env)
+    // チャットはGeminiを使用（軽量・高速）
+    const aiResponse = await callGeminiForChat(prompt, env)
     
     // AIレスポンスを保存
     await DB.prepare(`
@@ -18774,7 +18786,8 @@ ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text |
 
 質問: ${data.question_text}`
 
-    const suggestion = await callAI(prompt, env)
+    // 回答提案はGeminiを使用（軽量・高速）
+    const suggestion = await callGeminiForChat(prompt, env)
     return c.json({ suggestion })
     
   } catch (error: any) {
@@ -25700,19 +25713,27 @@ app.get('/admin/settings', async (c) => {
                         <div id="claude_test_result" class="mt-2 hidden"></div>
                     </div>
                     
-                    <!-- Claude AI 説明 -->
-                    <div id="claude_info_section">
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <!-- AI使用説明 -->
+                    <div id="ai_info_section">
+                        <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-3">
                             <div class="flex items-start gap-2">
-                                <i class="fas fa-check-circle text-green-600 mt-0.5"></i>
-                                <div class="text-sm text-green-800">
-                                    <p class="font-medium">Claude Haiku 4.5 を使用</p>
-                                    <p class="mt-1">すべてのAI機能（文書生成、チャット、書類解析など）にClaude Haiku 4.5が使用されます。</p>
-                                    <ul class="mt-2 text-xs list-disc list-inside space-y-1">
-                                        <li>高品質な日本語文書生成</li>
-                                        <li>安定したAPIレート</li>
-                                        <li>PDF・画像の解析対応</li>
-                                    </ul>
+                                <i class="fas fa-robot text-green-600 mt-0.5"></i>
+                                <div class="text-sm">
+                                    <p class="font-medium text-gray-800">AI機能の使い分け</p>
+                                    <div class="mt-2 space-y-2">
+                                        <div class="flex items-start gap-2">
+                                            <span class="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded">Claude</span>
+                                            <span class="text-gray-700 text-xs">文書生成、書類解析（PDF/画像）、マッチング分析</span>
+                                        </div>
+                                        <div class="flex items-start gap-2">
+                                            <span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded">Gemini</span>
+                                            <span class="text-gray-700 text-xs">AIチャット、回答提案（軽量・高速）</span>
+                                        </div>
+                                    </div>
+                                    <p class="mt-2 text-xs text-gray-500">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        Claude APIキーは上記で設定、Gemini APIキーは環境変数（wrangler.toml）で設定してください
+                                    </p>
                                 </div>
                             </div>
                         </div>
