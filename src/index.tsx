@@ -22,9 +22,9 @@ function generateSidebar(activePage: string = '') {
         <div class="p-4 border-b border-blue-700 flex-shrink-0">
             <h1 class="text-xl font-bold flex items-center gap-2">
                 <i class="fas fa-file-invoice-dollar"></i>
-                <span>申請革命</span>
+                <span>申請らくらく君</span>
             </h1>
-            <p class="text-xs text-blue-300 mt-1">Shinsei Kakumei</p>
+            <p class="text-xs text-blue-300 mt-1">Shinsei Rakuraku-kun</p>
         </div>
         
         <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
@@ -375,7 +375,7 @@ app.get('/login', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>ログイン - 申請革命</title>
+        <title>ログイン - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
@@ -384,7 +384,7 @@ app.get('/login', (c) => {
             <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
                 <div class="text-center mb-8">
                     <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
-                    <h1 class="text-2xl font-bold text-gray-800">申請革命</h1>
+                    <h1 class="text-2xl font-bold text-gray-800">申請らくらく君</h1>
                     <p class="text-sm text-gray-600 mt-2">管理者ログイン</p>
                 </div>
                 
@@ -467,7 +467,7 @@ app.get('/signup', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>新規登録 - 申請革命</title>
+        <title>新規登録 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
@@ -477,7 +477,7 @@ app.get('/signup', (c) => {
                 <!-- ヘッダー -->
                 <div class="text-center mb-8">
                     <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
-                    <h1 class="text-3xl font-bold text-gray-800">申請革命</h1>
+                    <h1 class="text-3xl font-bold text-gray-800">申請らくらく君</h1>
                     <p class="text-gray-600 mt-2">14日間の無料トライアルで今すぐ始めましょう</p>
                 </div>
                 
@@ -1459,7 +1459,7 @@ app.get('/api/legal-templates', async (c) => {
 
 最終更新日：2025年12月
 
-本利用規約（以下「本規約」）は、当社が提供する補助金・助成金申請支援システム（以下「本サービス」）の利用条件を定めるものです。本サービスをご利用いただく前に、本規約をよくお読みください。本サービスを利用することにより、本規約に同意したものとみなされます。
+本利用規約（以下「本規約」）は、当社が提供する申請らくらく君（以下「本サービス」）の利用条件を定めるものです。本サービスをご利用いただく前に、本規約をよくお読みください。本サービスを利用することにより、本規約に同意したものとみなされます。
 
 ## 第1条（定義）
 
@@ -1570,7 +1570,7 @@ app.get('/api/legal-templates', async (c) => {
 
 最終更新日：2025年12月
 
-当社（以下「当社」）は、補助金・助成金申請支援システム（以下「本サービス」）における個人情報の取り扱いについて、以下のとおりプライバシーポリシーを定めます。
+当社（以下「当社」）は、申請らくらく君（以下「本サービス」）における個人情報の取り扱いについて、以下のとおりプライバシーポリシーを定めます。
 
 ## 第1条（収集する情報）
 
@@ -1787,7 +1787,7 @@ app.get('/', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>申請革命 - 管理者</title>
+        <title>申請らくらく君 - 管理者</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
@@ -1855,9 +1855,9 @@ app.get('/', (c) => {
                 <div class="p-4 border-b border-blue-700 flex-shrink-0">
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
-                        <span>申請革命</span>
+                        <span>申請らくらく君</span>
                     </h1>
-                    <p class="text-xs text-blue-300 mt-1">Shinsei Kakumei</p>
+                    <p class="text-xs text-blue-300 mt-1">Shinsei Rakuraku-kun</p>
                 </div>
                 
                 <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
@@ -9838,7 +9838,7 @@ app.get('/case/:id', async (c) => {
                 <div class="p-4 border-b border-blue-700">
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
-                        <span>申請革命</span>
+                        <span>申請らくらく君</span>
                     </h1>
                 </div>
                 <nav class="p-4 space-y-1 flex-1 overflow-y-auto">
@@ -14678,7 +14678,7 @@ app.get('/admin/users', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>従業員管理 - 申請革命</title>
+        <title>従業員管理 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -15634,7 +15634,7 @@ app.get('/admin/guidelines', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>公募要領管理 - 申請革命</title>
+        <title>公募要領管理 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -17490,7 +17490,7 @@ app.get('/admin/backup', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>バックアップ管理 - 申請革命</title>
+        <title>バックアップ管理 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -21024,7 +21024,7 @@ app.get('/api/backup/export', async (c) => {
     const backupData = {
       version: '1.0',
       exported_at: new Date().toISOString(),
-      app_name: '申請革命',
+      app_name: '申請らくらく君',
       tables: {
         admin_users: adminUsers.results || [],
         subsidy_types: subsidyTypes.results || [],
@@ -22747,7 +22747,7 @@ app.get('/admin/master', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>マスター管理 - 申請革命</title>
+        <title>マスター管理 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -23332,7 +23332,7 @@ app.get('/admin/pipelines', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>パイプライン管理 - 申請革命</title>
+        <title>パイプライン管理 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
@@ -23350,9 +23350,9 @@ app.get('/admin/pipelines', (c) => {
                 <div class="p-4 border-b border-blue-700 flex-shrink-0">
                     <h1 class="text-xl font-bold flex items-center gap-2">
                         <i class="fas fa-file-invoice-dollar"></i>
-                        <span>申請革命</span>
+                        <span>申請らくらく君</span>
                     </h1>
-                    <p class="text-xs text-blue-300 mt-1">Shinsei Kakumei</p>
+                    <p class="text-xs text-blue-300 mt-1">Shinsei Rakuraku-kun</p>
                 </div>
                 
                 <nav class="p-4 space-y-1 flex-1 overflow-y-auto pb-20">
@@ -24214,7 +24214,7 @@ app.get('/privacy-policy', async (c) => {
     return c.redirect(settings.privacy_policy_url)
   }
   
-  const companyName = settings.company_name || '申請革命'
+  const companyName = settings.company_name || '申請らくらく君'
   const footerText = settings.footer_text || ''
   const privacyContent = settings.privacy_policy || ''
   
@@ -24505,7 +24505,7 @@ app.get('/terms', async (c) => {
     return c.redirect(settings.terms_url)
   }
   
-  const companyName = settings.company_name || '申請革命'
+  const companyName = settings.company_name || '申請らくらく君'
   const footerText = settings.footer_text || ''
   const termsContent = settings.terms_of_service || ''
   
@@ -24524,7 +24524,7 @@ app.get('/terms', async (c) => {
   // デフォルトの利用規約テンプレート
   const defaultTerms = `
     <h2 class="text-xl font-bold mb-4 text-gray-800">第1条（適用）</h2>
-    <p class="text-gray-700 mb-4">本規約は、${companyName}（以下「当社」といいます）が提供するサービス「申請革命」（以下「本サービス」といいます）の利用に関する条件を定めるものです。</p>
+    <p class="text-gray-700 mb-4">本規約は、${companyName}（以下「当社」といいます）が提供するサービス「申請らくらく君」（以下「本サービス」といいます）の利用に関する条件を定めるものです。</p>
     
     <h2 class="text-xl font-bold mt-8 mb-4 text-gray-800">第2条（利用登録）</h2>
     <p class="text-gray-700 mb-4">登録希望者が当社の定める方法によって利用登録を申請し、当社がこれを承認することによって、利用登録が完了するものとします。</p>
@@ -25015,7 +25015,7 @@ app.get('/admin/subscription', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>プラン・枠管理 - 申請革命</title>
+        <title>プラン・枠管理 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -25641,7 +25641,7 @@ app.get('/admin/settings', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>システム設定 - 申請革命</title>
+        <title>システム設定 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -26107,7 +26107,7 @@ app.get('/admin/payments', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>支払い確認 - 申請革命</title>
+        <title>支払い確認 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -26332,7 +26332,7 @@ app.get('/clients', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>顧客管理 - 申請革命</title>
+        <title>顧客管理 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -26623,7 +26623,7 @@ app.get('/cases', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>案件一覧 - 申請革命</title>
+        <title>案件一覧 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -26795,7 +26795,7 @@ app.get('/admin/statistics', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>統計情報 - 申請革命</title>
+        <title>統計情報 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
