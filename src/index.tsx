@@ -1996,7 +1996,7 @@ app.get('/', (c) => {
                                 <i class="fas fa-bell"></i>未対応の通知
                             </h3>
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="notificationCards">
-                                <button type="button" id="notifyCardMessage" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-blue-50 transition border-l-4 border-blue-400 text-left w-full">
+                                <button type="button" id="notifyCardMessage" onclick="openNotificationsModal('new_message')" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-blue-50 transition border-l-4 border-blue-400 text-left w-full">
                                     <div class="flex items-center justify-between">
                                         <div>
                                             <div class="text-gray-500 text-xs">未読メッセージ</div>
@@ -2005,7 +2005,7 @@ app.get('/', (c) => {
                                         <i class="fas fa-envelope text-blue-200 text-xl"></i>
                                     </div>
                                 </button>
-                                <button type="button" id="notifyCardDocument" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-green-50 transition border-l-4 border-green-400 text-left w-full">
+                                <button type="button" id="notifyCardDocument" onclick="openNotificationsModal('document_upload')" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-green-50 transition border-l-4 border-green-400 text-left w-full">
                                     <div class="flex items-center justify-between">
                                         <div>
                                             <div class="text-gray-500 text-xs">書類アップロード</div>
@@ -2014,7 +2014,7 @@ app.get('/', (c) => {
                                         <i class="fas fa-file-upload text-green-200 text-xl"></i>
                                     </div>
                                 </button>
-                                <button type="button" id="notifyCardPayment" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-yellow-50 transition border-l-4 border-yellow-400 text-left w-full">
+                                <button type="button" id="notifyCardPayment" onclick="openNotificationsModal('payment_report')" class="bg-white p-3 rounded-lg shadow-sm cursor-pointer hover:shadow-md hover:bg-yellow-50 transition border-l-4 border-yellow-400 text-left w-full">
                                     <div class="flex items-center justify-between">
                                         <div>
                                             <div class="text-gray-500 text-xs">入金報告</div>
@@ -2301,9 +2301,14 @@ app.get('/', (c) => {
             <div class="bg-white rounded-lg p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-bold">通知</h3>
-                    <button onclick="document.getElementById('notificationsModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="markAllNotificationsRead()" class="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded hover:bg-gray-200">
+                            <i class="fas fa-check-double mr-1"></i>すべて既読
+                        </button>
+                        <button onclick="closeNotificationsModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
                 </div>
                 <div id="notificationsList" class="space-y-3">
                     <div class="text-center py-4 text-gray-500">読み込み中...</div>
@@ -3047,6 +3052,9 @@ app.get('/', (c) => {
             
             // 通知を読み込んで表示（ダッシュボード用・グローバル）
             window.loadNotificationsWithType = async function(filterType) {
+                // 現在のフィルターを保持
+                window.currentNotificationFilter = filterType;
+                
                 try {
                     const response = await axios.get('/api/admin/notifications?unread_only=true');
                     let notifications = response.data;
@@ -3118,17 +3126,54 @@ app.get('/', (c) => {
             }
             
             // 通知を既読にする（グローバル関数）
-            window.markNotificationRead = async function(notificationId) {
+            window.markNotificationRead = async function(notificationId, skipReload = false) {
                 try {
                     await axios.put(\`/api/admin/notifications/\${notificationId}/read\`, {
                         read_by: localStorage.getItem('admin_name') || 'admin'
                     });
-                    // サマリーを更新（ページ遷移しない場合のため）
+                    // サマリーを更新
                     loadNotificationSummary();
+                    // 通知リストも更新（モーダルが開いている場合）
+                    if (!skipReload && document.getElementById('notificationsModal') && !document.getElementById('notificationsModal').classList.contains('hidden')) {
+                        window.loadNotificationsWithType(window.currentNotificationFilter);
+                    }
                 } catch (error) {
                     console.error('Error marking notification as read:', error);
                 }
             };
+            
+            // 現在のフィルター状態を保持
+            window.currentNotificationFilter = null;
+            
+            // 通知モーダルを開く
+            function openNotificationsModal(filterType = null) {
+                document.getElementById('notificationsModal').classList.remove('hidden');
+                window.loadNotificationsWithType(filterType);
+            }
+            
+            // 通知モーダルを閉じる
+            function closeNotificationsModal() {
+                document.getElementById('notificationsModal').classList.add('hidden');
+                // サマリーを更新
+                loadNotificationSummary();
+            }
+            
+            // すべての通知を既読にする
+            async function markAllNotificationsRead() {
+                try {
+                    const filterType = window.currentNotificationFilter;
+                    await axios.put('/api/admin/notifications/read-all', {
+                        notification_type: filterType,
+                        read_by: localStorage.getItem('admin_name') || 'admin'
+                    });
+                    // リストとサマリーを更新
+                    window.loadNotificationsWithType(filterType);
+                    loadNotificationSummary();
+                    showToast(filterType ? '表示中の通知をすべて既読にしました' : 'すべての通知を既読にしました');
+                } catch (error) {
+                    console.error('Error marking all as read:', error);
+                }
+            }
             
             // 枠残数を読み込む
             async function loadSlotBalance() {
