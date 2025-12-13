@@ -2861,6 +2861,7 @@ app.get('/', (c) => {
                             success_fee_enabled: document.getElementById('successFeeEnabled')?.checked ? 1 : 0,
                             success_fee_rate: parseFloat(formData.get('success_fee_percentage')) || 0,
                             success_fee_amount: parseInt(formData.get('success_fee_amount')) || 0,
+                            contract_url: formData.get('contract_url') || null,
                             pipeline_template_id: pipelineTemplateId ? parseInt(pipelineTemplateId) : null
                         };
                         console.log('caseData:', caseData);
