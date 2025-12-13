@@ -7898,20 +7898,28 @@ app.get('/client/:id', async (c) => {
                 }
                 
                 try {
-                    // 必要書類チェックリストと既にアップロードされた書類を取得
-                    const [checklistRes, docsRes] = await Promise.all([
+                    // 必要書類チェックリストと既にアップロードされた書類を取得（共通書類も含む）
+                    const [checklistRes, docsRes, commonDocsRes] = await Promise.all([
                         axios.get(\`/api/clients/\${CLIENT_ID}/document-checklist\`),
-                        axios.get(\`/api/clients/\${CLIENT_ID}/documents?t=\${Date.now()}\`)
+                        axios.get(\`/api/clients/\${CLIENT_ID}/documents?t=\${Date.now()}\`),
+                        axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`)
                     ]);
                     
                     const checklist = checklistRes.data || [];
                     const docs = docsRes.data || [];
+                    const commonDocs = commonDocsRes.data || [];
                     console.log('Documents loaded:', docs.map(d => ({id: d.id, type: d.document_type, status: d.status})));
-                    const uploadedTypes = new Set(docs.map(d => d.document_type));
                     
-                    // 必須書類のカウント
+                    // 案件別アップロード済みの書類タイプ
+                    const uploadedTypes = new Set(docs.map(d => d.document_type));
+                    // 共通書類でカバーされているタイプ（別途管理）
+                    const commonDocTypes = new Set(commonDocs.map(d => d.document_type));
+                    // 両方を合わせた充足済みタイプ
+                    const fulfilledTypes = new Set([...uploadedTypes, ...commonDocTypes]);
+                    
+                    // 必須書類のカウント（共通書類も含める）
                     const requiredDocs = checklist.filter(item => item.is_required);
-                    const uploadedRequired = requiredDocs.filter(item => uploadedTypes.has(item.document_type)).length;
+                    const uploadedRequired = requiredDocs.filter(item => fulfilledTypes.has(item.document_type)).length;
                     const totalRequired = requiredDocs.length;
                     const progressPercent = totalRequired > 0 ? Math.round((uploadedRequired / totalRequired) * 100) : 0;
                     
@@ -7926,15 +7934,17 @@ app.get('/client/:id', async (c) => {
                     </div>
                 \`;
                 
-                // チェックリスト表示（未提出の書類を強調）
+                // チェックリスト表示（未提出の書類を強調、共通書類も考慮）
                 const checklistContainer = document.getElementById('documentChecklist');
-                const pendingDocs = checklist.filter(item => !uploadedTypes.has(item.document_type));
+                const pendingDocs = checklist.filter(item => !fulfilledTypes.has(item.document_type));
+                const commonLinkedDocs = checklist.filter(item => !uploadedTypes.has(item.document_type) && commonDocTypes.has(item.document_type));
                 
                 if (pendingDocs.length === 0) {
                     checklistContainer.innerHTML = \`
                         <div class="text-center py-3 bg-green-50 rounded-lg">
                             <i class="fas fa-check-circle text-green-500 text-xl mb-1"></i>
                             <p class="text-sm text-green-700 font-medium">全ての書類が提出済みです</p>
+                            \${commonLinkedDocs.length > 0 ? '<p class="text-xs text-blue-600 mt-1"><i class="fas fa-link mr-1"></i>' + commonLinkedDocs.length + '件は共通書類から参照</p>' : ''}
                         </div>
                     \`;
                 } else {
@@ -7947,6 +7957,7 @@ app.get('/client/:id', async (c) => {
                                 \${item.is_required ? '<span class="text-xs text-red-500 font-medium">必須</span>' : '<span class="text-xs text-gray-400">任意</span>'}
                             </div>
                         \`).join('')}
+                        \${commonLinkedDocs.length > 0 ? '<div class="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded"><i class="fas fa-link mr-1"></i>' + commonLinkedDocs.length + '件は共通書類から参照</div>' : ''}
                     \`;
                 }
                 
@@ -12103,19 +12114,23 @@ app.get('/portal/:token', async (c) => {
                         }
                     } catch (e) { console.log('No pipeline tasks'); }
                     
-                    // 4. 未アップロード書類チェック
+                    // 4. 未アップロード書類チェック（共通書類も含む）
                     try {
                         // チェックリストとアップロード済み書類を取得（案件ベースで取得）
                         const checklistUrl = CASE_ID ? \`/api/cases/\${CASE_ID}/document-checklist\` : \`/api/clients/\${CLIENT_ID}/document-checklist\`;
-                        const [checklistRes, uploadedRes] = await Promise.all([
+                        const [checklistRes, uploadedRes, commonDocsRes] = await Promise.all([
                             axios.get(checklistUrl),
-                            axios.get(\`/api/clients/\${CLIENT_ID}/documents\`)
+                            axios.get(\`/api/clients/\${CLIENT_ID}/documents\`),
+                            axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`)
                         ]);
                         const checklist = checklistRes.data;
                         const uploaded = uploadedRes.data;
+                        const commonDocs = commonDocsRes.data || [];
                         
                         // アップロード済みの書類タイプを取得（document_typeで照合）
                         const uploadedTypes = new Set(uploaded.map(d => d.document_type));
+                        // 共通書類のタイプも含める
+                        commonDocs.forEach(d => uploadedTypes.add(d.document_type));
                         
                         // 未提出の書類をカウント（document_typeフィールドで照合）
                         const missingDocs = checklist.filter(item => 
@@ -12890,26 +12905,51 @@ app.get('/portal/:token', async (c) => {
                 
                 // 案件の助成金種別に基づくチェックリストを取得
                 const checklistUrl = CASE_ID ? \`/api/cases/\${CASE_ID}/document-checklist\` : \`/api/clients/\${CLIENT_ID}/document-checklist\`;
-                const response = await axios.get(checklistUrl);
+                const [response, docsResponse, commonDocsResponse] = await Promise.all([
+                    axios.get(checklistUrl),
+                    axios.get(\`/api/clients/\${CLIENT_ID}/documents\`),
+                    axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`)
+                ]);
                 const items = response.data;
-                
-                const docsResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/documents\`);
                 const uploadedDocs = docsResponse.data;
+                const commonDocs = commonDocsResponse.data || [];
+                
+                // 案件別アップロード済み書類
                 const uploadedTypes = new Set(uploadedDocs.map(d => d.document_type));
+                
+                // 共通書類の名前をマップ（同名の書類を紐づけ）
+                const commonDocsByType = {};
+                commonDocs.forEach(doc => {
+                    if (!commonDocsByType[doc.document_type]) {
+                        commonDocsByType[doc.document_type] = [];
+                    }
+                    commonDocsByType[doc.document_type].push(doc);
+                });
                 
                 document.getElementById('checklistItems').innerHTML = items.map(item => {
                     const isUploaded = uploadedTypes.has(item.document_type);
+                    // 共通書類から同名の書類を参照
+                    const linkedCommonDocs = commonDocsByType[item.document_type] || [];
+                    const hasCommonDoc = linkedCommonDocs.length > 0;
+                    const isFulfilled = isUploaded || hasCommonDoc;
+                    
+                    // 共通書類で補完されている場合のバッジ
+                    const commonBadge = hasCommonDoc && !isUploaded 
+                        ? '<span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-600"><i class="fas fa-link mr-0.5"></i>共通書類</span>' 
+                        : '';
+                    
                     return \`
-                        <div onclick="openUploadModal('\${item.document_type.replace(/'/g, "\\\\'")}', \${isUploaded})" 
-                             class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all \${isUploaded ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200 hover:bg-green-50 hover:border-green-300'}">
-                            <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center \${isUploaded ? 'bg-green-500' : 'bg-gray-300'}">
-                                <i class="fas \${isUploaded ? 'fa-check' : 'fa-plus'} text-white text-xs"></i>
+                        <div onclick="openUploadModal('\${item.document_type.replace(/'/g, "\\\\'")}', \${isFulfilled})" 
+                             class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all \${isFulfilled ? (hasCommonDoc && !isUploaded ? 'bg-blue-50 border border-blue-200' : 'bg-green-50 border border-green-200') : 'bg-gray-50 border border-gray-200 hover:bg-green-50 hover:border-green-300'}">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center \${isFulfilled ? (hasCommonDoc && !isUploaded ? 'bg-blue-500' : 'bg-green-500') : 'bg-gray-300'}">
+                                <i class="fas \${isFulfilled ? 'fa-check' : 'fa-plus'} text-white text-xs"></i>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <span class="text-sm \${isUploaded ? 'text-green-700 font-medium' : 'text-gray-700'}">\${item.document_type}</span>
+                                <span class="text-sm \${isFulfilled ? (hasCommonDoc && !isUploaded ? 'text-blue-700 font-medium' : 'text-green-700 font-medium') : 'text-gray-700'}">\${item.document_type}</span>
                                 \${item.is_required ? '<span class="ml-1 text-xs text-red-500">*必須</span>' : ''}
+                                \${commonBadge}
                             </div>
-                            <i class="fas fa-chevron-right text-xs \${isUploaded ? 'text-green-400' : 'text-gray-400'}"></i>
+                            <i class="fas fa-chevron-right text-xs \${isFulfilled ? (hasCommonDoc && !isUploaded ? 'text-blue-400' : 'text-green-400') : 'text-gray-400'}"></i>
                         </div>
                     \`;
                 }).join('');
