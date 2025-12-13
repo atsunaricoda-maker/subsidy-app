@@ -3594,6 +3594,12 @@ app.get('/', (c) => {
                 const container = document.getElementById('clientsList');
                 currentFilteredCases = cases;
                 
+                // 案件数を更新
+                const clientCountEl = document.getElementById('clientCount');
+                if (clientCountEl) {
+                    clientCountEl.textContent = cases.length + '件';
+                }
+                
                 if (cases.length === 0) {
                     container.innerHTML = \`
                         <div class="text-center py-12">
