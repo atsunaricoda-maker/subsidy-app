@@ -2243,6 +2243,33 @@ app.get('/', (c) => {
                                 </div>
                             </div>
                             
+                            <!-- 担当者別タスク -->
+                            <div class="bg-white rounded-xl shadow-sm p-4">
+                                <h2 class="text-base font-bold mb-4 flex items-center gap-2">
+                                    <i class="fas fa-user-check text-indigo-600"></i>担当者別タスク
+                                </h2>
+                                <div id="tasksByAssignee" class="space-y-2 text-sm">
+                                    <div class="animate-pulse space-y-2">
+                                        <div class="h-10 bg-gray-200 rounded"></div>
+                                        <div class="h-10 bg-gray-200 rounded"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 今週のToDo -->
+                            <div class="bg-white rounded-xl shadow-sm p-4">
+                                <h2 class="text-base font-bold mb-4 flex items-center gap-2">
+                                    <i class="fas fa-calendar-week text-green-600"></i>今週のToDo
+                                </h2>
+                                <div id="weeklyTodos" class="space-y-2 text-sm">
+                                    <div class="animate-pulse space-y-2">
+                                        <div class="h-8 bg-gray-200 rounded"></div>
+                                        <div class="h-8 bg-gray-200 rounded"></div>
+                                        <div class="h-8 bg-gray-200 rounded"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- クイックアクション -->
                             <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl shadow-sm p-4 text-white">
                                 <h2 class="text-base font-bold mb-3 flex items-center gap-2">
@@ -2969,6 +2996,8 @@ app.get('/', (c) => {
                     updateStatistics();
                     renderCases(allCases);
                     renderDeadlineAlerts(allCases);
+                    renderTasksByAssignee(allCases);
+                    renderWeeklyTodos(allCases);
                     loadRecentActivity();
                     loadSlotBalance();
                     loadNotificationSummary();
@@ -3255,6 +3284,154 @@ app.get('/', (c) => {
                         </div>
                     \`;
                 }).join('');
+            }
+            
+            // 担当者別タスクを表示
+            function renderTasksByAssignee(cases) {
+                const container = document.getElementById('tasksByAssignee');
+                if (!container) return;
+                
+                // 完了・却下以外の案件を担当者別にグループ化
+                const activeCases = cases.filter(c => c.status !== 'completed' && c.status !== 'rejected');
+                const byAssignee = {};
+                
+                activeCases.forEach(c => {
+                    const assignee = c.assigned_to || '未割り当て';
+                    if (!byAssignee[assignee]) {
+                        byAssignee[assignee] = [];
+                    }
+                    byAssignee[assignee].push(c);
+                });
+                
+                if (Object.keys(byAssignee).length === 0) {
+                    container.innerHTML = '<div class="text-center py-4 text-gray-500">進行中の案件はありません</div>';
+                    return;
+                }
+                
+                // 担当者名を取得
+                const getAssigneeName = (username) => {
+                    if (username === '未割り当て') return '未割り当て';
+                    const user = allUsers.find(u => u.username === username);
+                    return user?.name || username;
+                };
+                
+                container.innerHTML = Object.entries(byAssignee)
+                    .sort((a, b) => b[1].length - a[1].length) // 件数が多い順
+                    .map(([assignee, assigneeCases]) => {
+                        const urgentCount = assigneeCases.filter(c => {
+                            if (!c.application_end_date) return false;
+                            const deadline = new Date(c.application_end_date);
+                            const diffDays = Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24));
+                            return diffDays >= 0 && diffDays <= 7;
+                        }).length;
+                        
+                        return \`
+                            <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer" onclick="location.href='/cases?assigned_to=\${encodeURIComponent(assignee)}'">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                        <i class="fas fa-user text-xs"></i>
+                                    </div>
+                                    <span class="font-medium">\${getAssigneeName(assignee)}</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    \${urgentCount > 0 ? \`<span class="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">\${urgentCount}件緊急</span>\` : ''}
+                                    <span class="bg-indigo-100 text-indigo-600 text-xs px-2 py-1 rounded-full font-bold">\${assigneeCases.length}件</span>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+            }
+            
+            // 今週のToDoを表示
+            function renderWeeklyTodos(cases) {
+                const container = document.getElementById('weeklyTodos');
+                if (!container) return;
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                // 今週末（日曜日）を計算
+                const endOfWeek = new Date(today);
+                endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+                
+                // 今週期限の案件を抽出
+                const weeklyDeadlines = cases.filter(c => {
+                    if (c.status === 'completed' || c.status === 'rejected') return false;
+                    if (!c.application_end_date) return false;
+                    
+                    const deadline = new Date(c.application_end_date);
+                    return deadline >= today && deadline <= endOfWeek;
+                }).sort((a, b) => new Date(a.application_end_date) - new Date(b.application_end_date));
+                
+                // 未提出書類がある案件を抽出
+                const pendingDocs = cases.filter(c => {
+                    if (c.status === 'completed' || c.status === 'rejected') return false;
+                    return c.document_progress && c.document_progress < 100;
+                }).slice(0, 5);
+                
+                // ヒアリング未完了の案件を抽出
+                const pendingHearing = cases.filter(c => {
+                    if (c.status === 'completed' || c.status === 'rejected') return false;
+                    return c.hearing_progress && c.hearing_progress < 100;
+                }).slice(0, 3);
+                
+                let html = '';
+                
+                // 今週期限
+                if (weeklyDeadlines.length > 0) {
+                    html += \`
+                        <div class="mb-3">
+                            <div class="text-xs text-gray-500 mb-1 font-medium">📅 今週期限</div>
+                            \${weeklyDeadlines.slice(0, 5).map(c => {
+                                const deadline = new Date(c.application_end_date);
+                                const diffDays = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+                                const urgencyClass = diffDays <= 2 ? 'text-red-600 font-bold' : 'text-orange-600';
+                                return \`
+                                    <a href="/case/\${c.id}" class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                                        <span class="truncate flex-1">\${c.client_name} - \${c.subsidy_name || '補助金'}</span>
+                                        <span class="text-xs \${urgencyClass}">\${diffDays === 0 ? '今日!' : \`あと\${diffDays}日\`}</span>
+                                    </a>
+                                \`;
+                            }).join('')}
+                        </div>
+                    \`;
+                }
+                
+                // 書類待ち
+                if (pendingDocs.length > 0) {
+                    html += \`
+                        <div class="mb-3">
+                            <div class="text-xs text-gray-500 mb-1 font-medium">📄 書類待ち</div>
+                            \${pendingDocs.map(c => \`
+                                <a href="/case/\${c.id}" class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                                    <span class="truncate flex-1">\${c.client_name}</span>
+                                    <span class="text-xs text-blue-600">\${c.document_progress || 0}%完了</span>
+                                </a>
+                            \`).join('')}
+                        </div>
+                    \`;
+                }
+                
+                // ヒアリング待ち
+                if (pendingHearing.length > 0) {
+                    html += \`
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1 font-medium">🎤 ヒアリング待ち</div>
+                            \${pendingHearing.map(c => \`
+                                <a href="/case/\${c.id}" class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                                    <span class="truncate flex-1">\${c.client_name}</span>
+                                    <span class="text-xs text-purple-600">\${c.hearing_progress || 0}%完了</span>
+                                </a>
+                            \`).join('')}
+                        </div>
+                    \`;
+                }
+                
+                if (!html) {
+                    html = '<div class="text-center py-4 text-gray-500">今週のタスクはありません 🎉</div>';
+                }
+                
+                container.innerHTML = html;
             }
             
             // 助成金種別読み込み
@@ -5441,6 +5618,78 @@ app.get('/api/documents/:id/download', async (c) => {
       'Content-Type': object.httpMetadata?.contentType || 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${doc.file_name}"`
     }
+  })
+})
+
+// 案件の書類一括ダウンロード（ZIP）
+app.get('/api/cases/:id/documents/download-all', async (c) => {
+  const { DB, R2 } = c.env
+  const caseId = c.req.param('id')
+  
+  // 案件情報取得
+  const caseInfo = await DB.prepare(`
+    SELECT c.*, cl.name as client_name, cl.company_name, st.name as subsidy_name
+    FROM cases c
+    LEFT JOIN clients cl ON c.client_id = cl.id
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    WHERE c.id = ?
+  `).bind(caseId).first()
+  
+  if (!caseInfo) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  // 案件に紐づく書類を取得
+  const documents = await DB.prepare(`
+    SELECT * FROM documents WHERE case_id = ?
+  `).bind(caseId).all()
+  
+  // 顧客の共通書類も取得
+  const commonDocs = await DB.prepare(`
+    SELECT cd.*, cdt.name as type_name
+    FROM common_documents cd
+    LEFT JOIN common_document_types cdt ON cd.document_type_id = cdt.id
+    WHERE cd.client_id = ?
+  `).bind(caseInfo.client_id).all()
+  
+  const allDocs = [
+    ...(documents.results || []).map(d => ({ ...d, isCommon: false })),
+    ...(commonDocs.results || []).map(d => ({ ...d, isCommon: true }))
+  ]
+  
+  if (allDocs.length === 0) {
+    return c.json({ error: 'No documents found for this case' }, 404)
+  }
+  
+  // JSZipを使わずシンプルなtar形式で出力（または各ファイルを個別にダウンロード案内）
+  // Cloudflare WorkersではJSZipが重いため、ファイルリストをJSON返却
+  const fileList = []
+  
+  for (const doc of allDocs) {
+    const filePath = doc.file_path
+    const object = await R2.get(filePath)
+    
+    if (object) {
+      const arrayBuffer = await object.arrayBuffer()
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+      
+      fileList.push({
+        name: doc.isCommon ? `共通書類/${doc.type_name || 'その他'}/${doc.file_name}` : `案件書類/${doc.document_type || 'その他'}/${doc.file_name}`,
+        data: base64,
+        contentType: object.httpMetadata?.contentType || 'application/octet-stream'
+      })
+    }
+  }
+  
+  // クライアント側でZIP生成するためのデータを返す
+  const clientName = caseInfo.company_name || caseInfo.client_name || '顧客'
+  const subsidyName = caseInfo.subsidy_name || '案件'
+  
+  return c.json({
+    success: true,
+    zipFileName: `${clientName}_${subsidyName}_書類一式.zip`,
+    files: fileList,
+    totalFiles: fileList.length
   })
 })
 
@@ -10084,6 +10333,22 @@ app.get('/case/:id', async (c) => {
                     
                     <!-- 書類管理タブ -->
                     <div id="content-documents" class="tab-content hidden">
+                        <!-- 一括ダウンロードボタン -->
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm p-4 mb-6 border border-blue-100">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="font-bold text-blue-800">
+                                        <i class="fas fa-file-archive mr-2"></i>書類一括ダウンロード
+                                    </h3>
+                                    <p class="text-sm text-blue-600 mt-1">案件書類と共通書類をまとめてZIPファイルでダウンロードできます</p>
+                                </div>
+                                <button onclick="downloadAllDocuments()" id="downloadAllBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium">
+                                    <i class="fas fa-download"></i>
+                                    <span>一括ダウンロード</span>
+                                </button>
+                            </div>
+                        </div>
+                        
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div class="bg-white rounded-xl shadow-sm p-6">
                                 <h3 class="text-lg font-bold mb-4">
@@ -10517,6 +10782,72 @@ app.get('/case/:id', async (c) => {
                 navigator.clipboard.writeText(PORTAL_URL).then(() => {
                     showToast('ポータルURLをコピーしました');
                 });
+            }
+            
+            // 書類一括ダウンロード
+            async function downloadAllDocuments() {
+                const btn = document.getElementById('downloadAllBtn');
+                const originalContent = btn.innerHTML;
+                
+                try {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>準備中...</span>';
+                    
+                    const response = await axios.get(\`/api/cases/\${CASE_ID}/documents/download-all\`);
+                    
+                    if (!response.data.success || response.data.files.length === 0) {
+                        showToast('ダウンロードする書類がありません');
+                        return;
+                    }
+                    
+                    btn.innerHTML = '<i class="fas fa-cog fa-spin"></i><span>ZIP作成中...</span>';
+                    
+                    // JSZipを動的にロード
+                    if (!window.JSZip) {
+                        await new Promise((resolve, reject) => {
+                            const script = document.createElement('script');
+                            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                            script.onload = resolve;
+                            script.onerror = reject;
+                            document.head.appendChild(script);
+                        });
+                    }
+                    
+                    const zip = new JSZip();
+                    
+                    // ファイルをZIPに追加
+                    for (const file of response.data.files) {
+                        const binaryString = atob(file.data);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        zip.file(file.name, bytes);
+                    }
+                    
+                    // ZIPを生成してダウンロード
+                    const content = await zip.generateAsync({ type: 'blob' });
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = response.data.zipFileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    showToast(\`\${response.data.totalFiles}件の書類をダウンロードしました\`);
+                } catch (error) {
+                    console.error('Download error:', error);
+                    if (error.response?.status === 404) {
+                        showToast('ダウンロードする書類がありません');
+                    } else {
+                        showToast('ダウンロードに失敗しました');
+                    }
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalContent;
+                }
             }
             
             // トースト表示
