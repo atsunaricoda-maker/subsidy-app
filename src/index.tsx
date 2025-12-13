@@ -4624,7 +4624,6 @@ app.get('/api/cases/:id', async (c) => {
       clients.company_name,
       clients.email,
       clients.phone,
-      clients.contract_url as client_contract_url,
       subsidy_types.name as subsidy_type_name,
       admin_users.name as assigned_to_name
     FROM cases
@@ -4636,11 +4635,6 @@ app.get('/api/cases/:id', async (c) => {
   
   if (!result) {
     return c.json({ error: 'Case not found' }, 404)
-  }
-  
-  // contract_urlが案件になければ顧客のcontract_urlを使用
-  if (!result.contract_url && result.client_contract_url) {
-    result.contract_url = result.client_contract_url
   }
   
   return c.json(result)
@@ -11033,23 +11027,47 @@ app.get('/case/:id', async (c) => {
                         \`;
                     }
                     
-                    // 契約
-                    if (caseData.contract_url) {
-                        contractContainer.innerHTML = \`
-                            <a href="\${caseData.contract_url}" target="_blank" class="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50">
-                                <i class="fas fa-file-signature text-2xl text-blue-600"></i>
-                                <div class="flex-1">
-                                    <div class="font-medium">電子契約書</div>
-                                    <div class="text-sm text-gray-500">クリックして開く</div>
+                    // 契約URL（編集可能）
+                    contractContainer.innerHTML = \`
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">電子契約URL</label>
+                                <div class="flex gap-2">
+                                    <input type="url" id="contractUrlInput" value="\${caseData.contract_url || ''}" 
+                                           placeholder="https://..." 
+                                           class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                                    <button onclick="saveContractUrl()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                        <i class="fas fa-save mr-1"></i>保存
+                                    </button>
                                 </div>
-                                <i class="fas fa-external-link-alt text-gray-400"></i>
-                            </a>
-                        \`;
-                    } else {
-                        contractContainer.innerHTML = '<div class="text-gray-500">契約URLは設定されていません</div>';
-                    }
+                                <p class="text-xs text-gray-500 mt-1">CloudSign、freeeサインなどの電子契約URL</p>
+                            </div>
+                            \${caseData.contract_url ? \`
+                                <a href="\${caseData.contract_url}" target="_blank" class="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100">
+                                    <i class="fas fa-file-signature text-xl text-blue-600"></i>
+                                    <div class="flex-1">
+                                        <div class="font-medium text-blue-700">契約書を開く</div>
+                                        <div class="text-xs text-blue-500 truncate">\${caseData.contract_url}</div>
+                                    </div>
+                                    <i class="fas fa-external-link-alt text-blue-400"></i>
+                                </a>
+                            \` : ''}
+                        </div>
+                    \`;
                 } catch (error) {
                     console.error('Error loading payment:', error);
+                }
+            }
+            
+            // 契約URLを保存
+            async function saveContractUrl() {
+                try {
+                    const contractUrl = document.getElementById('contractUrlInput').value.trim();
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { contract_url: contractUrl || null });
+                    showToast('契約URLを保存しました');
+                    loadPayment();
+                } catch (error) {
+                    alert('保存に失敗しました');
                 }
             }
             
