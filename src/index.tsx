@@ -4618,6 +4618,7 @@ app.get('/api/cases/:id', async (c) => {
       clients.company_name,
       clients.email,
       clients.phone,
+      clients.contract_url as client_contract_url,
       subsidy_types.name as subsidy_type_name,
       admin_users.name as assigned_to_name
     FROM cases
@@ -4629,6 +4630,11 @@ app.get('/api/cases/:id', async (c) => {
   
   if (!result) {
     return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  // contract_urlが案件になければ顧客のcontract_urlを使用
+  if (!result.contract_url && result.client_contract_url) {
+    result.contract_url = result.client_contract_url
   }
   
   return c.json(result)
