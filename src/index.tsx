@@ -5484,6 +5484,57 @@ app.get('/api/common-document-types', async (c) => {
   return c.json(result.results || [])
 })
 
+// 共通書類タイプの初期化・更新（決算書3期分対応など）
+app.post('/api/common-document-types/initialize', async (c) => {
+  const { DB } = c.env
+  
+  // デフォルトの共通書類タイプ
+  const defaultTypes = [
+    { name: '登記簿謄本', description: '法人登記簿謄本（3ヶ月以内）', validity_months: 3, max_versions: 1, display_order: 1 },
+    { name: '決算書', description: '損益計算書・貸借対照表（最大3期分保存可能）', validity_months: null, max_versions: 3, display_order: 2 },
+    { name: '確定申告書', description: '法人税確定申告書（最大3期分保存可能）', validity_months: null, max_versions: 3, display_order: 3 },
+    { name: '会社概要', description: '会社案内・パンフレット等', validity_months: null, max_versions: 1, display_order: 4 },
+    { name: '印鑑証明書', description: '法人印鑑証明書（3ヶ月以内）', validity_months: 3, max_versions: 1, display_order: 5 },
+    { name: '納税証明書', description: '納税証明書（3ヶ月以内）', validity_months: 3, max_versions: 1, display_order: 6 },
+    { name: '定款', description: '会社定款', validity_months: null, max_versions: 1, display_order: 7 },
+    { name: '役員名簿', description: '役員一覧', validity_months: null, max_versions: 1, display_order: 8 }
+  ]
+  
+  let updated = 0
+  let inserted = 0
+  
+  for (const type of defaultTypes) {
+    // 既存チェック
+    const existing = await DB.prepare(`
+      SELECT id FROM common_document_types WHERE name = ?
+    `).bind(type.name).first()
+    
+    if (existing) {
+      // 既存の場合は更新（max_versions, validity_months, description）
+      await DB.prepare(`
+        UPDATE common_document_types 
+        SET max_versions = ?, validity_months = ?, description = ?, display_order = ?
+        WHERE name = ?
+      `).bind(type.max_versions, type.validity_months, type.description, type.display_order, type.name).run()
+      updated++
+    } else {
+      // 新規追加
+      await DB.prepare(`
+        INSERT INTO common_document_types (name, description, validity_months, max_versions, display_order)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(type.name, type.description, type.validity_months, type.max_versions, type.display_order).run()
+      inserted++
+    }
+  }
+  
+  return c.json({ 
+    success: true, 
+    message: `共通書類タイプを初期化しました（新規: ${inserted}件、更新: ${updated}件）`,
+    inserted,
+    updated
+  })
+})
+
 // 顧客の共通書類一覧取得
 app.get('/api/clients/:clientId/common-documents', async (c) => {
   const { DB } = c.env
@@ -8016,28 +8067,56 @@ app.get('/client/:id', async (c) => {
                             }
                         }
                         
+                        // 複数期分対応（決算書・確定申告書など）
+                        const isMultiVersion = type.max_versions && type.max_versions > 1;
+                        const maxVer = type.max_versions || 1;
+                        
                         return \`
-                            <div class="flex items-center gap-3 p-3 rounded-lg border \${hasDoc ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}">
-                                <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center \${hasDoc ? 'bg-blue-500' : 'bg-gray-300'}">
-                                    <i class="fas \${hasDoc ? 'fa-check' : 'fa-file-alt'} text-white text-sm"></i>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center">
-                                        <span class="font-medium text-sm \${hasDoc ? 'text-blue-800' : 'text-gray-700'}">\${type.name}</span>
-                                        \${validityBadge}
+                            <div class="p-3 rounded-lg border \${hasDoc ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center \${hasDoc ? 'bg-blue-500' : 'bg-gray-300'}">
+                                        <i class="fas \${hasDoc ? 'fa-check' : 'fa-file-alt'} text-white text-sm"></i>
                                     </div>
-                                    \${hasDoc ? \`
-                                        <div class="text-xs text-gray-600 mt-0.5">
-                                            \${latestDoc.fiscal_year ? latestDoc.fiscal_year + '年度 - ' : ''}\${latestDoc.file_name}
-                                            <span class="text-gray-400 ml-1">\${new Date(latestDoc.uploaded_at).toLocaleDateString('ja-JP')}</span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center flex-wrap gap-1">
+                                            <span class="font-medium text-sm \${hasDoc ? 'text-blue-800' : 'text-gray-700'}">\${type.name}</span>
+                                            \${validityBadge}
+                                            \${isMultiVersion ? \`<span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">最大\${maxVer}期</span>\` : ''}
                                         </div>
-                                    \` : '<div class="text-xs text-gray-500 mt-0.5">未アップロード</div>'}
+                                        \${!hasDoc ? '<div class="text-xs text-gray-500 mt-0.5">未アップロード</div>' : ''}
+                                    </div>
+                                    \${hasDoc && docs.length === 1 && !isMultiVersion ? \`
+                                        <a href="/api/common-documents/\${latestDoc.id}/download" 
+                                           class="text-blue-600 hover:text-blue-800 text-sm" title="ダウンロード">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                    \` : ''}
                                 </div>
-                                \${hasDoc ? \`
-                                    <a href="/api/common-documents/\${latestDoc.id}/download" 
-                                       class="text-blue-600 hover:text-blue-800 text-sm">
-                                        <i class="fas fa-download"></i>
-                                    </a>
+                                \${hasDoc && (isMultiVersion || docs.length > 1) ? \`
+                                    <div class="mt-2 ml-11 space-y-1">
+                                        \${docs.map((doc, idx) => \`
+                                            <div class="flex items-center justify-between text-xs bg-white rounded px-2 py-1.5 border">
+                                                <div class="flex items-center gap-2 min-w-0">
+                                                    <span class="text-purple-600 font-medium">\${doc.fiscal_year ? doc.fiscal_year + '期' : (idx + 1) + '件目'}</span>
+                                                    <span class="text-gray-600 truncate">\${doc.file_name}</span>
+                                                    <span class="text-gray-400">\${new Date(doc.uploaded_at).toLocaleDateString('ja-JP')}</span>
+                                                </div>
+                                                <a href="/api/common-documents/\${doc.id}/download" 
+                                                   class="text-blue-600 hover:text-blue-800 ml-2 flex-shrink-0" title="ダウンロード">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                            </div>
+                                        \`).join('')}
+                                        \${docs.length < maxVer ? \`
+                                            <div class="text-xs text-gray-400 italic">あと\${maxVer - docs.length}期分アップロード可能</div>
+                                        \` : ''}
+                                    </div>
+                                \` : ''}
+                                \${hasDoc && !isMultiVersion && docs.length === 1 ? \`
+                                    <div class="mt-1 ml-11 text-xs text-gray-600">
+                                        \${latestDoc.fiscal_year ? latestDoc.fiscal_year + '年度 - ' : ''}\${latestDoc.file_name}
+                                        <span class="text-gray-400 ml-1">\${new Date(latestDoc.uploaded_at).toLocaleDateString('ja-JP')}</span>
+                                    </div>
                                 \` : ''}
                             </div>
                         \`;
@@ -11456,11 +11535,21 @@ app.get('/portal/:token', async (c) => {
                         </button>
                     </div>
                     <div class="p-4">
+                        <!-- 複数期分対応の案内 -->
+                        <div id="commonDocMultiVersionInfo" class="hidden mb-3 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                            <p class="text-xs text-purple-700">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                <span id="commonDocMaxVersionText">この書類は最大3期分保存できます</span>
+                            </p>
+                        </div>
+                        
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">年度（任意）</label>
-                            <input type="text" id="commonDocFiscalYear" placeholder="例: 2024" 
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                年度・決算期 <span id="commonDocFiscalYearRequired" class="hidden text-red-500">*必須</span>
+                            </label>
+                            <input type="text" id="commonDocFiscalYear" placeholder="例: 2024 または 第10期" 
                                    class="w-full px-3 py-2 border rounded-lg text-sm">
-                            <p class="text-xs text-gray-500 mt-1">決算書や確定申告書など、年度がある書類の場合は入力してください</p>
+                            <p class="text-xs text-gray-500 mt-1">決算書・確定申告書は年度の入力を推奨します（管理しやすくなります）</p>
                         </div>
                         <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-blue-500 hover:bg-blue-50 cursor-pointer">
                             <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
@@ -12807,16 +12896,22 @@ app.get('/portal/:token', async (c) => {
                             }
                         }
                         
+                        // 複数期分対応
+                        const maxVer = type.max_versions || 1;
+                        const canAddMore = !hasDoc || (maxVer > 1 && docs.length < maxVer);
+                        const multiVersionBadge = maxVer > 1 ? \`<span class="ml-1 text-xs px-1 py-0.5 rounded bg-purple-100 text-purple-600">\${docs.length}/\${maxVer}期</span>\` : '';
+                        
                         return \`
-                            <div onclick="openCommonDocUploadModal('\${type.name.replace(/'/g, "\\\\'")}', \${type.id}, \${hasDoc})" 
+                            <div onclick="openCommonDocUploadModal('\${type.name.replace(/'/g, "\\\\'")}', \${type.id}, \${hasDoc}, \${maxVer})" 
                                  class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all \${hasDoc ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200 hover:bg-blue-50 hover:border-blue-300'}">
-                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center \${hasDoc ? 'bg-blue-500' : 'bg-gray-300'}">
-                                    <i class="fas \${hasDoc ? 'fa-check' : 'fa-plus'} text-white text-xs"></i>
+                                <div class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center \${hasDoc && !canAddMore ? 'bg-blue-500' : hasDoc ? 'bg-blue-400' : 'bg-gray-300'}">
+                                    <i class="fas \${hasDoc && !canAddMore ? 'fa-check' : hasDoc ? 'fa-plus' : 'fa-plus'} text-white text-xs"></i>
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <span class="text-sm \${hasDoc ? 'text-blue-700 font-medium' : 'text-gray-700'}">\${type.name}</span>
+                                    \${multiVersionBadge}
                                     \${validityStatus}
-                                    \${hasDoc ? '<span class="block text-xs text-gray-500 truncate">' + (latestDoc.fiscal_year ? latestDoc.fiscal_year + '年度 - ' : '') + latestDoc.file_name + '</span>' : ''}
+                                    \${hasDoc ? '<span class="block text-xs text-gray-500 truncate">' + (latestDoc.fiscal_year ? latestDoc.fiscal_year + '期 - ' : '') + latestDoc.file_name + (docs.length > 1 ? ' 他' + (docs.length - 1) + '件' : '') + '</span>' : ''}
                                 </div>
                                 <i class="fas fa-chevron-right text-xs \${hasDoc ? 'text-blue-400' : 'text-gray-400'}"></i>
                             </div>
@@ -12831,14 +12926,31 @@ app.get('/portal/:token', async (c) => {
             // 共通書類アップロードモーダルを開く
             let selectedCommonDocType = null;
             let selectedCommonDocTypeId = null;
+            let selectedDocMaxVersions = 1;
             
-            function openCommonDocUploadModal(typeName, typeId, hasDoc) {
+            function openCommonDocUploadModal(typeName, typeId, hasDoc, maxVersions = 1) {
                 selectedCommonDocType = typeName;
                 selectedCommonDocTypeId = typeId;
+                selectedDocMaxVersions = maxVersions || 1;
                 
                 document.getElementById('commonDocModalTitle').innerHTML = \`
                     <i class="fas fa-\${hasDoc ? 'sync-alt' : 'upload'} mr-2"></i>\${typeName}
                 \`;
+                
+                // 複数期分対応の場合は案内を表示
+                const multiVersionInfo = document.getElementById('commonDocMultiVersionInfo');
+                const maxVersionText = document.getElementById('commonDocMaxVersionText');
+                const fiscalYearRequired = document.getElementById('commonDocFiscalYearRequired');
+                
+                if (selectedDocMaxVersions > 1) {
+                    multiVersionInfo.classList.remove('hidden');
+                    maxVersionText.textContent = \`この書類は最大\${selectedDocMaxVersions}期分保存できます。年度を入力すると管理しやすくなります。\`;
+                    fiscalYearRequired.classList.remove('hidden');
+                } else {
+                    multiVersionInfo.classList.add('hidden');
+                    fiscalYearRequired.classList.add('hidden');
+                }
+                
                 document.getElementById('commonDocUploadModal').classList.remove('hidden');
             }
             
@@ -12846,8 +12958,11 @@ app.get('/portal/:token', async (c) => {
                 document.getElementById('commonDocUploadModal').classList.add('hidden');
                 document.getElementById('commonDocFileInput').value = '';
                 document.getElementById('commonDocFiscalYear').value = '';
+                document.getElementById('commonDocMultiVersionInfo').classList.add('hidden');
+                document.getElementById('commonDocFiscalYearRequired').classList.add('hidden');
                 selectedCommonDocType = null;
                 selectedCommonDocTypeId = null;
+                selectedDocMaxVersions = 1;
             }
             
             async function uploadCommonDocument() {
