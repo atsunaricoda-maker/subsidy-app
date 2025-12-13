@@ -15035,7 +15035,7 @@ app.post('/api/subsidy-check-updates', async (c) => {
 
 // AI による公募要領情報の自動抽出
 app.post('/api/subsidy-guidelines/:subsidyTypeId/ai-extract', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
+  const { DB } = c.env
   const subsidyTypeId = c.req.param('subsidyTypeId')
   const { url } = await c.req.json()
   
@@ -15117,44 +15117,8 @@ ${textContent}
 - 情報が明確に読み取れない場合はnullを設定
 - JSONのみを出力し、他の説明は不要`
 
-    // Gemini APIを呼び出し
-    if (!GEMINI_API_KEY) {
-      return c.json({ 
-        error: 'API key not configured',
-        demo: true,
-        extracted: {
-          fiscal_year: "2025年度",
-          version: "デモ用サンプル",
-          application_end_date: "2025-12-31",
-          max_amount: 5000000,
-          subsidy_rate: "1/2",
-          confidence: "low",
-          notes: "これはデモ用のサンプルデータです"
-        }
-      })
-    }
-    
-    const aiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 2048,
-          }
-        })
-      }
-    )
-    
-    if (!aiResponse.ok) {
-      throw new Error(`Gemini API error: ${aiResponse.status}`)
-    }
-    
-    const aiData = await aiResponse.json()
-    const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    // Claude AIを呼び出し
+    const aiText = await callAI(prompt, c.env)
     
     // JSONを抽出
     let extracted = null
@@ -18129,24 +18093,20 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
   throw lastError || new Error('Claude API failed after retries')
 }
 
-// 統合AI API呼び出し（Geminiがレート制限にかかったらClaudeにフォールバック）
+// 統合AI API呼び出し（Claude Haiku 4.5をメインで使用）
 async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: number): Promise<string> {
-  const { DB, GEMINI_API_KEY, CLAUDE_API_KEY } = env
+  const { DB, CLAUDE_API_KEY } = env
   
   // DB設定からClaude APIキーを取得
   let claudeApiKey = CLAUDE_API_KEY || ''
-  let aiProvider = 'gemini' // デフォルトはGemini
   
   try {
     const aiSettings = await DB.prepare(`
       SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key IN ('ai_provider', 'claude_api_key')
+      WHERE setting_key = 'claude_api_key'
     `).all()
     
     for (const setting of (aiSettings.results || [])) {
-      if ((setting as any).setting_key === 'ai_provider') {
-        aiProvider = (setting as any).setting_value || 'gemini'
-      }
       if ((setting as any).setting_key === 'claude_api_key' && (setting as any).setting_value) {
         claudeApiKey = (setting as any).setting_value
       }
@@ -18155,43 +18115,18 @@ async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: numbe
     console.error('Failed to load AI settings:', e)
   }
   
-  // 設定がClaudeの場合は直接Claude使用
-  if (aiProvider === 'claude' && claudeApiKey) {
-    return callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars)
+  // Claude APIキーがない場合はエラー
+  if (!claudeApiKey) {
+    throw new Error('Claude APIキーが設定されていません。システム設定からAPIキーを設定してください。')
   }
   
-  // Geminiを試行し、レート制限時はClaudeにフォールバック
-  try {
-    return await callGeminiAPI(prompt, GEMINI_API_KEY, maxRetries, maxChars)
-  } catch (error: any) {
-    const errorMessage = error?.message || ''
-    const isRateLimited = errorMessage.includes('429') || 
-                          errorMessage.includes('RESOURCE_EXHAUSTED') || 
-                          errorMessage.includes('quota')
-    
-    // レート制限でClaudeのAPIキーがある場合はフォールバック
-    if (isRateLimited && claudeApiKey) {
-      console.log('Gemini rate limited, falling back to Claude Haiku 4.5...')
-      try {
-        const result = await callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars)
-        // フォールバック成功時にログ
-        console.log('Successfully generated content using Claude fallback')
-        return result
-      } catch (claudeError) {
-        console.error('Claude fallback also failed:', claudeError)
-        throw new Error(`Both Gemini and Claude failed. Gemini: ${errorMessage}`)
-      }
-    }
-    
-    // Claudeキーがない場合は元のエラーをスロー
-    throw error
-  }
+  return callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars)
 }
 
-// マルチモーダルGemini API呼び出し（画像/PDF対応）
-async function callGeminiAPIWithFile(prompt: string, fileData: ArrayBuffer, mimeType: string, apiKey: string): Promise<string> {
+// マルチモーダルClaude API呼び出し（画像/PDF対応）
+async function callClaudeAPIWithFile(prompt: string, fileData: ArrayBuffer, mimeType: string, apiKey: string): Promise<string> {
   if (!apiKey) {
-    return `【デモモード】書類解析はAPIキーが必要です。`
+    return `【デモモード】書類解析はAPIキーが必要です。システム設定からClaude APIキーを設定してください。`
   }
   
   // ArrayBufferをBase64に変換
@@ -18199,48 +18134,57 @@ async function callGeminiAPIWithFile(prompt: string, fileData: ArrayBuffer, mime
     new Uint8Array(fileData).reduce((data, byte) => data + String.fromCharCode(byte), '')
   )
   
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: base64Data
-              }
+  // Claude APIはPDF/画像をサポート
+  // Claude 3 Haiku/Sonnet/OpusはPDF対応（直接インライン）
+  const mediaType = mimeType.includes('pdf') ? 'application/pdf' : mimeType
+  
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20241022',
+      max_tokens: 8192,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: mimeType.includes('pdf') ? 'document' : 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: base64Data
             }
-          ]
-        }],
-        generationConfig: {
-          temperature: 0.2, // 書類解析は精度重視で低温度
-          maxOutputTokens: 8192,
-        }
-      })
-    }
-  )
+          },
+          {
+            type: 'text',
+            text: prompt
+          }
+        ]
+      }]
+    })
+  })
   
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('Gemini multimodal API error:', response.status, errorText)
-    throw new Error(`Gemini API error: ${response.status}`)
+    console.error('Claude multimodal API error:', response.status, errorText)
+    throw new Error(`Claude API error: ${response.status}`)
   }
   
   const data = await response.json()
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  return data.content?.[0]?.text || ''
 }
 
-// 書類からテキストを抽出する関数
+// 書類からテキストを抽出する関数（Claude使用）
 async function extractTextFromDocument(
   r2: R2Bucket,
   filePath: string,
   documentType: string,
   fileName: string,
-  apiKey: string
+  claudeApiKey: string
 ): Promise<string> {
   try {
     const object = await r2.get(filePath)
@@ -18251,7 +18195,7 @@ async function extractTextFromDocument(
     const arrayBuffer = await object.arrayBuffer()
     const mimeType = object.httpMetadata?.contentType || 'application/octet-stream'
     
-    // サポートされるファイル形式をチェック
+    // サポートされるファイル形式をチェック（Claude対応形式）
     const supportedMimeTypes = [
       'application/pdf',
       'image/jpeg',
@@ -18279,7 +18223,7 @@ async function extractTextFromDocument(
 - 不明瞭な部分は「（読み取り困難）」と記載
 - マークダウン記法は使用しないでください`
 
-    return await callGeminiAPIWithFile(extractionPrompt, arrayBuffer, mimeType, apiKey)
+    return await callClaudeAPIWithFile(extractionPrompt, arrayBuffer, mimeType, claudeApiKey)
   } catch (error) {
     console.error(`Document extraction error for ${filePath}:`, error)
     return `【${documentType}】テキスト抽出に失敗しました。`
@@ -18662,7 +18606,8 @@ app.get('/api/clients/:clientId/ai-chat', async (c) => {
 
 // AIチャット送信
 app.post('/api/clients/:clientId/ai-chat', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
+  const { DB } = c.env
+  const env = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
   
@@ -18752,7 +18697,7 @@ ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? '
   const prompt = `${systemPrompt}\n\nユーザー: ${data.message}`
   
   try {
-    const aiResponse = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    const aiResponse = await callAI(prompt, env)
     
     // AIレスポンスを保存
     await DB.prepare(`
@@ -18761,24 +18706,19 @@ ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? '
     `).bind(clientId, aiResponse, data.context_type || 'hearing').run()
     
     return c.json({ response: aiResponse })
-  } catch (error) {
-    return c.json({ error: 'AI応答の生成に失敗しました', response: '申し訳ありません。一時的にAI機能が利用できません。しばらくしてからお試しください。' })
+  } catch (error: any) {
+    console.error('AI chat error:', error)
+    return c.json({ error: 'AI応答の生成に失敗しました', response: error?.message?.includes('APIキー') ? error.message : '申し訳ありません。一時的にAI機能が利用できません。しばらくしてからお試しください。' })
   }
 })
 
 // AI回答提案API
 app.post('/api/clients/:clientId/ai-suggest', async (c) => {
   try {
-    const { DB, GEMINI_API_KEY } = c.env
+    const { DB } = c.env
+    const env = c.env
     const clientId = c.req.param('clientId')
     const data = await c.req.json()
-    
-    // APIキーがない場合はデモモードで回答
-    if (!GEMINI_API_KEY) {
-      return c.json({ 
-        suggestion: `【デモモード】\n\nAI APIキーが設定されていないため、自動提案は利用できません。\n\n質問「${data.question_text}」に対して、以下のような情報を入力してください：\n\n・具体的な数字（従業員数、売上高など）\n・現在の状況や課題\n・今後の目標や計画\n\n手動で回答を入力してください。`
-      })
-    }
     
     // 顧客情報と既存回答を取得
     const client = await DB.prepare(`
@@ -18834,13 +18774,15 @@ ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text |
 
 質問: ${data.question_text}`
 
-    const suggestion = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    const suggestion = await callAI(prompt, env)
     return c.json({ suggestion })
     
   } catch (error: any) {
     console.error('AI suggest error:', error)
     return c.json({ 
-      suggestion: `【エラー】AI提案の生成に失敗しました。\n\n原因: ${error?.message || '不明なエラー'}\n\n手動で回答を入力するか、後でもう一度お試しください。`
+      suggestion: error?.message?.includes('APIキー') 
+        ? `【設定エラー】${error.message}` 
+        : `【エラー】AI提案の生成に失敗しました。\n\n原因: ${error?.message || '不明なエラー'}\n\n手動で回答を入力するか、後でもう一度お試しください。`
     })
   }
 })
@@ -18911,7 +18853,7 @@ app.get('/api/generated-documents/:id', async (c) => {
 
 // AI文書生成
 app.post('/api/clients/:clientId/generate-document', async (c) => {
-  const { DB, GEMINI_API_KEY, CLAUDE_API_KEY } = c.env
+  const { DB, CLAUDE_API_KEY } = c.env
   const env = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
@@ -18996,12 +18938,25 @@ app.post('/api/clients/:clientId/generate-document', async (c) => {
       })
       .slice(0, 5) // 最大5件まで
       .map(async (doc: any) => {
+        // DB設定からClaude APIキーを取得
+        let claudeKey = CLAUDE_API_KEY || ''
+        try {
+          const keyResult = await DB.prepare(`
+            SELECT setting_value FROM site_settings WHERE setting_key = 'claude_api_key'
+          `).first()
+          if (keyResult?.setting_value) {
+            claudeKey = (keyResult as any).setting_value
+          }
+        } catch (e) {
+          console.error('Failed to get Claude API key:', e)
+        }
+        
         const extracted = await extractTextFromDocument(
           R2,
           doc.file_path,
           doc.document_type,
           doc.file_name,
-          GEMINI_API_KEY
+          claudeKey
         )
         return `【${doc.document_type}（${doc.file_name}）】\n${extracted}`
       })
@@ -19324,7 +19279,7 @@ app.put('/api/generated-documents/:id/status', async (c) => {
 
 // セクション再生成
 app.post('/api/generated-documents/:id/regenerate-section', async (c) => {
-  const { DB, GEMINI_API_KEY, CLAUDE_API_KEY } = c.env
+  const { DB, CLAUDE_API_KEY } = c.env
   const env = c.env
   const docId = c.req.param('id')
   const data = await c.req.json()
@@ -19658,7 +19613,8 @@ app.put('/api/clients/:clientId/profile', async (c) => {
 
 // 補助金マッチング実行
 app.post('/api/clients/:clientId/match-subsidies', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
+  const { DB } = c.env
+  const env = c.env
   const clientId = c.req.param('clientId')
   
   // 顧客プロファイル取得
@@ -19714,7 +19670,7 @@ ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text |
 }`
 
     try {
-      const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
+      const response = await callAI(prompt, env)
       
       // JSONを抽出してクリーニング
       let jsonStr = response.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
@@ -19804,7 +19760,8 @@ app.get('/api/generated-documents/:id/edit-history', async (c) => {
 
 // AI分析：セクション品質チェック
 app.post('/api/generated-documents/:id/analyze-quality', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
+  const { DB } = c.env
+  const env = c.env
   const id = c.req.param('id')
   
   // 文書取得
@@ -19844,7 +19801,7 @@ JSON形式で回答してください：
 }`
 
   try {
-    const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    const response = await callAI(prompt, env)
     
     // JSONを抽出してクリーニング
     let jsonStr = response.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
@@ -19857,7 +19814,7 @@ JSON形式で回答してください：
     
     if (jsonStr) {
       const result = JSON.parse(jsonStr)
-      return c.json(JSON.parse(jsonMatch[0]))
+      return c.json(result)
     }
     return c.json({ error: 'AI分析の解析に失敗しました' }, 500)
   } catch (error) {
@@ -19871,7 +19828,8 @@ JSON形式で回答してください：
 
 // 詳細な採択率予測API
 app.post('/api/clients/:clientId/predict-adoption', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
+  const { DB } = c.env
+  const env = c.env
   const clientId = c.req.param('clientId')
   
   // 顧客情報取得
@@ -19982,7 +19940,7 @@ ${(successCases.results || []).slice(0, 3).map((c: any, i: number) => `
 }`
 
   try {
-    const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    const response = await callAI(prompt, env)
     
     // JSONを抽出してクリーニング
     let jsonStr = response
@@ -20110,7 +20068,7 @@ ${(successCases.results || []).slice(0, 3).map((c: any, i: number) => `
 
 // 全補助金との詳細マッチング分析
 app.post('/api/clients/:clientId/comprehensive-matching', async (c) => {
-  const { DB, GEMINI_API_KEY } = c.env
+  const { DB } = c.env
   const clientId = c.req.param('clientId')
   
   // 顧客情報取得
@@ -20173,7 +20131,7 @@ ${(subsidies.results || []).map((s: any) => `
 {"company_summary":"企業の特徴（50字以内）","recommendations":[{"subsidy_name":"補助金名","match_score":50,"adoption_probability":50,"application_complexity":"普通","rank":1,"reasons":["理由1"],"concerns":["懸念点1"],"estimated_amount":"100万円","compatibility":{"eligibility":{"met":true,"detail":"申請資格あり"},"timing":{"status":"申請可能"}}}],"overall_strategy":"補助金活用戦略（50字以内）","priority_actions":["アクション1","アクション2"]}`
 
   try {
-    const response = await callGeminiAPI(prompt, GEMINI_API_KEY)
+    const response = await callAI(prompt, c.env)
     
     // JSONを抽出してクリーニング
     let jsonStr = response
@@ -25742,18 +25700,19 @@ app.get('/admin/settings', async (c) => {
                         <div id="claude_test_result" class="mt-2 hidden"></div>
                     </div>
                     
-                    <!-- Gemini API Key情報 -->
-                    <div id="gemini_api_key_section">
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <!-- Claude AI 説明 -->
+                    <div id="claude_info_section">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-3">
                             <div class="flex items-start gap-2">
-                                <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
-                                <div class="text-sm text-blue-800">
-                                    <p class="font-medium">Gemini APIキーについて</p>
-                                    <p class="mt-1">Gemini APIキーは環境変数（wrangler.toml）で設定してください：</p>
-                                    <code class="block mt-2 bg-blue-100 p-2 rounded text-xs">
-                                        [vars]<br>
-                                        GEMINI_API_KEY = "AIza..."
-                                    </code>
+                                <i class="fas fa-check-circle text-green-600 mt-0.5"></i>
+                                <div class="text-sm text-green-800">
+                                    <p class="font-medium">Claude Haiku 4.5 を使用</p>
+                                    <p class="mt-1">すべてのAI機能（文書生成、チャット、書類解析など）にClaude Haiku 4.5が使用されます。</p>
+                                    <ul class="mt-2 text-xs list-disc list-inside space-y-1">
+                                        <li>高品質な日本語文書生成</li>
+                                        <li>安定したAPIレート</li>
+                                        <li>PDF・画像の解析対応</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
