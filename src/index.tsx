@@ -1304,7 +1304,7 @@ app.post('/api/test-claude-api', async (c) => {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20241022',
+        model: 'claude-3-5-haiku-20241022',
         max_tokens: 100,
         messages: [
           {
@@ -18063,7 +18063,7 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20241022',
+          model: 'claude-3-5-haiku-20241022',
           max_tokens: maxChars ? Math.min(maxChars * 2, 8192) : 4096,
           messages: [
             {
@@ -18157,7 +18157,7 @@ async function callClaudeAPIWithFile(prompt: string, fileData: ArrayBuffer, mime
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20241022',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 8192,
       messages: [{
         role: 'user',
@@ -25980,8 +25980,16 @@ app.get('/admin/settings', async (c) => {
             
             // Claude API接続テスト
             async function testClaudeAPI() {
-                const apiKey = document.getElementById('claude_api_key').value;
+                const apiKeyInput = document.getElementById('claude_api_key');
                 const resultDiv = document.getElementById('claude_test_result');
+                
+                if (!apiKeyInput || !resultDiv) {
+                    console.error('Required elements not found');
+                    alert('エラー: 必要な要素が見つかりません');
+                    return;
+                }
+                
+                const apiKey = apiKeyInput.value;
                 
                 if (!apiKey) {
                     resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-exclamation-circle mr-1"></i>APIキーを入力してください</div>';
@@ -25993,14 +26001,18 @@ app.get('/admin/settings', async (c) => {
                 resultDiv.classList.remove('hidden');
                 
                 try {
+                    console.log('Testing Claude API...');
                     const response = await axios.post('/api/test-claude-api', { api_key: apiKey });
+                    console.log('Response:', response.data);
                     if (response.data.success) {
                         resultDiv.innerHTML = '<div class="p-2 bg-green-100 text-green-700 rounded text-sm"><i class="fas fa-check-circle mr-1"></i>接続成功！Claude Haiku 4.5が利用可能です</div>';
                     } else {
                         resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-times-circle mr-1"></i>' + (response.data.error || '接続に失敗しました') + '</div>';
                     }
                 } catch (error) {
-                    resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-times-circle mr-1"></i>接続テストに失敗しました</div>';
+                    console.error('Claude API test error:', error);
+                    const errorMsg = error.response ? 'API接続エラー: ' + error.response.status : '接続テストに失敗しました';
+                    resultDiv.innerHTML = '<div class="p-2 bg-red-100 text-red-700 rounded text-sm"><i class="fas fa-times-circle mr-1"></i>' + errorMsg + '</div>';
                 }
             }
             
