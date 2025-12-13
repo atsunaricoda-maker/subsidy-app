@@ -8095,16 +8095,22 @@ app.get('/client/:id', async (c) => {
                                 \${hasDoc && (isMultiVersion || docs.length > 1) ? \`
                                     <div class="mt-2 ml-11 space-y-1">
                                         \${docs.map((doc, idx) => \`
-                                            <div class="flex items-center justify-between text-xs bg-white rounded px-2 py-1.5 border">
+                                            <div class="flex items-center justify-between text-xs bg-white rounded px-2 py-1.5 border group">
                                                 <div class="flex items-center gap-2 min-w-0">
                                                     <span class="text-purple-600 font-medium">\${doc.fiscal_year ? doc.fiscal_year + '期' : (idx + 1) + '件目'}</span>
                                                     <span class="text-gray-600 truncate">\${doc.file_name}</span>
                                                     <span class="text-gray-400">\${new Date(doc.uploaded_at).toLocaleDateString('ja-JP')}</span>
                                                 </div>
-                                                <a href="/api/common-documents/\${doc.id}/download" 
-                                                   class="text-blue-600 hover:text-blue-800 ml-2 flex-shrink-0" title="ダウンロード">
-                                                    <i class="fas fa-download"></i>
-                                                </a>
+                                                <div class="flex items-center gap-1 ml-2 flex-shrink-0">
+                                                    <a href="/api/common-documents/\${doc.id}/download" 
+                                                       class="text-blue-600 hover:text-blue-800" title="ダウンロード">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                    <button onclick="deleteCommonDocumentAdmin(\${doc.id})" 
+                                                            class="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="削除">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                         \`).join('')}
                                         \${docs.length < maxVer ? \`
@@ -8113,9 +8119,15 @@ app.get('/client/:id', async (c) => {
                                     </div>
                                 \` : ''}
                                 \${hasDoc && !isMultiVersion && docs.length === 1 ? \`
-                                    <div class="mt-1 ml-11 text-xs text-gray-600">
-                                        \${latestDoc.fiscal_year ? latestDoc.fiscal_year + '年度 - ' : ''}\${latestDoc.file_name}
-                                        <span class="text-gray-400 ml-1">\${new Date(latestDoc.uploaded_at).toLocaleDateString('ja-JP')}</span>
+                                    <div class="mt-1 ml-11 flex items-center justify-between text-xs group">
+                                        <div class="text-gray-600">
+                                            \${latestDoc.fiscal_year ? latestDoc.fiscal_year + '年度 - ' : ''}\${latestDoc.file_name}
+                                            <span class="text-gray-400 ml-1">\${new Date(latestDoc.uploaded_at).toLocaleDateString('ja-JP')}</span>
+                                        </div>
+                                        <button onclick="deleteCommonDocumentAdmin(\${latestDoc.id})" 
+                                                class="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity ml-2" title="削除">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
                                     </div>
                                 \` : ''}
                             </div>
@@ -8129,6 +8141,22 @@ app.get('/client/:id', async (c) => {
                     }
                 }
             }
+            
+            // 共通書類削除（管理画面）
+            async function deleteCommonDocumentAdmin(docId) {
+                if (!confirm('この書類を削除しますか？\\n（削除後は元に戻せません）')) return;
+                
+                try {
+                    await axios.delete(\`/api/common-documents/\${docId}\`);
+                    showToast('書類を削除しました', 'success');
+                    loadCommonDocumentsAdmin();
+                } catch (error) {
+                    console.error('Error deleting common document:', error);
+                    showToast('書類の削除に失敗しました', 'error');
+                }
+            }
+            
+            window.deleteCommonDocumentAdmin = deleteCommonDocumentAdmin;
 
             async function loadCommunications() {
                 const response = await axios.get(\`/api/clients/\${CLIENT_ID}/communications\`);
@@ -11555,8 +11583,8 @@ app.get('/portal/:token', async (c) => {
 
             <!-- 共通書類アップロードモーダル -->
             <div id="commonDocUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-                <div class="bg-white rounded-xl w-full max-w-sm shadow-xl">
-                    <div class="flex items-center justify-between p-4 border-b bg-blue-600 text-white rounded-t-xl">
+                <div class="bg-white rounded-xl w-full max-w-sm shadow-xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between p-4 border-b bg-blue-600 text-white rounded-t-xl sticky top-0">
                         <h3 id="commonDocModalTitle" class="font-bold text-sm">
                             <i class="fas fa-upload mr-2"></i>共通書類アップロード
                         </h3>
@@ -11565,6 +11593,18 @@ app.get('/portal/:token', async (c) => {
                         </button>
                     </div>
                     <div class="p-4">
+                        <!-- 既存の書類一覧 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-folder mr-1 text-blue-600"></i>アップロード済み
+                            </label>
+                            <div id="existingCommonDocsList" class="space-y-1">
+                                <div class="text-xs text-gray-500 py-2">読み込み中...</div>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
                         <!-- 複数期分対応の案内 -->
                         <div id="commonDocMultiVersionInfo" class="hidden mb-3 p-2 bg-purple-50 border border-purple-200 rounded-lg">
                             <p class="text-xs text-purple-700">
@@ -11575,26 +11615,31 @@ app.get('/portal/:token', async (c) => {
                         
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-1">
-                                年度・決算期 <span id="commonDocFiscalYearRequired" class="hidden text-red-500">*必須</span>
+                                <i class="fas fa-plus-circle mr-1 text-green-600"></i>新しくアップロード
                             </label>
-                            <input type="text" id="commonDocFiscalYear" placeholder="例: 2024 または 第10期" 
-                                   class="w-full px-3 py-2 border rounded-lg text-sm">
-                            <p class="text-xs text-gray-500 mt-1">決算書・確定申告書は年度の入力を推奨します（管理しやすくなります）</p>
+                            <div class="mt-2">
+                                <label class="block text-xs text-gray-600 mb-1">
+                                    年度・決算期 <span id="commonDocFiscalYearRequired" class="hidden text-red-500">*</span>
+                                </label>
+                                <input type="text" id="commonDocFiscalYear" placeholder="例: 2024 または 第10期" 
+                                       class="w-full px-3 py-2 border rounded-lg text-sm">
+                                <p class="text-xs text-gray-500 mt-1">決算書・確定申告書は年度の入力を推奨</p>
+                            </div>
                         </div>
-                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-blue-500 hover:bg-blue-50 cursor-pointer">
-                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
-                            <p class="text-sm text-gray-600 mb-3">ファイルをドラッグ&ドロップ</p>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center transition-colors hover:border-blue-500 hover:bg-blue-50 cursor-pointer">
+                            <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-2"></i>
+                            <p class="text-xs text-gray-600 mb-2">ファイルをドラッグ&ドロップ</p>
                             <input type="file" id="commonDocFileInput" class="hidden">
                             <button onclick="document.getElementById('commonDocFileInput').click()" 
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                    class="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-xs">
                                 <i class="fas fa-folder-open mr-1"></i>ファイルを選択
                             </button>
                         </div>
-                        <p class="text-xs text-gray-500 mt-3 text-center">
-                            対応形式: PDF, Word, Excel, 画像ファイル
+                        <p class="text-xs text-gray-500 mt-2 text-center">
+                            PDF, Word, Excel, 画像ファイル対応
                         </p>
                         <button onclick="uploadCommonDocument()" 
-                                class="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+                                class="w-full mt-3 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
                             <i class="fas fa-upload mr-1"></i>アップロード
                         </button>
                     </div>
@@ -12958,13 +13003,16 @@ app.get('/portal/:token', async (c) => {
             let selectedCommonDocTypeId = null;
             let selectedDocMaxVersions = 1;
             
-            function openCommonDocUploadModal(typeName, typeId, hasDoc, maxVersions = 1) {
+            // 共通書類の既存ファイル一覧用
+            let currentCommonDocs = [];
+            
+            async function openCommonDocUploadModal(typeName, typeId, hasDoc, maxVersions = 1) {
                 selectedCommonDocType = typeName;
                 selectedCommonDocTypeId = typeId;
                 selectedDocMaxVersions = maxVersions || 1;
                 
                 document.getElementById('commonDocModalTitle').innerHTML = \`
-                    <i class="fas fa-\${hasDoc ? 'sync-alt' : 'upload'} mr-2"></i>\${typeName}
+                    <i class="fas fa-\${hasDoc ? 'folder-open' : 'upload'} mr-2"></i>\${typeName}
                 \`;
                 
                 // 複数期分対応の場合は案内を表示
@@ -12981,8 +13029,67 @@ app.get('/portal/:token', async (c) => {
                     fiscalYearRequired.classList.add('hidden');
                 }
                 
+                // 既存の書類を取得して表示
+                await loadExistingCommonDocs(typeName);
+                
                 document.getElementById('commonDocUploadModal').classList.remove('hidden');
             }
+            
+            async function loadExistingCommonDocs(typeName) {
+                const container = document.getElementById('existingCommonDocsList');
+                if (!container) return;
+                
+                try {
+                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`);
+                    const docs = (response.data || []).filter(d => d.document_type === typeName);
+                    currentCommonDocs = docs;
+                    
+                    if (docs.length === 0) {
+                        container.innerHTML = '<div class="text-xs text-gray-500 py-2">まだアップロードされていません</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = docs.map(doc => \`
+                        <div class="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1.5 border">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <i class="fas fa-file text-blue-500"></i>
+                                <span class="text-purple-600 font-medium">\${doc.fiscal_year ? doc.fiscal_year + '期' : ''}</span>
+                                <span class="text-gray-600 truncate">\${doc.file_name}</span>
+                            </div>
+                            <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+                                <a href="/api/common-documents/\${doc.id}/download" 
+                                   class="text-blue-600 hover:text-blue-800" title="ダウンロード">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                                <button onclick="deleteCommonDocument(\${doc.id}, event)" 
+                                        class="text-red-500 hover:text-red-700" title="削除">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Error loading existing docs:', error);
+                    container.innerHTML = '<div class="text-xs text-red-500 py-2">読み込みに失敗しました</div>';
+                }
+            }
+            
+            async function deleteCommonDocument(docId, event) {
+                event.stopPropagation();
+                if (!confirm('この書類を削除しますか？')) return;
+                
+                try {
+                    await axios.delete(\`/api/common-documents/\${docId}\`);
+                    showMessage('success', '書類を削除しました');
+                    await loadExistingCommonDocs(selectedCommonDocType);
+                    loadCommonDocuments();
+                } catch (error) {
+                    console.error('Error deleting common document:', error);
+                    showMessage('error', '削除に失敗しました');
+                }
+            }
+            
+            window.deleteCommonDocument = deleteCommonDocument;
             
             function closeCommonDocUploadModal() {
                 document.getElementById('commonDocUploadModal').classList.add('hidden');
