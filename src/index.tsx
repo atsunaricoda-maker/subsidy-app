@@ -11411,6 +11411,36 @@ app.get('/portal/:token', async (c) => {
                                 </button>
                             </div>
                             
+                            <!-- 共通質問 / 案件別質問 切り替えタブ -->
+                            <div class="mb-4 flex border-b">
+                                <button onclick="switchHearingTab('common')" id="hearingTabCommon"
+                                        class="flex-1 px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+                                    <i class="fas fa-building mr-1"></i>会社情報（共通）
+                                    <span id="commonQuestionsBadge" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">0/0</span>
+                                </button>
+                                <button onclick="switchHearingTab('specific')" id="hearingTabSpecific"
+                                        class="flex-1 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-folder mr-1"></i>案件別質問
+                                    <span id="specificQuestionsBadge" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">0/0</span>
+                                </button>
+                            </div>
+                            
+                            <!-- 共通質問の説明 -->
+                            <div id="commonQuestionsInfo" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p class="text-sm text-blue-700">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    会社情報は一度入力すると、すべての申請案件で自動的に参照されます。
+                                </p>
+                            </div>
+                            
+                            <!-- 案件別質問の説明（非表示デフォルト） -->
+                            <div id="specificQuestionsInfo" class="hidden mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                                <p class="text-sm text-indigo-700">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    この申請に固有の質問です。各申請種別ごとに回答してください。
+                                </p>
+                            </div>
+                            
                             <!-- カテゴリ別タブ -->
                             <div class="mb-4 border-b">
                                 <div id="hearingCategoryTabs" class="flex overflow-x-auto gap-1">
@@ -13409,21 +13439,22 @@ app.get('/portal/:token', async (c) => {
                         hearingAnswers[a.question_id] = a.answer_text;
                     });
                     
-                    // カテゴリを抽出してタブを作成
-                    const categories = [...new Set(hearingQuestions.map(q => q.category))];
-                    if (categories.length > 0) {
-                        currentCategory = categories[0];
-                        renderCategoryTabs(categories);
-                        renderQuestions();
-                        updateProgress();
-                    } else {
-                        document.getElementById('hearingQuestionsList').innerHTML = \`
-                            <div class="text-center py-8 text-gray-500">
-                                <i class="fas fa-check-circle text-2xl mb-2 text-green-500"></i>
-                                <p>この助成金種別にはヒアリング質問が設定されていません。</p>
-                            </div>
-                        \`;
+                    // バッジを更新してから、デフォルトタブで表示
+                    updateHearingBadges();
+                    
+                    // 共通質問があれば共通タブ、なければ案件別タブをデフォルトに
+                    const commonQs = hearingQuestions.filter(q => q.subsidy_type_id === 0);
+                    const specificQs = hearingQuestions.filter(q => q.subsidy_type_id !== 0);
+                    
+                    if (commonQs.length > 0) {
+                        currentHearingTab = 'common';
+                    } else if (specificQs.length > 0) {
+                        currentHearingTab = 'specific';
                     }
+                    
+                    // タブを初期化して表示
+                    switchHearingTab(currentHearingTab);
+                    updateProgress();
                 } catch (error) {
                     console.error('Error loading hearing questions:', error);
                     document.getElementById('hearingQuestionsList').innerHTML = \`
@@ -13435,11 +13466,92 @@ app.get('/portal/:token', async (c) => {
                 }
             }
             
+            // 共通質問 / 案件別質問のタブ切り替え
+            let currentHearingTab = 'common'; // 'common' or 'specific'
+            
+            function switchHearingTab(tab) {
+                currentHearingTab = tab;
+                
+                // タブスタイル更新
+                const commonTab = document.getElementById('hearingTabCommon');
+                const specificTab = document.getElementById('hearingTabSpecific');
+                const commonInfo = document.getElementById('commonQuestionsInfo');
+                const specificInfo = document.getElementById('specificQuestionsInfo');
+                
+                if (tab === 'common') {
+                    commonTab.className = 'flex-1 px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600';
+                    specificTab.className = 'flex-1 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+                    commonInfo.classList.remove('hidden');
+                    specificInfo.classList.add('hidden');
+                } else {
+                    commonTab.className = 'flex-1 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+                    specificTab.className = 'flex-1 px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600';
+                    commonInfo.classList.add('hidden');
+                    specificInfo.classList.remove('hidden');
+                }
+                
+                // カテゴリタブと質問を再レンダリング
+                const filteredQuestions = getFilteredQuestionsByTab();
+                const categories = [...new Set(filteredQuestions.map(q => q.category))];
+                if (categories.length > 0) {
+                    currentCategory = categories[0];
+                    renderCategoryTabs(categories);
+                    renderQuestions();
+                } else {
+                    document.getElementById('hearingCategoryTabs').innerHTML = '';
+                    document.getElementById('hearingQuestionsList').innerHTML = \`
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-check-circle text-2xl mb-2 text-green-500"></i>
+                            <p>\${tab === 'common' ? '共通質問' : '案件別質問'}は設定されていません。</p>
+                        </div>
+                    \`;
+                }
+                
+                updateHearingBadges();
+            }
+            
+            function getFilteredQuestionsByTab() {
+                return hearingQuestions.filter(q => {
+                    if (currentHearingTab === 'common') {
+                        return q.subsidy_type_id === 0;
+                    } else {
+                        return q.subsidy_type_id !== 0;
+                    }
+                });
+            }
+            
+            function updateHearingBadges() {
+                const commonQs = hearingQuestions.filter(q => q.subsidy_type_id === 0);
+                const specificQs = hearingQuestions.filter(q => q.subsidy_type_id !== 0);
+                
+                const commonAnswered = commonQs.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
+                const specificAnswered = specificQs.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
+                
+                const commonBadge = document.getElementById('commonQuestionsBadge');
+                const specificBadge = document.getElementById('specificQuestionsBadge');
+                
+                if (commonBadge) {
+                    commonBadge.textContent = \`\${commonAnswered}/\${commonQs.length}\`;
+                    commonBadge.className = commonAnswered === commonQs.length && commonQs.length > 0
+                        ? 'ml-1 text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700'
+                        : 'ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700';
+                }
+                if (specificBadge) {
+                    specificBadge.textContent = \`\${specificAnswered}/\${specificQs.length}\`;
+                    specificBadge.className = specificAnswered === specificQs.length && specificQs.length > 0
+                        ? 'ml-1 text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700'
+                        : 'ml-1 text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600';
+                }
+            }
+            
+            window.switchHearingTab = switchHearingTab;
+            
             function renderCategoryTabs(categories) {
                 const container = document.getElementById('hearingCategoryTabs');
+                const borderColor = currentHearingTab === 'common' ? 'border-blue-600 text-blue-600' : 'border-indigo-600 text-indigo-600';
                 container.innerHTML = categories.map(cat => \`
                     <button onclick="switchHearingCategory('\${cat}')" 
-                            class="px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors \${currentCategory === cat ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+                            class="px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors \${currentCategory === cat ? borderColor : 'border-transparent text-gray-500 hover:text-gray-700'}">
                         \${cat}
                         <span class="ml-1 text-xs px-1.5 py-0.5 rounded-full \${getCategoryProgressColor(cat)}">
                             \${getCategoryProgress(cat)}
@@ -13449,13 +13561,15 @@ app.get('/portal/:token', async (c) => {
             }
             
             function getCategoryProgress(category) {
-                const catQuestions = hearingQuestions.filter(q => q.category === category);
+                const filteredByTab = getFilteredQuestionsByTab();
+                const catQuestions = filteredByTab.filter(q => q.category === category);
                 const answered = catQuestions.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
                 return \`\${answered}/\${catQuestions.length}\`;
             }
             
             function getCategoryProgressColor(category) {
-                const catQuestions = hearingQuestions.filter(q => q.category === category);
+                const filteredByTab = getFilteredQuestionsByTab();
+                const catQuestions = filteredByTab.filter(q => q.category === category);
                 const answered = catQuestions.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
                 if (answered === catQuestions.length) return 'bg-green-100 text-green-800';
                 if (answered > 0) return 'bg-yellow-100 text-yellow-800';
@@ -13464,14 +13578,16 @@ app.get('/portal/:token', async (c) => {
             
             function switchHearingCategory(category) {
                 currentCategory = category;
-                const categories = [...new Set(hearingQuestions.map(q => q.category))];
+                const filteredByTab = getFilteredQuestionsByTab();
+                const categories = [...new Set(filteredByTab.map(q => q.category))];
                 renderCategoryTabs(categories);
                 renderQuestions();
             }
             
             function renderQuestions() {
                 const container = document.getElementById('hearingQuestionsList');
-                const filteredQuestions = hearingQuestions.filter(q => q.category === currentCategory);
+                const filteredByTab = getFilteredQuestionsByTab();
+                const filteredQuestions = filteredByTab.filter(q => q.category === currentCategory);
                 
                 if (filteredQuestions.length === 0) {
                     container.innerHTML = '<div class="text-center py-8 text-gray-500">このカテゴリに質問はありません。</div>';
