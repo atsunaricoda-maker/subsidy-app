@@ -13134,6 +13134,10 @@ app.get('/portal/:token', async (c) => {
                     showMessage('success', '書類を削除しました');
                     await loadExistingCommonDocs(selectedCommonDocType);
                     loadCommonDocuments();
+                    // 案件別必要書類リストも更新（共通書類との連携を反映）
+                    if (typeof loadDocumentChecklist === 'function') {
+                        loadDocumentChecklist();
+                    }
                 } catch (error) {
                     console.error('Error deleting common document:', error);
                     showMessage('error', '削除に失敗しました');
@@ -13182,6 +13186,10 @@ app.get('/portal/:token', async (c) => {
                     showMessage('success', '共通書類をアップロードしました');
                     closeCommonDocUploadModal();
                     loadCommonDocuments();
+                    // 案件別必要書類リストも更新（共通書類との連携を反映）
+                    if (typeof loadDocumentChecklist === 'function') {
+                        loadDocumentChecklist();
+                    }
                 } catch (error) {
                     console.error('Error uploading common document:', error);
                     showMessage('error', 'アップロードに失敗しました');
