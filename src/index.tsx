@@ -4458,22 +4458,13 @@ app.patch('/api/clients/:id', async (c) => {
     company_name: data.company_name !== undefined ? data.company_name : current.company_name,
     email: data.email !== undefined ? data.email : current.email,
     phone: data.phone !== undefined ? data.phone : current.phone,
-    status: data.status !== undefined ? data.status : current.status,
-    assigned_staff: data.assigned_staff !== undefined ? data.assigned_staff : current.assigned_staff,
-    assigned_to: data.assigned_to !== undefined ? data.assigned_to : current.assigned_to,
-    notes: data.notes !== undefined ? data.notes : current.notes,
-    subsidy_type_id: data.subsidy_type_id !== undefined ? data.subsidy_type_id : current.subsidy_type_id,
-    deposit_required: data.deposit_required !== undefined ? data.deposit_required : current.deposit_required,
-    deposit_amount: data.deposit_amount !== undefined ? data.deposit_amount : current.deposit_amount,
-    withholding_tax: data.withholding_tax !== undefined ? data.withholding_tax : current.withholding_tax,
-    contract_url: data.contract_url !== undefined ? data.contract_url : current.contract_url
+    address: data.address !== undefined ? data.address : current.address,
+    notes: data.notes !== undefined ? data.notes : current.notes
   }
   
   await DB.prepare(`
     UPDATE clients 
-    SET name = ?, company_name = ?, email = ?, phone = ?, 
-        status = ?, assigned_staff = ?, assigned_to = ?, notes = ?, subsidy_type_id = ?,
-        deposit_required = ?, deposit_amount = ?, withholding_tax = ?, contract_url = ?,
+    SET name = ?, company_name = ?, email = ?, phone = ?, address = ?, notes = ?,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).bind(
@@ -4481,15 +4472,8 @@ app.patch('/api/clients/:id', async (c) => {
     updated.company_name,
     updated.email,
     updated.phone,
-    updated.status,
-    updated.assigned_staff,
-    updated.assigned_to,
+    updated.address,
     updated.notes,
-    updated.subsidy_type_id,
-    updated.deposit_required,
-    updated.deposit_amount,
-    updated.withholding_tax,
-    updated.contract_url,
     id
   ).run()
   
@@ -7450,75 +7434,22 @@ app.get('/client/:id', async (c) => {
                         <input type="tel" name="phone" id="edit_phone" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">申請する助成金</label>
-                        <div class="relative">
-                            <input type="text" id="editSubsidySearchInput" 
-                                   placeholder="🔍 補助金名で検索..." 
-                                   class="w-full px-3 py-2 border rounded-lg mb-1"
-                                   oninput="filterEditSubsidyOptions()">
-                            <select name="subsidy_type_id" id="edit_subsidy_type_id" class="w-full px-3 py-2 border rounded-lg" size="5">
-                                <option value="">選択してください</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">ステータス</label>
-                        <select name="status" id="edit_status" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="inquiry">見込み</option>
-                            <option value="preparing">書類準備中</option>
-                            <option value="applying">申請中</option>
-                            <option value="adopted">採択・入金待ち</option>
-                            <option value="rejected">不採択</option>
-                            <option value="completed">完了</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">担当者</label>
-                        <select name="assigned_to" id="editClientAssignedTo" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="">未割り当て</option>
-                        </select>
+                        <label class="block text-sm font-medium mb-1">住所</label>
+                        <input type="text" name="address" id="edit_address" class="w-full px-3 py-2 border rounded-lg" placeholder="東京都...">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">メモ</label>
-                        <textarea name="notes" id="edit_notes" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                        <textarea name="notes" id="edit_notes" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="顧客に関するメモ..."></textarea>
                     </div>
                     
-                    <div class="border-t pt-4 mt-4">
-                        <h4 class="font-medium text-gray-700 mb-3">
-                            <i class="fas fa-file-signature mr-1 text-blue-600"></i>契約・決済
-                        </h4>
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-sm font-medium mb-1">電子契約URL</label>
-                                <input type="url" name="contract_url" id="edit_contract_url" 
-                                       placeholder="https://..." 
-                                       class="w-full px-3 py-2 border rounded-lg">
-                                <p class="text-xs text-gray-500 mt-1">CloudSign, DocuSign等のURL</p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium mb-1">手付金額</label>
-                                <input type="number" name="deposit_amount" id="edit_deposit_amount" 
-                                       placeholder="50000" min="0"
-                                       class="w-full px-3 py-2 border rounded-lg">
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <label class="flex items-center gap-2">
-                                    <input type="checkbox" name="deposit_required" id="edit_deposit_required" 
-                                           class="rounded text-blue-600">
-                                    <span class="text-sm">手付金必要</span>
-                                </label>
-                                <label class="flex items-center gap-2">
-                                    <input type="checkbox" name="deposit_paid" id="edit_deposit_paid" 
-                                           class="rounded text-green-600">
-                                    <span class="text-sm">支払済</span>
-                                </label>
-                            </div>
-                        </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        ステータス、契約URL、手付金などは各案件の詳細画面で編集できます
                     </div>
                     
                     <div class="flex gap-2 pt-4">
                         <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 text-base">
-                            更新
+                            <i class="fas fa-save mr-2"></i>更新
                         </button>
                         <button type="button" onclick="closeEditModal()" 
                                 class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 text-base">
@@ -8225,35 +8156,13 @@ app.get('/client/:id', async (c) => {
             function editClient() {
                 if (!currentClient) return;
                 
-                // フォームに現在の値を設定
+                // フォームに現在の値を設定（基本情報のみ）
                 document.getElementById('edit_name').value = currentClient.name || '';
                 document.getElementById('edit_company_name').value = currentClient.company_name || '';
                 document.getElementById('edit_email').value = currentClient.email || '';
                 document.getElementById('edit_phone').value = currentClient.phone || '';
-                document.getElementById('edit_subsidy_type_id').value = currentClient.subsidy_type_id || '';
-                document.getElementById('edit_status').value = currentClient.status || 'inquiry';
-                document.getElementById('editClientAssignedTo').value = currentClient.assigned_to || '';
+                document.getElementById('edit_address').value = currentClient.address || '';
                 document.getElementById('edit_notes').value = currentClient.notes || '';
-                
-                // 契約・決済情報
-                document.getElementById('edit_contract_url').value = currentClient.contract_url || '';
-                document.getElementById('edit_deposit_amount').value = currentClient.deposit_amount || '';
-                document.getElementById('edit_deposit_required').checked = !!currentClient.deposit_required;
-                document.getElementById('edit_deposit_paid').checked = !!currentClient.deposit_paid;
-                
-                // 非adminは完了ステータスを選択できない
-                const statusSelect = document.getElementById('edit_status');
-                const completedOption = statusSelect.querySelector('option[value="completed"]');
-                if (localStorage.getItem('admin_role') !== 'admin' && completedOption) {
-                    completedOption.disabled = true;
-                    completedOption.textContent = '完了（管理者のみ）';
-                    
-                    // もし現在completedなら警告
-                    if (currentClient.status === 'completed') {
-                        statusSelect.disabled = true;
-                        statusSelect.title = 'このプロジェクトは完了済みです。変更する場合は管理者に連絡してください。';
-                    }
-                }
                 
                 document.getElementById('editClientModal').classList.remove('hidden');
             }
@@ -8276,33 +8185,24 @@ app.get('/client/:id', async (c) => {
                     const formData = new FormData(e.target);
                     const data = Object.fromEntries(formData);
                     
-                    // チェックボックスの値を正しく処理（チェックなし＝0, あり＝1）
-                    data.deposit_required = document.getElementById('edit_deposit_required').checked ? 1 : 0;
-                    data.deposit_paid = document.getElementById('edit_deposit_paid').checked ? 1 : 0;
+                    // 顧客基本情報のみ送信
+                    const updateData = {
+                        name: data.name,
+                        company_name: data.company_name || null,
+                        email: data.email || null,
+                        phone: data.phone || null,
+                        address: data.address || null,
+                        notes: data.notes || null
+                    };
                     
-                    // 数値を整数に変換
-                    if (data.deposit_amount) {
-                        data.deposit_amount = parseInt(data.deposit_amount, 10) || 0;
-                    }
-                    
-                    console.log('=== 更新前の状態 ===');
-                    console.log('現在のステータス:', currentClient.status);
-                    console.log('送信するデータ:', data);
-                    console.log('新しいステータス:', data.status);
-                    
-                    const response = await axios.put(\`/api/clients/\${CLIENT_ID}\`, data);
-                    
-                    console.log('=== 更新レスポンス ===', response.data);
+                    await axios.patch(\`/api/clients/\${CLIENT_ID}\`, updateData);
                     
                     closeEditModal();
                     await loadClient();
                     
-                    console.log('=== 更新後の状態 ===');
-                    console.log('更新後のステータス:', currentClient.status);
-                    
                     showToast('顧客情報を更新しました！');
                 } catch (error) {
-                    console.error('=== 更新エラー ===', error);
+                    console.error('更新エラー:', error);
                     alert('更新に失敗しました: ' + (error.response?.data?.error || error.message));
                 } finally {
                     // ボタンを元に戻す
