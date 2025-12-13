@@ -18858,7 +18858,6 @@ app.get('/api/hearing-questions/:subsidyTypeId', async (c) => {
   }
   
   // 質問テキストの正規化関数（重複検出用）
-  // 質問の核心部分を抽出して比較
   const normalizeText = (text: string) => {
     let normalized = text
       .replace(/導入後|実現後/g, '効果')
@@ -18883,29 +18882,29 @@ app.get('/api/hearing-questions/:subsidyTypeId', async (c) => {
     return keywords
   }
   
-  // 固有質問で既にカバーされているキーワードを収集
-  const coveredKeywords = new Set<string>()
-  specificQs.forEach(q => {
-    getKeywords(q.question_text).forEach(k => coveredKeywords.add(k))
+  // 共通質問でカバーされているキーワードを収集
+  const commonKeywords = new Set<string>()
+  commonQs.forEach(q => {
+    getKeywords(q.question_text).forEach(k => commonKeywords.add(k))
   })
   
-  // 固有質問の正規化されたテキストセットを作成
-  const specificTextSet = new Set(specificQs.map(q => normalizeText(q.question_text)))
+  // 共通質問の正規化されたテキストセットを作成
+  const commonTextSet = new Set(commonQs.map(q => normalizeText(q.question_text)))
   
-  // 共通質問から重複を除外（テキスト一致 OR キーワード重複）
-  const filteredCommonQs = commonQs.filter(q => {
+  // 案件別質問から重複を除外（共通質問と被るものは除外）
+  const filteredSpecificQs = specificQs.filter(q => {
     // 正規化テキストで完全一致する場合は除外
-    if (specificTextSet.has(normalizeText(q.question_text))) return false
-    // キーワードが既にカバーされている場合も除外
+    if (commonTextSet.has(normalizeText(q.question_text))) return false
+    // キーワードが共通質問でカバーされている場合も除外
     const qKeywords = getKeywords(q.question_text)
-    if (qKeywords.some(k => coveredKeywords.has(k))) return false
+    if (qKeywords.some(k => commonKeywords.has(k))) return false
     return true
   })
   
-  // 固有質問をベースにして、共通質問の固有に無いものを追加
+  // 共通質問を優先し、案件別質問の重複していないものを追加
   const mergedQuestions = [
-    ...specificQs,  // 固有質問を優先
-    ...filteredCommonQs  // 共通質問で重複していないもの
+    ...commonQs,  // 共通質問を優先（全件表示）
+    ...filteredSpecificQs  // 案件別質問で重複していないもの
   ]
   
   // display_orderでソート
