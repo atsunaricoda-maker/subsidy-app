@@ -4416,6 +4416,7 @@ app.put('/api/clients/:id', async (c) => {
     UPDATE clients 
     SET name = ?, company_name = ?, email = ?, phone = ?, 
         status = ?, assigned_staff = ?, assigned_to = ?, notes = ?, subsidy_type_id = ?,
+        deposit_required = ?, deposit_amount = ?, withholding_tax = ?, contract_url = ?,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).bind(
@@ -4428,6 +4429,10 @@ app.put('/api/clients/:id', async (c) => {
     data.assigned_to || null,
     data.notes || null,
     data.subsidy_type_id || null,
+    data.deposit_required !== undefined ? data.deposit_required : 0,
+    data.deposit_amount || 0,
+    data.withholding_tax !== undefined ? data.withholding_tax : 0,
+    data.contract_url || null,
     id
   ).run()
   
