@@ -11626,21 +11626,32 @@ app.get('/portal/:token', async (c) => {
                                 <p class="text-xs text-gray-500 mt-1">決算書・確定申告書は年度の入力を推奨</p>
                             </div>
                         </div>
-                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center transition-colors hover:border-blue-500 hover:bg-blue-50 cursor-pointer">
-                            <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-2"></i>
-                            <p class="text-xs text-gray-600 mb-2">ファイルをドラッグ&ドロップ</p>
-                            <input type="file" id="commonDocFileInput" class="hidden">
-                            <button onclick="document.getElementById('commonDocFileInput').click()" 
-                                    class="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-xs">
-                                <i class="fas fa-folder-open mr-1"></i>ファイルを選択
-                            </button>
+                        <div id="commonDocDropZone" onclick="document.getElementById('commonDocFileInput').click()"
+                             class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center transition-colors hover:border-blue-500 hover:bg-blue-50 cursor-pointer">
+                            <div id="commonDocDropZoneDefault">
+                                <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-2"></i>
+                                <p class="text-xs text-gray-600 mb-2">ファイルをドラッグ&ドロップ</p>
+                                <input type="file" id="commonDocFileInput" class="hidden" onchange="onCommonDocFileSelected(this)">
+                                <span class="inline-block bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-xs">
+                                    <i class="fas fa-folder-open mr-1"></i>ファイルを選択
+                                </span>
+                            </div>
+                            <div id="commonDocDropZoneSelected" class="hidden">
+                                <i class="fas fa-check-circle text-2xl text-green-500 mb-2"></i>
+                                <p class="text-sm font-medium text-green-700 mb-1">ファイル選択済み</p>
+                                <p id="commonDocSelectedFileName" class="text-xs text-gray-600 truncate px-2"></p>
+                                <button onclick="event.stopPropagation(); clearCommonDocFile()" 
+                                        class="mt-2 text-xs text-red-500 hover:text-red-700">
+                                    <i class="fas fa-times mr-1"></i>取り消し
+                                </button>
+                            </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2 text-center">
+                        <p id="commonDocFormatHint" class="text-xs text-gray-500 mt-2 text-center">
                             PDF, Word, Excel, 画像ファイル対応
                         </p>
-                        <button onclick="uploadCommonDocument()" 
-                                class="w-full mt-3 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
-                            <i class="fas fa-upload mr-1"></i>アップロード
+                        <button onclick="uploadCommonDocument()" id="commonDocUploadBtn"
+                                class="w-full mt-3 bg-gray-300 text-gray-500 py-2 rounded-lg text-sm font-medium cursor-not-allowed" disabled>
+                            <i class="fas fa-upload mr-1"></i>ファイルを選択してください
                         </button>
                     </div>
                 </div>
@@ -13097,6 +13108,8 @@ app.get('/portal/:token', async (c) => {
                 document.getElementById('commonDocFiscalYear').value = '';
                 document.getElementById('commonDocMultiVersionInfo').classList.add('hidden');
                 document.getElementById('commonDocFiscalYearRequired').classList.add('hidden');
+                // ファイル選択表示をリセット
+                clearCommonDocFileDisplay();
                 selectedCommonDocType = null;
                 selectedCommonDocTypeId = null;
                 selectedDocMaxVersions = 1;
@@ -13135,6 +13148,51 @@ app.get('/portal/:token', async (c) => {
                 }
             }
             
+            // ファイル選択時のUI更新
+            function onCommonDocFileSelected(input) {
+                const defaultZone = document.getElementById('commonDocDropZoneDefault');
+                const selectedZone = document.getElementById('commonDocDropZoneSelected');
+                const fileNameDisplay = document.getElementById('commonDocSelectedFileName');
+                const uploadBtn = document.getElementById('commonDocUploadBtn');
+                
+                if (input.files && input.files.length > 0) {
+                    const file = input.files[0];
+                    defaultZone.classList.add('hidden');
+                    selectedZone.classList.remove('hidden');
+                    fileNameDisplay.textContent = file.name;
+                    
+                    // アップロードボタンを有効化
+                    uploadBtn.disabled = false;
+                    uploadBtn.className = 'w-full mt-3 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 cursor-pointer';
+                    uploadBtn.innerHTML = '<i class="fas fa-upload mr-1"></i>アップロード';
+                } else {
+                    clearCommonDocFileDisplay();
+                }
+            }
+            
+            // ファイル選択をクリア
+            function clearCommonDocFile() {
+                const fileInput = document.getElementById('commonDocFileInput');
+                fileInput.value = '';
+                clearCommonDocFileDisplay();
+            }
+            
+            function clearCommonDocFileDisplay() {
+                const defaultZone = document.getElementById('commonDocDropZoneDefault');
+                const selectedZone = document.getElementById('commonDocDropZoneSelected');
+                const uploadBtn = document.getElementById('commonDocUploadBtn');
+                
+                defaultZone.classList.remove('hidden');
+                selectedZone.classList.add('hidden');
+                
+                // アップロードボタンを無効化
+                uploadBtn.disabled = true;
+                uploadBtn.className = 'w-full mt-3 bg-gray-300 text-gray-500 py-2 rounded-lg text-sm font-medium cursor-not-allowed';
+                uploadBtn.innerHTML = '<i class="fas fa-upload mr-1"></i>ファイルを選択してください';
+            }
+            
+            window.onCommonDocFileSelected = onCommonDocFileSelected;
+            window.clearCommonDocFile = clearCommonDocFile;
             window.openCommonDocUploadModal = openCommonDocUploadModal;
             window.closeCommonDocUploadModal = closeCommonDocUploadModal;
             window.uploadCommonDocument = uploadCommonDocument;
