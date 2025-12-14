@@ -228,7 +228,10 @@ const sidebarScripts = `
     }
     
     // 管理者名を設定
-    document.getElementById('sidebarAdminName').textContent = localStorage.getItem('admin_name') || '管理者';
+    const sidebarAdminName = document.getElementById('sidebarAdminName');
+    if (sidebarAdminName) {
+        sidebarAdminName.textContent = localStorage.getItem('admin_name') || '管理者';
+    }
     
     // adminロールのみの項目を表示
     if (localStorage.getItem('admin_role') === 'admin') {
@@ -2825,9 +2828,13 @@ app.get('/', (c) => {
                     const response = await axios.get('/api/payments/pending');
                     const count = response.data.length;
                     const badge = document.getElementById('pendingPaymentsBadge');
-                    if (badge && count > 0) {
-                        badge.textContent = count;
-                        badge.classList.remove('hidden');
+                    if (badge) {
+                        if (count > 0) {
+                            badge.textContent = count;
+                            badge.classList.remove('hidden');
+                        } else {
+                            badge.classList.add('hidden');
+                        }
                     }
                 } catch (error) {
                     console.error('Error loading pending payments count:', error);
@@ -6196,34 +6203,6 @@ app.get('/api/clients/:id/document-checklist', async (c) => {
     WHERE subsidy_type_id = ? 
     ORDER BY display_order
   `).bind(client.subsidy_type_id).all()
-  
-  return c.json(result.results)
-})
-
-// 案件の助成金種別に基づくチェックリスト（案件ID指定）
-app.get('/api/cases/:id/document-checklist', async (c) => {
-  const { DB } = c.env
-  const id = c.req.param('id')
-  
-  // 案件の助成金種別を取得
-  const caseData = await DB.prepare(`
-    SELECT subsidy_type_id FROM cases WHERE id = ?
-  `).bind(id).first()
-  
-  if (!caseData || !caseData.subsidy_type_id) {
-    // 助成金種別が設定されていない場合は旧チェックリストを返す
-    const result = await DB.prepare(`
-      SELECT * FROM document_checklist ORDER BY display_order
-    `).all()
-    return c.json(result.results)
-  }
-  
-  // 助成金種別の必要書類を取得
-  const result = await DB.prepare(`
-    SELECT * FROM subsidy_type_documents 
-    WHERE subsidy_type_id = ? 
-    ORDER BY display_order
-  `).bind(caseData.subsidy_type_id).all()
   
   return c.json(result.results)
 })
@@ -26915,33 +26894,41 @@ app.get('/admin/settings', async (c) => {
                     const response = await axios.get('/api/settings');
                     const settings = response.data;
                     
+                    // ヘルパー関数: 要素の値を安全に設定
+                    const setValue = (id, value) => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = value;
+                    };
+                    
                     // 銀行情報
-                    document.getElementById('bank_name').value = getSettingValue(settings, 'bank_name');
-                    document.getElementById('bank_branch').value = getSettingValue(settings, 'bank_branch');
-                    document.getElementById('bank_account_type').value = getSettingValue(settings, 'bank_account_type') || '普通';
-                    document.getElementById('bank_account_number').value = getSettingValue(settings, 'bank_account_number');
-                    document.getElementById('bank_account_holder').value = getSettingValue(settings, 'bank_account_holder');
+                    setValue('bank_name', getSettingValue(settings, 'bank_name'));
+                    setValue('bank_branch', getSettingValue(settings, 'bank_branch'));
+                    setValue('bank_account_type', getSettingValue(settings, 'bank_account_type') || '普通');
+                    setValue('bank_account_number', getSettingValue(settings, 'bank_account_number'));
+                    setValue('bank_account_holder', getSettingValue(settings, 'bank_account_holder'));
                     
                     // 会社情報
-                    document.getElementById('company_name').value = getSettingValue(settings, 'company_name');
-                    document.getElementById('company_address').value = getSettingValue(settings, 'company_address');
-                    document.getElementById('company_phone').value = getSettingValue(settings, 'company_phone');
-                    document.getElementById('company_email').value = getSettingValue(settings, 'company_email');
-                    document.getElementById('company_representative').value = getSettingValue(settings, 'company_representative');
-                    document.getElementById('company_registration').value = getSettingValue(settings, 'company_registration');
+                    setValue('company_name', getSettingValue(settings, 'company_name'));
+                    setValue('company_address', getSettingValue(settings, 'company_address'));
+                    setValue('company_phone', getSettingValue(settings, 'company_phone'));
+                    setValue('company_email', getSettingValue(settings, 'company_email'));
+                    setValue('company_representative', getSettingValue(settings, 'company_representative'));
+                    setValue('company_registration', getSettingValue(settings, 'company_registration'));
                     
                     // 法務設定
-                    document.getElementById('company_website_url').value = getSettingValue(settings, 'company_website_url');
-                    document.getElementById('privacy_policy_url').value = getSettingValue(settings, 'privacy_policy_url');
-                    document.getElementById('terms_url').value = getSettingValue(settings, 'terms_url');
-                    document.getElementById('legal_notice_url').value = getSettingValue(settings, 'legal_notice_url');
-                    document.getElementById('privacy_policy').value = getSettingValue(settings, 'privacy_policy');
-                    document.getElementById('legal_notice').value = getSettingValue(settings, 'legal_notice');
-                    document.getElementById('terms_of_service').value = getSettingValue(settings, 'terms_of_service');
-                    document.getElementById('footer_text').value = getSettingValue(settings, 'footer_text');
+                    setValue('company_website_url', getSettingValue(settings, 'company_website_url'));
+                    setValue('privacy_policy_url', getSettingValue(settings, 'privacy_policy_url'));
+                    setValue('terms_url', getSettingValue(settings, 'terms_url'));
+                    setValue('legal_notice_url', getSettingValue(settings, 'legal_notice_url'));
+                    setValue('privacy_policy', getSettingValue(settings, 'privacy_policy'));
+                    setValue('legal_notice', getSettingValue(settings, 'legal_notice'));
+                    setValue('terms_of_service', getSettingValue(settings, 'terms_of_service'));
+                    setValue('footer_text', getSettingValue(settings, 'footer_text'));
                     
                     // 外部URL入力時にテキストエリアを薄く表示
-                    toggleContentVisibility();
+                    if (typeof toggleContentVisibility === 'function') {
+                        toggleContentVisibility();
+                    }
                     
                     // Stripe（要素が存在する場合のみ）
                     const stripeEnabledEl = document.getElementById('stripe_enabled');
@@ -26957,30 +26944,36 @@ app.get('/admin/settings', async (c) => {
             // 設定を保存
             async function saveSettings() {
                 try {
+                    // ヘルパー関数: 要素の値を安全に取得
+                    const getValue = (id) => {
+                        const el = document.getElementById(id);
+                        return el ? el.value : '';
+                    };
+                    
                     const settings = {
                         // 銀行情報
-                        bank_name: document.getElementById('bank_name').value,
-                        bank_branch: document.getElementById('bank_branch').value,
-                        bank_account_type: document.getElementById('bank_account_type').value,
-                        bank_account_number: document.getElementById('bank_account_number').value,
-                        bank_account_holder: document.getElementById('bank_account_holder').value,
+                        bank_name: getValue('bank_name'),
+                        bank_branch: getValue('bank_branch'),
+                        bank_account_type: getValue('bank_account_type'),
+                        bank_account_number: getValue('bank_account_number'),
+                        bank_account_holder: getValue('bank_account_holder'),
                         // 会社情報
-                        company_name: document.getElementById('company_name').value,
-                        company_address: document.getElementById('company_address').value,
-                        company_phone: document.getElementById('company_phone').value,
-                        company_email: document.getElementById('company_email').value,
-                        company_representative: document.getElementById('company_representative').value,
-                        company_registration: document.getElementById('company_registration').value,
+                        company_name: getValue('company_name'),
+                        company_address: getValue('company_address'),
+                        company_phone: getValue('company_phone'),
+                        company_email: getValue('company_email'),
+                        company_representative: getValue('company_representative'),
+                        company_registration: getValue('company_registration'),
                         // 法務設定 - 外部URL
-                        company_website_url: document.getElementById('company_website_url').value,
-                        privacy_policy_url: document.getElementById('privacy_policy_url').value,
-                        terms_url: document.getElementById('terms_url').value,
-                        legal_notice_url: document.getElementById('legal_notice_url').value,
+                        company_website_url: getValue('company_website_url'),
+                        privacy_policy_url: getValue('privacy_policy_url'),
+                        terms_url: getValue('terms_url'),
+                        legal_notice_url: getValue('legal_notice_url'),
                         // 法務設定 - 内部コンテンツ
-                        privacy_policy: document.getElementById('privacy_policy').value,
-                        legal_notice: document.getElementById('legal_notice').value,
-                        terms_of_service: document.getElementById('terms_of_service').value,
-                        footer_text: document.getElementById('footer_text').value
+                        privacy_policy: getValue('privacy_policy'),
+                        legal_notice: getValue('legal_notice'),
+                        terms_of_service: getValue('terms_of_service'),
+                        footer_text: getValue('footer_text')
                     };
                     
                     // Stripe（要素が存在する場合のみ）
