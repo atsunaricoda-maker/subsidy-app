@@ -10799,13 +10799,22 @@ app.get('/case/:id', async (c) => {
                     
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium mb-1">金額（税抜） <span class="text-red-500">*</span></label>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-sm font-medium">金額 <span class="text-red-500">*</span></label>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" id="inputModeExcludingTax" onclick="setInputMode('excluding')" 
+                                            class="text-xs px-2 py-1 rounded bg-blue-600 text-white">税抜</button>
+                                    <button type="button" id="inputModeIncludingTax" onclick="setInputMode('including')" 
+                                            class="text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300">税込</button>
+                                </div>
+                            </div>
                             <div class="relative">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
                                 <input type="number" name="subtotal" id="invoiceSubtotal" required min="0"
                                        class="w-full pl-8 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                                       onchange="calculateInvoiceTotal()">
+                                       oninput="calculateInvoiceTotal()">
                             </div>
+                            <p id="inputModeHint" class="text-xs text-gray-500 mt-1">税抜金額を入力してください</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1">消費税率</label>
@@ -11762,6 +11771,10 @@ app.get('/case/:id', async (c) => {
                 document.getElementById('invoiceTaxRate').value = '10';
                 document.getElementById('invoiceWithholding').checked = false;
                 
+                // 入力モードを税抜にリセット
+                currentInputMode = 'excluding';
+                setInputMode('excluding');
+                
                 calculateInvoiceTotal();
                 modal.classList.remove('hidden');
             }
@@ -11769,21 +11782,63 @@ app.get('/case/:id', async (c) => {
             
             function closeCreateInvoiceModal() {
                 document.getElementById('createInvoiceModal').classList.add('hidden');
+                // モーダルを閉じる時に税抜モードにリセット
+                currentInputMode = 'excluding';
             }
             window.closeCreateInvoiceModal = closeCreateInvoiceModal;
             
+            // 金額入力モード（税抜/税込）
+            let currentInputMode = 'excluding';
+            
+            function setInputMode(mode) {
+                currentInputMode = mode;
+                const excludingBtn = document.getElementById('inputModeExcludingTax');
+                const includingBtn = document.getElementById('inputModeIncludingTax');
+                const hint = document.getElementById('inputModeHint');
+                
+                if (mode === 'excluding') {
+                    excludingBtn.className = 'text-xs px-2 py-1 rounded bg-blue-600 text-white';
+                    includingBtn.className = 'text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300';
+                    hint.textContent = '税抜金額を入力してください';
+                } else {
+                    excludingBtn.className = 'text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300';
+                    includingBtn.className = 'text-xs px-2 py-1 rounded bg-green-600 text-white';
+                    hint.textContent = '税込金額を入力 → 税抜金額を自動計算';
+                }
+                calculateInvoiceTotal();
+            }
+            window.setInputMode = setInputMode;
+            
             // 請求金額計算
             function calculateInvoiceTotal() {
-                const subtotal = parseInt(document.getElementById('invoiceSubtotal').value) || 0;
+                const inputValue = parseInt(document.getElementById('invoiceSubtotal').value) || 0;
                 const taxRate = parseInt(document.getElementById('invoiceTaxRate').value) || 0;
                 const hasWithholding = document.getElementById('invoiceWithholding').checked;
                 
-                const tax = Math.floor(subtotal * taxRate / 100);
+                let subtotal, tax, total;
+                
+                if (currentInputMode === 'including' && taxRate > 0) {
+                    // 税込入力モード: 入力値から税抜金額を逆算
+                    // 税込金額 = 税抜金額 × (1 + 税率/100)
+                    // 税抜金額 = 税込金額 ÷ (1 + 税率/100)
+                    subtotal = Math.floor(inputValue / (1 + taxRate / 100));
+                    tax = inputValue - subtotal;
+                    total = inputValue;
+                } else {
+                    // 税抜入力モード（通常）
+                    subtotal = inputValue;
+                    tax = Math.floor(subtotal * taxRate / 100);
+                    total = subtotal + tax;
+                }
+                
                 let withholding = 0;
                 if (hasWithholding) {
                     withholding = Math.floor(subtotal * 0.1021);
+                    total = total - withholding;
                 }
-                const total = subtotal + tax - withholding;
+                
+                // 実際の税抜金額を隠しフィールドまたはデータ属性に保存
+                document.getElementById('invoiceSubtotal').dataset.actualSubtotal = subtotal;
                 
                 document.getElementById('calcSubtotal').textContent = '¥' + subtotal.toLocaleString();
                 document.getElementById('calcTax').textContent = '¥' + tax.toLocaleString();
@@ -11794,6 +11849,19 @@ app.get('/case/:id', async (c) => {
                     document.getElementById('calcWithholdingRow').classList.remove('hidden');
                 } else {
                     document.getElementById('calcWithholdingRow').classList.add('hidden');
+                }
+                
+                // 税込モードの場合、逆算結果を表示
+                const hint = document.getElementById('inputModeHint');
+                if (currentInputMode === 'including' && inputValue > 0) {
+                    hint.innerHTML = '税込 <strong>¥' + inputValue.toLocaleString() + '</strong> → 税抜 <strong>¥' + subtotal.toLocaleString() + '</strong>';
+                    hint.className = 'text-xs text-green-600 mt-1 font-medium';
+                } else if (currentInputMode === 'including') {
+                    hint.textContent = '税込金額を入力 → 税抜金額を自動計算';
+                    hint.className = 'text-xs text-gray-500 mt-1';
+                } else {
+                    hint.textContent = '税抜金額を入力してください';
+                    hint.className = 'text-xs text-gray-500 mt-1';
                 }
             }
             window.calculateInvoiceTotal = calculateInvoiceTotal;
@@ -11812,9 +11880,17 @@ app.get('/case/:id', async (c) => {
             
             async function createInvoice(status) {
                 try {
-                    const subtotal = parseInt(document.getElementById('invoiceSubtotal').value) || 0;
+                    const inputValue = parseInt(document.getElementById('invoiceSubtotal').value) || 0;
                     const taxRate = parseInt(document.getElementById('invoiceTaxRate').value) || 0;
                     const hasWithholding = document.getElementById('invoiceWithholding').checked;
+                    
+                    // 税込モードの場合は逆算した税抜金額を使用
+                    let subtotal;
+                    if (currentInputMode === 'including' && taxRate > 0) {
+                        subtotal = Math.floor(inputValue / (1 + taxRate / 100));
+                    } else {
+                        subtotal = inputValue;
+                    }
                     
                     const taxAmount = Math.floor(subtotal * taxRate / 100);
                     const withholdingAmount = hasWithholding ? Math.floor(subtotal * 0.1021) : 0;
