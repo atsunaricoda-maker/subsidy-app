@@ -16968,8 +16968,35 @@ app.get('/api/admin/notifications', async (c) => {
   query += ` ORDER BY created_at DESC LIMIT 50`
   
   const result = await DB.prepare(query).all()
+  let notifications = result.results || []
   
-  return c.json(result.results)
+  // 支払い報告通知の場合、関連する請求書が既にpaid状態ならフィルタリング
+  const paymentNotifications = notifications.filter((n: any) => 
+    n.notification_type === 'payment_report' && n.related_table === 'invoices' && n.related_id
+  )
+  
+  if (paymentNotifications.length > 0) {
+    const invoiceIds = paymentNotifications.map((n: any) => n.related_id)
+    try {
+      // 既にpaid状態の請求書IDを取得
+      const paidInvoices = await DB.prepare(`
+        SELECT id FROM invoices WHERE id IN (${invoiceIds.join(',')}) AND status = 'paid'
+      `).all()
+      const paidIds = new Set((paidInvoices.results || []).map((inv: any) => inv.id))
+      
+      // paid状態の請求書に関連する通知を除外
+      notifications = notifications.filter((n: any) => {
+        if (n.notification_type === 'payment_report' && n.related_table === 'invoices' && n.related_id) {
+          return !paidIds.has(n.related_id)
+        }
+        return true
+      })
+    } catch (e) {
+      // エラーの場合はそのまま返す
+    }
+  }
+  
+  return c.json(notifications)
 })
 
 // 通知を既読にする
@@ -17002,14 +17029,38 @@ app.get('/api/admin/notifications/unread-count', async (c) => {
 app.get('/api/admin/notifications/summary', async (c) => {
   const { DB } = c.env
   
-  const result = await DB.prepare(`
-    SELECT 
-      notification_type,
-      COUNT(*) as count
+  // 未読通知を全て取得
+  const allNotifications = await DB.prepare(`
+    SELECT id, notification_type, related_table, related_id
     FROM admin_notifications 
     WHERE is_read = 0
-    GROUP BY notification_type
   `).all()
+  
+  let notifications = allNotifications.results || []
+  
+  // 支払い報告通知で、既にpaid状態の請求書に関連するものを除外
+  const paymentNotifications = notifications.filter((n: any) => 
+    n.notification_type === 'payment_report' && n.related_table === 'invoices' && n.related_id
+  )
+  
+  if (paymentNotifications.length > 0) {
+    const invoiceIds = paymentNotifications.map((n: any) => n.related_id)
+    try {
+      const paidInvoices = await DB.prepare(`
+        SELECT id FROM invoices WHERE id IN (${invoiceIds.join(',')}) AND status = 'paid'
+      `).all()
+      const paidIds = new Set((paidInvoices.results || []).map((inv: any) => inv.id))
+      
+      notifications = notifications.filter((n: any) => {
+        if (n.notification_type === 'payment_report' && n.related_table === 'invoices' && n.related_id) {
+          return !paidIds.has(n.related_id)
+        }
+        return true
+      })
+    } catch (e) {
+      // エラーの場合はそのまま
+    }
+  }
   
   // 結果をオブジェクトに変換
   const summary: Record<string, number> = {
@@ -17019,15 +17070,15 @@ app.get('/api/admin/notifications/summary', async (c) => {
     other: 0
   }
   
-  for (const row of (result.results || []) as any[]) {
-    if (row.notification_type === 'new_message') {
-      summary.new_message = row.count
-    } else if (row.notification_type === 'document_upload') {
-      summary.document_upload = row.count
-    } else if (row.notification_type === 'payment_report') {
-      summary.payment_report = row.count
+  for (const n of notifications as any[]) {
+    if (n.notification_type === 'new_message') {
+      summary.new_message++
+    } else if (n.notification_type === 'document_upload') {
+      summary.document_upload++
+    } else if (n.notification_type === 'payment_report') {
+      summary.payment_report++
     } else {
-      summary.other += row.count
+      summary.other++
     }
   }
   
