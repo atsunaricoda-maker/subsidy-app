@@ -22475,8 +22475,10 @@ app.post('/api/clients/:clientId/export-all-documents', async (c) => {
 // 管理者ダッシュボード用統計API
 app.get('/api/dashboard/stats', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = user?.organization_id || 1
   
-  // 顧客統計
+  // 顧客統計（organization_idでフィルタ）
   const clientStats = await DB.prepare(`
     SELECT 
       COUNT(*) as total,
@@ -22485,18 +22487,19 @@ app.get('/api/dashboard/stats', async (c) => {
       SUM(CASE WHEN status = 'applying' THEN 1 ELSE 0 END) as applying,
       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
     FROM clients
-  `).first()
+    WHERE organization_id = ?
+  `).bind(orgId).first()
   
-  // 今月の統計
+  // 今月の統計（organization_idでフィルタ）
   const thisMonth = new Date().toISOString().substring(0, 7)
   const monthlyStats = await DB.prepare(`
     SELECT 
       COUNT(*) as new_clients,
-      (SELECT COUNT(*) FROM clients WHERE status = 'completed' AND strftime('%Y-%m', updated_at) = ?) as completed_this_month
-    FROM clients WHERE strftime('%Y-%m', created_at) = ?
-  `).bind(thisMonth, thisMonth).first()
+      (SELECT COUNT(*) FROM clients WHERE organization_id = ? AND status = 'completed' AND strftime('%Y-%m', updated_at) = ?) as completed_this_month
+    FROM clients WHERE organization_id = ? AND strftime('%Y-%m', created_at) = ?
+  `).bind(orgId, thisMonth, orgId, thisMonth).first()
   
-  // 今月の案件実績（完了・採択・採択額）
+  // 今月の案件実績（organization_idでフィルタ）
   const monthlyCaseStats = await DB.prepare(`
     SELECT 
       SUM(CASE WHEN is_archived = 1 AND strftime('%Y-%m', updated_at) = ? THEN 1 ELSE 0 END) as monthly_completed,
@@ -22505,26 +22508,31 @@ app.get('/api/dashboard/stats', async (c) => {
       SUM(CASE WHEN result = 'approved' AND strftime('%Y-%m', updated_at) = ? THEN COALESCE(approved_amount, 0) ELSE 0 END) as monthly_approved_amount,
       SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) as total_archived
     FROM cases
-  `).bind(thisMonth, thisMonth, thisMonth, thisMonth).first() as any
+    WHERE organization_id = ?
+  `).bind(thisMonth, thisMonth, thisMonth, thisMonth, orgId).first() as any
   
-  // 生成文書統計
+  // 生成文書統計（organization_idでフィルタ - casesテーブル経由）
   const docStats = await DB.prepare(`
     SELECT 
       COUNT(*) as total,
-      SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft,
-      SUM(CASE WHEN status = 'review' THEN 1 ELSE 0 END) as review,
-      SUM(CASE WHEN status = 'final' THEN 1 ELSE 0 END) as final
-    FROM generated_documents
-  `).first()
+      SUM(CASE WHEN gd.status = 'draft' THEN 1 ELSE 0 END) as draft,
+      SUM(CASE WHEN gd.status = 'review' THEN 1 ELSE 0 END) as review,
+      SUM(CASE WHEN gd.status = 'final' THEN 1 ELSE 0 END) as final
+    FROM generated_documents gd
+    JOIN cases c ON gd.case_id = c.id
+    WHERE c.organization_id = ?
+  `).bind(orgId).first()
   
-  // マッチングスコア統計
+  // マッチングスコア統計（organization_idでフィルタ - clientsテーブル経由）
   const matchStats = await DB.prepare(`
     SELECT 
-      AVG(match_score) as avg_score,
-      AVG(adoption_probability) as avg_probability,
+      AVG(sms.match_score) as avg_score,
+      AVG(sms.adoption_probability) as avg_probability,
       COUNT(*) as total_analyses
-    FROM subsidy_match_scores
-  `).first()
+    FROM subsidy_match_scores sms
+    JOIN clients cl ON sms.client_id = cl.id
+    WHERE cl.organization_id = ?
+  `).bind(orgId).first()
   
   // 公募要領更新通知
   const pendingUpdates = await DB.prepare(`
@@ -27885,14 +27893,7 @@ app.get('/admin/payments', async (c) => {
 // 顧客管理ページ
 // =============================================
 app.get('/clients', async (c) => {
-  const { DB } = c.env
-  const clients = await DB.prepare(`
-    SELECT c.*, 
-           (SELECT COUNT(*) FROM cases WHERE cases.client_id = c.id) as case_count
-    FROM clients c
-    ORDER BY c.created_at DESC
-  `).all()
-  
+  // データはクライアントサイドでAPIから取得（organization_idでフィルタされる）
   return c.html(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -27954,30 +27955,11 @@ app.get('/clients', async (c) => {
                                 </tr>
                             </thead>
                             <tbody id="customerList" class="divide-y divide-gray-200">
-                                ${(clients.results || []).map((client: any) => `
-                                    <tr class="hover:bg-blue-50 customer-row cursor-pointer transition-colors" 
-                                        data-name="${client.name}" 
-                                        data-company="${client.company_name || ''}"
-                                        onclick="window.location.href='/client/${client.id}'">
-                                        <td class="px-4 py-3">
-                                            <div class="font-medium text-gray-900">${client.name}</div>
-                                        </td>
-                                        <td class="px-4 py-3 text-gray-600">${client.company_name || '-'}</td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
-                                            ${client.email ? `<div><i class="fas fa-envelope mr-1"></i>${client.email}</div>` : ''}
-                                            ${client.phone ? `<div><i class="fas fa-phone mr-1"></i>${client.phone}</div>` : ''}
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            <span class="${client.case_count > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-sm">${client.case_count || 0}件</span>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">${client.created_at?.split(' ')[0] || '-'}</td>
-                                        <td class="px-4 py-3">
-                                            <span class="text-blue-600 hover:text-blue-800">
-                                                <i class="fas fa-eye"></i> 詳細
-                                            </span>
-                                        </td>
-                                    </tr>
-                                `).join('')}
+                                <tr>
+                                    <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                                        <i class="fas fa-spinner fa-spin mr-2"></i>読み込み中...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -27987,6 +27969,67 @@ app.get('/clients', async (c) => {
 
         <script>
             ${sidebarScripts}
+            
+            // 認証チェック
+            const token = localStorage.getItem('admin_token');
+            if (!token) {
+                window.location.href = '/login';
+            }
+            
+            // Axios設定
+            axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_username') + ':' + localStorage.getItem('admin_role');
+            
+            let allClients = [];
+            
+            // データ読み込み
+            async function loadClients() {
+                try {
+                    const response = await axios.get('/api/clients?include_cases=true');
+                    allClients = response.data;
+                    renderClients(allClients);
+                } catch (error) {
+                    console.error('Error loading clients:', error);
+                    document.getElementById('customerList').innerHTML = 
+                        '<tr><td colspan="6" class="px-4 py-8 text-center text-red-500">データの読み込みに失敗しました</td></tr>';
+                }
+            }
+            
+            // 顧客一覧の表示
+            function renderClients(clients) {
+                const container = document.getElementById('customerList');
+                if (!clients || clients.length === 0) {
+                    container.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">顧客が登録されていません</td></tr>';
+                    return;
+                }
+                
+                container.innerHTML = clients.map(client => {
+                    const caseCount = client.cases?.length || 0;
+                    return \`
+                        <tr class="hover:bg-blue-50 customer-row cursor-pointer transition-colors" 
+                            data-name="\${client.name}" 
+                            data-company="\${client.company_name || ''}"
+                            onclick="window.location.href='/client/\${client.id}'">
+                            <td class="px-4 py-3">
+                                <div class="font-medium text-gray-900">\${client.name}</div>
+                            </td>
+                            <td class="px-4 py-3 text-gray-600">\${client.company_name || '-'}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                \${client.email ? '<div><i class="fas fa-envelope mr-1"></i>' + client.email + '</div>' : ''}
+                                \${client.phone ? '<div><i class="fas fa-phone mr-1"></i>' + client.phone + '</div>' : ''}
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="\${caseCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-sm">\${caseCount}件</span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">\${client.created_at?.split(' ')[0] || '-'}</td>
+                            <td class="px-4 py-3">
+                                <span class="text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-eye"></i> 詳細
+                                </span>
+                            </td>
+                        </tr>
+                    \`;
+                }).join('');
+            }
             
             function filterCustomers() {
                 const query = document.getElementById('searchQuery').value.toLowerCase();
@@ -28000,6 +28043,9 @@ app.get('/clients', async (c) => {
             function openNewCustomerModal() {
                 window.location.href = '/?action=new_customer';
             }
+            
+            // 初期化
+            loadClients();
         </script>
     </body>
     </html>
