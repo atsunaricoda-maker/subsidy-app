@@ -26033,14 +26033,24 @@ app.post('/api/stripe/create-subscription-checkout', async (c) => {
     return c.json({ error: 'Stripe決済は現在設定されていません' }, 400)
   }
   
-  const { plan_code } = await c.req.json()
-  
-  if (!plan_code || !STRIPE_PRICES.plans[plan_code as keyof typeof STRIPE_PRICES.plans]) {
-    return c.json({ error: '無効なプランです' }, 400)
-  }
+  const { plan_code, plan_id } = await c.req.json()
   
   const orgId = user.organization_id || 1
-  const priceId = STRIPE_PRICES.plans[plan_code as keyof typeof STRIPE_PRICES.plans]
+  
+  // plan_idが指定された場合はDBからplan_codeを取得
+  let resolvedPlanCode = plan_code
+  if (plan_id && !plan_code) {
+    const plan = await DB.prepare(`SELECT plan_code FROM subscription_plans WHERE id = ?`).bind(plan_id).first() as any
+    if (plan) {
+      resolvedPlanCode = plan.plan_code
+    }
+  }
+  
+  if (!resolvedPlanCode || !STRIPE_PRICES.plans[resolvedPlanCode as keyof typeof STRIPE_PRICES.plans]) {
+    return c.json({ error: '無効なプランです。plan_code: ' + resolvedPlanCode }, 400)
+  }
+  
+  const priceId = STRIPE_PRICES.plans[resolvedPlanCode as keyof typeof STRIPE_PRICES.plans]
   
   // 組織情報を取得
   const org = await DB.prepare(`SELECT * FROM organizations WHERE id = ?`).bind(orgId).first() as any
@@ -26097,10 +26107,10 @@ app.post('/api/stripe/create-subscription-checkout', async (c) => {
       'success_url': `${baseUrl}/admin/subscription?session_id={CHECKOUT_SESSION_ID}&status=success`,
       'cancel_url': `${baseUrl}/admin/subscription?status=cancelled`,
       'metadata[organization_id]': String(orgId),
-      'metadata[plan_code]': plan_code,
+      'metadata[plan_code]': resolvedPlanCode,
       'metadata[type]': 'subscription',
       'subscription_data[metadata][organization_id]': String(orgId),
-      'subscription_data[metadata][plan_code]': plan_code
+      'subscription_data[metadata][plan_code]': resolvedPlanCode
     }
     
     // 試用期間を設定（新規の場合）
@@ -27071,19 +27081,11 @@ app.get('/admin/subscription', async (c) => {
             
             // Stripe決済でプラン変更
             async function changePlan(planId) {
-                // プランコードを取得（DBのplan_codeと一致させる）
-                const planCodeMap = { 1: 'basic', 2: 'standard', 3: 'premium', 4: 'business', 5: 'enterprise' };
-                const planCode = planCodeMap[planId];
-                
-                if (!planCode) {
-                    alert('無効なプランです');
-                    return;
-                }
-                
                 if (!confirm('プランを変更しますか？\\n\\nStripe決済画面に移動します。')) return;
                 
                 try {
-                    const response = await axios.post('/api/stripe/create-subscription-checkout', { plan_code: planCode });
+                    // plan_idを直接送信（APIでDBからplan_codeを取得する）
+                    const response = await axios.post('/api/stripe/create-subscription-checkout', { plan_id: planId });
                     if (response.data.checkout_url) {
                         window.location.href = response.data.checkout_url;
                     } else {
