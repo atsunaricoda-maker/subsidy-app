@@ -27841,6 +27841,76 @@ app.get('/admin/statistics', async (c) => {
     GROUP BY strftime('%Y-%m', created_at)
     ORDER BY month DESC
   `).all()
+  
+  // 支払い統計（月別）- invoicesテーブルから
+  let monthlyPayments: any[] = []
+  let yearlyPayments: any[] = []
+  let totalPaymentThisMonth = { deposit: 0, success_fee: 0, total: 0 }
+  let totalPaymentThisYear = { deposit: 0, success_fee: 0, total: 0 }
+  
+  try {
+    // 月別支払い（過去12ヶ月）
+    const monthlyPaymentsResult = await DB.prepare(`
+      SELECT 
+        strftime('%Y-%m', paid_at) as month,
+        invoice_type,
+        SUM(total_amount) as total,
+        COUNT(*) as count
+      FROM invoices
+      WHERE status = 'paid' AND paid_at >= date('now', '-12 months')
+      GROUP BY strftime('%Y-%m', paid_at), invoice_type
+      ORDER BY month DESC
+    `).all()
+    monthlyPayments = monthlyPaymentsResult.results || []
+    
+    // 年別支払い（過去5年）
+    const yearlyPaymentsResult = await DB.prepare(`
+      SELECT 
+        strftime('%Y', paid_at) as year,
+        invoice_type,
+        SUM(total_amount) as total,
+        COUNT(*) as count
+      FROM invoices
+      WHERE status = 'paid' AND paid_at >= date('now', '-5 years')
+      GROUP BY strftime('%Y', paid_at), invoice_type
+      ORDER BY year DESC
+    `).all()
+    yearlyPayments = yearlyPaymentsResult.results || []
+    
+    // 今月の支払い合計
+    const thisMonthPayments = await DB.prepare(`
+      SELECT 
+        invoice_type,
+        SUM(total_amount) as total
+      FROM invoices
+      WHERE status = 'paid' AND strftime('%Y-%m', paid_at) = strftime('%Y-%m', 'now')
+      GROUP BY invoice_type
+    `).all()
+    
+    for (const p of (thisMonthPayments.results || []) as any[]) {
+      if (p.invoice_type === 'deposit') totalPaymentThisMonth.deposit = p.total || 0
+      else if (p.invoice_type === 'success_fee') totalPaymentThisMonth.success_fee = p.total || 0
+    }
+    totalPaymentThisMonth.total = totalPaymentThisMonth.deposit + totalPaymentThisMonth.success_fee
+    
+    // 今年の支払い合計
+    const thisYearPayments = await DB.prepare(`
+      SELECT 
+        invoice_type,
+        SUM(total_amount) as total
+      FROM invoices
+      WHERE status = 'paid' AND strftime('%Y', paid_at) = strftime('%Y', 'now')
+      GROUP BY invoice_type
+    `).all()
+    
+    for (const p of (thisYearPayments.results || []) as any[]) {
+      if (p.invoice_type === 'deposit') totalPaymentThisYear.deposit = p.total || 0
+      else if (p.invoice_type === 'success_fee') totalPaymentThisYear.success_fee = p.total || 0
+    }
+    totalPaymentThisYear.total = totalPaymentThisYear.deposit + totalPaymentThisYear.success_fee
+  } catch (e) {
+    // invoicesテーブルがない場合は空
+  }
 
   // Build HTML for status cards
   const labels: Record<string, string> = {
@@ -27883,6 +27953,48 @@ app.get('/admin/statistics', async (c) => {
     '</tr>'
   }).join('')
   
+  // 月別支払いデータを整形（月ごとにまとめる）
+  const monthlyPaymentMap = new Map<string, { deposit: number, success_fee: number }>()
+  for (const p of monthlyPayments as any[]) {
+    if (!monthlyPaymentMap.has(p.month)) {
+      monthlyPaymentMap.set(p.month, { deposit: 0, success_fee: 0 })
+    }
+    const data = monthlyPaymentMap.get(p.month)!
+    if (p.invoice_type === 'deposit') data.deposit = p.total || 0
+    else if (p.invoice_type === 'success_fee') data.success_fee = p.total || 0
+  }
+  
+  const monthlyPaymentsHtml = Array.from(monthlyPaymentMap.entries()).map(([month, data]) => {
+    const total = data.deposit + data.success_fee
+    return '<tr class="border-b hover:bg-gray-50">' +
+      '<td class="py-3 text-sm font-medium">' + month + '</td>' +
+      '<td class="py-3 text-right"><span class="text-blue-600">¥' + data.deposit.toLocaleString() + '</span></td>' +
+      '<td class="py-3 text-right"><span class="text-purple-600">¥' + data.success_fee.toLocaleString() + '</span></td>' +
+      '<td class="py-3 text-right font-bold text-green-600">¥' + total.toLocaleString() + '</td>' +
+    '</tr>'
+  }).join('')
+  
+  // 年別支払いデータを整形
+  const yearlyPaymentMap = new Map<string, { deposit: number, success_fee: number }>()
+  for (const p of yearlyPayments as any[]) {
+    if (!yearlyPaymentMap.has(p.year)) {
+      yearlyPaymentMap.set(p.year, { deposit: 0, success_fee: 0 })
+    }
+    const data = yearlyPaymentMap.get(p.year)!
+    if (p.invoice_type === 'deposit') data.deposit = p.total || 0
+    else if (p.invoice_type === 'success_fee') data.success_fee = p.total || 0
+  }
+  
+  const yearlyPaymentsHtml = Array.from(yearlyPaymentMap.entries()).map(([year, data]) => {
+    const total = data.deposit + data.success_fee
+    return '<tr class="border-b hover:bg-gray-50">' +
+      '<td class="py-3 text-sm font-medium">' + year + '年</td>' +
+      '<td class="py-3 text-right"><span class="text-blue-600">¥' + data.deposit.toLocaleString() + '</span></td>' +
+      '<td class="py-3 text-right"><span class="text-purple-600">¥' + data.success_fee.toLocaleString() + '</span></td>' +
+      '<td class="py-3 text-right font-bold text-green-600">¥' + total.toLocaleString() + '</td>' +
+    '</tr>'
+  }).join('')
+  
   return c.html(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -27917,37 +28029,120 @@ app.get('/admin/statistics', async (c) => {
 
                 <div class="p-4 lg:p-6">
                     <!-- サマリーカード -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                        <div class="bg-white rounded-xl shadow-sm p-4">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <p class="text-gray-500 text-sm">総顧客数</p>
-                                    <p class="text-3xl font-bold text-gray-900">${totalClients?.count || 0}</p>
+                                    <p class="text-gray-500 text-xs">総顧客数</p>
+                                    <p class="text-2xl font-bold text-gray-900">${totalClients?.count || 0}</p>
                                 </div>
-                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-users text-blue-600 text-xl"></i>
+                                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-users text-blue-600"></i>
                                 </div>
                             </div>
                         </div>
-                        <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="bg-white rounded-xl shadow-sm p-4">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <p class="text-gray-500 text-sm">今月の新規</p>
-                                    <p class="text-3xl font-bold text-blue-600">${newThisMonth?.count || 0}</p>
+                                    <p class="text-gray-500 text-xs">今月の新規</p>
+                                    <p class="text-2xl font-bold text-blue-600">${newThisMonth?.count || 0}</p>
                                 </div>
-                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-user-plus text-blue-600 text-xl"></i>
+                                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-user-plus text-blue-600"></i>
                                 </div>
                             </div>
                         </div>
-                        <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="bg-white rounded-xl shadow-sm p-4">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <p class="text-gray-500 text-sm">今月の完了</p>
-                                    <p class="text-3xl font-bold text-green-600">${completedThisMonth?.count || 0}</p>
+                                    <p class="text-gray-500 text-xs">今月の完了</p>
+                                    <p class="text-2xl font-bold text-green-600">${completedThisMonth?.count || 0}</p>
                                 </div>
-                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-check-circle text-green-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-xs">今月の売上</p>
+                                    <p class="text-xl font-bold text-green-600">¥${totalPaymentThisMonth.total.toLocaleString()}</p>
+                                </div>
+                                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-yen-sign text-green-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-xs">今年の売上</p>
+                                    <p class="text-xl font-bold text-indigo-600">¥${totalPaymentThisYear.total.toLocaleString()}</p>
+                                </div>
+                                <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-calendar-alt text-indigo-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-4">
+                            <div>
+                                <p class="text-gray-500 text-xs mb-1">内訳（今月）</p>
+                                <div class="flex gap-2 text-xs">
+                                    <span class="text-blue-600">手付¥${totalPaymentThisMonth.deposit.toLocaleString()}</span>
+                                    <span class="text-purple-600">報酬¥${totalPaymentThisMonth.success_fee.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 売上統計セクション -->
+                    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-coins text-yellow-500"></i>売上統計
+                        </h2>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- 月別売上 -->
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-600 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-calendar-week text-blue-500"></i>月別売上（過去12ヶ月）
+                                </h3>
+                                <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-50 sticky top-0">
+                                            <tr>
+                                                <th class="py-2 px-2 text-left font-medium text-gray-500">月</th>
+                                                <th class="py-2 px-2 text-right font-medium text-blue-500">手付金</th>
+                                                <th class="py-2 px-2 text-right font-medium text-purple-500">成功報酬</th>
+                                                <th class="py-2 px-2 text-right font-medium text-green-600">合計</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${monthlyPaymentsHtml || '<tr><td colspan="4" class="py-4 text-center text-gray-400">データがありません</td></tr>'}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 年別売上 -->
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-600 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-calendar-alt text-indigo-500"></i>年別売上（過去5年）
+                                </h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="py-2 px-2 text-left font-medium text-gray-500">年</th>
+                                                <th class="py-2 px-2 text-right font-medium text-blue-500">手付金</th>
+                                                <th class="py-2 px-2 text-right font-medium text-purple-500">成功報酬</th>
+                                                <th class="py-2 px-2 text-right font-medium text-green-600">合計</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${yearlyPaymentsHtml || '<tr><td colspan="4" class="py-4 text-center text-gray-400">データがありません</td></tr>'}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
