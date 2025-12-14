@@ -28004,6 +28004,7 @@ app.get('/admin/statistics', async (c) => {
         <title>統計情報 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
             ${sidebarStyles}
@@ -28098,10 +28099,42 @@ app.get('/admin/statistics', async (c) => {
                     
                     <!-- 売上統計セクション -->
                     <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                            <i class="fas fa-coins text-yellow-500"></i>売上統計
-                        </h2>
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-bold flex items-center gap-2">
+                                <i class="fas fa-coins text-yellow-500"></i>売上統計
+                            </h2>
+                            <div class="flex items-center gap-2">
+                                <button onclick="switchView('chart')" id="btnChart" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white">
+                                    <i class="fas fa-chart-bar mr-1"></i>グラフ
+                                </button>
+                                <button onclick="switchView('table')" id="btnTable" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 text-gray-600 hover:bg-gray-300">
+                                    <i class="fas fa-table mr-1"></i>表
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- グラフ表示 -->
+                        <div id="chartView" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-600 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-calendar-week text-blue-500"></i>月別売上（過去12ヶ月）
+                                </h3>
+                                <div class="h-64">
+                                    <canvas id="monthlyChart"></canvas>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-600 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-calendar-alt text-indigo-500"></i>年別売上（過去5年）
+                                </h3>
+                                <div class="h-64">
+                                    <canvas id="yearlyChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 表表示 -->
+                        <div id="tableView" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <!-- 月別売上 -->
                             <div>
                                 <h3 class="text-sm font-medium text-gray-600 mb-3 flex items-center gap-2">
@@ -28196,6 +28229,142 @@ app.get('/admin/statistics', async (c) => {
         
         <script>
             ${sidebarScripts}
+            
+            // グラフ/表切り替え
+            function switchView(view) {
+                const chartView = document.getElementById('chartView');
+                const tableView = document.getElementById('tableView');
+                const btnChart = document.getElementById('btnChart');
+                const btnTable = document.getElementById('btnTable');
+                
+                if (view === 'chart') {
+                    chartView.classList.remove('hidden');
+                    tableView.classList.add('hidden');
+                    btnChart.className = 'px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white';
+                    btnTable.className = 'px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 text-gray-600 hover:bg-gray-300';
+                } else {
+                    chartView.classList.add('hidden');
+                    tableView.classList.remove('hidden');
+                    btnChart.className = 'px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 text-gray-600 hover:bg-gray-300';
+                    btnTable.className = 'px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white';
+                }
+            }
+            
+            // グラフデータ
+            const monthlyData = ${JSON.stringify(Array.from(monthlyPaymentMap.entries()).reverse())};
+            const yearlyData = ${JSON.stringify(Array.from(yearlyPaymentMap.entries()).reverse())};
+            
+            // 月別グラフ
+            const monthlyCtx = document.getElementById('monthlyChart');
+            if (monthlyCtx && monthlyData.length > 0) {
+                new Chart(monthlyCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: monthlyData.map(d => d[0]),
+                        datasets: [
+                            {
+                                label: '手付金',
+                                data: monthlyData.map(d => d[1].deposit),
+                                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                borderColor: 'rgb(59, 130, 246)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: '成功報酬',
+                                data: monthlyData.map(d => d[1].success_fee),
+                                backgroundColor: 'rgba(147, 51, 234, 0.7)',
+                                borderColor: 'rgb(147, 51, 234)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ¥' + context.raw.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                            },
+                            y: {
+                                stacked: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '¥' + value.toLocaleString();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // 年別グラフ
+            const yearlyCtx = document.getElementById('yearlyChart');
+            if (yearlyCtx && yearlyData.length > 0) {
+                new Chart(yearlyCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: yearlyData.map(d => d[0] + '年'),
+                        datasets: [
+                            {
+                                label: '手付金',
+                                data: yearlyData.map(d => d[1].deposit),
+                                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                borderColor: 'rgb(59, 130, 246)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: '成功報酬',
+                                data: yearlyData.map(d => d[1].success_fee),
+                                backgroundColor: 'rgba(147, 51, 234, 0.7)',
+                                borderColor: 'rgb(147, 51, 234)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ¥' + context.raw.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                            },
+                            y: {
+                                stacked: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '¥' + value.toLocaleString();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
         </script>
     </body>
     </html>
