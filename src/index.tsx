@@ -27085,9 +27085,6 @@ app.get('/admin/settings', async (c) => {
             window.closePreview = closePreview;
             window.saveSettings = saveSettings;
             window.applyLegalTemplates = applyLegalTemplates;
-            window.updateAIProviderUI = updateAIProviderUI;
-            window.toggleClaudeKeyVisibility = toggleClaudeKeyVisibility;
-            window.testClaudeAPI = testClaudeAPI;
             
             loadSettings();
         </script>
