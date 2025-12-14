@@ -1762,11 +1762,10 @@ app.get('/api/legal-templates', async (c) => {
 
 ## 支払方法
 - 銀行振込
-- クレジットカード（Stripe経由）
 
 ## 支払時期
-- 月額プラン：毎月1日に当月分を請求
-- 追加枠：購入時に即時請求
+- 月額プラン：請求書発行後14日以内に銀行振込
+- 追加枠：請求書発行後14日以内に銀行振込
 
 ## サービス提供時期
 お支払い確認後、即時利用可能
@@ -3039,6 +3038,24 @@ app.get('/', (c) => {
                         }
                     };
                     
+                    const getNotificationUrl = (n) => {
+                        // related_tableに基づいてURLを決定
+                        switch(n.related_table) {
+                            case 'invoices':
+                                // 請求書関連（振込報告）は支払い確認ページへ
+                                return '/admin/payments';
+                            case 'cases':
+                                return '/case/' + n.related_id;
+                            case 'clients':
+                                return '/client/' + n.related_id;
+                            case 'documents':
+                                return '/documents?id=' + n.related_id;
+                            default:
+                                // デフォルトは案件一覧
+                                return '/cases';
+                        }
+                    };
+                    
                     container.innerHTML = filterHtml + notifications.map(n => \`
                         <div class="border rounded-lg p-3 \${getTypeColor(n.notification_type)}">
                             <div class="flex justify-between items-start">
@@ -3047,7 +3064,7 @@ app.get('/', (c) => {
                                     <h4 class="font-medium text-sm">\${n.title}</h4>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    \${n.related_id ? \`<a href="/client/\${n.related_id}" onclick="window.markNotificationRead(\${n.id})" class="text-xs text-blue-600 hover:underline">詳細</a>\` : ''}
+                                    \${n.related_id ? \`<a href="\${getNotificationUrl(n)}" onclick="window.markNotificationRead(\${n.id})" class="text-xs text-blue-600 hover:underline">詳細</a>\` : ''}
                                     <button onclick="window.markNotificationRead(\${n.id})" class="text-xs text-gray-500 hover:text-gray-700">既読</button>
                                 </div>
                             </div>
@@ -4980,6 +4997,94 @@ app.post('/api/cases', async (c) => {
     } catch (pipelineError) {
       console.error('Error creating pipeline:', pipelineError)
       // パイプライン作成に失敗してもケース作成は続行
+    }
+  }
+  
+  // 手付金が設定されている場合、請求書を自動作成
+  if (data.deposit_required && data.deposit_amount > 0) {
+    try {
+      // invoicesテーブルが存在しない場合は作成
+      await DB.prepare(`
+        CREATE TABLE IF NOT EXISTS invoices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          organization_id INTEGER NOT NULL,
+          case_id INTEGER NOT NULL,
+          client_id INTEGER NOT NULL,
+          invoice_number TEXT NOT NULL,
+          invoice_type TEXT NOT NULL,
+          subtotal INTEGER NOT NULL,
+          tax_rate INTEGER DEFAULT 10,
+          tax_amount INTEGER DEFAULT 0,
+          withholding_tax INTEGER DEFAULT 0,
+          total_amount INTEGER NOT NULL,
+          issue_date DATE,
+          due_date DATE,
+          item_name TEXT NOT NULL,
+          item_description TEXT,
+          granted_amount INTEGER,
+          fee_rate REAL,
+          status TEXT NOT NULL DEFAULT 'draft',
+          paid_at DATETIME,
+          paid_amount INTEGER,
+          payment_reported_at DATETIME,
+          payment_confirmed_at DATETIME,
+          payment_confirmed_by INTEGER,
+          notes TEXT,
+          internal_memo TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
+      
+      // 請求書番号を生成
+      const now = new Date()
+      const invoiceYear = now.getFullYear()
+      const invoiceSeq = now.getTime().toString().slice(-6)
+      const invoiceNumber = `INV-${invoiceYear}-${invoiceSeq}`
+      
+      // 消費税計算（10%）
+      const subtotal = data.deposit_amount
+      const taxRate = 10
+      const taxAmount = Math.floor(subtotal * taxRate / 100)
+      const totalAmount = subtotal + taxAmount
+      
+      // 発行日・支払期限
+      const issueDate = now.toISOString().split('T')[0]
+      const dueDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      
+      // 補助金名を取得して品目名を生成
+      let itemName = '補助金申請サポート 着手金'
+      if (data.subsidy_type_id) {
+        const subsidyType = await DB.prepare(`SELECT name FROM subsidy_types WHERE id = ?`).bind(data.subsidy_type_id).first()
+        if (subsidyType?.name) {
+          itemName = `${subsidyType.name} 着手金`
+        }
+      }
+      
+      await DB.prepare(`
+        INSERT INTO invoices (
+          organization_id, case_id, client_id, invoice_number, invoice_type,
+          subtotal, tax_rate, tax_amount, withholding_tax, total_amount,
+          issue_date, due_date, item_name, status
+        ) VALUES (?, ?, ?, ?, 'deposit', ?, ?, ?, 0, ?, ?, ?, ?, 'issued')
+      `).bind(
+        orgId,
+        caseId,
+        data.client_id,
+        invoiceNumber,
+        subtotal,
+        taxRate,
+        taxAmount,
+        totalAmount,
+        issueDate,
+        dueDate,
+        itemName
+      ).run()
+      
+      console.log('Deposit invoice created for case:', caseId, 'invoice_number:', invoiceNumber)
+    } catch (invoiceError) {
+      console.error('Error creating deposit invoice:', invoiceError)
+      // 請求書作成に失敗してもケース作成は続行
     }
   }
   
@@ -10293,8 +10398,8 @@ app.get('/case/:id', async (c) => {
                             <button onclick="switchTab('hearing')" id="tab-hearing" class="tab-btn px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
                                 <i class="fas fa-clipboard-list mr-2"></i>ヒアリング
                             </button>
-                            <button onclick="switchTab('payment')" id="tab-payment" class="tab-btn px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                                <i class="fas fa-yen-sign mr-2"></i>手付金・契約
+                            <button onclick="switchTab('invoices')" id="tab-invoices" class="tab-btn px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                                <i class="fas fa-file-invoice-dollar mr-2"></i>請求書
                             </button>
                             <button onclick="switchTab('communications')" id="tab-communications" class="tab-btn px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
                                 <i class="fas fa-comments mr-2"></i>やり取り
@@ -10392,32 +10497,37 @@ app.get('/case/:id', async (c) => {
                         </div>
                     </div>
                     
-                    <!-- 手付金・契約タブ -->
-                    <div id="content-payment" class="tab-content hidden">
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div class="bg-white rounded-xl shadow-sm p-6">
-                                <h3 class="text-lg font-bold mb-4">
-                                    <i class="fas fa-yen-sign mr-2 text-yellow-600"></i>手付金情報
+                    <!-- 請求書タブ -->
+                    <div id="content-invoices" class="tab-content hidden">
+                        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold">
+                                    <i class="fas fa-file-invoice-dollar mr-2 text-green-600"></i>請求書一覧
                                 </h3>
-                                <div id="depositInfo">
-                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                <div class="flex gap-2">
+                                    <button onclick="openCreateInvoiceModal('deposit')" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 text-sm">
+                                        <i class="fas fa-plus mr-2"></i>手付金請求書
+                                    </button>
+                                    <button onclick="openCreateInvoiceModal('success_fee')" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm">
+                                        <i class="fas fa-plus mr-2"></i>成功報酬請求書
+                                    </button>
                                 </div>
                             </div>
-                            <div class="bg-white rounded-xl shadow-sm p-6">
-                                <h3 class="text-lg font-bold mb-4">
-                                    <i class="fas fa-percentage mr-2 text-purple-600"></i>成果報酬情報
-                                </h3>
-                                <div id="successFeeInfo">
-                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                            <div id="invoicesList">
+                                <div class="text-center py-8 text-gray-500">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <div>読み込み中...</div>
                                 </div>
                             </div>
-                            <div class="bg-white rounded-xl shadow-sm p-6">
-                                <h3 class="text-lg font-bold mb-4">
-                                    <i class="fas fa-file-signature mr-2 text-blue-600"></i>契約情報
-                                </h3>
-                                <div id="contractInfo">
-                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
-                                </div>
+                        </div>
+                        
+                        <!-- 契約情報 -->
+                        <div class="bg-white rounded-xl shadow-sm p-6">
+                            <h3 class="text-lg font-bold mb-4">
+                                <i class="fas fa-file-signature mr-2 text-blue-600"></i>契約情報
+                            </h3>
+                            <div id="contractInfo">
+                                <div class="text-center py-4 text-gray-500">読み込み中...</div>
                             </div>
                         </div>
                     </div>
@@ -10523,6 +10633,111 @@ app.get('/case/:id', async (c) => {
                         </button>
                         <button type="button" onclick="closeAddTaskModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
                             キャンセル
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 請求書作成モーダル -->
+        <div id="createInvoiceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 id="invoiceModalTitle" class="text-xl font-bold">請求書を作成</h3>
+                        <button onclick="closeCreateInvoiceModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <form id="createInvoiceForm" class="p-6 space-y-4">
+                    <input type="hidden" name="invoice_type" id="invoiceType" value="deposit">
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">品目名 <span class="text-red-500">*</span></label>
+                        <input type="text" name="item_name" id="invoiceItemName" required 
+                               class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">品目詳細</label>
+                        <textarea name="item_description" id="invoiceItemDescription" rows="2" 
+                                  class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                  placeholder="詳細説明があれば入力"></textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">金額（税抜） <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
+                                <input type="number" name="subtotal" id="invoiceSubtotal" required min="0"
+                                       class="w-full pl-8 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                       onchange="calculateInvoiceTotal()">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">消費税率</label>
+                            <select name="tax_rate" id="invoiceTaxRate" class="w-full px-3 py-2 border rounded-lg" onchange="calculateInvoiceTotal()">
+                                <option value="10">10%</option>
+                                <option value="8">8%（軽減税率）</option>
+                                <option value="0">0%（非課税）</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="withholdingSection" class="hidden">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="invoiceWithholding" onchange="calculateInvoiceTotal()">
+                            <span class="text-sm">源泉徴収を適用（10.21%）</span>
+                        </label>
+                    </div>
+                    
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>小計</span>
+                            <span id="calcSubtotal">¥0</span>
+                        </div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>消費税</span>
+                            <span id="calcTax">¥0</span>
+                        </div>
+                        <div id="calcWithholdingRow" class="hidden flex justify-between text-sm mb-1 text-orange-600">
+                            <span>源泉徴収</span>
+                            <span id="calcWithholding">-¥0</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-lg border-t pt-2 mt-2">
+                            <span>請求金額</span>
+                            <span id="calcTotal" class="text-blue-600">¥0</span>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">発行日</label>
+                            <input type="date" name="issue_date" id="invoiceIssueDate" 
+                                   class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">支払期限</label>
+                            <input type="date" name="due_date" id="invoiceDueDate" 
+                                   class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">備考</label>
+                        <textarea name="notes" id="invoiceNotes" rows="2" 
+                                  class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                  placeholder="請求書に記載する備考"></textarea>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-file-invoice mr-2"></i>作成（下書き）
+                        </button>
+                        <button type="button" onclick="createAndIssueInvoice()" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                            <i class="fas fa-paper-plane mr-2"></i>作成して発行
                         </button>
                     </div>
                 </form>
@@ -11140,127 +11355,110 @@ app.get('/case/:id', async (c) => {
                 }
             }
             
-            // 手付金・契約読み込み
-            async function loadPayment() {
+            // 請求書一覧読み込み
+            async function loadInvoices() {
                 try {
-                    const response = await axios.get(\`/api/cases/\${CASE_ID}\`);
-                    const caseData = response.data;
+                    const response = await axios.get(\`/api/cases/\${CASE_ID}/invoices\`);
+                    const invoices = response.data;
                     
-                    const depositContainer = document.getElementById('depositInfo');
-                    const successFeeContainer = document.getElementById('successFeeInfo');
-                    const contractContainer = document.getElementById('contractInfo');
+                    const container = document.getElementById('invoicesList');
                     
-                    // 手付金
-                    if (!caseData.deposit_required) {
-                        depositContainer.innerHTML = '<div class="text-gray-500">手付金は設定されていません</div>';
-                    } else {
-                        const amount = (caseData.deposit_amount || 0).toLocaleString();
-                        const isPaid = caseData.deposit_paid;
-                        
-                        depositContainer.innerHTML = \`
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-2xl font-bold">¥\${amount}</span>
-                                    <span class="px-3 py-1 rounded-full text-sm \${isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
-                                        \${isPaid ? '✓ 支払い済み' : '未払い'}
-                                    </span>
-                                </div>
-                                \${!isPaid ? \`
-                                    <button onclick="markDepositPaid()" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
-                                        <i class="fas fa-check mr-2"></i>支払い済みにする
-                                    </button>
-                                \` : ''}
+                    if (invoices.length === 0) {
+                        container.innerHTML = \`
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-file-invoice text-4xl mb-3 opacity-50"></i>
+                                <div>請求書はまだ発行されていません</div>
+                                <div class="text-sm mt-2">上部のボタンから請求書を作成してください</div>
                             </div>
                         \`;
+                        loadContractInfo();
+                        return;
                     }
                     
-                    // 成果報酬
-                    if (!caseData.success_fee_enabled) {
-                        successFeeContainer.innerHTML = '<div class="text-gray-500">成果報酬は設定されていません</div>';
-                    } else {
-                        const rate = caseData.success_fee_rate || 0;
-                        const fixedAmount = caseData.success_fee_amount || 0;
-                        const hasWithholding = caseData.withholding_tax;
-                        const appliedAmount = caseData.applied_amount || 0;
-                        const grantedAmount = caseData.granted_amount || 0;
-                        
-                        // 成果報酬計算
-                        let calculatedFee = fixedAmount;
-                        if (rate > 0 && grantedAmount > 0) {
-                            calculatedFee = Math.floor(grantedAmount * rate / 100);
-                        }
-                        
-                        // 源泉徴収計算（10.21%）
-                        let withholdingAmount = 0;
-                        let netAmount = calculatedFee;
-                        if (hasWithholding && calculatedFee > 0) {
-                            withholdingAmount = Math.floor(calculatedFee * 0.1021);
-                            netAmount = calculatedFee - withholdingAmount;
-                        }
-                        
-                        successFeeContainer.innerHTML = \`
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-lg font-bold">\${rate > 0 ? '報酬率: ' + rate + '%' : '固定: ¥' + fixedAmount.toLocaleString()}</span>
-                                    <span class="px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-700">
-                                        成果報酬あり
-                                    </span>
-                                </div>
-                                
-                                <!-- 申請・採択金額入力 -->
-                                <div class="border-t pt-3 space-y-2">
-                                    <div>
-                                        <label class="text-xs text-gray-500">申請金額</label>
-                                        <div class="flex items-center gap-2">
-                                            <input type="number" id="appliedAmountInput" value="\${appliedAmount}" 
-                                                   class="flex-1 px-2 py-1 border rounded text-sm" placeholder="0">
-                                            <span class="text-sm text-gray-500">円</span>
+                    const statusLabels = {
+                        draft: { label: '下書き', color: 'bg-gray-100 text-gray-600' },
+                        issued: { label: '発行済み', color: 'bg-blue-100 text-blue-700' },
+                        sent: { label: '送付済み', color: 'bg-yellow-100 text-yellow-700' },
+                        payment_reported: { label: '振込報告済み', color: 'bg-purple-100 text-purple-700' },
+                        paid: { label: '入金済み', color: 'bg-green-100 text-green-700' },
+                        cancelled: { label: 'キャンセル', color: 'bg-red-100 text-red-700' }
+                    };
+                    const typeLabels = {
+                        deposit: { label: '手付金', color: 'text-yellow-600', icon: 'fa-hand-holding-usd' },
+                        success_fee: { label: '成功報酬', color: 'text-purple-600', icon: 'fa-trophy' },
+                        other: { label: 'その他', color: 'text-gray-600', icon: 'fa-file-invoice' }
+                    };
+                    
+                    container.innerHTML = \`
+                        <div class="space-y-3">
+                            \${invoices.map(inv => {
+                                const status = statusLabels[inv.status] || statusLabels.draft;
+                                const type = typeLabels[inv.invoice_type] || typeLabels.other;
+                                return \`
+                                    <div class="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50">
+                                        <div class="text-2xl \${type.color}">
+                                            <i class="fas \${type.icon}"></i>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label class="text-xs text-gray-500">採択金額</label>
-                                        <div class="flex items-center gap-2">
-                                            <input type="number" id="grantedAmountInput" value="\${grantedAmount}" 
-                                                   class="flex-1 px-2 py-1 border rounded text-sm" placeholder="0">
-                                            <span class="text-sm text-gray-500">円</span>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-bold">\${inv.invoice_number}</span>
+                                                <span class="text-xs px-2 py-0.5 rounded \${status.color}">\${status.label}</span>
+                                            </div>
+                                            <div class="text-sm text-gray-600">\${inv.item_name}</div>
+                                            <div class="text-xs text-gray-400">
+                                                発行日: \${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP') : '未設定'}
+                                                \${inv.due_date ? ' / 期限: ' + new Date(inv.due_date).toLocaleDateString('ja-JP') : ''}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <button onclick="saveGrantAmounts()" class="w-full bg-purple-600 text-white py-1.5 rounded text-sm hover:bg-purple-700">
-                                        <i class="fas fa-save mr-1"></i>金額を保存
-                                    </button>
-                                </div>
-                                
-                                \${grantedAmount > 0 ? \`
-                                    <!-- 成果報酬計算結果 -->
-                                    <div class="border-t pt-3 bg-purple-50 -mx-6 -mb-6 px-6 py-4 rounded-b-xl">
-                                        <div class="text-sm text-gray-600 mb-2">成果報酬計算</div>
-                                        <div class="space-y-1 text-sm">
-                                            <div class="flex justify-between">
-                                                <span>採択金額</span>
-                                                <span>¥\${grantedAmount.toLocaleString()}</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span>成果報酬 (\${rate}%)</span>
-                                                <span class="font-bold">¥\${calculatedFee.toLocaleString()}</span>
-                                            </div>
-                                            \${hasWithholding ? \`
-                                                <div class="flex justify-between text-orange-600">
-                                                    <span>源泉徴収 (10.21%)</span>
-                                                    <span>-¥\${withholdingAmount.toLocaleString()}</span>
-                                                </div>
-                                                <div class="flex justify-between border-t pt-1 mt-1 font-bold">
-                                                    <span>お支払い額</span>
-                                                    <span class="text-purple-700">¥\${netAmount.toLocaleString()}</span>
-                                                </div>
+                                        <div class="text-right">
+                                            <div class="text-lg font-bold">¥\${inv.total_amount.toLocaleString()}</div>
+                                            <div class="text-xs text-gray-500">(税込)</div>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            \${inv.status === 'draft' ? \`
+                                                <button onclick="issueInvoice(\${inv.id})" class="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700">
+                                                    <i class="fas fa-paper-plane mr-1"></i>発行
+                                                </button>
+                                            \` : ''}
+                                            \${inv.status === 'issued' || inv.status === 'sent' || inv.status === 'payment_reported' ? \`
+                                                <button onclick="markInvoicePaid(\${inv.id})" class="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700">
+                                                    <i class="fas fa-check mr-1"></i>入金確認
+                                                </button>
+                                            \` : ''}
+                                            <button onclick="viewInvoiceDetail(\${inv.id})" class="bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-300">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            \${inv.status === 'draft' ? \`
+                                                <button onclick="deleteInvoice(\${inv.id})" class="bg-red-100 text-red-600 px-3 py-1.5 rounded text-sm hover:bg-red-200">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             \` : ''}
                                         </div>
                                     </div>
-                                \` : ''}
-                            </div>
-                        \`;
-                    }
+                                \`;
+                            }).join('')}
+                        </div>
+                    \`;
                     
-                    // 契約URL（編集可能）
+                    loadContractInfo();
+                } catch (error) {
+                    console.error('Error loading invoices:', error);
+                    document.getElementById('invoicesList').innerHTML = \`
+                        <div class="text-center py-8 text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <div>請求書の読み込みに失敗しました</div>
+                        </div>
+                    \`;
+                }
+            }
+            
+            // 契約情報を読み込む
+            async function loadContractInfo() {
+                try {
+                    const response = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                    const caseData = response.data;
+                    const contractContainer = document.getElementById('contractInfo');
+                    
                     contractContainer.innerHTML = \`
                         <div class="space-y-3">
                             <div>
@@ -11288,9 +11486,192 @@ app.get('/case/:id', async (c) => {
                         </div>
                     \`;
                 } catch (error) {
-                    console.error('Error loading payment:', error);
+                    console.error('Error loading contract info:', error);
                 }
             }
+            
+            // 請求書作成モーダルを開く
+            let currentInvoiceType = 'deposit';
+            
+            function openCreateInvoiceModal(type) {
+                currentInvoiceType = type;
+                document.getElementById('invoiceType').value = type;
+                
+                const modal = document.getElementById('createInvoiceModal');
+                const title = document.getElementById('invoiceModalTitle');
+                const itemNameInput = document.getElementById('invoiceItemName');
+                const withholdingSection = document.getElementById('withholdingSection');
+                
+                if (type === 'deposit') {
+                    title.textContent = '手付金請求書を作成';
+                    itemNameInput.value = '補助金申請サポート 着手金';
+                    withholdingSection.classList.add('hidden');
+                } else {
+                    title.textContent = '成功報酬請求書を作成';
+                    itemNameInput.value = '補助金申請サポート 成功報酬';
+                    withholdingSection.classList.remove('hidden');
+                }
+                
+                const today = new Date();
+                const dueDate = new Date(today);
+                dueDate.setDate(dueDate.getDate() + 14);
+                
+                document.getElementById('invoiceIssueDate').value = today.toISOString().split('T')[0];
+                document.getElementById('invoiceDueDate').value = dueDate.toISOString().split('T')[0];
+                
+                document.getElementById('invoiceSubtotal').value = '';
+                document.getElementById('invoiceItemDescription').value = '';
+                document.getElementById('invoiceNotes').value = '';
+                document.getElementById('invoiceTaxRate').value = '10';
+                document.getElementById('invoiceWithholding').checked = false;
+                
+                calculateInvoiceTotal();
+                modal.classList.remove('hidden');
+            }
+            window.openCreateInvoiceModal = openCreateInvoiceModal;
+            
+            function closeCreateInvoiceModal() {
+                document.getElementById('createInvoiceModal').classList.add('hidden');
+            }
+            window.closeCreateInvoiceModal = closeCreateInvoiceModal;
+            
+            // 請求金額計算
+            function calculateInvoiceTotal() {
+                const subtotal = parseInt(document.getElementById('invoiceSubtotal').value) || 0;
+                const taxRate = parseInt(document.getElementById('invoiceTaxRate').value) || 0;
+                const hasWithholding = document.getElementById('invoiceWithholding').checked;
+                
+                const tax = Math.floor(subtotal * taxRate / 100);
+                let withholding = 0;
+                if (hasWithholding) {
+                    withholding = Math.floor(subtotal * 0.1021);
+                }
+                const total = subtotal + tax - withholding;
+                
+                document.getElementById('calcSubtotal').textContent = '¥' + subtotal.toLocaleString();
+                document.getElementById('calcTax').textContent = '¥' + tax.toLocaleString();
+                document.getElementById('calcWithholding').textContent = '-¥' + withholding.toLocaleString();
+                document.getElementById('calcTotal').textContent = '¥' + total.toLocaleString();
+                
+                if (hasWithholding) {
+                    document.getElementById('calcWithholdingRow').classList.remove('hidden');
+                } else {
+                    document.getElementById('calcWithholdingRow').classList.add('hidden');
+                }
+            }
+            window.calculateInvoiceTotal = calculateInvoiceTotal;
+            
+            // 請求書作成（下書き）
+            document.getElementById('createInvoiceForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await createInvoice('draft');
+            });
+            
+            // 作成して発行
+            async function createAndIssueInvoice() {
+                await createInvoice('issued');
+            }
+            window.createAndIssueInvoice = createAndIssueInvoice;
+            
+            async function createInvoice(status) {
+                try {
+                    const subtotal = parseInt(document.getElementById('invoiceSubtotal').value) || 0;
+                    const taxRate = parseInt(document.getElementById('invoiceTaxRate').value) || 0;
+                    const hasWithholding = document.getElementById('invoiceWithholding').checked;
+                    
+                    const taxAmount = Math.floor(subtotal * taxRate / 100);
+                    const withholdingAmount = hasWithholding ? Math.floor(subtotal * 0.1021) : 0;
+                    const totalAmount = subtotal + taxAmount - withholdingAmount;
+                    
+                    const data = {
+                        invoice_type: document.getElementById('invoiceType').value,
+                        item_name: document.getElementById('invoiceItemName').value,
+                        item_description: document.getElementById('invoiceItemDescription').value || null,
+                        subtotal: subtotal,
+                        tax_rate: taxRate,
+                        tax_amount: taxAmount,
+                        withholding_tax: withholdingAmount,
+                        total_amount: totalAmount,
+                        issue_date: document.getElementById('invoiceIssueDate').value || null,
+                        due_date: document.getElementById('invoiceDueDate').value || null,
+                        notes: document.getElementById('invoiceNotes').value || null,
+                        status: status
+                    };
+                    
+                    await axios.post(\`/api/cases/\${CASE_ID}/invoices\`, data);
+                    showToast(status === 'issued' ? '請求書を発行しました' : '請求書を下書き保存しました');
+                    closeCreateInvoiceModal();
+                    loadInvoices();
+                } catch (error) {
+                    alert('請求書の作成に失敗しました: ' + (error.response?.data?.error || error.message));
+                }
+            }
+            
+            // 請求書を発行
+            async function issueInvoice(invoiceId) {
+                if (!confirm('この請求書を発行しますか？')) return;
+                try {
+                    await axios.put(\`/api/invoices/\${invoiceId}/status\`, { status: 'issued' });
+                    showToast('請求書を発行しました');
+                    loadInvoices();
+                } catch (error) {
+                    alert('発行に失敗しました');
+                }
+            }
+            window.issueInvoice = issueInvoice;
+            
+            // 入金確認
+            async function markInvoicePaid(invoiceId) {
+                if (!confirm('この請求書の入金を確認しますか？')) return;
+                try {
+                    await axios.put(\`/api/invoices/\${invoiceId}/status\`, { status: 'paid' });
+                    showToast('入金を確認しました');
+                    loadInvoices();
+                } catch (error) {
+                    alert('更新に失敗しました');
+                }
+            }
+            window.markInvoicePaid = markInvoicePaid;
+            
+            // 請求書詳細表示
+            async function viewInvoiceDetail(invoiceId) {
+                try {
+                    const response = await axios.get(\`/api/invoices/\${invoiceId}\`);
+                    const inv = response.data;
+                    
+                    const statusLabels = {
+                        draft: '下書き', issued: '発行済み', sent: '送付済み', payment_reported: '振込報告済み', paid: '入金済み', cancelled: 'キャンセル'
+                    };
+                    
+                    alert(
+                        '請求書番号: ' + inv.invoice_number + '\\n' +
+                        '品目: ' + inv.item_name + '\\n' +
+                        '小計: ¥' + inv.subtotal.toLocaleString() + '\\n' +
+                        '消費税: ¥' + inv.tax_amount.toLocaleString() + '\\n' +
+                        (inv.withholding_tax ? '源泉徴収: -¥' + inv.withholding_tax.toLocaleString() + '\\n' : '') +
+                        '合計: ¥' + inv.total_amount.toLocaleString() + '\\n' +
+                        'ステータス: ' + statusLabels[inv.status] + '\\n' +
+                        '発行日: ' + (inv.issue_date || '未設定') + '\\n' +
+                        '支払期限: ' + (inv.due_date || '未設定')
+                    );
+                } catch (error) {
+                    alert('詳細の取得に失敗しました');
+                }
+            }
+            window.viewInvoiceDetail = viewInvoiceDetail;
+            
+            // 請求書削除
+            async function deleteInvoice(invoiceId) {
+                if (!confirm('この請求書を削除しますか？')) return;
+                try {
+                    await axios.delete(\`/api/invoices/\${invoiceId}\`);
+                    showToast('請求書を削除しました');
+                    loadInvoices();
+                } catch (error) {
+                    alert('削除に失敗しました');
+                }
+            }
+            window.deleteInvoice = deleteInvoice;
             
             // 契約URLを保存
             async function saveContractUrl() {
@@ -11298,42 +11679,11 @@ app.get('/case/:id', async (c) => {
                     const contractUrl = document.getElementById('contractUrlInput').value.trim();
                     await axios.put(\`/api/cases/\${CASE_ID}\`, { contract_url: contractUrl || null });
                     showToast('契約URLを保存しました');
-                    loadPayment();
+                    loadContractInfo();
                 } catch (error) {
                     alert('保存に失敗しました');
                 }
             }
-            
-            // 支払い済みにする
-            async function markDepositPaid() {
-                if (!confirm('手付金を支払い済みにしますか？')) return;
-                try {
-                    await axios.put(\`/api/cases/\${CASE_ID}\`, { deposit_paid: true });
-                    showToast('手付金を支払い済みにしました');
-                    loadPayment();
-                } catch (error) {
-                    alert('更新に失敗しました');
-                }
-            }
-            
-            // 申請・採択金額を保存
-            async function saveGrantAmounts() {
-                try {
-                    const appliedAmount = parseInt(document.getElementById('appliedAmountInput')?.value) || 0;
-                    const grantedAmount = parseInt(document.getElementById('grantedAmountInput')?.value) || 0;
-                    
-                    await axios.put(\`/api/cases/\${CASE_ID}\`, { 
-                        applied_amount: appliedAmount,
-                        granted_amount: grantedAmount,
-                        granted_at: grantedAmount > 0 ? new Date().toISOString() : null
-                    });
-                    showToast('金額を保存しました');
-                    loadPayment();
-                } catch (error) {
-                    alert('保存に失敗しました');
-                }
-            }
-            window.saveGrantAmounts = saveGrantAmounts;
             
             // やり取り読み込み
             async function loadCommunications() {
@@ -11458,7 +11808,7 @@ app.get('/case/:id', async (c) => {
             loadPipeline();
             loadDocuments();
             loadHearing();
-            loadPayment();
+            loadInvoices();
             loadCommunications();
             
             ${sidebarScripts}
@@ -11682,29 +12032,31 @@ app.get('/portal/:token', async (c) => {
                                 </div>
                             </div>
                             
-                            <!-- 手付金・契約セクション -->
-                            <div id="depositSection" class="mt-4 pt-4 border-t hidden">
+                            <!-- 請求書セクション -->
+                            <div id="invoicesSection" class="mt-4 pt-4 border-t">
                                 <div class="flex items-center justify-between mb-3">
                                     <h3 class="text-sm font-medium text-gray-700">
-                                        <i class="fas fa-credit-card mr-1 text-blue-600"></i>手付金・契約
+                                        <i class="fas fa-file-invoice-dollar mr-1 text-green-600"></i>請求書一覧
                                     </h3>
-                                    <span id="depositStatusBadge" class="text-xs px-2 py-1 rounded-full"></span>
                                 </div>
                                 
-                                <div id="depositContent" class="space-y-3">
-                                    <!-- 手付金情報が表示される -->
+                                <div id="portalInvoicesContent" class="space-y-3">
+                                    <!-- 請求書一覧が表示される -->
+                                    <div class="text-center py-4 text-gray-500">
+                                        <i class="fas fa-spinner fa-spin"></i> 読み込み中...
+                                    </div>
                                 </div>
                             </div>
                             
-                            <!-- 成果報酬・契約セクション -->
-                            <div id="successFeeSection" class="mt-4 pt-4 border-t hidden">
+                            <!-- 契約情報セクション -->
+                            <div id="contractSection" class="mt-4 pt-4 border-t hidden">
                                 <div class="flex items-center justify-between mb-3">
                                     <h3 class="text-sm font-medium text-gray-700">
-                                        <i class="fas fa-percentage mr-1 text-purple-600"></i>成果報酬・契約
+                                        <i class="fas fa-file-signature mr-1 text-blue-600"></i>契約書
                                     </h3>
                                 </div>
-                                <div id="successFeeContent" class="space-y-3">
-                                    <!-- 成果報酬・契約情報が表示される -->
+                                <div id="portalContractContent" class="space-y-3">
+                                    <!-- 契約URL情報が表示される -->
                                 </div>
                             </div>
                         </div>
@@ -12717,279 +13069,439 @@ app.get('/portal/:token', async (c) => {
                 }
             }
             
-            // 手付金・契約情報を読み込む
-            async function loadDepositInfo() {
+            // 請求書一覧を読み込む（顧客ポータル）
+            async function loadPortalInvoices() {
                 try {
-                    // 案件データから手付金情報を取得（CASE_IDがある場合）
-                    let depositData = null;
+                    const content = document.getElementById('portalInvoicesContent');
+                    const contractSection = document.getElementById('contractSection');
+                    const contractContent = document.getElementById('portalContractContent');
+                    
+                    if (!content) return;
+                    
+                    // 案件がある場合は請求書を取得
                     if (CASE_ID) {
-                        const caseResponse = await axios.get(\`/api/cases/\${CASE_ID}\`);
-                        depositData = caseResponse.data;
-                    } else {
-                        // フォールバック：クライアントデータから取得
-                        const clientResponse = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                        depositData = clientResponse.data;
-                    }
-                    const client = depositData;
-                    
-                    const section = document.getElementById('depositSection');
-                    const badge = document.getElementById('depositStatusBadge');
-                    const content = document.getElementById('depositContent');
-                    
-                    if (!section) return;
-                    
-                    // 手付金が不要な場合は非表示
-                    if (!client.deposit_required) {
-                        section.classList.add('hidden');
-                        return;
-                    }
-                    
-                    section.classList.remove('hidden');
-                    
-                    // ステータスバッジ
-                    if (client.deposit_paid) {
-                        badge.className = 'text-xs px-2 py-1 rounded-full bg-green-100 text-green-700';
-                        badge.innerHTML = '<i class="fas fa-check mr-1"></i>支払い済み';
-                    } else {
-                        badge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700';
-                        badge.innerHTML = '<i class="fas fa-clock mr-1"></i>未払い';
-                    }
-                    
-                    // 金額フォーマット
-                    const amount = (client.deposit_amount || 0).toLocaleString();
-                    
-                    if (client.deposit_paid) {
-                        // 支払い済みの場合
-                        content.innerHTML = \`
-                            <div class="bg-green-50 rounded-lg p-4">
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
-                                        <i class="fas fa-check text-white"></i>
-                                    </div>
-                                    <div>
-                                        <div class="font-bold text-green-800">¥\${amount}</div>
-                                        <div class="text-xs text-green-600">
-                                            \${client.deposit_paid_at ? new Date(client.deposit_paid_at).toLocaleDateString('ja-JP') + ' にお支払い完了' : 'お支払い完了'}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="text-xs text-gray-500">
-                                    支払方法: \${client.deposit_payment_method || '不明'}
-                                </div>
-                            </div>
-                            \${client.contract_url ? \`
-                                <a href="\${client.contract_url}" target="_blank" class="flex items-center gap-2 p-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100">
-                                    <i class="fas fa-file-signature"></i>
-                                    <span class="text-sm font-medium">電子契約書を確認</span>
-                                    <i class="fas fa-external-link-alt ml-auto text-xs"></i>
-                                </a>
-                            \` : ''}
-                        \`;
-                    } else if (client.deposit_transfer_reported) {
-                        // 振込報告済み・確認待ちの場合
-                        badge.className = 'text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700';
-                        badge.innerHTML = '<i class="fas fa-hourglass-half mr-1"></i>確認中';
+                        const response = await axios.get(\`/api/cases/\${CASE_ID}/invoices\`);
+                        const invoices = response.data;
                         
-                        content.innerHTML = \`
-                            <div class="bg-blue-50 rounded-lg p-4">
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                                        <i class="fas fa-hourglass-half text-white"></i>
+                        // 契約情報も取得
+                        const caseResponse = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                        const caseData = caseResponse.data;
+                        
+                        // 契約URLがある場合は契約セクションを表示
+                        if (caseData.contract_url && contractSection && contractContent) {
+                            contractSection.classList.remove('hidden');
+                            contractContent.innerHTML = \`
+                                <a href="\${caseData.contract_url}" target="_blank" class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100">
+                                    <i class="fas fa-file-signature text-lg"></i>
+                                    <div class="flex-1">
+                                        <div class="text-sm font-medium">契約書を確認する</div>
+                                        <div class="text-xs text-blue-500">新しいタブで開きます</div>
                                     </div>
-                                    <div>
-                                        <div class="font-bold text-blue-800">¥\${amount}</div>
-                                        <div class="text-xs text-blue-600">
-                                            振込報告済み - 確認をお待ちください
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            \`;
+                        }
+                        
+                        // 発行済みの請求書のみ表示（下書きは除外）
+                        const issuedInvoices = invoices.filter(inv => inv.status !== 'draft' && inv.status !== 'cancelled');
+                        
+                        if (issuedInvoices.length === 0) {
+                            content.innerHTML = \`
+                                <div class="text-center py-6 text-gray-500">
+                                    <i class="fas fa-file-invoice text-3xl mb-2 opacity-50"></i>
+                                    <div class="text-sm">請求書はまだありません</div>
+                                </div>
+                            \`;
+                            return;
+                        }
+                        
+                        const statusLabels = {
+                            issued: { label: '発行済み', color: 'bg-blue-100 text-blue-700', icon: 'fa-paper-plane' },
+                            sent: { label: '送付済み', color: 'bg-yellow-100 text-yellow-700', icon: 'fa-envelope' },
+                            paid: { label: '入金済み', color: 'bg-green-100 text-green-700', icon: 'fa-check-circle' },
+                            payment_reported: { label: '振込報告済み', color: 'bg-purple-100 text-purple-700', icon: 'fa-hourglass-half' }
+                        };
+                        const typeLabels = {
+                            deposit: { label: '着手金', icon: 'fa-hand-holding-usd', color: 'text-yellow-600' },
+                            success_fee: { label: '成功報酬', icon: 'fa-trophy', color: 'text-purple-600' },
+                            other: { label: 'その他', icon: 'fa-file-invoice', color: 'text-gray-600' }
+                        };
+                        
+                        content.innerHTML = issuedInvoices.map(inv => {
+                            const status = statusLabels[inv.status] || statusLabels.issued;
+                            const type = typeLabels[inv.invoice_type] || typeLabels.other;
+                            const needsPayment = inv.status === 'issued' || inv.status === 'sent';
+                            const isOverdue = inv.due_date && new Date(inv.due_date) < new Date() && needsPayment;
+                            
+                            return \`
+                                <div class="bg-white border rounded-lg overflow-hidden \${needsPayment ? 'border-yellow-300' : ''} \${isOverdue ? 'border-red-400' : ''}">
+                                    <!-- 期限警告バナー -->
+                                    \${isOverdue ? \`
+                                        <div class="bg-red-500 text-white text-xs py-1 px-3 text-center">
+                                            <i class="fas fa-exclamation-triangle mr-1"></i>支払期限を過ぎています
                                         </div>
+                                    \` : ''}
+                                    
+                                    <div class="p-4">
+                                        <div class="flex items-start gap-3">
+                                            <div class="text-2xl \${type.color}">
+                                                <i class="fas \${type.icon}"></i>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2 flex-wrap">
+                                                    <span class="font-bold text-sm">\${inv.invoice_number}</span>
+                                                    <span class="text-xs px-2 py-0.5 rounded-full \${status.color}">
+                                                        <i class="fas \${status.icon} mr-1"></i>\${status.label}
+                                                    </span>
+                                                </div>
+                                                <div class="text-sm text-gray-600 mt-1">\${inv.item_name}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 金額・期限情報 -->
+                                        <div class="mt-3 bg-gray-50 rounded-lg p-3">
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-sm text-gray-600">請求金額</span>
+                                                <span class="text-xl font-bold text-gray-900">¥\${inv.total_amount.toLocaleString()}</span>
+                                            </div>
+                                            <div class="flex justify-between items-center mt-2 text-sm">
+                                                <span class="text-gray-500">発行日</span>
+                                                <span>\${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP') : '-'}</span>
+                                            </div>
+                                            <div class="flex justify-between items-center mt-1 text-sm \${isOverdue ? 'text-red-600 font-bold' : ''}">
+                                                <span class="\${isOverdue ? 'text-red-600' : 'text-gray-500'}">支払期限</span>
+                                                <span>\${inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP') : '-'}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- アクションボタン -->
+                                        <div class="mt-3 space-y-2">
+                                            <button onclick="showInvoiceDetailModal(\${inv.id})" 
+                                                    class="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200">
+                                                <i class="fas fa-file-alt"></i>
+                                                <span>請求書詳細を見る</span>
+                                            </button>
+                                            
+                                            \${needsPayment ? \`
+                                                <button onclick="showInvoiceBankTransfer(\${inv.id})" 
+                                                        class="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                                                    <i class="fas fa-university"></i>
+                                                    <span>振込先を確認・支払う</span>
+                                                </button>
+                                                <button onclick="reportInvoicePayment(\${inv.id})" 
+                                                        class="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                                                    <i class="fas fa-check"></i>
+                                                    <span>振込完了を報告する</span>
+                                                </button>
+                                            \` : ''}
+                                        </div>
+                                        
+                                        \${inv.status === 'payment_reported' ? \`
+                                            <div class="mt-3 text-sm text-purple-700 bg-purple-50 p-3 rounded-lg">
+                                                <i class="fas fa-hourglass-half mr-1"></i>
+                                                振込報告を受け付けました。担当者の確認をお待ちください。
+                                            </div>
+                                        \` : ''}
+                                        
+                                        \${inv.status === 'paid' ? \`
+                                            <div class="mt-3 text-sm text-green-700 bg-green-50 p-3 rounded-lg">
+                                                <i class="fas fa-check-circle mr-1"></i>
+                                                お支払いを確認しました。ありがとうございました。
+                                                \${inv.paid_at ? '<div class="text-xs mt-1">入金確認日: ' + new Date(inv.paid_at).toLocaleDateString('ja-JP') + '</div>' : ''}
+                                            </div>
+                                        \` : ''}
                                     </div>
                                 </div>
-                                <div class="text-xs text-gray-500 mt-2">
-                                    <i class="fas fa-clock mr-1"></i>
-                                    報告日時: \${client.deposit_transfer_reported_at ? new Date(client.deposit_transfer_reported_at).toLocaleString('ja-JP') : '-'}
-                                </div>
-                            </div>
-                            <div class="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
-                                <i class="fas fa-info-circle text-blue-500 mr-1"></i>
-                                担当者が振込を確認後、ステータスが更新されます。
-                            </div>
-                            \${client.contract_url ? \`
-                                <a href="\${client.contract_url}" target="_blank" class="flex items-center gap-2 p-3 mt-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100">
-                                    <i class="fas fa-file-signature"></i>
-                                    <span class="text-sm font-medium">電子契約書を確認</span>
-                                    <i class="fas fa-external-link-alt ml-auto text-xs"></i>
-                                </a>
-                            \` : ''}
-                        \`;
+                            \`;
+                        }).join('');
                     } else {
-                        // 未払いの場合
                         content.innerHTML = \`
-                            <div class="bg-yellow-50 rounded-lg p-4">
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center">
-                                        <i class="fas fa-yen-sign text-white"></i>
-                                    </div>
-                                    <div>
-                                        <div class="font-bold text-yellow-800">¥\${amount}</div>
-                                        <div class="text-xs text-yellow-600">手付金のお支払いをお願いいたします</div>
-                                    </div>
-                                </div>
+                            <div class="text-center py-6 text-gray-500">
+                                <i class="fas fa-file-invoice text-3xl mb-2 opacity-50"></i>
+                                <div class="text-sm">請求書はまだありません</div>
                             </div>
-                            
-                            <div class="mt-3 space-y-2">
-                                <p class="text-sm font-medium text-gray-700">お支払い方法</p>
-                                <button onclick="showPaymentModal('credit')" class="w-full flex items-center gap-3 p-3 bg-white border rounded-lg hover:bg-gray-50">
-                                    <div class="w-8 h-8 rounded bg-blue-100 flex items-center justify-center">
-                                        <i class="fas fa-credit-card text-blue-600"></i>
-                                    </div>
-                                    <div class="flex-1 text-left">
-                                        <div class="text-sm font-medium">クレジットカード</div>
-                                        <div class="text-xs text-gray-500">VISA, Mastercard, JCB</div>
-                                    </div>
-                                    <i class="fas fa-chevron-right text-gray-400"></i>
-                                </button>
-                                <button onclick="showPaymentModal('bank')" class="w-full flex items-center gap-3 p-3 bg-white border rounded-lg hover:bg-gray-50">
-                                    <div class="w-8 h-8 rounded bg-green-100 flex items-center justify-center">
-                                        <i class="fas fa-university text-green-600"></i>
-                                    </div>
-                                    <div class="flex-1 text-left">
-                                        <div class="text-sm font-medium">銀行振込</div>
-                                        <div class="text-xs text-gray-500">お振込先情報を表示</div>
-                                    </div>
-                                    <i class="fas fa-chevron-right text-gray-400"></i>
-                                </button>
-                            </div>
-                            
-                            \${client.contract_url ? \`
-                                <a href="\${client.contract_url}" target="_blank" class="flex items-center gap-2 p-3 mt-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100">
-                                    <i class="fas fa-file-signature"></i>
-                                    <span class="text-sm font-medium">電子契約書を確認</span>
-                                    <i class="fas fa-external-link-alt ml-auto text-xs"></i>
-                                </a>
-                            \` : ''}
                         \`;
                     }
                 } catch (error) {
-                    console.error('Error loading deposit info:', error);
+                    console.error('Error loading portal invoices:', error);
+                    document.getElementById('portalInvoicesContent').innerHTML = \`
+                        <div class="text-center py-4 text-red-500">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <div class="text-sm">読み込みに失敗しました</div>
+                        </div>
+                    \`;
                 }
             }
             
-            // 成果報酬・契約情報を読み込む
-            async function loadSuccessFeeInfo() {
+            // 請求書の振込先を表示
+            async function showInvoiceBankTransfer(invoiceId) {
                 try {
-                    let caseData = null;
-                    if (CASE_ID) {
-                        const caseResponse = await axios.get(\`/api/cases/\${CASE_ID}\`);
-                        caseData = caseResponse.data;
-                    } else {
-                        const clientResponse = await axios.get(\`/api/clients/\${CLIENT_ID}\`);
-                        caseData = clientResponse.data;
-                    }
+                    const invoiceResponse = await axios.get(\`/api/invoices/\${invoiceId}\`);
+                    const invoice = invoiceResponse.data;
                     
-                    const section = document.getElementById('successFeeSection');
-                    const content = document.getElementById('successFeeContent');
+                    // 組織の振込先情報を取得（案件から組織情報を取得）
+                    const bankInfo = await getBankInfo();
                     
-                    if (!section) return;
-                    
-                    // 成果報酬が有効な場合、または契約URLがある場合は表示
-                    const hasSuccessFee = caseData.success_fee_enabled;
-                    const hasContract = caseData.contract_url;
-                    
-                    if (!hasSuccessFee && !hasContract) {
-                        section.classList.add('hidden');
-                        return;
-                    }
-                    
-                    section.classList.remove('hidden');
-                    
-                    let html = '';
-                    
-                    // 成果報酬情報
-                    if (hasSuccessFee) {
-                        const rate = caseData.success_fee_rate || 0;
-                        const fixedAmount = caseData.success_fee_amount || 0;
-                        const hasWithholding = caseData.withholding_tax;
-                        const grantedAmount = caseData.granted_amount || 0;
-                        
-                        // 成果報酬計算
-                        let calculatedFee = fixedAmount;
-                        if (rate > 0 && grantedAmount > 0) {
-                            calculatedFee = Math.floor(grantedAmount * rate / 100);
-                        }
-                        
-                        // 源泉徴収計算（10.21%）
-                        let withholdingAmount = 0;
-                        let netAmount = calculatedFee;
-                        if (hasWithholding && calculatedFee > 0) {
-                            withholdingAmount = Math.floor(calculatedFee * 0.1021);
-                            netAmount = calculatedFee - withholdingAmount;
-                        }
-                        
-                        html += \`
-                            <div class="bg-purple-50 rounded-lg p-4">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <div class="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center">
-                                        <i class="fas fa-percentage text-white"></i>
+                    const modal = document.createElement('div');
+                    modal.id = 'bankTransferModal';
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                    modal.innerHTML = \`
+                        <div class="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                            <div class="p-6 border-b">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-bold">振込先情報</h3>
+                                    <button onclick="document.getElementById('bankTransferModal').remove()" class="text-gray-500 hover:text-gray-700">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="p-6">
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                                    <div class="text-sm font-medium text-green-800 mb-3">
+                                        <i class="fas fa-university mr-2"></i>振込先口座
                                     </div>
-                                    <div>
-                                        <div class="text-xs text-purple-600">成果報酬</div>
-                                        <div class="font-bold text-purple-800">
-                                            \${rate > 0 ? '報酬率: ' + rate + '%' : '固定: ¥' + fixedAmount.toLocaleString()}
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">金融機関</span>
+                                            <span class="font-medium">\${bankInfo.bank_name || '未設定'}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">支店</span>
+                                            <span class="font-medium">\${bankInfo.bank_branch || '未設定'}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">口座種別</span>
+                                            <span class="font-medium">\${bankInfo.bank_account_type || '普通'}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">口座番号</span>
+                                            <span class="font-medium">\${bankInfo.bank_account_number || '未設定'}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">口座名義</span>
+                                            <span class="font-medium">\${bankInfo.bank_account_holder || '未設定'}</span>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                \${grantedAmount > 0 ? \`
-                                    <div class="border-t border-purple-200 mt-3 pt-3">
-                                        <div class="text-xs text-purple-600 mb-2">採択後の成果報酬</div>
-                                        <div class="space-y-1 text-sm">
-                                            <div class="flex justify-between">
-                                                <span class="text-gray-600">採択金額</span>
-                                                <span>¥\${grantedAmount.toLocaleString()}</span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span class="text-gray-600">成果報酬 (\${rate}%)</span>
-                                                <span class="font-bold">¥\${calculatedFee.toLocaleString()}</span>
-                                            </div>
-                                            \${hasWithholding ? \`
-                                                <div class="flex justify-between text-orange-600 text-xs">
-                                                    <span>源泉徴収 (10.21%)</span>
-                                                    <span>-¥\${withholdingAmount.toLocaleString()}</span>
-                                                </div>
-                                                <div class="flex justify-between border-t border-purple-200 pt-1 mt-1 font-bold">
-                                                    <span>お支払い金額</span>
-                                                    <span class="text-purple-700">¥\${netAmount.toLocaleString()}</span>
-                                                </div>
-                                            \` : ''}
-                                        </div>
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                                    <div class="text-sm font-medium text-yellow-800 mb-2">
+                                        <i class="fas fa-yen-sign mr-2"></i>お振込金額
                                     </div>
-                                \` : \`
-                                    <div class="text-xs text-gray-600 mt-2">
-                                        <i class="fas fa-info-circle text-purple-500 mr-1"></i>
-                                        補助金・助成金の採択後、\${rate > 0 ? '採択金額の' + rate + '%を成果報酬として' : '成果報酬として¥' + fixedAmount.toLocaleString() + 'を'}お支払いいただきます。
-                                        \${hasWithholding ? '<br><span class="text-orange-600"><i class="fas fa-calculator mr-1"></i>源泉徴収が適用されます</span>' : ''}
+                                    <div class="text-2xl font-bold text-yellow-900">
+                                        ¥\${invoice.total_amount.toLocaleString()}
                                     </div>
-                                \`}
+                                    <div class="text-xs text-yellow-700 mt-1">
+                                        請求書番号: \${invoice.invoice_number}
+                                    </div>
+                                </div>
+                                
+                                <div class="text-sm text-gray-500">
+                                    <p><i class="fas fa-info-circle mr-1"></i>お振込時は、振込人名にお名前をご入力ください。</p>
+                                    <p class="mt-2">振込完了後は「振込完了を報告する」ボタンからご報告ください。</p>
+                                </div>
                             </div>
-                        \`;
-                    }
-                    
-                    // 電子契約情報
-                    if (hasContract) {
-                        html += \`
-                            <a href="\${caseData.contract_url}" target="_blank" class="flex items-center gap-2 p-3 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100 mt-3">
-                                <i class="fas fa-file-signature"></i>
-                                <span class="text-sm font-medium">電子契約書を確認</span>
-                                <i class="fas fa-external-link-alt ml-auto text-xs"></i>
-                            </a>
-                        \`;
-                    }
-                    
-                    content.innerHTML = html;
-                    
+                            <div class="p-6 border-t bg-gray-50">
+                                <button onclick="document.getElementById('bankTransferModal').remove()" 
+                                        class="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
+                                    閉じる
+                                </button>
+                            </div>
+                        </div>
+                    \`;
+                    document.body.appendChild(modal);
                 } catch (error) {
-                    console.error('Error loading success fee info:', error);
+                    alert('振込先情報の取得に失敗しました');
                 }
             }
+            window.showInvoiceBankTransfer = showInvoiceBankTransfer;
+            
+            // 請求書詳細モーダルを表示
+            async function showInvoiceDetailModal(invoiceId) {
+                try {
+                    const invoiceResponse = await axios.get(\`/api/invoices/\${invoiceId}\`);
+                    const inv = invoiceResponse.data;
+                    
+                    const typeLabels = {
+                        deposit: '着手金',
+                        success_fee: '成功報酬',
+                        other: 'その他'
+                    };
+                    
+                    const modal = document.createElement('div');
+                    modal.id = 'invoiceDetailModal';
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                    modal.innerHTML = \`
+                        <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div class="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-xl">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="text-sm opacity-80">請求書</div>
+                                        <h3 class="text-xl font-bold">\${inv.invoice_number}</h3>
+                                    </div>
+                                    <button onclick="document.getElementById('invoiceDetailModal').remove()" class="text-white hover:text-gray-200">
+                                        <i class="fas fa-times text-xl"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="p-6">
+                                <!-- 発行元・請求先情報 -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                    <!-- 発行元（SaaS利用者） -->
+                                    <div class="bg-blue-50 rounded-lg p-4">
+                                        <div class="text-xs text-blue-600 font-medium mb-2">
+                                            <i class="fas fa-building mr-1"></i>発行元
+                                        </div>
+                                        <div class="font-bold text-gray-900">\${inv.org_name || '事業者名'}</div>
+                                        \${inv.org_representative ? \`<div class="text-sm text-gray-600">代表: \${inv.org_representative}</div>\` : ''}
+                                        \${inv.org_address ? \`<div class="text-sm text-gray-600 mt-1">\${inv.org_address}</div>\` : ''}
+                                        \${inv.org_phone ? \`<div class="text-sm text-gray-600">TEL: \${inv.org_phone}</div>\` : ''}
+                                        \${inv.org_email ? \`<div class="text-sm text-gray-600">Email: \${inv.org_email}</div>\` : ''}
+                                    </div>
+                                    
+                                    <!-- 請求先（エンド顧客） -->
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <div class="text-xs text-gray-600 font-medium mb-2">
+                                            <i class="fas fa-user mr-1"></i>請求先
+                                        </div>
+                                        <div class="font-bold text-gray-900">\${inv.client_company || inv.client_name || 'お客様'} 御中</div>
+                                        \${inv.client_name && inv.client_company ? \`<div class="text-sm text-gray-600">\${inv.client_name} 様</div>\` : ''}
+                                        \${inv.client_email ? \`<div class="text-sm text-gray-600">Email: \${inv.client_email}</div>\` : ''}
+                                    </div>
+                                </div>
+                                
+                                <!-- 日付情報 -->
+                                <div class="flex flex-wrap gap-4 mb-6 text-sm">
+                                    <div class="bg-gray-100 px-4 py-2 rounded-lg">
+                                        <span class="text-gray-500">発行日:</span>
+                                        <span class="font-medium ml-1">\${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP') : '-'}</span>
+                                    </div>
+                                    <div class="bg-yellow-100 px-4 py-2 rounded-lg">
+                                        <span class="text-yellow-700">支払期限:</span>
+                                        <span class="font-bold text-yellow-800 ml-1">\${inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP') : '-'}</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 品目・金額 -->
+                                <div class="border rounded-lg overflow-hidden mb-6">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-100">
+                                            <tr>
+                                                <th class="text-left p-3">品目</th>
+                                                <th class="text-right p-3 w-32">金額</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t">
+                                                <td class="p-3">
+                                                    <div class="font-medium">\${inv.item_name}</div>
+                                                    \${inv.item_description ? \`<div class="text-gray-500 text-xs mt-1">\${inv.item_description}</div>\` : ''}
+                                                    <div class="text-xs text-gray-400 mt-1">種別: \${typeLabels[inv.invoice_type] || 'その他'}</div>
+                                                </td>
+                                                <td class="p-3 text-right">¥\${inv.subtotal.toLocaleString()}</td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot class="bg-gray-50">
+                                            <tr class="border-t">
+                                                <td class="p-3 text-right text-gray-600">小計</td>
+                                                <td class="p-3 text-right">¥\${inv.subtotal.toLocaleString()}</td>
+                                            </tr>
+                                            <tr class="border-t">
+                                                <td class="p-3 text-right text-gray-600">消費税 (\${inv.tax_rate || 10}%)</td>
+                                                <td class="p-3 text-right">¥\${(inv.tax_amount || 0).toLocaleString()}</td>
+                                            </tr>
+                                            \${inv.withholding_tax ? \`
+                                                <tr class="border-t">
+                                                    <td class="p-3 text-right text-orange-600">源泉徴収税 (10.21%)</td>
+                                                    <td class="p-3 text-right text-orange-600">-¥\${inv.withholding_tax.toLocaleString()}</td>
+                                                </tr>
+                                            \` : ''}
+                                            <tr class="border-t-2 border-gray-300">
+                                                <td class="p-3 text-right font-bold text-lg">合計</td>
+                                                <td class="p-3 text-right font-bold text-lg text-blue-600">¥\${inv.total_amount.toLocaleString()}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                
+                                <!-- 振込先情報 -->
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                                    <div class="text-sm font-medium text-green-800 mb-3">
+                                        <i class="fas fa-university mr-2"></i>振込先口座
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-sm">
+                                        <div class="text-gray-600">金融機関:</div>
+                                        <div class="font-medium">\${inv.bank_name || '-'}</div>
+                                        <div class="text-gray-600">支店:</div>
+                                        <div class="font-medium">\${inv.bank_branch || '-'}</div>
+                                        <div class="text-gray-600">口座種別:</div>
+                                        <div class="font-medium">\${inv.bank_account_type || '普通'}</div>
+                                        <div class="text-gray-600">口座番号:</div>
+                                        <div class="font-medium">\${inv.bank_account_number || '-'}</div>
+                                        <div class="text-gray-600">口座名義:</div>
+                                        <div class="font-medium">\${inv.bank_account_holder || '-'}</div>
+                                    </div>
+                                </div>
+                                
+                                \${inv.notes ? \`
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <div class="text-xs text-gray-500 mb-1">備考</div>
+                                        <div class="text-sm text-gray-700">\${inv.notes}</div>
+                                    </div>
+                                \` : ''}
+                            </div>
+                            
+                            <div class="p-6 border-t bg-gray-50 flex gap-3">
+                                <button onclick="document.getElementById('invoiceDetailModal').remove()" 
+                                        class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
+                                    閉じる
+                                </button>
+                            </div>
+                        </div>
+                    \`;
+                    document.body.appendChild(modal);
+                } catch (error) {
+                    alert('請求書詳細の取得に失敗しました');
+                }
+            }
+            window.showInvoiceDetailModal = showInvoiceDetailModal;
+            
+            // 振込先情報を取得
+            async function getBankInfo() {
+                try {
+                    // 案件から組織情報を取得
+                    if (CASE_ID) {
+                        const caseResponse = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                        const caseData = caseResponse.data;
+                        if (caseData.organization_id) {
+                            // 組織の設定から振込先情報を取得
+                            const orgResponse = await axios.get(\`/api/public/organization/\${caseData.organization_id}\`);
+                            return orgResponse.data || {};
+                        }
+                    }
+                    // フォールバック: 公開設定から取得
+                    const settingsResponse = await axios.get('/api/public/settings');
+                    return settingsResponse.data || {};
+                } catch (error) {
+                    console.error('Error getting bank info:', error);
+                    return {};
+                }
+            }
+            
+            // 振込完了を報告
+            async function reportInvoicePayment(invoiceId) {
+                if (!confirm('振込完了を報告しますか？')) return;
+                
+                try {
+                    await axios.post(\`/api/invoices/\${invoiceId}/report-payment\`);
+                    alert('振込報告を受け付けました。担当者の確認をお待ちください。');
+                    loadPortalInvoices();
+                } catch (error) {
+                    alert('報告に失敗しました: ' + (error.response?.data?.error || error.message));
+                }
+            }
+            window.reportInvoicePayment = reportInvoicePayment;
             
             // 銀行振込情報を取得
             let bankInfo = {};
@@ -13003,34 +13515,11 @@ app.get('/portal/:token', async (c) => {
             }
             loadBankInfo();
             
-            // 支払いモーダル表示
-            async function showPaymentModal(method) {
+            // 支払いモーダル表示（銀行振込のみ対応）
+            function showPaymentModal(method) {
                 const amount = document.querySelector('#depositContent .font-bold')?.textContent || '¥0';
-                
-                if (method === 'credit') {
-                    // Stripeが有効か確認
-                    try {
-                        const settingsRes = await axios.get('/api/settings');
-                        if (settingsRes.data.stripe_enabled) {
-                            // Stripe決済セッション作成
-                            showMessage('決済ページを準備しています...', 'info');
-                            const response = await axios.post(\`/api/clients/\${CLIENT_ID}/create-checkout-session\`, {
-                                success_url: window.location.origin,
-                                cancel_url: window.location.origin
-                            });
-                            if (response.data.checkout_url) {
-                                window.location.href = response.data.checkout_url;
-                            }
-                        } else {
-                            alert('クレジットカード決済機能は現在ご利用いただけません。\\n\\nお手数ですが、銀行振込をご利用ください。');
-                        }
-                    } catch (error) {
-                        console.error('Stripe error:', error);
-                        alert('決済の準備中にエラーが発生しました。\\n銀行振込をご利用いただくか、担当者までお問い合わせください。');
-                    }
-                } else if (method === 'bank') {
-                    showBankTransferModal(amount);
-                }
+                // 銀行振込モーダルを表示
+                showBankTransferModal(amount);
             }
             
             // 銀行振込モーダル
@@ -15371,8 +15860,7 @@ app.get('/portal/:token', async (c) => {
                 loadNextActions();
                 loadPipelineProgress();
                 loadServiceProgress();
-                loadDepositInfo();
-                loadSuccessFeeInfo();
+                loadPortalInvoices();
                 loadHearingQuestions();
                 loadChecklist();
                 loadDocuments();
@@ -17931,6 +18419,21 @@ app.get('/admin/guidelines', (c) => {
                     }
                 };
                 
+                const getNotificationUrl = (n) => {
+                    switch(n.related_table) {
+                        case 'invoices':
+                            return '/admin/payments';
+                        case 'cases':
+                            return '/case/' + n.related_id;
+                        case 'clients':
+                            return '/client/' + n.related_id;
+                        case 'documents':
+                            return '/documents?id=' + n.related_id;
+                        default:
+                            return '/cases';
+                    }
+                };
+                
                 container.innerHTML = filterHtml + notifications.map(n => \`
                     <div class="border rounded-lg p-3 \${n.is_read ? 'bg-gray-50 border-gray-200' : getTypeColor(n.notification_type)}">
                         <div class="flex justify-between items-start">
@@ -17939,7 +18442,7 @@ app.get('/admin/guidelines', (c) => {
                                 <h4 class="font-medium text-sm">\${n.title}</h4>
                             </div>
                             <div class="flex items-center gap-2">
-                                \${n.related_id ? \`<a href="/client/\${n.related_id}" onclick="markAsRead(\${n.id})" class="text-xs text-blue-600 hover:underline">詳細</a>\` : ''}
+                                \${n.related_id ? \`<a href="\${getNotificationUrl(n)}" onclick="markAsRead(\${n.id})" class="text-xs text-blue-600 hover:underline">詳細</a>\` : ''}
                                 \${!n.is_read ? \`<button onclick="markAsRead(\${n.id})" class="text-xs text-gray-600 hover:underline">既読</button>\` : ''}
                             </div>
                         </div>
@@ -24439,11 +24942,11 @@ app.get('/legal', async (c) => {
                             </tr>
                             <tr class="hover:bg-gray-50">
                                 <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">支払方法</th>
-                                <td class="px-6 py-4 text-gray-900">${settings.legal_payment_method || 'クレジットカード決済、銀行振込'}</td>
+                                <td class="px-6 py-4 text-gray-900">${settings.legal_payment_method || '銀行振込'}</td>
                             </tr>
                             <tr class="hover:bg-gray-50">
                                 <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">支払時期</th>
-                                <td class="px-6 py-4 text-gray-900">${settings.legal_payment_timing || 'クレジットカード：お申込み時に決済 / 銀行振込：請求書発行後14日以内'}</td>
+                                <td class="px-6 py-4 text-gray-900">${settings.legal_payment_timing || '請求書発行後14日以内'}</td>
                             </tr>
                             <tr class="hover:bg-gray-50">
                                 <th class="px-6 py-4 bg-gray-50 text-left text-sm font-semibold text-gray-700">サービス提供時期</th>
@@ -24793,12 +25296,32 @@ app.put('/api/payments/:paymentId/confirm', async (c) => {
   const { DB } = c.env
   const paymentId = c.req.param('paymentId')
   const user = await getCurrentUser(c)
+  const { source } = await c.req.json().catch(() => ({ source: 'payment_history' }))
   
   if (!user) {
     return c.json({ error: '認証が必要です' }, 401)
   }
   
-  // 支払い情報を取得
+  // 請求書からの支払いの場合
+  if (source === 'invoices') {
+    try {
+      await DB.prepare(`
+        UPDATE invoices 
+        SET status = 'paid', 
+            paid_at = CURRENT_TIMESTAMP,
+            payment_confirmed_at = CURRENT_TIMESTAMP,
+            payment_confirmed_by = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(user.id, paymentId).run()
+      
+      return c.json({ success: true, message: '請求書の入金を確認しました' })
+    } catch (error: any) {
+      return c.json({ error: error.message || '入金確認に失敗しました' }, 500)
+    }
+  }
+  
+  // 旧payment_historyからの支払いの場合
   const payment = await DB.prepare(`
     SELECT * FROM payment_history WHERE id = ?
   `).bind(paymentId).first() as any
@@ -24845,15 +25368,58 @@ app.put('/api/payments/:paymentId/confirm', async (c) => {
 app.get('/api/payments/pending', async (c) => {
   const { DB } = c.env
   
-  const payments = await DB.prepare(`
-    SELECT ph.*, c.name as client_name, c.company_name
-    FROM payment_history ph
-    JOIN clients c ON ph.client_id = c.id
-    WHERE ph.status = 'reported'
-    ORDER BY ph.bank_transfer_reported_at ASC
-  `).all()
-  
-  return c.json(payments.results || [])
+  try {
+    // 旧payment_historyからの未確認報告
+    const oldPayments = await DB.prepare(`
+      SELECT ph.*, c.name as client_name, c.company_name, 'payment_history' as source
+      FROM payment_history ph
+      JOIN clients c ON ph.client_id = c.id
+      WHERE ph.status = 'reported'
+      ORDER BY ph.bank_transfer_reported_at ASC
+    `).all()
+    
+    // 新invoicesからの振込報告（payment_reported状態）
+    let invoicePayments: any[] = []
+    try {
+      const invoices = await DB.prepare(`
+        SELECT 
+          i.id,
+          i.invoice_number,
+          i.invoice_type as payment_type,
+          i.total_amount as amount,
+          i.payment_reported_at as bank_transfer_reported_at,
+          i.item_name,
+          i.case_id,
+          c.name as client_name,
+          c.company_name,
+          cs.case_number,
+          'invoices' as source
+        FROM invoices i
+        JOIN clients c ON i.client_id = c.id
+        LEFT JOIN cases cs ON i.case_id = cs.id
+        WHERE i.status = 'payment_reported'
+        ORDER BY i.payment_reported_at ASC
+      `).all()
+      invoicePayments = invoices.results || []
+    } catch (e) {
+      // invoicesテーブルがない場合は空配列
+    }
+    
+    // 両方のデータを結合してソート
+    const allPayments = [
+      ...(oldPayments.results || []),
+      ...invoicePayments
+    ].sort((a: any, b: any) => {
+      const dateA = new Date(a.bank_transfer_reported_at || 0).getTime()
+      const dateB = new Date(b.bank_transfer_reported_at || 0).getTime()
+      return dateA - dateB
+    })
+    
+    return c.json(allPayments)
+  } catch (error: any) {
+    console.error('Error fetching pending payments:', error)
+    return c.json([])
+  }
 })
 
 // 支払い履歴一覧（管理者用）
@@ -25744,37 +26310,6 @@ app.get('/admin/settings', async (c) => {
                 </div>
             </div>
             
-            <!-- Stripe設定 -->
-            <div class="bg-white rounded-lg shadow mb-6">
-                <div class="p-4 border-b">
-                    <h2 class="text-lg font-bold flex items-center gap-2">
-                        <i class="fab fa-stripe text-purple-600"></i>
-                        Stripe決済設定
-                    </h2>
-                    <p class="text-sm text-gray-500 mt-1">クレジットカード決済を利用する場合に設定します</p>
-                </div>
-                <div class="p-4 space-y-4">
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" id="stripe_enabled" class="rounded text-purple-600">
-                        <label class="text-sm font-medium text-gray-700">Stripe決済を有効にする</label>
-                    </div>
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <div class="flex items-start gap-2">
-                            <i class="fas fa-info-circle text-yellow-600 mt-0.5"></i>
-                            <div class="text-sm text-yellow-800">
-                                <p class="font-medium">APIキーの設定について</p>
-                                <p class="mt-1">Stripe APIキーは環境変数（wrangler.toml）で設定してください：</p>
-                                <code class="block mt-2 bg-yellow-100 p-2 rounded text-xs">
-                                    [vars]<br>
-                                    STRIPE_SECRET_KEY = "sk_..."<br>
-                                    STRIPE_WEBHOOK_SECRET = "whsec_..."
-                                </code>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
             <!-- 法務設定 -->
             <div class="bg-white rounded-lg shadow mb-6">
                 <div class="p-4 border-b bg-gradient-to-r from-indigo-50 to-purple-50">
@@ -26210,31 +26745,50 @@ app.get('/admin/payments', async (c) => {
                         return;
                     }
                     
-                    document.getElementById('paymentsList').innerHTML = payments.map(p => \`
-                        <div class="p-4 flex items-center justify-between hover:bg-gray-50">
-                            <div class="flex items-center gap-4">
-                                <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                                    <i class="fas fa-university text-yellow-600"></i>
-                                </div>
-                                <div>
-                                    <div class="font-medium">\${p.client_name}</div>
-                                    <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
-                                    <div class="text-xs text-gray-400">
-                                        報告日時: \${new Date(p.bank_transfer_reported_at).toLocaleString('ja-JP')}
+                    document.getElementById('paymentsList').innerHTML = payments.map(p => {
+                        const isInvoice = p.source === 'invoices';
+                        const typeLabel = p.payment_type === 'deposit' ? '手付金' : (p.payment_type === 'success_fee' ? '成功報酬' : 'その他');
+                        
+                        return \`
+                            <div class="p-4 flex items-center justify-between hover:bg-gray-50">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-full \${isInvoice ? 'bg-blue-100' : 'bg-yellow-100'} flex items-center justify-center">
+                                        <i class="fas \${isInvoice ? 'fa-file-invoice-dollar text-blue-600' : 'fa-university text-yellow-600'}"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-medium">\${p.client_name}</div>
+                                        <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
+                                        \${isInvoice ? \`
+                                            <div class="text-xs text-blue-600">
+                                                <i class="fas fa-file-invoice mr-1"></i>\${p.invoice_number} - \${p.item_name || ''}
+                                            </div>
+                                            \${p.case_number ? \`<div class="text-xs text-gray-400">案件: \${p.case_number}</div>\` : ''}
+                                        \` : ''}
+                                        <div class="text-xs text-gray-400">
+                                            報告日時: \${p.bank_transfer_reported_at ? new Date(p.bank_transfer_reported_at).toLocaleString('ja-JP') : '-'}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <div class="text-right">
-                                    <div class="font-bold text-lg">¥\${p.amount.toLocaleString()}</div>
-                                    <div class="text-xs text-gray-500">\${p.payment_type === 'deposit' ? '手付金' : 'その他'}</div>
+                                <div class="flex items-center gap-4">
+                                    <div class="text-right">
+                                        <div class="font-bold text-lg">¥\${(p.amount || 0).toLocaleString()}</div>
+                                        <div class="text-xs \${isInvoice ? 'text-blue-500' : 'text-gray-500'}">
+                                            \${typeLabel}
+                                            \${isInvoice ? '<span class="ml-1 px-1 bg-blue-100 text-blue-600 rounded text-[10px]">請求書</span>' : ''}
+                                        </div>
+                                    </div>
+                                    <button onclick="confirmPayment(\${p.id}, '\${p.source || 'payment_history'}')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                        <i class="fas fa-check mr-1"></i>確認
+                                    </button>
+                                    \${isInvoice && p.case_id ? \`
+                                        <a href="/case/\${p.case_id}" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                    \` : ''}
                                 </div>
-                                <button onclick="confirmPayment(\${p.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                                    <i class="fas fa-check mr-1"></i>確認
-                                </button>
                             </div>
-                        </div>
-                    \`).join('');
+                        \`;
+                    }).join('');
                 } catch (error) {
                     console.error('Error:', error);
                 }
@@ -26299,11 +26853,11 @@ app.get('/admin/payments', async (c) => {
                 }
             }
             
-            async function confirmPayment(paymentId) {
+            async function confirmPayment(paymentId, source = 'payment_history') {
                 if (!confirm('この支払いを確認済みにしますか？')) return;
                 
                 try {
-                    await axios.put(\`/api/payments/\${paymentId}/confirm\`);
+                    await axios.put(\`/api/payments/\${paymentId}/confirm\`, { source });
                     alert('支払いを確認しました');
                     loadPayments();
                     loadPaymentHistory();
@@ -29099,14 +29653,14 @@ app.get('/master/organizations/:id', async (c) => {
                     </div>
                 </div>
                 <form id="paymentForm" class="p-6 space-y-6">
-                    <!-- 決済方法選択 -->
+                    <!-- 決済方法（銀行振込のみ） -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">決済方法</label>
-                        <select id="payment_method" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                            <option value="bank_transfer">銀行振込のみ</option>
-                            <option value="stripe">Stripe（カード決済）</option>
-                            <option value="both">銀行振込 + Stripe</option>
-                        </select>
+                        <div class="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                            <i class="fas fa-university text-green-600"></i>
+                            <span class="text-green-800 font-medium">銀行振込</span>
+                        </div>
+                        <input type="hidden" id="payment_method" value="bank_transfer">
                     </div>
                     
                     <!-- 銀行振込設定 -->
@@ -29137,24 +29691,6 @@ app.get('/master/organizations/:id', async (c) => {
                             <div class="col-span-2">
                                 <label class="block text-xs text-gray-600 mb-1">口座名義</label>
                                 <input type="text" id="payment_bank_account_holder" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: カ）サンプルジムショ">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Stripe設定 -->
-                    <div class="border rounded-lg p-4 bg-purple-50">
-                        <h4 class="font-medium mb-3 flex items-center gap-2">
-                            <i class="fab fa-stripe text-purple-600"></i>Stripe設定
-                        </h4>
-                        <div class="space-y-3">
-                            <div class="flex items-center gap-3">
-                                <input type="checkbox" id="payment_stripe_enabled" class="w-4 h-4 text-purple-600">
-                                <label for="payment_stripe_enabled" class="text-sm">Stripe決済を有効にする</label>
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-1">Stripe Connect アカウントID</label>
-                                <input type="text" id="payment_stripe_account_id" class="w-full px-3 py-2 border rounded-lg text-sm font-mono" placeholder="例: acct_xxxxxxxxxxxxx">
-                                <p class="text-xs text-gray-500 mt-1">※ Stripe Connectで連携したアカウントIDを入力</p>
                             </div>
                         </div>
                     </div>
@@ -29292,11 +29828,9 @@ app.get('/master/organizations/:id', async (c) => {
                         </div>
                     \`;
                     
-                    // 決済情報
+                    // 決済情報（銀行振込のみ対応）
                     const paymentMethodLabels = {
-                        'bank_transfer': '銀行振込',
-                        'stripe': 'Stripe',
-                        'both': '銀行振込 + Stripe'
+                        'bank_transfer': '銀行振込'
                     };
                     const hasBankInfo = org.bank_name && org.bank_account_number;
                     document.getElementById('paymentInfo').innerHTML = \`
@@ -32283,6 +32817,695 @@ app.delete('/api/document-templates/:id', async (c) => {
   const id = c.req.param('id')
   await DB.prepare('DELETE FROM document_templates WHERE id = ?').bind(id).run()
   return c.json({ success: true })
+})
+
+// ===============================
+// 請求書API
+// ===============================
+
+// 請求書番号を生成
+async function generateInvoiceNumber(DB: D1Database, organizationId: number): Promise<string> {
+  const currentYear = new Date().getFullYear()
+  
+  // 組織の採番情報を取得または作成
+  let seq = await DB.prepare(`
+    SELECT * FROM invoice_sequences WHERE organization_id = ?
+  `).bind(organizationId).first()
+  
+  if (!seq) {
+    // 初回：採番レコードを作成
+    await DB.prepare(`
+      INSERT INTO invoice_sequences (organization_id, current_year, current_sequence, prefix)
+      VALUES (?, ?, 1, 'INV')
+    `).bind(organizationId, currentYear).run()
+    return `INV-${currentYear}-0001`
+  }
+  
+  let newSequence: number
+  if ((seq as any).current_year !== currentYear) {
+    // 年が変わったらリセット
+    newSequence = 1
+    await DB.prepare(`
+      UPDATE invoice_sequences SET current_year = ?, current_sequence = 1, updated_at = CURRENT_TIMESTAMP
+      WHERE organization_id = ?
+    `).bind(currentYear, organizationId).run()
+  } else {
+    // 採番をインクリメント
+    newSequence = ((seq as any).current_sequence || 0) + 1
+    await DB.prepare(`
+      UPDATE invoice_sequences SET current_sequence = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE organization_id = ?
+    `).bind(newSequence, organizationId).run()
+  }
+  
+  const prefix = (seq as any).prefix || 'INV'
+  return `${prefix}-${currentYear}-${String(newSequence).padStart(4, '0')}`
+}
+
+// 請求書一覧取得（案件別）
+app.get('/api/cases/:caseId/invoices', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('caseId')
+  
+  try {
+    // まずテーブルが存在するか確認
+    const tableCheck = await DB.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='invoices'
+    `).first()
+    
+    if (!tableCheck) {
+      // テーブルがなければ空配列を返す
+      return c.json([])
+    }
+    
+    const invoices = await DB.prepare(`
+      SELECT i.*, c.name as client_name, c.company_name as client_company
+      FROM invoices i
+      LEFT JOIN clients c ON i.client_id = c.id
+      WHERE i.case_id = ?
+      ORDER BY i.created_at DESC
+    `).bind(caseId).all()
+    
+    return c.json(invoices.results || [])
+  } catch (error: any) {
+    console.error('Error fetching invoices:', error)
+    // テーブルがない場合も空配列を返す
+    if (error.message?.includes('no such table')) {
+      return c.json([])
+    }
+    return c.json({ error: error.message || 'エラーが発生しました' }, 500)
+  }
+})
+
+// 請求書一覧取得（顧客ポータル用）
+app.get('/api/portal/invoices', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.query('client_id')
+  const caseId = c.req.query('case_id')
+  
+  let query = `
+    SELECT i.*, cs.case_number, st.name as subsidy_name
+    FROM invoices i
+    LEFT JOIN cases cs ON i.case_id = cs.id
+    LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+    WHERE i.status != 'draft'
+  `
+  const params: any[] = []
+  
+  if (caseId) {
+    query += ` AND i.case_id = ?`
+    params.push(caseId)
+  } else if (clientId) {
+    query += ` AND i.client_id = ?`
+    params.push(clientId)
+  }
+  
+  query += ` ORDER BY i.issue_date DESC`
+  
+  const invoices = await DB.prepare(query).bind(...params).all()
+  return c.json(invoices.results || [])
+})
+
+// 請求書詳細取得
+app.get('/api/invoices/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const invoice = await DB.prepare(`
+    SELECT i.*, 
+           c.name as client_name, c.company_name as client_company, c.email as client_email,
+           cs.case_number, st.name as subsidy_name,
+           o.name as org_name, o.email as org_email, o.phone as org_phone, o.address as org_address,
+           o.bank_name, o.bank_branch, o.bank_account_type, o.bank_account_number, o.bank_account_holder,
+           o.representative_name as org_representative
+    FROM invoices i
+    LEFT JOIN clients c ON i.client_id = c.id
+    LEFT JOIN cases cs ON i.case_id = cs.id
+    LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+    LEFT JOIN organizations o ON i.organization_id = o.id
+    WHERE i.id = ?
+  `).bind(id).first()
+  
+  if (!invoice) {
+    return c.json({ error: '請求書が見つかりません' }, 404)
+  }
+  
+  return c.json(invoice)
+})
+
+// 請求書作成
+app.post('/api/cases/:caseId/invoices', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('caseId')
+  const data = await c.req.json()
+  
+  try {
+    const user = await getCurrentUser(c)
+    const orgId = user?.organization_id || 1
+    
+    // テーブルが存在しない場合は作成
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        organization_id INTEGER NOT NULL,
+        case_id INTEGER NOT NULL,
+        client_id INTEGER NOT NULL,
+        invoice_number TEXT NOT NULL,
+        invoice_type TEXT NOT NULL,
+        subtotal INTEGER NOT NULL,
+        tax_rate INTEGER DEFAULT 10,
+        tax_amount INTEGER DEFAULT 0,
+        withholding_tax INTEGER DEFAULT 0,
+        total_amount INTEGER NOT NULL,
+        issue_date DATE,
+        due_date DATE,
+        item_name TEXT NOT NULL,
+        item_description TEXT,
+        granted_amount INTEGER,
+        fee_rate REAL,
+        status TEXT NOT NULL DEFAULT 'draft',
+        paid_at DATETIME,
+        paid_amount INTEGER,
+        payment_reported_at DATETIME,
+        payment_confirmed_at DATETIME,
+        payment_confirmed_by INTEGER,
+        notes TEXT,
+        internal_memo TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    // 案件情報を取得
+    const caseData = await DB.prepare(`
+      SELECT cs.*, c.id as client_id, c.company_name, st.name as subsidy_name
+      FROM cases cs
+      LEFT JOIN clients c ON cs.client_id = c.id
+      LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+      WHERE cs.id = ?
+    `).bind(caseId).first()
+    
+    if (!caseData) {
+      return c.json({ error: '案件が見つかりません' }, 404)
+    }
+    
+    // 請求書番号を生成（シンプルなタイムスタンプベース）
+    const now = new Date()
+    const year = now.getFullYear()
+    const seq = now.getTime().toString().slice(-6)
+    const invoiceNumber = `INV-${year}-${seq}`
+    
+    // 金額計算
+    const subtotal = data.subtotal || 0
+    const taxRate = data.tax_rate ?? 10
+    const taxAmount = Math.floor(subtotal * taxRate / 100)
+    const withholdingTax = data.withholding_tax || 0
+    const totalAmount = subtotal + taxAmount - withholdingTax
+    
+    // デフォルトの支払期限（発行日から14日後）
+    const issueDate = data.issue_date || new Date().toISOString().split('T')[0]
+    const dueDate = data.due_date || (() => {
+      const d = new Date(issueDate)
+      d.setDate(d.getDate() + 14)
+      return d.toISOString().split('T')[0]
+    })()
+    
+    // 品目名の自動生成
+    let itemName = data.item_name
+    if (!itemName) {
+      const subsidyName = (caseData as any).subsidy_name || '補助金・助成金'
+      itemName = data.invoice_type === 'deposit' 
+        ? `${subsidyName}申請 着手金`
+        : `${subsidyName}申請 成功報酬`
+    }
+    
+    const result = await DB.prepare(`
+      INSERT INTO invoices (
+        organization_id, case_id, client_id, invoice_number, invoice_type,
+        subtotal, tax_rate, tax_amount, withholding_tax, total_amount,
+        issue_date, due_date, item_name, item_description, status, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      orgId,
+      caseId,
+      (caseData as any).client_id,
+      invoiceNumber,
+      data.invoice_type || 'deposit',
+      subtotal,
+      taxRate,
+      taxAmount,
+      withholdingTax,
+      totalAmount,
+      issueDate,
+      dueDate,
+      itemName,
+      data.item_description || null,
+      data.status || 'draft',
+      data.notes || null
+    ).run()
+    
+    return c.json({
+      success: true,
+      id: result.meta?.last_row_id,
+      invoice_number: invoiceNumber,
+      message: '請求書を作成しました'
+    })
+  } catch (error: any) {
+    console.error('Error creating invoice:', error)
+    return c.json({ error: error.message || '請求書の作成に失敗しました' }, 500)
+  }
+})
+
+// 請求書更新
+app.put('/api/invoices/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  // 金額再計算
+  const subtotal = data.subtotal || 0
+  const taxRate = data.tax_rate ?? 10
+  const taxAmount = data.tax_included ? 0 : Math.floor(subtotal * taxRate / 100)
+  const withholdingTax = data.withholding_tax || 0
+  const totalAmount = subtotal + taxAmount - withholdingTax
+  
+  await DB.prepare(`
+    UPDATE invoices SET
+      subtotal = ?,
+      tax_rate = ?,
+      tax_amount = ?,
+      withholding_tax = ?,
+      total_amount = ?,
+      issue_date = COALESCE(?, issue_date),
+      due_date = COALESCE(?, due_date),
+      item_name = COALESCE(?, item_name),
+      item_description = ?,
+      notes = ?,
+      status = COALESCE(?, status),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    subtotal,
+    taxRate,
+    taxAmount,
+    withholdingTax,
+    totalAmount,
+    data.issue_date || null,
+    data.due_date || null,
+    data.item_name || null,
+    data.item_description || null,
+    data.notes || null,
+    data.status || null,
+    id
+  ).run()
+  
+  return c.json({ success: true, message: '請求書を更新しました' })
+})
+
+// 請求書ステータス更新（管理画面から）
+app.put('/api/invoices/:id/status', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const { status } = await c.req.json()
+  
+  if (!['draft', 'issued', 'sent', 'payment_reported', 'paid', 'cancelled'].includes(status)) {
+    return c.json({ error: '無効なステータスです' }, 400)
+  }
+  
+  const paidAt = status === 'paid' ? new Date().toISOString() : null
+  
+  await DB.prepare(`
+    UPDATE invoices SET 
+      status = ?, 
+      paid_at = COALESCE(?, paid_at),
+      updated_at = CURRENT_TIMESTAMP 
+    WHERE id = ?
+  `).bind(status, paidAt, id).run()
+  
+  return c.json({ success: true, message: 'ステータスを更新しました' })
+})
+
+// 請求書発行（ステータスをissuedに変更）
+app.post('/api/invoices/:id/issue', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  await DB.prepare(`
+    UPDATE invoices SET status = 'issued', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).bind(id).run()
+  
+  return c.json({ success: true, message: '請求書を発行しました' })
+})
+
+// 振込報告（顧客ポータルから）
+app.post('/api/invoices/:id/report-payment', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  await DB.prepare(`
+    UPDATE invoices SET 
+      status = 'payment_reported',
+      payment_reported_at = CURRENT_TIMESTAMP,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(id).run()
+  
+  // 通知を作成
+  const invoice = await DB.prepare(`SELECT * FROM invoices WHERE id = ?`).bind(id).first()
+  if (invoice) {
+    await DB.prepare(`
+      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
+      VALUES ('payment_report', '振込報告', ?, ?, 'invoices')
+    `).bind(
+      `請求書 ${(invoice as any).invoice_number} の振込報告がありました`,
+      id
+    ).run()
+  }
+  
+  return c.json({ success: true, message: '振込報告を送信しました' })
+})
+
+// 入金確認（管理者から）
+app.post('/api/invoices/:id/confirm-payment', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const data = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE invoices SET 
+      status = 'paid',
+      paid_at = CURRENT_TIMESTAMP,
+      paid_amount = COALESCE(?, total_amount),
+      payment_confirmed_at = CURRENT_TIMESTAMP,
+      payment_confirmed_by = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    data.paid_amount || null,
+    user?.id || null,
+    id
+  ).run()
+  
+  return c.json({ success: true, message: '入金を確認しました' })
+})
+
+// 請求書削除
+app.delete('/api/invoices/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  // 発行済みの請求書は削除不可（キャンセルのみ）
+  const invoice = await DB.prepare(`SELECT status FROM invoices WHERE id = ?`).bind(id).first()
+  if (invoice && (invoice as any).status !== 'draft') {
+    return c.json({ error: '発行済みの請求書は削除できません。キャンセルしてください。' }, 400)
+  }
+  
+  await DB.prepare(`DELETE FROM invoices WHERE id = ?`).bind(id).run()
+  return c.json({ success: true, message: '請求書を削除しました' })
+})
+
+// 請求書キャンセル
+app.post('/api/invoices/:id/cancel', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  await DB.prepare(`
+    UPDATE invoices SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).bind(id).run()
+  
+  return c.json({ success: true, message: '請求書をキャンセルしました' })
+})
+
+// 請求書PDF生成（HTML形式で返す - ブラウザで印刷してPDF化）
+app.get('/api/invoices/:id/pdf', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const invoice = await DB.prepare(`
+    SELECT i.*, 
+           c.name as client_name, c.company_name as client_company,
+           cs.case_number, st.name as subsidy_name,
+           o.name as org_name, o.email as org_email, o.phone as org_phone, o.address as org_address,
+           o.bank_name, o.bank_branch, o.bank_account_type, o.bank_account_number, o.bank_account_holder,
+           o.representative_name as org_representative
+    FROM invoices i
+    LEFT JOIN clients c ON i.client_id = c.id
+    LEFT JOIN cases cs ON i.case_id = cs.id
+    LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+    LEFT JOIN organizations o ON i.organization_id = o.id
+    WHERE i.id = ?
+  `).bind(id).first()
+  
+  if (!invoice) {
+    return c.json({ error: '請求書が見つかりません' }, 404)
+  }
+  
+  const inv = invoice as any
+  const invoiceTypeLabel = inv.invoice_type === 'deposit' ? '着手金' : '成功報酬'
+  
+  // 日付フォーマット
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+  }
+  
+  const html = `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>請求書 ${inv.invoice_number}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
+        }
+        .invoice-container {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 15mm;
+            background: white;
+        }
+        @media print {
+            body { background: white; }
+            .invoice-container { padding: 10mm; }
+            .no-print { display: none !important; }
+        }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { 
+            font-size: 28px; 
+            font-weight: bold;
+            letter-spacing: 8px;
+            border-bottom: 3px double #333;
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+        .invoice-number { 
+            text-align: right; 
+            margin: 20px 0;
+            font-size: 11px;
+        }
+        .parties { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .client { flex: 1; }
+        .client-name { 
+            font-size: 18px; 
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
+        .client-name::after { content: " 御中"; font-size: 14px; }
+        .issuer { 
+            text-align: right; 
+            font-size: 11px;
+            line-height: 1.8;
+        }
+        .issuer-name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+        .total-box {
+            background: #f5f5f5;
+            border: 2px solid #333;
+            padding: 15px 20px;
+            margin: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .total-label { font-size: 14px; font-weight: bold; }
+        .total-amount { font-size: 24px; font-weight: bold; }
+        .total-amount::before { content: "¥"; }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .details-table th, .details-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        .details-table th {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+        .details-table .amount { text-align: right; }
+        .bank-info {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .bank-info h3 { 
+            font-size: 13px; 
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        .bank-info table { width: 100%; }
+        .bank-info td { padding: 3px 10px; }
+        .bank-info td:first-child { width: 80px; color: #666; }
+        .notes { margin-top: 20px; font-size: 11px; color: #666; }
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .print-btn:hover { background: #1d4ed8; }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">
+        🖨️ 印刷 / PDF保存
+    </button>
+    
+    <div class="invoice-container">
+        <div class="header">
+            <h1>請 求 書</h1>
+        </div>
+        
+        <div class="invoice-number">
+            <div>請求書番号: ${inv.invoice_number}</div>
+            <div>発行日: ${formatDate(inv.issue_date)}</div>
+        </div>
+        
+        <div class="parties">
+            <div class="client">
+                <div class="client-name">${inv.client_company || inv.client_name || '（顧客名）'}</div>
+            </div>
+            <div class="issuer">
+                <div class="issuer-name">${inv.org_name || '（発行元）'}</div>
+                ${inv.org_address ? `<div>${inv.org_address}</div>` : ''}
+                ${inv.org_phone ? `<div>TEL: ${inv.org_phone}</div>` : ''}
+                ${inv.org_email ? `<div>Email: ${inv.org_email}</div>` : ''}
+                ${inv.org_representative ? `<div>代表: ${inv.org_representative}</div>` : ''}
+            </div>
+        </div>
+        
+        <div class="total-box">
+            <div class="total-label">ご請求金額</div>
+            <div class="total-amount">${inv.total_amount?.toLocaleString() || 0}</div>
+        </div>
+        
+        <table class="details-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%">品目</th>
+                    <th style="width: 15%" class="amount">数量</th>
+                    <th style="width: 15%" class="amount">単価</th>
+                    <th style="width: 20%" class="amount">金額</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <strong>${inv.item_name || invoiceTypeLabel}</strong>
+                        ${inv.item_description ? `<br><small style="color: #666">${inv.item_description}</small>` : ''}
+                        ${inv.case_number ? `<br><small style="color: #666">案件番号: ${inv.case_number}</small>` : ''}
+                    </td>
+                    <td class="amount">1</td>
+                    <td class="amount">¥${inv.subtotal?.toLocaleString() || 0}</td>
+                    <td class="amount">¥${inv.subtotal?.toLocaleString() || 0}</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="amount">小計</td>
+                    <td class="amount">¥${inv.subtotal?.toLocaleString() || 0}</td>
+                </tr>
+                ${inv.tax_amount > 0 ? `
+                <tr>
+                    <td colspan="3" class="amount">消費税 (${inv.tax_rate || 10}%)</td>
+                    <td class="amount">¥${inv.tax_amount?.toLocaleString() || 0}</td>
+                </tr>
+                ` : ''}
+                ${inv.withholding_tax > 0 ? `
+                <tr>
+                    <td colspan="3" class="amount">源泉徴収税</td>
+                    <td class="amount">-¥${inv.withholding_tax?.toLocaleString() || 0}</td>
+                </tr>
+                ` : ''}
+                <tr style="background: #f5f5f5; font-weight: bold;">
+                    <td colspan="3" class="amount">合計</td>
+                    <td class="amount">¥${inv.total_amount?.toLocaleString() || 0}</td>
+                </tr>
+            </tfoot>
+        </table>
+        
+        <div class="bank-info">
+            <h3>🏦 お振込先</h3>
+            <table>
+                <tr>
+                    <td>銀行名</td>
+                    <td><strong>${inv.bank_name || '（未設定）'}</strong></td>
+                </tr>
+                <tr>
+                    <td>支店名</td>
+                    <td><strong>${inv.bank_branch || '（未設定）'}</strong></td>
+                </tr>
+                <tr>
+                    <td>口座種別</td>
+                    <td>${inv.bank_account_type || '普通'}</td>
+                </tr>
+                <tr>
+                    <td>口座番号</td>
+                    <td><strong>${inv.bank_account_number || '（未設定）'}</strong></td>
+                </tr>
+                <tr>
+                    <td>口座名義</td>
+                    <td><strong>${inv.bank_account_holder || '（未設定）'}</strong></td>
+                </tr>
+            </table>
+        </div>
+        
+        <div style="margin: 20px 0; padding: 10px; background: #fff3cd; border-radius: 5px;">
+            <strong>📅 お支払期限: ${formatDate(inv.due_date)}</strong>
+        </div>
+        
+        ${inv.notes ? `
+        <div class="notes">
+            <strong>備考:</strong><br>
+            ${inv.notes.replace(/\n/g, '<br>')}
+        </div>
+        ` : ''}
+    </div>
+</body>
+</html>
+  `
+  
+  return c.html(html)
 })
 
 export default app
