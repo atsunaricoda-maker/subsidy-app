@@ -25539,48 +25539,8 @@ app.get('/terms', async (c) => {
 // API: システム設定（銀行振込先など）
 // ===============================
 
-// システム設定取得
-app.get('/api/settings', async (c) => {
-  const { DB } = c.env
-  
-  const settings = await DB.prepare(`
-    SELECT setting_key, setting_value, setting_type, description
-    FROM system_settings
-  `).all()
-  
-  // キー・バリュー形式に変換
-  const result: Record<string, any> = {}
-  for (const row of (settings.results || []) as any[]) {
-    let value = row.setting_value
-    if (row.setting_type === 'boolean') {
-      value = value === 'true'
-    } else if (row.setting_type === 'number') {
-      value = Number(value)
-    } else if (row.setting_type === 'json') {
-      try { value = JSON.parse(value) } catch {}
-    }
-    result[row.setting_key] = value
-  }
-  
-  return c.json(result)
-})
-
-// システム設定更新
-app.put('/api/settings', async (c) => {
-  const { DB } = c.env
-  const data = await c.req.json()
-  
-  for (const [key, value] of Object.entries(data)) {
-    const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
-    await DB.prepare(`
-      UPDATE system_settings 
-      SET setting_value = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE setting_key = ?
-    `).bind(stringValue, key).run()
-  }
-  
-  return c.json({ success: true, message: '設定を保存しました' })
-})
+// システム設定取得・更新は /api/settings (line 1294, 1335) で統一
+// 重複APIを削除してsite_settingsテーブルを使用
 
 // 銀行振込先情報取得（公開API - 顧客ポータル用）
 app.get('/api/bank-info', async (c) => {
