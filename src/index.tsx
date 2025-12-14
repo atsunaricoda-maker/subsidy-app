@@ -26936,7 +26936,8 @@ app.get('/admin/settings', async (c) => {
             if (!token) {
                 window.location.href = '/login';
             }
-            document.getElementById('adminName').textContent = localStorage.getItem('admin_name') || '';
+            const adminNameEl = document.getElementById('adminName');
+            if (adminNameEl) adminNameEl.textContent = localStorage.getItem('admin_name') || '';
             
             axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
             
@@ -26982,9 +26983,12 @@ app.get('/admin/settings', async (c) => {
                     // 外部URL入力時にテキストエリアを薄く表示
                     toggleContentVisibility();
                     
-                    // Stripe
-                    const stripeEnabled = getSettingValue(settings, 'stripe_enabled');
-                    document.getElementById('stripe_enabled').checked = stripeEnabled === 'true' || stripeEnabled === true;
+                    // Stripe（要素が存在する場合のみ）
+                    const stripeEnabledEl = document.getElementById('stripe_enabled');
+                    if (stripeEnabledEl) {
+                        const stripeEnabled = getSettingValue(settings, 'stripe_enabled');
+                        stripeEnabledEl.checked = stripeEnabled === 'true' || stripeEnabled === true;
+                    }
                 } catch (error) {
                     console.error('Error loading settings:', error);
                 }
@@ -27016,10 +27020,14 @@ app.get('/admin/settings', async (c) => {
                         privacy_policy: document.getElementById('privacy_policy').value,
                         legal_notice: document.getElementById('legal_notice').value,
                         terms_of_service: document.getElementById('terms_of_service').value,
-                        footer_text: document.getElementById('footer_text').value,
-                        // Stripe
-                        stripe_enabled: document.getElementById('stripe_enabled').checked ? 'true' : 'false'
+                        footer_text: document.getElementById('footer_text').value
                     };
+                    
+                    // Stripe（要素が存在する場合のみ）
+                    const stripeEnabledEl = document.getElementById('stripe_enabled');
+                    if (stripeEnabledEl) {
+                        settings.stripe_enabled = stripeEnabledEl.checked ? 'true' : 'false';
+                    }
                     
                     await axios.put('/api/settings', settings);
                     alert('設定を保存しました');
