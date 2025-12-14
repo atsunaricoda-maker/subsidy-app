@@ -11818,12 +11818,18 @@ app.get('/case/:id', async (c) => {
                 let subtotal, tax, total;
                 
                 if (currentInputMode === 'including' && taxRate > 0) {
-                    // 税込入力モード: 入力値から税抜金額を逆算
-                    // 税込金額 = 税抜金額 × (1 + 税率/100)
-                    // 税抜金額 = 税込金額 ÷ (1 + 税率/100)
-                    subtotal = Math.floor(inputValue / (1 + taxRate / 100));
-                    tax = inputValue - subtotal;
+                    // 税込入力モード: 税込金額を優先し、税抜金額を逆算
+                    // 端数が出る場合は税抜金額を切り上げて、税込金額がピッタリになるように調整
+                    // 例: 税込30,000円 → 税抜27,273円 + 消費税2,727円 = 30,000円
                     total = inputValue;
+                    subtotal = Math.ceil(inputValue / (1 + taxRate / 100));
+                    tax = total - subtotal;
+                    
+                    // もし切り上げで税込が超える場合は切り捨てに戻す
+                    if (subtotal + Math.floor(subtotal * taxRate / 100) > total) {
+                        subtotal = Math.floor(inputValue / (1 + taxRate / 100));
+                        tax = total - subtotal;
+                    }
                 } else {
                     // 税抜入力モード（通常）
                     subtotal = inputValue;
@@ -11884,17 +11890,26 @@ app.get('/case/:id', async (c) => {
                     const taxRate = parseInt(document.getElementById('invoiceTaxRate').value) || 0;
                     const hasWithholding = document.getElementById('invoiceWithholding').checked;
                     
-                    // 税込モードの場合は逆算した税抜金額を使用
-                    let subtotal;
+                    // 税込モードの場合は税込金額を優先して計算
+                    let subtotal, taxAmount, totalAmount;
                     if (currentInputMode === 'including' && taxRate > 0) {
-                        subtotal = Math.floor(inputValue / (1 + taxRate / 100));
+                        // 税込金額を優先：税抜を切り上げて計算し、消費税で端数調整
+                        const includingTotal = inputValue;
+                        subtotal = Math.ceil(includingTotal / (1 + taxRate / 100));
+                        // 切り上げで超える場合は切り捨てに戻す
+                        if (subtotal + Math.floor(subtotal * taxRate / 100) > includingTotal) {
+                            subtotal = Math.floor(includingTotal / (1 + taxRate / 100));
+                        }
+                        taxAmount = includingTotal - subtotal;
+                        totalAmount = includingTotal;
                     } else {
                         subtotal = inputValue;
+                        taxAmount = Math.floor(subtotal * taxRate / 100);
+                        totalAmount = subtotal + taxAmount;
                     }
                     
-                    const taxAmount = Math.floor(subtotal * taxRate / 100);
                     const withholdingAmount = hasWithholding ? Math.floor(subtotal * 0.1021) : 0;
-                    const totalAmount = subtotal + taxAmount - withholdingAmount;
+                    totalAmount = totalAmount - withholdingAmount;
                     
                     const data = {
                         invoice_type: document.getElementById('invoiceType').value,
