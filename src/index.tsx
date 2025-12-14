@@ -25801,14 +25801,20 @@ app.get('/api/payments/history', async (c) => {
   const type = c.req.query('type') || 'all'
   
   try {
-    // 支払い履歴を取得（クライアントに紐づく最新の案件から申請種別を取得）
-    let query = `
+    // 旧payment_historyからの確認済み支払い
+    let oldQuery = `
       SELECT 
-        ph.*,
+        ph.id,
+        ph.amount,
+        ph.payment_type,
+        ph.bank_transfer_confirmed_at as confirmed_at,
         c.name as client_name,
         c.company_name,
         cs.case_number,
-        st.name as subsidy_type_name
+        st.name as subsidy_type_name,
+        'payment_history' as source,
+        NULL as invoice_number,
+        NULL as item_name
       FROM payment_history ph
       JOIN clients c ON ph.client_id = c.id
       LEFT JOIN cases cs ON cs.client_id = ph.client_id
@@ -25817,16 +25823,61 @@ app.get('/api/payments/history', async (c) => {
     `
     
     if (type === 'deposit') {
-      query += ` AND ph.payment_type = 'deposit'`
+      oldQuery += ` AND ph.payment_type = 'deposit'`
     } else if (type === 'success_fee') {
-      query += ` AND ph.payment_type = 'success_fee'`
+      oldQuery += ` AND ph.payment_type = 'success_fee'`
     }
     
-    query += ` GROUP BY ph.id ORDER BY ph.bank_transfer_confirmed_at DESC LIMIT 100`
+    oldQuery += ` GROUP BY ph.id`
     
-    const payments = await DB.prepare(query).all()
+    const oldPayments = await DB.prepare(oldQuery).all()
     
-    return c.json(payments.results || [])
+    // invoicesテーブルからの確認済み支払い（status = 'paid'）
+    let invoicePayments: any[] = []
+    try {
+      let invoiceQuery = `
+        SELECT 
+          i.id,
+          i.total_amount as amount,
+          i.invoice_type as payment_type,
+          i.paid_at as confirmed_at,
+          c.name as client_name,
+          c.company_name,
+          cs.case_number,
+          st.name as subsidy_type_name,
+          'invoices' as source,
+          i.invoice_number,
+          i.item_name
+        FROM invoices i
+        JOIN clients c ON i.client_id = c.id
+        LEFT JOIN cases cs ON i.case_id = cs.id
+        LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+        WHERE i.status = 'paid'
+      `
+      
+      if (type === 'deposit') {
+        invoiceQuery += ` AND i.invoice_type = 'deposit'`
+      } else if (type === 'success_fee') {
+        invoiceQuery += ` AND i.invoice_type = 'success_fee'`
+      }
+      
+      const invoices = await DB.prepare(invoiceQuery).all()
+      invoicePayments = invoices.results || []
+    } catch (e) {
+      // invoicesテーブルがない場合は空配列
+    }
+    
+    // 両方のデータを結合して日付でソート
+    const allPayments = [
+      ...(oldPayments.results || []),
+      ...invoicePayments
+    ].sort((a: any, b: any) => {
+      const dateA = new Date(a.confirmed_at || 0).getTime()
+      const dateB = new Date(b.confirmed_at || 0).getTime()
+      return dateB - dateA // 新しい順
+    }).slice(0, 100)
+    
+    return c.json(allPayments)
   } catch (error: any) {
     console.error('Payment history error:', error)
     return c.json({ error: error.message || 'Failed to load payment history' }, 500)
@@ -27193,36 +27244,45 @@ app.get('/admin/payments', async (c) => {
                         return;
                     }
                     
-                    document.getElementById('paymentHistory').innerHTML = payments.map(p => \`
-                        <div class="p-4 hover:bg-gray-50">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                                        <i class="fas fa-check text-green-600"></i>
+                    document.getElementById('paymentHistory').innerHTML = payments.map(p => {
+                        const isInvoice = p.source === 'invoices';
+                        return \`
+                            <div class="p-4 hover:bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-10 h-10 rounded-full \${isInvoice ? 'bg-blue-100' : 'bg-green-100'} flex items-center justify-center">
+                                            <i class="fas \${isInvoice ? 'fa-file-invoice-dollar text-blue-600' : 'fa-check text-green-600'}"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium">\${p.client_name}</div>
+                                            <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
+                                            \${isInvoice && p.invoice_number ? \`
+                                                <div class="text-xs text-blue-600">
+                                                    <i class="fas fa-file-invoice mr-1"></i>\${p.invoice_number}\${p.item_name ? ' - ' + p.item_name : ''}
+                                                </div>
+                                            \` : ''}
+                                            <div class="text-xs text-gray-400">
+                                                案件: \${p.case_number || '-'} | 
+                                                \${p.subsidy_type_name || '申請種別未設定'}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div class="font-medium">\${p.client_name}</div>
-                                        <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
-                                        <div class="text-xs text-gray-400">
-                                            案件: \${p.case_number || '-'} | 
-                                            \${p.subsidy_type_name || '申請種別未設定'}
+                                    <div class="text-right">
+                                        <div class="font-bold text-lg text-green-600">¥\${(p.amount || 0).toLocaleString()}</div>
+                                        <div class="text-xs text-gray-500">
+                                            <span class="px-1.5 py-0.5 rounded \${p.payment_type === 'deposit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">
+                                                \${p.payment_type === 'deposit' ? '手付金' : '成功報酬'}
+                                            </span>
+                                            \${isInvoice ? '<span class="ml-1 px-1 bg-blue-50 text-blue-500 rounded text-[10px]">請求書</span>' : ''}
+                                        </div>
+                                        <div class="text-xs text-gray-400 mt-1">
+                                            \${p.confirmed_at ? new Date(p.confirmed_at).toLocaleDateString('ja-JP') : ''}
                                         </div>
                                     </div>
                                 </div>
-                                <div class="text-right">
-                                    <div class="font-bold text-lg text-green-600">¥\${(p.amount || 0).toLocaleString()}</div>
-                                    <div class="text-xs text-gray-500">
-                                        <span class="px-1.5 py-0.5 rounded \${p.payment_type === 'deposit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">
-                                            \${p.payment_type === 'deposit' ? '手付金' : '成功報酬'}
-                                        </span>
-                                    </div>
-                                    <div class="text-xs text-gray-400 mt-1">
-                                        \${p.confirmed_at ? new Date(p.confirmed_at).toLocaleDateString('ja-JP') : ''}
-                                    </div>
-                                </div>
                             </div>
-                        </div>
-                    \`).join('');
+                        \`;
+                    }).join('');
                 } catch (error) {
                     console.error('Error:', error);
                     document.getElementById('paymentHistory').innerHTML = \`
