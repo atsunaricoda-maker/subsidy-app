@@ -98,7 +98,7 @@ function generateSidebar(activePage: string = '') {
                         <span>支払い</span>
                         <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">0</span>
                     </a>
-                    <a href="/admin/subscription" class="sidebar-link ${isActive('subscription')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                    <a href="/admin/subscription" id="sidebarSubscriptionLink" class="sidebar-link ${isActive('subscription')} hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
                         <i class="fas fa-ticket-alt w-4 text-center"></i>
                         <span>プラン</span>
                         <span id="slotsBadge" class="ml-auto bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded-full">...</span>
@@ -236,10 +236,12 @@ const sidebarScripts = `
         const paymentsLink = document.getElementById('sidebarPaymentsLink');
         const settingsLink = document.getElementById('sidebarSettingsLink');
         const backupLink = document.getElementById('sidebarBackupLink');
+        const subscriptionLink = document.getElementById('sidebarSubscriptionLink');
         if (employeeLink) employeeLink.classList.remove('hidden');
         if (paymentsLink) paymentsLink.classList.remove('hidden');
         if (settingsLink) settingsLink.classList.remove('hidden');
         if (backupLink) backupLink.classList.remove('hidden');
+        if (subscriptionLink) subscriptionLink.classList.remove('hidden');
     }
     
     // Axios設定：認証ヘッダーを自動付与
@@ -1191,7 +1193,7 @@ app.get('/api/admin/users', async (c) => {
 // 従業員追加
 app.post('/api/admin/users', async (c) => {
   const { DB } = c.env
-  const { username, password, name } = await c.req.json()
+  const { username, password, name, role } = await c.req.json()
   const user = await getCurrentUser(c)
   
   // organization_idでテナント分離
@@ -1206,11 +1208,14 @@ app.post('/api/admin/users', async (c) => {
     return c.json({ error: 'このユーザー名は既に使用されています' }, 400)
   }
   
+  // ロールのバリデーション
+  const validRole = ['admin', 'staff'].includes(role) ? role : 'staff'
+  
   // ユーザー追加（organization_id付き）
   const result = await DB.prepare(`
     INSERT INTO admin_users (username, password_hash, name, organization_id, role)
-    VALUES (?, ?, ?, ?, 'staff')
-  `).bind(username, password, name, orgId).run()
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(username, password, name, orgId, validRole).run()
   
   return c.json({ 
     success: true, 
@@ -1223,7 +1228,7 @@ app.post('/api/admin/users', async (c) => {
 app.put('/api/admin/users/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
-  const { username, password, name } = await c.req.json()
+  const { username, password, name, role } = await c.req.json()
   
   // ユーザー名の重複チェック（自分以外）
   const existing = await DB.prepare(`
@@ -1234,19 +1239,25 @@ app.put('/api/admin/users/:id', async (c) => {
     return c.json({ error: 'このユーザー名は既に使用されています' }, 400)
   }
   
+  // ロールのバリデーション（ID=1のメイン管理者はadminから変更不可）
+  let validRole = ['admin', 'staff'].includes(role) ? role : 'staff'
+  if (id === '1') {
+    validRole = 'admin' // メイン管理者は常にadmin
+  }
+  
   // パスワードが空でない場合のみ更新
   if (password) {
     await DB.prepare(`
       UPDATE admin_users 
-      SET username = ?, password_hash = ?, name = ?
+      SET username = ?, password_hash = ?, name = ?, role = ?
       WHERE id = ?
-    `).bind(username, password, name, id).run()
+    `).bind(username, password, name, validRole, id).run()
   } else {
     await DB.prepare(`
       UPDATE admin_users 
-      SET username = ?, name = ?
+      SET username = ?, name = ?, role = ?
       WHERE id = ?
-    `).bind(username, name, id).run()
+    `).bind(username, name, validRole, id).run()
   }
   
   return c.json({ 
@@ -2397,10 +2408,21 @@ app.get('/', (c) => {
                                     <input type="checkbox" name="success_fee_enabled" id="successFeeEnabled" class="rounded text-blue-600" onchange="toggleSuccessFeeFields()">
                                     <span class="text-sm font-medium">成果報酬あり</span>
                                 </label>
-                                <div id="successFeeFields" class="hidden space-y-2">
+                                <div id="successFeeFields" class="hidden space-y-3">
                                     <div>
+                                        <label class="block text-xs text-gray-600 mb-1">報酬タイプ</label>
+                                        <select id="successFeeType" name="success_fee_type" class="w-full px-3 py-2 border rounded-lg text-sm" onchange="toggleSuccessFeeType()">
+                                            <option value="percentage">％（採択額に対する割合）</option>
+                                            <option value="fixed">固定金額</option>
+                                        </select>
+                                    </div>
+                                    <div id="successFeePercentageField">
                                         <label class="block text-xs text-gray-600 mb-1">成果報酬率（%）</label>
-                                        <input type="number" name="success_fee_percentage" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 10" min="0" max="100" step="0.1">
+                                        <input type="number" name="success_fee_percentage" id="successFeePercentage" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 10" min="0" max="100" step="0.1">
+                                    </div>
+                                    <div id="successFeeAmountField" class="hidden">
+                                        <label class="block text-xs text-gray-600 mb-1">固定報酬額（円）</label>
+                                        <input type="number" name="success_fee_amount" id="successFeeAmount" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 100000" min="0">
                                     </div>
                                 </div>
                             </div>
@@ -2475,6 +2497,23 @@ app.get('/', (c) => {
                     fields.classList.remove('hidden');
                 } else {
                     fields.classList.add('hidden');
+                }
+            }
+            
+            // 成果報酬タイプの切り替え（%/固定金額）
+            function toggleSuccessFeeType() {
+                const type = document.getElementById('successFeeType').value;
+                const percentageField = document.getElementById('successFeePercentageField');
+                const amountField = document.getElementById('successFeeAmountField');
+                
+                if (type === 'percentage') {
+                    percentageField.classList.remove('hidden');
+                    amountField.classList.add('hidden');
+                    document.getElementById('successFeeAmount').value = '';
+                } else {
+                    percentageField.classList.add('hidden');
+                    amountField.classList.remove('hidden');
+                    document.getElementById('successFeePercentage').value = '';
                 }
             }
             
@@ -2753,13 +2792,14 @@ app.get('/', (c) => {
                 // リダイレクト処理は checkAuth 内で実行
             }
             
-            // adminロールのみ従業員管理・バックアップ・支払い・設定リンク表示
+            // adminロールのみ従業員管理・バックアップ・支払い・設定・プランリンク表示
             const adminRole = localStorage.getItem('admin_role');
             if (adminRole === 'admin') {
                 const employeeLink = document.getElementById('sidebarEmployeeLink');
                 const backupLink = document.getElementById('sidebarBackupLink');
                 const paymentsLink = document.getElementById('sidebarPaymentsLink');
                 const settingsLink = document.getElementById('sidebarSettingsLink');
+                const subscriptionLink = document.getElementById('sidebarSubscriptionLink');
                 if (employeeLink) {
                     employeeLink.classList.remove('hidden');
                 }
@@ -2773,6 +2813,9 @@ app.get('/', (c) => {
                 }
                 if (settingsLink) {
                     settingsLink.classList.remove('hidden');
+                }
+                if (subscriptionLink) {
+                    subscriptionLink.classList.remove('hidden');
                 }
             }
             
@@ -3896,7 +3939,8 @@ app.get('/', (c) => {
                                             </div>
                                             <div class="text-xs text-gray-500 mt-0.5 flex items-center gap-3 flex-wrap">
                                                 \${caseItem.assigned_to_name || caseItem.assigned_to ? \`<span><i class="fas fa-user w-3"></i> \${caseItem.assigned_to_name || caseItem.assigned_to}</span>\` : ''}
-                                                \${caseItem.deposit_required ? \`<span class="\${caseItem.deposit_paid ? 'text-green-600' : 'text-yellow-600'}"><i class="fas fa-yen-sign w-3"></i> ¥\${(caseItem.deposit_amount || 0).toLocaleString()} \${caseItem.deposit_paid ? '✓' : '未払'}</span>\` : ''}
+                                                \${caseItem.deposit_required ? \`<span class="\${caseItem.deposit_paid ? 'text-green-600' : 'text-yellow-600'}" title="着手金"><i class="fas fa-hand-holding-usd w-3"></i> ¥\${(caseItem.deposit_amount || 0).toLocaleString()} \${caseItem.deposit_paid ? '✓' : '未払'}</span>\` : ''}
+                                                \${caseItem.success_fee_enabled ? \`<span class="\${caseItem.success_fee_invoice_status === 'paid' ? 'text-green-600' : (caseItem.success_fee_invoice_status === 'payment_reported' ? 'text-purple-600' : (caseItem.success_fee_invoice_count > 0 ? 'text-blue-600' : 'text-gray-400'))}" title="成功報酬"><i class="fas fa-trophy w-3"></i> \${caseItem.success_fee_rate ? caseItem.success_fee_rate + '%' : '¥' + (caseItem.success_fee_amount || 0).toLocaleString()} \${caseItem.success_fee_invoice_status === 'paid' ? '✓' : (caseItem.success_fee_invoice_status === 'payment_reported' ? '確認中' : (caseItem.success_fee_invoice_count > 0 ? '請求中' : '未発行'))}</span>\` : ''}
                                             </div>
                                         </a>
                                         <!-- 右側: アクションボタン -->
@@ -4262,6 +4306,7 @@ app.get('/', (c) => {
             window.filterClients = filterClients;
             window.toggleDepositFields = toggleDepositFields;
             window.toggleSuccessFeeFields = toggleSuccessFeeFields;
+            window.toggleSuccessFeeType = toggleSuccessFeeType;
             window.toggleCustomerType = toggleCustomerType;
             window.filterSubsidyOptions = filterSubsidyOptions;
             window.renderSubsidyOptions = renderSubsidyOptions;
@@ -4443,6 +4488,9 @@ app.get('/api/clients-with-cases', async (c) => {
       cases.deposit_required,
       cases.deposit_amount,
       cases.deposit_paid,
+      cases.success_fee_enabled,
+      cases.success_fee_rate,
+      cases.success_fee_amount,
       cases.access_token,
       cases.created_at,
       cases.updated_at,
@@ -4455,7 +4503,9 @@ app.get('/api/clients-with-cases', async (c) => {
       sg.application_end_date,
       sg.max_amount,
       sg.subsidy_rate,
-      sg.fiscal_year
+      sg.fiscal_year,
+      (SELECT COUNT(*) FROM invoices WHERE invoices.case_id = cases.id AND invoices.invoice_type = 'success_fee') as success_fee_invoice_count,
+      (SELECT status FROM invoices WHERE invoices.case_id = cases.id AND invoices.invoice_type = 'success_fee' ORDER BY created_at DESC LIMIT 1) as success_fee_invoice_status
     FROM cases
     LEFT JOIN clients ON cases.client_id = clients.id
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
@@ -8704,8 +8754,14 @@ app.get('/client/:id', async (c) => {
                                                 </div>
                                                 \${c.deposit_required ? \`
                                                     <div class="mt-2 text-xs \${c.deposit_paid ? 'text-green-600' : 'text-yellow-600'}">
-                                                        <i class="fas fa-yen-sign mr-1"></i>¥\${(c.deposit_amount || 0).toLocaleString()}
+                                                        <i class="fas fa-hand-holding-usd mr-1"></i>¥\${(c.deposit_amount || 0).toLocaleString()}
                                                         \${c.deposit_paid ? '<span class="ml-1">✓</span>' : '<span class="ml-1">未払</span>'}
+                                                    </div>
+                                                \` : ''}
+                                                \${c.success_fee_enabled ? \`
+                                                    <div class="mt-1 text-xs \${c.success_fee_invoice_status === 'paid' ? 'text-green-600' : (c.success_fee_invoice_status === 'payment_reported' ? 'text-purple-600' : (c.success_fee_invoice_count > 0 ? 'text-blue-600' : 'text-gray-400'))}">
+                                                        <i class="fas fa-trophy mr-1"></i>\${c.success_fee_rate ? c.success_fee_rate + '%' : '¥' + (c.success_fee_amount || 0).toLocaleString()}
+                                                        <span class="ml-1">\${c.success_fee_invoice_status === 'paid' ? '✓' : (c.success_fee_invoice_status === 'payment_reported' ? '確認中' : (c.success_fee_invoice_count > 0 ? '請求中' : '未発行'))}</span>
                                                     </div>
                                                 \` : ''}
                                             </div>
@@ -10530,6 +10586,81 @@ app.get('/case/:id', async (c) => {
                                 <div class="text-center py-4 text-gray-500">読み込み中...</div>
                             </div>
                         </div>
+                        
+                        <!-- 報酬設定 -->
+                        <div class="bg-white rounded-xl shadow-sm p-6 mt-6">
+                            <h3 class="text-lg font-bold mb-4">
+                                <i class="fas fa-coins mr-2 text-yellow-600"></i>報酬設定
+                            </h3>
+                            <div id="rewardSettingsContent">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- 手付金 -->
+                                    <div class="border rounded-lg p-4">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h4 class="font-medium text-gray-800">
+                                                <i class="fas fa-hand-holding-usd mr-2 text-yellow-500"></i>手付金
+                                            </h4>
+                                            <span id="depositStatus" class="${caseData.deposit_paid ? 'text-green-600' : 'text-yellow-600'} text-sm font-medium">
+                                                ${caseData.deposit_paid ? '<i class="fas fa-check-circle mr-1"></i>支払済' : '<i class="fas fa-clock mr-1"></i>未払'}
+                                            </span>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label class="flex items-center gap-2">
+                                                <input type="checkbox" id="depositRequiredEdit" ${caseData.deposit_required ? 'checked' : ''} onchange="updateRewardSettings()" class="rounded text-blue-600">
+                                                <span class="text-sm">手付金あり</span>
+                                            </label>
+                                            <div id="depositAmountEditField" class="${caseData.deposit_required ? '' : 'hidden'}">
+                                                <label class="block text-xs text-gray-500 mb-1">金額（円）</label>
+                                                <input type="number" id="depositAmountEdit" value="${caseData.deposit_amount || ''}" 
+                                                       class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 50000">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 成功報酬 -->
+                                    <div class="border rounded-lg p-4">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h4 class="font-medium text-gray-800">
+                                                <i class="fas fa-trophy mr-2 text-purple-500"></i>成功報酬
+                                            </h4>
+                                            <span id="successFeeStatus" class="text-gray-500 text-sm">
+                                                ${caseData.success_fee_enabled ? (caseData.success_fee_rate ? caseData.success_fee_rate + '%' : '¥' + (caseData.success_fee_amount || 0).toLocaleString()) : '未設定'}
+                                            </span>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label class="flex items-center gap-2">
+                                                <input type="checkbox" id="successFeeEnabledEdit" ${caseData.success_fee_enabled ? 'checked' : ''} onchange="toggleSuccessFeeEdit()" class="rounded text-blue-600">
+                                                <span class="text-sm">成功報酬あり</span>
+                                            </label>
+                                            <div id="successFeeEditFields" class="${caseData.success_fee_enabled ? '' : 'hidden'} space-y-2">
+                                                <div>
+                                                    <label class="block text-xs text-gray-500 mb-1">報酬タイプ</label>
+                                                    <select id="successFeeTypeEdit" onchange="toggleSuccessFeeTypeEdit()" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                                        <option value="percentage" ${caseData.success_fee_rate > 0 ? 'selected' : ''}>％（採択額に対する割合）</option>
+                                                        <option value="fixed" ${caseData.success_fee_amount > 0 && !caseData.success_fee_rate ? 'selected' : ''}>固定金額</option>
+                                                    </select>
+                                                </div>
+                                                <div id="successFeePercentageEditField" class="${caseData.success_fee_rate > 0 || caseData.success_fee_amount == 0 ? '' : 'hidden'}">
+                                                    <label class="block text-xs text-gray-500 mb-1">成功報酬率（%）</label>
+                                                    <input type="number" id="successFeePercentageEdit" value="${caseData.success_fee_rate || ''}" 
+                                                           class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 10" min="0" max="100" step="0.1">
+                                                </div>
+                                                <div id="successFeeAmountEditField" class="${caseData.success_fee_amount > 0 && !caseData.success_fee_rate ? '' : 'hidden'}">
+                                                    <label class="block text-xs text-gray-500 mb-1">固定報酬額（円）</label>
+                                                    <input type="number" id="successFeeAmountEdit" value="${caseData.success_fee_amount || ''}" 
+                                                           class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 100000" min="0">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex justify-end">
+                                    <button onclick="saveRewardSettings()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                        <i class="fas fa-save mr-2"></i>報酬設定を保存
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- やり取りタブ -->
@@ -10750,6 +10881,10 @@ app.get('/case/:id', async (c) => {
             const CLIENT_ID = ${caseData.client_id};
             const SUBSIDY_TYPE_ID = ${caseData.subsidy_type_id || 'null'};
             const PORTAL_URL = '${new URL(c.req.url).origin}/portal/${caseData.access_token}';
+            const SUCCESS_FEE_ENABLED = ${caseData.success_fee_enabled ? 'true' : 'false'};
+            const SUCCESS_FEE_RATE = ${caseData.success_fee_rate || 0};
+            const SUCCESS_FEE_AMOUNT = ${caseData.success_fee_amount || 0};
+            const APPROVED_AMOUNT = ${caseData.approved_amount || 0};
             
             const STATUS_LABELS = {
                 inquiry: '見込み',
@@ -11490,6 +11625,82 @@ app.get('/case/:id', async (c) => {
                 }
             }
             
+            // 報酬設定の編集関連関数
+            function toggleSuccessFeeEdit() {
+                const checkbox = document.getElementById('successFeeEnabledEdit');
+                const fields = document.getElementById('successFeeEditFields');
+                if (checkbox.checked) {
+                    fields.classList.remove('hidden');
+                } else {
+                    fields.classList.add('hidden');
+                }
+            }
+            window.toggleSuccessFeeEdit = toggleSuccessFeeEdit;
+            
+            function toggleSuccessFeeTypeEdit() {
+                const type = document.getElementById('successFeeTypeEdit').value;
+                const percentageField = document.getElementById('successFeePercentageEditField');
+                const amountField = document.getElementById('successFeeAmountEditField');
+                
+                if (type === 'percentage') {
+                    percentageField.classList.remove('hidden');
+                    amountField.classList.add('hidden');
+                    document.getElementById('successFeeAmountEdit').value = '';
+                } else {
+                    percentageField.classList.add('hidden');
+                    amountField.classList.remove('hidden');
+                    document.getElementById('successFeePercentageEdit').value = '';
+                }
+            }
+            window.toggleSuccessFeeTypeEdit = toggleSuccessFeeTypeEdit;
+            
+            function updateRewardSettings() {
+                const depositRequired = document.getElementById('depositRequiredEdit').checked;
+                const depositField = document.getElementById('depositAmountEditField');
+                if (depositRequired) {
+                    depositField.classList.remove('hidden');
+                } else {
+                    depositField.classList.add('hidden');
+                }
+            }
+            window.updateRewardSettings = updateRewardSettings;
+            
+            async function saveRewardSettings() {
+                try {
+                    const depositRequired = document.getElementById('depositRequiredEdit').checked;
+                    const depositAmount = parseInt(document.getElementById('depositAmountEdit').value) || 0;
+                    const successFeeEnabled = document.getElementById('successFeeEnabledEdit').checked;
+                    const successFeeType = document.getElementById('successFeeTypeEdit')?.value || 'percentage';
+                    const successFeeRate = parseFloat(document.getElementById('successFeePercentageEdit')?.value) || 0;
+                    const successFeeAmount = parseInt(document.getElementById('successFeeAmountEdit')?.value) || 0;
+                    
+                    const data = {
+                        deposit_required: depositRequired ? 1 : 0,
+                        deposit_amount: depositAmount,
+                        success_fee_enabled: successFeeEnabled ? 1 : 0,
+                        success_fee_rate: successFeeType === 'percentage' ? successFeeRate : 0,
+                        success_fee_amount: successFeeType === 'fixed' ? successFeeAmount : 0
+                    };
+                    
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, data);
+                    showToast('報酬設定を保存しました', 'success');
+                    
+                    // ステータス表示を更新
+                    const statusSpan = document.getElementById('successFeeStatus');
+                    if (statusSpan) {
+                        if (successFeeEnabled) {
+                            statusSpan.textContent = successFeeType === 'percentage' ? successFeeRate + '%' : '¥' + successFeeAmount.toLocaleString();
+                        } else {
+                            statusSpan.textContent = '未設定';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error saving reward settings:', error);
+                    showToast('報酬設定の保存に失敗しました', 'error');
+                }
+            }
+            window.saveRewardSettings = saveRewardSettings;
+            
             // 請求書作成モーダルを開く
             let currentInvoiceType = 'deposit';
             
@@ -11501,15 +11712,43 @@ app.get('/case/:id', async (c) => {
                 const title = document.getElementById('invoiceModalTitle');
                 const itemNameInput = document.getElementById('invoiceItemName');
                 const withholdingSection = document.getElementById('withholdingSection');
+                const subtotalInput = document.getElementById('invoiceSubtotal');
+                const descriptionInput = document.getElementById('invoiceItemDescription');
                 
                 if (type === 'deposit') {
                     title.textContent = '手付金請求書を作成';
                     itemNameInput.value = '補助金申請サポート 着手金';
                     withholdingSection.classList.add('hidden');
+                    subtotalInput.value = '';
+                    descriptionInput.value = '';
                 } else {
                     title.textContent = '成功報酬請求書を作成';
                     itemNameInput.value = '補助金申請サポート 成功報酬';
                     withholdingSection.classList.remove('hidden');
+                    
+                    // 成功報酬の金額を自動計算
+                    if (SUCCESS_FEE_ENABLED) {
+                        if (SUCCESS_FEE_RATE > 0 && APPROVED_AMOUNT > 0) {
+                            // %ベースの場合: 採択額 × 報酬率
+                            const calculatedFee = Math.floor(APPROVED_AMOUNT * SUCCESS_FEE_RATE / 100);
+                            subtotalInput.value = calculatedFee;
+                            descriptionInput.value = '採択額 ¥' + APPROVED_AMOUNT.toLocaleString() + ' × ' + SUCCESS_FEE_RATE + '%';
+                        } else if (SUCCESS_FEE_AMOUNT > 0) {
+                            // 固定金額の場合
+                            subtotalInput.value = SUCCESS_FEE_AMOUNT;
+                            descriptionInput.value = '固定報酬';
+                        } else if (SUCCESS_FEE_RATE > 0 && APPROVED_AMOUNT === 0) {
+                            // %設定あるが採択額未入力
+                            subtotalInput.value = '';
+                            descriptionInput.value = '※採択額を入力すると自動計算（' + SUCCESS_FEE_RATE + '%）';
+                        } else {
+                            subtotalInput.value = '';
+                            descriptionInput.value = '';
+                        }
+                    } else {
+                        subtotalInput.value = '';
+                        descriptionInput.value = '';
+                    }
                 }
                 
                 const today = new Date();
@@ -11519,8 +11758,6 @@ app.get('/case/:id', async (c) => {
                 document.getElementById('invoiceIssueDate').value = today.toISOString().split('T')[0];
                 document.getElementById('invoiceDueDate').value = dueDate.toISOString().split('T')[0];
                 
-                document.getElementById('invoiceSubtotal').value = '';
-                document.getElementById('invoiceItemDescription').value = '';
                 document.getElementById('invoiceNotes').value = '';
                 document.getElementById('invoiceTaxRate').value = '10';
                 document.getElementById('invoiceWithholding').checked = false;
@@ -15924,13 +16161,14 @@ app.get('/admin/users', (c) => {
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ユーザー名</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">表示名</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">権限</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">登録日</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="usersList" class="divide-y divide-gray-200">
                                 <tr>
-                                    <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                                         <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                         <div>読み込み中...</div>
                                     </td>
@@ -15964,6 +16202,14 @@ app.get('/admin/users', (c) => {
                         <input type="text" name="name" required 
                                class="w-full px-3 py-2 border rounded-lg"
                                placeholder="山田太郎">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">権限 *</label>
+                        <select name="role" required class="w-full px-3 py-2 border rounded-lg">
+                            <option value="staff">スタッフ</option>
+                            <option value="admin">管理者</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">管理者は従業員管理、支払い管理、設定変更などが可能です</p>
                     </div>
                     <div class="flex gap-2 pt-4">
                         <button type="submit" 
@@ -16000,6 +16246,14 @@ app.get('/admin/users', (c) => {
                         <label class="block text-sm font-medium mb-1">表示名 *</label>
                         <input type="text" name="name" required 
                                class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">権限 *</label>
+                        <select name="role" id="editUserRole" required class="w-full px-3 py-2 border rounded-lg">
+                            <option value="staff">スタッフ</option>
+                            <option value="admin">管理者</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">管理者は従業員管理、支払い管理、設定変更などが可能です</p>
                     </div>
                     <div class="flex gap-2 pt-4">
                         <button type="submit" 
@@ -16062,6 +16316,7 @@ app.get('/admin/users', (c) => {
                 form.elements['username'].value = user.username;
                 form.elements['name'].value = user.name;
                 form.elements['password'].value = '';
+                document.getElementById('editUserRole').value = user.role || 'staff';
                 document.getElementById('editUserModal').classList.remove('hidden');
             }
 
@@ -16080,7 +16335,7 @@ app.get('/admin/users', (c) => {
                     if (users.length === 0) {
                         tbody.innerHTML = \`
                             <tr>
-                                <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                                <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                                     従業員が登録されていません
                                 </td>
                             </tr>
@@ -16088,7 +16343,14 @@ app.get('/admin/users', (c) => {
                         return;
                     }
                     
-                    tbody.innerHTML = users.map(user => \`
+                    const roleLabels = {
+                        admin: { label: '管理者', color: 'bg-red-100 text-red-700', icon: 'fa-user-shield' },
+                        staff: { label: 'スタッフ', color: 'bg-blue-100 text-blue-700', icon: 'fa-user' }
+                    };
+                    
+                    tbody.innerHTML = users.map(user => {
+                        const role = roleLabels[user.role] || roleLabels.staff;
+                        return \`
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 text-sm">\${user.id}</td>
                             <td class="px-6 py-4">
@@ -16096,7 +16358,13 @@ app.get('/admin/users', (c) => {
                                 \${user.id === 1 ? '<span class="text-xs text-green-600"><i class="fas fa-shield-alt mr-1"></i>メイン管理者</span>' : ''}
                             </td>
                             <td class="px-6 py-4">\${user.name}</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium \${role.color}">
+                                    <i class="fas \${role.icon}"></i>
+                                    \${role.label}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500 hidden sm:table-cell">
                                 \${new Date(user.created_at).toLocaleDateString('ja-JP')}
                             </td>
                             <td class="px-6 py-4">
@@ -16114,7 +16382,7 @@ app.get('/admin/users', (c) => {
                                 </div>
                             </td>
                         </tr>
-                    \`).join('');
+                    \`}).join('');
                 } catch (error) {
                     console.error('Failed to load users:', error);
                     showToast('従業員一覧の読み込みに失敗しました', 'error');
@@ -25305,6 +25573,9 @@ app.put('/api/payments/:paymentId/confirm', async (c) => {
   // 請求書からの支払いの場合
   if (source === 'invoices') {
     try {
+      // 請求書情報を取得
+      const invoice = await DB.prepare(`SELECT case_id, invoice_type FROM invoices WHERE id = ?`).bind(paymentId).first() as any
+      
       await DB.prepare(`
         UPDATE invoices 
         SET status = 'paid', 
@@ -25314,6 +25585,17 @@ app.put('/api/payments/:paymentId/confirm', async (c) => {
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).bind(user.id, paymentId).run()
+      
+      // 手付金請求書の場合、案件のdeposit_paidも更新
+      if (invoice && invoice.case_id && invoice.invoice_type === 'deposit') {
+        await DB.prepare(`
+          UPDATE cases SET 
+            deposit_paid = 1, 
+            deposit_paid_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP 
+          WHERE id = ?
+        `).bind(invoice.case_id).run()
+      }
       
       return c.json({ success: true, message: '請求書の入金を確認しました' })
     } catch (error: any) {
@@ -25782,6 +26064,14 @@ app.get('/admin/subscription', async (c) => {
             if (!token) {
                 window.location.href = '/login';
             }
+            
+            // 管理者権限チェック
+            const adminRole = localStorage.getItem('admin_role');
+            if (adminRole !== 'admin') {
+                alert('この機能は管理者のみ利用可能です');
+                window.location.href = '/';
+            }
+            
             axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_username') + ':' + localStorage.getItem('admin_role');
             
             let currentSubscription = null;
@@ -27030,11 +27320,14 @@ app.get('/cases', async (c) => {
       SELECT 
         cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
         cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
+        cs.success_fee_enabled, cs.success_fee_rate, cs.success_fee_amount,
         cs.is_archived, cs.result, cs.approved_amount, cs.result_date,
         cs.assigned_to,
         cl.id as client_id, cl.name as client_name, cl.company_name,
         st.name as subsidy_type_name, st.category as subsidy_category,
-        au.name as assigned_to_name
+        au.name as assigned_to_name,
+        (SELECT COUNT(*) FROM invoices WHERE invoices.case_id = cs.id AND invoices.invoice_type = 'success_fee') as success_fee_invoice_count,
+        (SELECT status FROM invoices WHERE invoices.case_id = cs.id AND invoices.invoice_type = 'success_fee' ORDER BY created_at DESC LIMIT 1) as success_fee_invoice_status
       FROM cases cs
       LEFT JOIN clients cl ON cs.client_id = cl.id
       LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
@@ -27049,11 +27342,14 @@ app.get('/cases', async (c) => {
         SELECT 
           cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
           cs.deposit_required, cs.deposit_amount, cs.deposit_paid,
+          cs.success_fee_enabled, cs.success_fee_rate, cs.success_fee_amount,
           cs.is_archived, cs.result, cs.approved_amount, cs.result_date,
           cs.assigned_to,
           cl.id as client_id, cl.name as client_name, cl.company_name,
           st.name as subsidy_type_name, st.category as subsidy_category,
-          au.name as assigned_to_name
+          au.name as assigned_to_name,
+          (SELECT COUNT(*) FROM invoices WHERE invoices.case_id = cs.id AND invoices.invoice_type = 'success_fee') as success_fee_invoice_count,
+          (SELECT status FROM invoices WHERE invoices.case_id = cs.id AND invoices.invoice_type = 'success_fee' ORDER BY created_at DESC LIMIT 1) as success_fee_invoice_status
         FROM cases cs
         LEFT JOIN clients cl ON cs.client_id = cl.id
         LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
@@ -27187,7 +27483,8 @@ app.get('/cases', async (c) => {
               <div class="flex items-center gap-2 text-xs text-gray-500 mt-2">
                 ${c.assigned_to_name ? '<span><i class="fas fa-user mr-1"></i>' + c.assigned_to_name + '</span>' : ''}
               </div>
-              ${c.deposit_required ? '<div class="mt-2 text-xs ' + (c.deposit_paid ? 'text-green-600' : 'text-yellow-600') + '"><i class="fas fa-yen-sign mr-1"></i>¥' + (c.deposit_amount || 0).toLocaleString() + (c.deposit_paid ? '<span class="ml-1">✓支払済</span>' : '<span class="ml-1">未払</span>') + '</div>' : ''}
+              ${c.deposit_required ? '<div class="mt-2 text-xs ' + (c.deposit_paid ? 'text-green-600' : 'text-yellow-600') + '"><i class="fas fa-hand-holding-usd mr-1"></i>¥' + (c.deposit_amount || 0).toLocaleString() + (c.deposit_paid ? '<span class="ml-1">✓支払済</span>' : '<span class="ml-1">未払</span>') + '</div>' : ''}
+              ${c.success_fee_enabled ? '<div class="mt-1 text-xs ' + (c.success_fee_invoice_status === 'paid' ? 'text-green-600' : (c.success_fee_invoice_status === 'payment_reported' ? 'text-purple-600' : (c.success_fee_invoice_count > 0 ? 'text-blue-600' : 'text-gray-400'))) + '"><i class="fas fa-trophy mr-1"></i>' + (c.success_fee_rate ? c.success_fee_rate + '%' : '¥' + (c.success_fee_amount || 0).toLocaleString()) + '<span class="ml-1">' + (c.success_fee_invoice_status === 'paid' ? '✓支払済' : (c.success_fee_invoice_status === 'payment_reported' ? '確認中' : (c.success_fee_invoice_count > 0 ? '請求中' : '未発行'))) + '</span></div>' : ''}
             </div>
           </a>
         `}).join('')
@@ -27945,6 +28242,11 @@ app.post('/api/subscription/purchase-slots', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   
+  // 管理者権限チェック
+  if (!user || user.role !== 'admin') {
+    return c.json({ error: 'この操作は管理者のみ実行できます' }, 403)
+  }
+  
   // organization_idでテナント分離
   const orgId = user?.organization_id || 1
   const { package_id } = await c.req.json()
@@ -28010,6 +28312,11 @@ app.post('/api/subscription/change-plan', async (c) => {
   const { plan_id } = await c.req.json()
   const user = await getCurrentUser(c)
   
+  // 管理者権限チェック
+  if (!user || user.role !== 'admin') {
+    return c.json({ error: 'この操作は管理者のみ実行できます' }, 403)
+  }
+  
   // organization_idでテナント分離
   const orgId = user?.organization_id || 1
   
@@ -28065,6 +28372,11 @@ app.post('/api/subscription/cancel-scheduled-plan', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   
+  // 管理者権限チェック
+  if (!user || user.role !== 'admin') {
+    return c.json({ error: 'この操作は管理者のみ実行できます' }, 403)
+  }
+  
   // organization_idでテナント分離
   const orgId = user?.organization_id || 1
   
@@ -28084,6 +28396,11 @@ app.post('/api/subscription/add-dual-scope', async (c) => {
   
   if (!user) {
     return c.json({ error: '認証が必要です' }, 401)
+  }
+  
+  // 管理者権限チェック
+  if (user.role !== 'admin') {
+    return c.json({ error: 'この操作は管理者のみ実行できます' }, 403)
   }
   
   const orgId = user.organization_id
@@ -33142,6 +33459,20 @@ app.put('/api/invoices/:id/status', async (c) => {
     WHERE id = ?
   `).bind(status, paidAt, id).run()
   
+  // 入金確認時は関連する案件のdeposit_paidも更新
+  if (status === 'paid') {
+    const invoice = await DB.prepare(`SELECT case_id, invoice_type FROM invoices WHERE id = ?`).bind(id).first() as any
+    if (invoice && invoice.case_id && invoice.invoice_type === 'deposit') {
+      await DB.prepare(`
+        UPDATE cases SET 
+          deposit_paid = 1, 
+          deposit_paid_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `).bind(invoice.case_id).run()
+    }
+  }
+  
   return c.json({ success: true, message: 'ステータスを更新しました' })
 })
 
@@ -33192,6 +33523,9 @@ app.post('/api/invoices/:id/confirm-payment', async (c) => {
   const user = await getCurrentUser(c)
   const data = await c.req.json()
   
+  // 請求書情報を取得
+  const invoice = await DB.prepare(`SELECT case_id, invoice_type FROM invoices WHERE id = ?`).bind(id).first() as any
+  
   await DB.prepare(`
     UPDATE invoices SET 
       status = 'paid',
@@ -33206,6 +33540,17 @@ app.post('/api/invoices/:id/confirm-payment', async (c) => {
     user?.id || null,
     id
   ).run()
+  
+  // 手付金請求書の場合、案件のdeposit_paidも更新
+  if (invoice && invoice.case_id && invoice.invoice_type === 'deposit') {
+    await DB.prepare(`
+      UPDATE cases SET 
+        deposit_paid = 1, 
+        deposit_paid_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `).bind(invoice.case_id).run()
+  }
   
   return c.json({ success: true, message: '入金を確認しました' })
 })
