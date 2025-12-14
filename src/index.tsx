@@ -26002,16 +26002,21 @@ app.post('/api/stripe/webhook', async (c) => {
 const STRIPE_PRICES = {
   // プラン別Price ID
   plans: {
-    basic: 'price_1SeEBHHHmXlTI7JBiVZaGYlm',      // ¥9,800/月
-    standard: 'price_1SeEB5HHmXlTI7JBwVh3jzxM',   // ¥29,800/月
-    pro: 'price_1SeEB5HHmXlTI7JBo8po52Oq',        // ¥79,800/月
-    unlimited: 'price_1SeEB6HHmXlTI7JBEAUQexOk'   // ¥149,800/月
+    basic: 'price_1SeEJaHHmXlTI7JB3BgmuFge',      // ¥3,000/月 - 月1枠
+    standard: 'price_1SeEJbHHmXlTI7JBZh4Y0JLo',   // ¥5,000/月 - 月3枠
+    premium: 'price_1SeEJcHHmXlTI7JBkFdHea9D',    // ¥10,000/月 - 月10枠
+    business: 'price_1SeEJcHHmXlTI7JBxRPXqMqa',   // ¥30,000/月 - 月30枠
+    enterprise: 'price_1SeEJdHHmXlTI7JBCuGRjpBk'  // ¥100,000/月 - 月100枠
   },
   // 追加枠Price ID
   slots: {
-    slot_1: { price_id: 'price_1SeEB6HHmXlTI7JB3Od9uMPN', slots: 1, amount: 3000 },    // ¥3,000
-    slot_5: { price_id: 'price_1SeEB6HHmXlTI7JB1h1gOsxP', slots: 5, amount: 12000 },   // ¥12,000
-    slot_10: { price_id: 'price_1SeEB7HHmXlTI7JBAE2KGvr9', slots: 10, amount: 20000 }  // ¥20,000
+    slot_1: { price_id: 'price_1SeEJdHHmXlTI7JBhAQuNtYY', slots: 1, amount: 1500 },    // ¥1,500/枠
+    slot_3: { price_id: 'price_1SeEJdHHmXlTI7JBLidNMEmf', slots: 3, amount: 3000 },    // ¥3,000/3枠 (¥1,000/枠)
+    slot_10: { price_id: 'price_1SeEJeHHmXlTI7JBzWIBapUn', slots: 10, amount: 9000 }   // ¥9,000/10枠 (¥900/枠)
+  },
+  // 管轄オプション
+  addons: {
+    dual_scope: 'price_1SeEJeHHmXlTI7JBONrn5ImQ'  // ¥2,000/月 - 両方管轄オプション
   }
 }
 
@@ -27066,8 +27071,8 @@ app.get('/admin/subscription', async (c) => {
             
             // Stripe決済でプラン変更
             async function changePlan(planId) {
-                // プランコードを取得
-                const planCodeMap = { 1: 'basic', 2: 'standard', 3: 'pro', 4: 'unlimited' };
+                // プランコードを取得（DBのplan_codeと一致させる）
+                const planCodeMap = { 1: 'basic', 2: 'standard', 3: 'premium', 4: 'business', 5: 'enterprise' };
                 const planCode = planCodeMap[planId];
                 
                 if (!planCode) {
@@ -27113,8 +27118,8 @@ app.get('/admin/subscription', async (c) => {
             
             // Stripe決済で追加枠購入
             async function purchaseSlots(packageId, name, price) {
-                // パッケージIDをSlot パッケージ名に変換
-                const slotPackageMap = { 1: 'slot_1', 2: 'slot_5', 3: 'slot_10' };
+                // パッケージIDをSlot パッケージ名に変換（DBのslot_packagesと一致）
+                const slotPackageMap = { 1: 'slot_1', 2: 'slot_3', 3: 'slot_10' };
                 const slotPackage = slotPackageMap[packageId];
                 
                 if (!slotPackage) {
