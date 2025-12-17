@@ -12018,8 +12018,8 @@ app.get('/case/:id', async (c) => {
                     const existing = document.getElementById('invoiceDetailModal');
                     if (existing) existing.remove();
                     
-                    // インボイス番号（適格請求書番号）- 設定から取得するか、デフォルト値
-                    const invoiceRegistrationNumber = inv.registration_number || 'T1234567890123';
+                    // インボイス番号（適格請求書番号）- APIレスポンスから取得
+                    const invoiceRegistrationNumber = inv.invoice_registration_number || '';
                     
                     const modal = document.createElement('div');
                     modal.id = 'invoiceDetailModal';
@@ -12119,12 +12119,14 @@ app.get('/case/:id', async (c) => {
                                 </div>
                                 
                                 <!-- インボイス番号（適格請求書発行事業者登録番号） -->
+                                \${invoiceRegistrationNumber ? \`
                                 <div class="bg-gray-100 border rounded-lg p-3 text-sm">
                                     <div class="text-xs text-gray-500 mb-1">
                                         <i class="fas fa-certificate mr-1"></i>適格請求書発行事業者登録番号
                                     </div>
                                     <div class="font-mono font-bold text-gray-700">\${invoiceRegistrationNumber}</div>
                                 </div>
+                                \` : ''}
                             </div>
                             
                             <!-- フッター -->
@@ -27545,6 +27547,15 @@ app.get('/admin/settings', async (c) => {
                             <input type="text" id="company_registration" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 行政書士登録番号: 第00000号">
                         </div>
                     </div>
+                    
+                    <!-- インボイス登録番号 -->
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-file-invoice text-yellow-600 mr-1"></i>適格請求書発行事業者登録番号（インボイス番号）
+                        </label>
+                        <input type="text" id="invoice_registration_number" class="w-full px-3 py-2 border rounded-lg" placeholder="例: T1234567890123">
+                        <p class="text-xs text-gray-500 mt-1">請求書に記載される登録番号です。「T」から始まる13桁の番号を入力してください。</p>
+                    </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
                         <input type="email" id="company_email" class="w-full px-3 py-2 border rounded-lg" placeholder="例: info@example.com">
@@ -27694,6 +27705,7 @@ app.get('/admin/settings', async (c) => {
                     setValue('company_email', getSettingValue(settings, 'company_email'));
                     setValue('company_representative', getSettingValue(settings, 'company_representative'));
                     setValue('company_registration', getSettingValue(settings, 'company_registration'));
+                    setValue('invoice_registration_number', getSettingValue(settings, 'invoice_registration_number'));
                     
                     // 法務設定
                     setValue('company_website_url', getSettingValue(settings, 'company_website_url'));
@@ -27744,6 +27756,7 @@ app.get('/admin/settings', async (c) => {
                         company_email: getValue('company_email'),
                         company_representative: getValue('company_representative'),
                         company_registration: getValue('company_registration'),
+                        invoice_registration_number: getValue('invoice_registration_number'),
                         // 法務設定 - 外部URL
                         company_website_url: getValue('company_website_url'),
                         privacy_policy_url: getValue('privacy_policy_url'),
@@ -34608,11 +34621,11 @@ app.get('/api/invoices/:id', async (c) => {
     return c.json({ error: '請求書が見つかりません' }, 404)
   }
   
-  // site_settingsから銀行情報・会社情報を取得して補完
+  // site_settingsから銀行情報・会社情報・インボイス番号を取得して補完
   try {
     const settings = await DB.prepare(`
       SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name', 'company_address', 'company_phone', 'company_email', 'company_representative')
+      WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name', 'company_address', 'company_phone', 'company_email', 'company_representative', 'invoice_registration_number')
     `).all()
     
     const settingsMap: Record<string, string> = {}
@@ -34631,6 +34644,7 @@ app.get('/api/invoices/:id', async (c) => {
     invoice.org_phone = invoice.org_phone || settingsMap.company_phone || null
     invoice.org_email = invoice.org_email || settingsMap.company_email || null
     invoice.org_representative = invoice.org_representative || settingsMap.company_representative || null
+    invoice.invoice_registration_number = settingsMap.invoice_registration_number || null
   } catch (e) {
     // site_settingsがない場合は無視
     console.error('Error fetching site_settings:', e)
@@ -34978,11 +34992,11 @@ app.get('/api/invoices/:id/pdf', async (c) => {
   
   const inv = invoice as any
   
-  // site_settingsから銀行情報・会社情報を補完
+  // site_settingsから銀行情報・会社情報・インボイス番号を補完
   try {
     const settings = await DB.prepare(`
       SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name', 'company_address', 'company_phone', 'company_email', 'company_representative')
+      WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name', 'company_address', 'company_phone', 'company_email', 'company_representative', 'invoice_registration_number')
     `).all()
     
     const settingsMap: Record<string, string> = {}
@@ -35000,6 +35014,7 @@ app.get('/api/invoices/:id/pdf', async (c) => {
     inv.org_phone = inv.org_phone || settingsMap.company_phone || null
     inv.org_email = inv.org_email || settingsMap.company_email || null
     inv.org_representative = inv.org_representative || settingsMap.company_representative || null
+    inv.invoice_registration_number = settingsMap.invoice_registration_number || null
   } catch (e) {
     console.error('Error fetching site_settings for PDF:', e)
   }
@@ -35231,6 +35246,17 @@ app.get('/api/invoices/:id/pdf', async (c) => {
                 </tr>
             </table>
         </div>
+        
+        ${inv.invoice_registration_number ? `
+        <div style="margin: 20px 0; padding: 15px; background: #f0f9ff; border: 1px solid #0284c7; border-radius: 5px;">
+            <div style="font-size: 11px; color: #0369a1; margin-bottom: 5px;">
+                📋 適格請求書発行事業者登録番号
+            </div>
+            <div style="font-size: 14px; font-weight: bold; font-family: monospace; color: #0c4a6e;">
+                ${inv.invoice_registration_number}
+            </div>
+        </div>
+        ` : ''}
         
         <div style="margin: 20px 0; padding: 10px; background: #fff3cd; border-radius: 5px;">
             <strong>📅 お支払期限: ${formatDate(inv.due_date)}</strong>
