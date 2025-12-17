@@ -12111,10 +12111,10 @@ app.get('/case/:id', async (c) => {
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-sm text-blue-700">
                                         <div>金融機関:</div><div>\${inv.bank_name || '-'}</div>
-                                        <div>支店:</div><div>\${inv.branch_name || '-'}</div>
-                                        <div>口座種別:</div><div>\${inv.account_type || '普通'}</div>
-                                        <div>口座番号:</div><div>\${inv.account_number || '-'}</div>
-                                        <div>口座名義:</div><div>\${inv.account_holder || '-'}</div>
+                                        <div>支店:</div><div>\${inv.bank_branch || '-'}</div>
+                                        <div>口座種別:</div><div>\${inv.bank_account_type || '普通'}</div>
+                                        <div>口座番号:</div><div>\${inv.bank_account_number || '-'}</div>
+                                        <div>口座名義:</div><div>\${inv.bank_account_holder || '-'}</div>
                                     </div>
                                 </div>
                                 
@@ -34592,32 +34592,32 @@ app.get('/api/invoices/:id', async (c) => {
     return c.json({ error: '請求書が見つかりません' }, 404)
   }
   
-  // organizationsテーブルに銀行情報がない場合、site_settingsから取得
-  if (!invoice.bank_name) {
-    try {
-      const settings = await DB.prepare(`
-        SELECT setting_key, setting_value FROM site_settings 
-        WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name', 'company_address', 'company_phone', 'company_email', 'representative_name')
-      `).all()
-      
-      const settingsMap: Record<string, string> = {}
-      for (const s of (settings.results || [])) {
-        settingsMap[(s as any).setting_key] = (s as any).setting_value
-      }
-      
-      invoice.bank_name = settingsMap.bank_name || invoice.bank_name
-      invoice.bank_branch = settingsMap.bank_branch || invoice.bank_branch
-      invoice.bank_account_type = settingsMap.bank_account_type || invoice.bank_account_type
-      invoice.bank_account_number = settingsMap.bank_account_number || invoice.bank_account_number
-      invoice.bank_account_holder = settingsMap.bank_account_holder || invoice.bank_account_holder
-      invoice.org_name = invoice.org_name || settingsMap.company_name
-      invoice.org_address = invoice.org_address || settingsMap.company_address
-      invoice.org_phone = invoice.org_phone || settingsMap.company_phone
-      invoice.org_email = invoice.org_email || settingsMap.company_email
-      invoice.org_representative = invoice.org_representative || settingsMap.representative_name
-    } catch (e) {
-      // site_settingsがない場合は無視
+  // site_settingsから銀行情報・会社情報を取得して補完
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name', 'company_address', 'company_phone', 'company_email', 'company_representative')
+    `).all()
+    
+    const settingsMap: Record<string, string> = {}
+    for (const s of (settings.results || [])) {
+      settingsMap[(s as any).setting_key] = (s as any).setting_value
     }
+    
+    // organizationsの値がない場合はsite_settingsから補完
+    invoice.bank_name = invoice.bank_name || settingsMap.bank_name || null
+    invoice.bank_branch = invoice.bank_branch || settingsMap.bank_branch || null
+    invoice.bank_account_type = invoice.bank_account_type || settingsMap.bank_account_type || null
+    invoice.bank_account_number = invoice.bank_account_number || settingsMap.bank_account_number || null
+    invoice.bank_account_holder = invoice.bank_account_holder || settingsMap.bank_account_holder || null
+    invoice.org_name = invoice.org_name || settingsMap.company_name || null
+    invoice.org_address = invoice.org_address || settingsMap.company_address || null
+    invoice.org_phone = invoice.org_phone || settingsMap.company_phone || null
+    invoice.org_email = invoice.org_email || settingsMap.company_email || null
+    invoice.org_representative = invoice.org_representative || settingsMap.company_representative || null
+  } catch (e) {
+    // site_settingsがない場合は無視
+    console.error('Error fetching site_settings:', e)
   }
   
   return c.json(invoice)
