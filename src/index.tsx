@@ -25745,9 +25745,10 @@ app.get('/terms', async (c) => {
 app.get('/api/bank-info', async (c) => {
   const { DB } = c.env
   
+  // site_settingsテーブルから取得
   const settings = await DB.prepare(`
     SELECT setting_key, setting_value
-    FROM system_settings
+    FROM site_settings
     WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name')
   `).all()
   
@@ -34585,10 +34586,38 @@ app.get('/api/invoices/:id', async (c) => {
     LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
     LEFT JOIN organizations o ON i.organization_id = o.id
     WHERE i.id = ?
-  `).bind(id).first()
+  `).bind(id).first() as any
   
   if (!invoice) {
     return c.json({ error: '請求書が見つかりません' }, 404)
+  }
+  
+  // organizationsテーブルに銀行情報がない場合、site_settingsから取得
+  if (!invoice.bank_name) {
+    try {
+      const settings = await DB.prepare(`
+        SELECT setting_key, setting_value FROM site_settings 
+        WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name', 'company_address', 'company_phone', 'company_email', 'representative_name')
+      `).all()
+      
+      const settingsMap: Record<string, string> = {}
+      for (const s of (settings.results || [])) {
+        settingsMap[(s as any).setting_key] = (s as any).setting_value
+      }
+      
+      invoice.bank_name = settingsMap.bank_name || invoice.bank_name
+      invoice.bank_branch = settingsMap.bank_branch || invoice.bank_branch
+      invoice.bank_account_type = settingsMap.bank_account_type || invoice.bank_account_type
+      invoice.bank_account_number = settingsMap.bank_account_number || invoice.bank_account_number
+      invoice.bank_account_holder = settingsMap.bank_account_holder || invoice.bank_account_holder
+      invoice.org_name = invoice.org_name || settingsMap.company_name
+      invoice.org_address = invoice.org_address || settingsMap.company_address
+      invoice.org_phone = invoice.org_phone || settingsMap.company_phone
+      invoice.org_email = invoice.org_email || settingsMap.company_email
+      invoice.org_representative = invoice.org_representative || settingsMap.representative_name
+    } catch (e) {
+      // site_settingsがない場合は無視
+    }
   }
   
   return c.json(invoice)
