@@ -13966,6 +13966,10 @@ app.get('/portal/:token', async (c) => {
                             </div>
                             
                             <div class="p-6 border-t bg-gray-50 flex gap-3">
+                                <button onclick="downloadPortalInvoicePdf(\${inv.id})" 
+                                        class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium">
+                                    <i class="fas fa-file-pdf mr-2"></i>PDFダウンロード
+                                </button>
                                 <button onclick="document.getElementById('invoiceDetailModal').remove()" 
                                         class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300">
                                     閉じる
@@ -13979,6 +13983,18 @@ app.get('/portal/:token', async (c) => {
                 }
             }
             window.showInvoiceDetailModal = showInvoiceDetailModal;
+            
+            // 請求書PDFダウンロード（顧客ポータル用）
+            async function downloadPortalInvoicePdf(invoiceId) {
+                try {
+                    // 新しいウィンドウでPDFページを開く（印刷用）
+                    window.open(\`/api/invoices/\${invoiceId}/pdf\`, '_blank');
+                } catch (error) {
+                    console.error('Error downloading PDF:', error);
+                    alert('PDFのダウンロードに失敗しました');
+                }
+            }
+            window.downloadPortalInvoicePdf = downloadPortalInvoicePdf;
             
             // 振込先情報を取得
             async function getBankInfo() {
@@ -34961,6 +34977,33 @@ app.get('/api/invoices/:id/pdf', async (c) => {
   }
   
   const inv = invoice as any
+  
+  // site_settingsから銀行情報・会社情報を補完
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key IN ('bank_name', 'bank_branch', 'bank_account_type', 'bank_account_number', 'bank_account_holder', 'company_name', 'company_address', 'company_phone', 'company_email', 'company_representative')
+    `).all()
+    
+    const settingsMap: Record<string, string> = {}
+    for (const s of (settings.results || [])) {
+      settingsMap[(s as any).setting_key] = (s as any).setting_value
+    }
+    
+    inv.bank_name = inv.bank_name || settingsMap.bank_name || null
+    inv.bank_branch = inv.bank_branch || settingsMap.bank_branch || null
+    inv.bank_account_type = inv.bank_account_type || settingsMap.bank_account_type || null
+    inv.bank_account_number = inv.bank_account_number || settingsMap.bank_account_number || null
+    inv.bank_account_holder = inv.bank_account_holder || settingsMap.bank_account_holder || null
+    inv.org_name = inv.org_name || settingsMap.company_name || null
+    inv.org_address = inv.org_address || settingsMap.company_address || null
+    inv.org_phone = inv.org_phone || settingsMap.company_phone || null
+    inv.org_email = inv.org_email || settingsMap.company_email || null
+    inv.org_representative = inv.org_representative || settingsMap.company_representative || null
+  } catch (e) {
+    console.error('Error fetching site_settings for PDF:', e)
+  }
+  
   const invoiceTypeLabel = inv.invoice_type === 'deposit' ? '着手金' : '成功報酬'
   
   // 日付フォーマット
