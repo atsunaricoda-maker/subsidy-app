@@ -5281,13 +5281,24 @@ app.delete('/api/cases/:id', async (c) => {
 // 案件の書類一覧取得
 app.get('/api/cases/:id/documents', async (c) => {
   const { DB } = c.env
-  const id = c.req.param('id')
+  const caseId = c.req.param('id')
   
+  // 案件情報を取得してclient_idを得る
+  const caseData = await DB.prepare(`SELECT client_id FROM cases WHERE id = ?`).bind(caseId).first()
+  
+  if (!caseData) {
+    return c.json([])
+  }
+  
+  // case_id が一致する書類、または case_id が NULL で client_id が一致する書類を取得
   const result = await DB.prepare(`
-    SELECT * FROM documents WHERE case_id = ? ORDER BY uploaded_at DESC
-  `).bind(id).all()
+    SELECT * FROM documents 
+    WHERE case_id = ? 
+       OR (case_id IS NULL AND client_id = ?)
+    ORDER BY uploaded_at DESC
+  `).bind(caseId, caseData.client_id).all()
   
-  return c.json(result.results)
+  return c.json(result.results || [])
 })
 
 // 案件のパイプライン取得
@@ -5675,6 +5686,7 @@ app.post('/api/clients/:id/documents/upload', async (c) => {
     const file = formData.get('file') as File
     const documentType = formData.get('document_type') as string
     const uploadedBy = formData.get('uploaded_by') as string
+    const caseId = formData.get('case_id') as string
     
     if (!file) {
       return c.json({ error: 'No file provided' }, 400)
@@ -5695,12 +5707,13 @@ app.post('/api/clients/:id/documents/upload', async (c) => {
       }
     })
     
-    // メタデータをD1に保存
+    // メタデータをD1に保存（case_id を含める）
     const result = await DB.prepare(`
-      INSERT INTO documents (client_id, document_type, file_name, file_path, file_size, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO documents (client_id, case_id, document_type, file_name, file_path, file_size, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
+      caseId || null,
       documentType,
       file.name,
       filePath,
@@ -5809,17 +5822,31 @@ app.get('/api/cases/:id/documents/download-all', async (c) => {
   
   for (const doc of allDocs) {
     const filePath = doc.file_path
-    const object = await R2.get(filePath)
-    
-    if (object) {
-      const arrayBuffer = await object.arrayBuffer()
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    try {
+      const object = await R2.get(filePath)
       
-      fileList.push({
-        name: doc.isCommon ? `共通書類/${doc.type_name || 'その他'}/${doc.file_name}` : `案件書類/${doc.document_type || 'その他'}/${doc.file_name}`,
-        data: base64,
-        contentType: object.httpMetadata?.contentType || 'application/octet-stream'
-      })
+      if (object) {
+        const arrayBuffer = await object.arrayBuffer()
+        const uint8Array = new Uint8Array(arrayBuffer)
+        
+        // 大きなファイルでもスタックオーバーフローを避けるためチャンクで処理
+        let base64 = ''
+        const chunkSize = 8192
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+          const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+          base64 += String.fromCharCode.apply(null, chunk as any)
+        }
+        base64 = btoa(base64)
+        
+        fileList.push({
+          name: doc.isCommon ? `共通書類/${doc.type_name || 'その他'}/${doc.file_name}` : `案件書類/${doc.document_type || 'その他'}/${doc.file_name}`,
+          data: base64,
+          contentType: object.httpMetadata?.contentType || 'application/octet-stream'
+        })
+      }
+    } catch (error) {
+      console.error(`Error processing file ${doc.file_name}:`, error)
+      // エラーが発生したファイルはスキップして続行
     }
   }
   
@@ -14994,6 +15021,7 @@ app.get('/portal/:token', async (c) => {
                         formData.append('file', file);
                         formData.append('document_type', documentType);
                         formData.append('uploaded_by', 'client');
+                        formData.append('case_id', CASE_ID);
                         
                         const response = await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
                             headers: {
@@ -15073,6 +15101,7 @@ app.get('/portal/:token', async (c) => {
                         formData.append('file', file);
                         formData.append('document_type', documentType);
                         formData.append('uploaded_by', 'client');
+                        formData.append('case_id', CASE_ID);
                         
                         const response = await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
                             headers: {
