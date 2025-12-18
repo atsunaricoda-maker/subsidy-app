@@ -13524,47 +13524,82 @@ app.get('/portal/:token', async (c) => {
                 setTimeout(() => toast.remove(), 3000);
             }
             
-            // サービス進捗状況を読み込む（横型バー表示・要件15）
+            // サービス進捗状況を読み込む（案件ごとに表示・横型バー表示・要件15）
             async function loadServiceProgress() {
                 try {
-                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/pipelines\`);
-                    const pipelines = response.data;
+                    // 案件一覧を取得
+                    const casesResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/cases\`);
+                    const cases = casesResponse.data || [];
+                    
+                    // パイプライン一覧を取得
+                    const pipelinesResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/pipelines\`);
+                    const allPipelines = pipelinesResponse.data || [];
                     
                     const section = document.getElementById('serviceProgressSection');
                     const listContainer = document.getElementById('serviceProgressList');
                     
-                    if (pipelines.length === 0) {
+                    if (allPipelines.length === 0) {
                         section.classList.add('hidden');
                         return;
                     }
                     
                     section.classList.remove('hidden');
                     
-                    // 各パイプラインのサービス進捗を表示
+                    // 案件ごとのパイプラインをグループ化
+                    const caseProgressMap = new Map();
+                    
+                    // 案件IDごとにパイプラインを整理
+                    for (const pipeline of allPipelines) {
+                        const caseId = pipeline.case_id;
+                        if (!caseProgressMap.has(caseId)) {
+                            const caseData = cases.find(c => c.id === caseId) || { id: caseId, subsidy_type_name: '案件' };
+                            caseProgressMap.set(caseId, {
+                                caseData,
+                                pipelines: []
+                            });
+                        }
+                        caseProgressMap.get(caseId).pipelines.push(pipeline);
+                    }
+                    
+                    // 各案件のサービス進捗を表示
                     let html = '';
                     
-                    for (const pipeline of pipelines) {
+                    for (const [caseId, caseInfo] of caseProgressMap) {
+                        const { caseData, pipelines } = caseInfo;
+                        const activePipeline = pipelines.find(p => p.status === 'active') || pipelines[0];
+                        
+                        if (!activePipeline) continue;
+                        
                         // タスク一覧を取得
-                        const tasksResponse = await axios.get(\`/api/pipelines/\${pipeline.id}/tasks\`);
-                        const tasks = tasksResponse.data;
+                        const tasksResponse = await axios.get(\`/api/pipelines/\${activePipeline.id}/tasks\`);
+                        const tasks = tasksResponse.data || [];
                         
                         if (tasks.length === 0) continue;
                         
-                        // サービス名（パイプライン名 or 補助金名）
-                        const serviceName = pipeline.subsidy_name || pipeline.template_name || 'サービス';
-                        const expectedDate = pipeline.expected_completion_date 
-                            ? new Date(pipeline.expected_completion_date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
+                        // 案件名（補助金名）
+                        const caseName = caseData.subsidy_type_name || activePipeline.subsidy_name || activePipeline.template_name || '案件';
+                        const caseNumber = caseData.case_number || '';
+                        const progress = activePipeline.progress_percentage || 0;
+                        const expectedDate = activePipeline.expected_completion_date 
+                            ? new Date(activePipeline.expected_completion_date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
                             : '';
+                        const isCurrentCase = caseId === CASE_ID;
                         
                         html += \`
-                            <div class="border rounded-lg p-4">
+                            <div class="border rounded-lg p-4 \${isCurrentCase ? 'bg-green-50 border-green-300' : 'bg-white'}">
                                 <div class="flex items-center justify-between mb-3">
                                     <div>
-                                        <h3 class="font-bold text-gray-800">\${serviceName}</h3>
-                                        \${expectedDate ? \`<p class="text-xs text-gray-500">予定日: \${expectedDate}</p>\` : ''}
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="font-bold \${isCurrentCase ? 'text-green-800' : 'text-gray-800'}">\${caseName}</h3>
+                                            \${isCurrentCase ? '<span class="text-xs px-1.5 py-0.5 bg-green-600 text-white rounded">現在表示中</span>' : ''}
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-0.5">
+                                            \${caseNumber ? \`案件番号: \${caseNumber}\` : ''}
+                                            \${expectedDate ? \` | 予定日: \${expectedDate}\` : ''}
+                                        </div>
                                     </div>
-                                    <span class="text-sm font-bold \${pipeline.progress_percentage >= 100 ? 'text-green-600' : 'text-blue-600'}">
-                                        \${pipeline.progress_percentage || 0}%
+                                    <span class="text-sm font-bold \${progress >= 100 ? 'text-green-600' : 'text-blue-600'}">
+                                        \${progress}%
                                     </span>
                                 </div>
                                 
@@ -13573,14 +13608,13 @@ app.get('/portal/:token', async (c) => {
                                     <!-- 背景バー -->
                                     <div class="absolute top-4 left-0 right-0 h-1 bg-gray-200 rounded"></div>
                                     <!-- 進捗バー -->
-                                    <div class="absolute top-4 left-0 h-1 bg-orange-500 rounded transition-all" style="width: \${pipeline.progress_percentage || 0}%"></div>
+                                    <div class="absolute top-4 left-0 h-1 bg-orange-500 rounded transition-all" style="width: \${progress}%"></div>
                                     
                                     <!-- ステップポイント -->
                                     <div class="relative flex justify-between">
                                         \${tasks.map((task, index) => {
                                             const isCompleted = task.status === 'completed';
                                             const isInProgress = task.status === 'in_progress';
-                                            const posPercent = tasks.length > 1 ? (index / (tasks.length - 1)) * 100 : 50;
                                             
                                             return \`
                                                 <div class="flex flex-col items-center" style="width: \${100 / tasks.length}%;">
@@ -13596,6 +13630,16 @@ app.get('/portal/:token', async (c) => {
                                         }).join('')}
                                     </div>
                                 </div>
+                                
+                                <!-- 案件切り替えボタン（現在表示中以外） -->
+                                \${!isCurrentCase ? \`
+                                    <div class="mt-3 pt-3 border-t">
+                                        <button onclick="switchCase(\${caseId}, '\${caseData.access_token || ''}')" 
+                                                class="text-xs text-blue-600 hover:text-blue-800 hover:underline">
+                                            <i class="fas fa-arrow-right mr-1"></i>この案件に切り替える
+                                        </button>
+                                    </div>
+                                \` : ''}
                             </div>
                         \`;
                     }
