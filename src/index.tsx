@@ -29353,6 +29353,8 @@ app.get('/cases', async (c) => {
       { key: 'inquiry', label: '見込み', color: 'yellow', icon: 'fa-lightbulb' },
       { key: 'preparing', label: '書類準備中', color: 'orange', icon: 'fa-file-alt' },
       { key: 'applying', label: '申請中', color: 'purple', icon: 'fa-paper-plane' },
+      { key: 'adopted', label: '採択・入金待', color: 'blue', icon: 'fa-trophy' },
+      { key: 'rejected', label: '不採択', color: 'red', icon: 'fa-times-circle' },
       { key: 'archived', label: '完了済み', color: 'green', icon: 'fa-check-circle', isArchived: true }
     ]
     
@@ -29406,7 +29408,8 @@ app.get('/cases', async (c) => {
         blue: { bg: 'bg-blue-50', border: 'border-blue-300', header: 'bg-blue-100 text-blue-800', badge: 'bg-blue-500' },
         orange: { bg: 'bg-orange-50', border: 'border-orange-300', header: 'bg-orange-100 text-orange-800', badge: 'bg-orange-500' },
         purple: { bg: 'bg-purple-50', border: 'border-purple-300', header: 'bg-purple-100 text-purple-800', badge: 'bg-purple-500' },
-        green: { bg: 'bg-green-50', border: 'border-green-300', header: 'bg-green-100 text-green-800', badge: 'bg-green-500' }
+        green: { bg: 'bg-green-50', border: 'border-green-300', header: 'bg-green-100 text-green-800', badge: 'bg-green-500' },
+        red: { bg: 'bg-red-50', border: 'border-red-300', header: 'bg-red-100 text-red-800', badge: 'bg-red-500' }
       }
       const colors = colorMap[status.color]
       
