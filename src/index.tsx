@@ -28298,7 +28298,7 @@ app.get('/admin/payments', async (c) => {
                                             </div>
                                         </div>
                                         <div class="mt-3 pt-3 border-t flex justify-end gap-2">
-                                            <a href="/cases/\${inv.case_id}" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                                            <a href="/case/\${inv.case_id}" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
                                                 <i class="fas fa-external-link-alt mr-1"></i>案件詳細
                                             </a>
                                         </div>
@@ -28366,7 +28366,7 @@ app.get('/admin/payments', async (c) => {
                                         </div>
                                         <div class="mt-3 pt-3 border-t border-yellow-200 flex justify-end gap-2">
                                             \${isInvoice && p.case_id ? \`
-                                                <a href="/cases/\${p.case_id}" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                                                <a href="/case/\${p.case_id}" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
                                                     <i class="fas fa-external-link-alt mr-1"></i>案件詳細
                                                 </a>
                                             \` : ''}
