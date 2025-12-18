@@ -18810,7 +18810,7 @@ app.get('/admin/guidelines', (c) => {
                     // サマリー更新
                     const totalCases = filteredCases.length;
                     const appliedCases = filteredCases.filter(c => ['applying', 'applied', 'adopted'].includes(c.status)).length;
-                    const preparingCases = filteredCases.filter(c => ['document_preparation', 'inquiry'].includes(c.status)).length;
+                    const preparingCases = filteredCases.filter(c => ['preparing', 'inquiry'].includes(c.status)).length;
                     const subsidyTypesWithCases = new Set(filteredCases.map(c => c.subsidy_type_id)).size;
                     
                     document.getElementById('caseTreeTotalCases').textContent = totalCases;
@@ -18873,7 +18873,7 @@ app.get('/admin/guidelines', (c) => {
                                         <div class="flex items-center gap-4 text-sm">
                                             <div class="text-center">
                                                 <p class="text-gray-500">準備中</p>
-                                                <p class="font-bold text-orange-600">\${cases.filter(c => c.status === 'document_preparation').length}</p>
+                                                <p class="font-bold text-orange-600">\${cases.filter(c => c.status === 'preparing').length}</p>
                                             </div>
                                             <div class="text-center">
                                                 <p class="text-gray-500">申請中</p>
@@ -18893,12 +18893,14 @@ app.get('/admin/guidelines', (c) => {
                                         \${cases.map(caseItem => {
                                             const statusConfig = {
                                                 inquiry: { label: '見込み', color: 'gray', icon: 'question-circle' },
-                                                document_preparation: { label: '書類準備中', color: 'orange', icon: 'file-alt' },
+                                                preparing: { label: '書類準備中', color: 'orange', icon: 'file-alt' },
                                                 applying: { label: '申請中', color: 'blue', icon: 'paper-plane' },
-                                                applied: { label: '申請済み', color: 'indigo', icon: 'check-circle' },
+                                                submitted: { label: '申請済', color: 'indigo', icon: 'check' },
+                                                under_review: { label: '審査中', color: 'purple', icon: 'search' },
                                                 adopted: { label: '採択', color: 'green', icon: 'trophy' },
                                                 rejected: { label: '不採択', color: 'red', icon: 'times-circle' },
-                                                completed: { label: '完了', color: 'gray', icon: 'flag-checkered' }
+                                                completed: { label: '完了', color: 'teal', icon: 'flag-checkered' },
+                                                cancelled: { label: 'キャンセル', color: 'gray', icon: 'ban' }
                                             }[caseItem.status] || { label: caseItem.status, color: 'gray', icon: 'circle' };
                                             
                                             return \`
