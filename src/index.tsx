@@ -18166,6 +18166,10 @@ app.get('/admin/guidelines', (c) => {
                                 class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
                             <i class="fas fa-columns mr-2"></i>比較
                         </button>
+                        <button onclick="switchTab('cases')" id="tab-cases" 
+                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-sitemap mr-2"></i>案件進捗
+                        </button>
                     </div>
                 </div>
 
@@ -18364,6 +18368,58 @@ app.get('/admin/guidelines', (c) => {
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+                
+                <!-- 案件進捗タブ -->
+                <div id="content-cases" class="hidden space-y-6">
+                    <div class="flex flex-wrap justify-between items-center gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold">
+                                <i class="fas fa-sitemap mr-2 text-indigo-600"></i>案件進捗ツリー
+                            </h2>
+                            <p class="text-sm text-gray-500">補助金ごとに申請中の案件と進捗状況を確認できます</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <select id="caseTreeCategoryFilter" onchange="loadCaseTree()" class="px-3 py-2 border rounded-lg text-sm">
+                                <option value="all">全管轄</option>
+                                <option value="行政書士管轄">行政書士管轄</option>
+                                <option value="社労士管轄">社労士管轄</option>
+                            </select>
+                            <select id="caseTreeStatusFilter" onchange="loadCaseTree()" class="px-3 py-2 border rounded-lg text-sm">
+                                <option value="active">進行中の案件</option>
+                                <option value="all">すべての案件</option>
+                                <option value="completed">完了した案件</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- サマリーカード -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                            <p class="text-sm text-gray-500">申請中の案件</p>
+                            <p class="text-2xl font-bold text-blue-600" id="caseTreeTotalCases">-</p>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+                            <p class="text-sm text-gray-500">申請済み</p>
+                            <p class="text-2xl font-bold text-green-600" id="caseTreeAppliedCases">-</p>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
+                            <p class="text-sm text-gray-500">準備中</p>
+                            <p class="text-2xl font-bold text-orange-600" id="caseTreePreparingCases">-</p>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+                            <p class="text-sm text-gray-500">補助金種別数</p>
+                            <p class="text-2xl font-bold text-purple-600" id="caseTreeSubsidyTypes">-</p>
+                        </div>
+                    </div>
+                    
+                    <!-- ツリー表示 -->
+                    <div id="caseTreeContainer" class="space-y-4">
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                            <p>読み込み中...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -18690,7 +18746,7 @@ app.get('/admin/guidelines', (c) => {
 
             // タブ切り替え
             function switchTab(tab) {
-                ['watch', 'updates', 'guidelines', 'calendar', 'compare'].forEach(t => {
+                ['watch', 'updates', 'guidelines', 'calendar', 'compare', 'cases'].forEach(t => {
                     const content = document.getElementById('content-' + t);
                     const tabEl = document.getElementById('tab-' + t);
                     if (content) content.classList.add('hidden');
@@ -18706,6 +18762,7 @@ app.get('/admin/guidelines', (c) => {
                 // タブ切り替え時にデータ更新
                 if (tab === 'calendar') renderCalendarTimeline();
                 if (tab === 'compare') renderCompareSelection();
+                if (tab === 'cases') loadCaseTree();
             }
 
             // トースト
@@ -18715,6 +18772,190 @@ app.get('/admin/guidelines', (c) => {
                 toast.innerHTML = \`<i class="fas fa-\${type === 'success' ? 'check' : 'exclamation'}-circle mr-2"></i>\${message}\`;
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 3000);
+            }
+            
+            // 案件進捗ツリー読み込み
+            async function loadCaseTree() {
+                const container = document.getElementById('caseTreeContainer');
+                const categoryFilter = document.getElementById('caseTreeCategoryFilter').value;
+                const statusFilter = document.getElementById('caseTreeStatusFilter').value;
+                
+                container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>読み込み中...</p></div>';
+                
+                try {
+                    // 補助金種別と案件を取得
+                    const [subsidyRes, casesRes, guidelinesRes] = await Promise.all([
+                        axios.get('/api/subsidy-types'),
+                        axios.get('/api/cases'),
+                        axios.get('/api/subsidy-guidelines')
+                    ]);
+                    
+                    let subsidies = subsidyRes.data || [];
+                    const allCases = casesRes.data || [];
+                    const guidelines = guidelinesRes.data || [];
+                    
+                    // カテゴリフィルタ
+                    if (categoryFilter !== 'all') {
+                        subsidies = subsidies.filter(s => s.category === categoryFilter);
+                    }
+                    
+                    // ステータスフィルタ
+                    let filteredCases = allCases;
+                    if (statusFilter === 'active') {
+                        filteredCases = allCases.filter(c => !['completed', 'rejected', 'cancelled'].includes(c.status));
+                    } else if (statusFilter === 'completed') {
+                        filteredCases = allCases.filter(c => ['completed', 'adopted'].includes(c.status));
+                    }
+                    
+                    // サマリー更新
+                    const totalCases = filteredCases.length;
+                    const appliedCases = filteredCases.filter(c => ['applying', 'applied', 'adopted'].includes(c.status)).length;
+                    const preparingCases = filteredCases.filter(c => ['document_preparation', 'inquiry'].includes(c.status)).length;
+                    const subsidyTypesWithCases = new Set(filteredCases.map(c => c.subsidy_type_id)).size;
+                    
+                    document.getElementById('caseTreeTotalCases').textContent = totalCases;
+                    document.getElementById('caseTreeAppliedCases').textContent = appliedCases;
+                    document.getElementById('caseTreePreparingCases').textContent = preparingCases;
+                    document.getElementById('caseTreeSubsidyTypes').textContent = subsidyTypesWithCases;
+                    
+                    // 補助金ごとにグループ化
+                    const subsidyGroups = subsidies.map(subsidy => {
+                        const cases = filteredCases.filter(c => c.subsidy_type_id === subsidy.id);
+                        const guideline = guidelines.find(g => g.subsidy_type_id === subsidy.id);
+                        return { subsidy, cases, guideline };
+                    }).filter(g => g.cases.length > 0); // 案件がある補助金のみ
+                    
+                    if (subsidyGroups.length === 0) {
+                        container.innerHTML = \`
+                            <div class="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
+                                <i class="fas fa-folder-open text-4xl mb-3 text-gray-300"></i>
+                                <p>該当する案件がありません</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    // ツリー表示生成
+                    container.innerHTML = subsidyGroups.map(group => {
+                        const { subsidy, cases, guideline } = group;
+                        const isGyoseishoshi = subsidy.category === '行政書士管轄';
+                        const categoryColor = isGyoseishoshi ? 'emerald' : 'blue';
+                        const deadline = guideline?.application_end ? new Date(guideline.application_end) : null;
+                        const daysUntilDeadline = deadline ? Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
+                        
+                        return \`
+                            <div class="bg-white rounded-lg shadow overflow-hidden">
+                                <!-- 補助金ヘッダー -->
+                                <div class="p-4 bg-gradient-to-r from-\${categoryColor}-50 to-\${categoryColor}-100 border-b border-\${categoryColor}-200 cursor-pointer"
+                                     onclick="toggleCaseTreeGroup(this)">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-chevron-down text-\${categoryColor}-600 transition-transform tree-toggle-icon"></i>
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-bold text-\${categoryColor}-800">\${subsidy.name}</span>
+                                                    <span class="text-xs px-2 py-0.5 rounded bg-\${categoryColor}-200 text-\${categoryColor}-800">
+                                                        \${isGyoseishoshi ? '補助金' : '助成金'}
+                                                    </span>
+                                                    <span class="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-700">
+                                                        \${cases.length}件
+                                                    </span>
+                                                </div>
+                                                \${deadline ? \`
+                                                    <div class="text-sm mt-1 \${daysUntilDeadline <= 7 ? 'text-red-600 font-medium' : daysUntilDeadline <= 30 ? 'text-orange-600' : 'text-gray-600'}">
+                                                        <i class="fas fa-calendar-alt mr-1"></i>
+                                                        締切: \${deadline.toLocaleDateString('ja-JP')}
+                                                        \${daysUntilDeadline !== null ? \`（あと\${daysUntilDeadline}日）\` : ''}
+                                                    </div>
+                                                \` : ''}
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-4 text-sm">
+                                            <div class="text-center">
+                                                <p class="text-gray-500">準備中</p>
+                                                <p class="font-bold text-orange-600">\${cases.filter(c => c.status === 'document_preparation').length}</p>
+                                            </div>
+                                            <div class="text-center">
+                                                <p class="text-gray-500">申請中</p>
+                                                <p class="font-bold text-blue-600">\${cases.filter(c => c.status === 'applying').length}</p>
+                                            </div>
+                                            <div class="text-center">
+                                                <p class="text-gray-500">採択</p>
+                                                <p class="font-bold text-green-600">\${cases.filter(c => c.status === 'adopted').length}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 案件リスト -->
+                                <div class="case-tree-content">
+                                    <div class="divide-y">
+                                        \${cases.map(caseItem => {
+                                            const statusConfig = {
+                                                inquiry: { label: '見込み', color: 'gray', icon: 'question-circle' },
+                                                document_preparation: { label: '書類準備中', color: 'orange', icon: 'file-alt' },
+                                                applying: { label: '申請中', color: 'blue', icon: 'paper-plane' },
+                                                applied: { label: '申請済み', color: 'indigo', icon: 'check-circle' },
+                                                adopted: { label: '採択', color: 'green', icon: 'trophy' },
+                                                rejected: { label: '不採択', color: 'red', icon: 'times-circle' },
+                                                completed: { label: '完了', color: 'gray', icon: 'flag-checkered' }
+                                            }[caseItem.status] || { label: caseItem.status, color: 'gray', icon: 'circle' };
+                                            
+                                            return \`
+                                                <div class="p-4 hover:bg-gray-50 flex items-center justify-between">
+                                                    <div class="flex items-center gap-4">
+                                                        <div class="w-10 h-10 rounded-full bg-\${statusConfig.color}-100 flex items-center justify-center">
+                                                            <i class="fas fa-\${statusConfig.icon} text-\${statusConfig.color}-600"></i>
+                                                        </div>
+                                                        <div>
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="font-medium">\${caseItem.company_name || caseItem.client_name || '未設定'}</span>
+                                                                <span class="text-xs px-2 py-0.5 rounded bg-\${statusConfig.color}-100 text-\${statusConfig.color}-700">
+                                                                    \${statusConfig.label}
+                                                                </span>
+                                                            </div>
+                                                            <div class="text-sm text-gray-500">
+                                                                案件番号: \${caseItem.case_number || '-'}
+                                                                \${caseItem.assigned_staff_name ? \` | 担当: \${caseItem.assigned_staff_name}\` : ''}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <a href="/case/\${caseItem.id}" 
+                                                       class="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 text-sm">
+                                                        <i class="fas fa-external-link-alt mr-1"></i>詳細
+                                                    </a>
+                                                </div>
+                                            \`;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading case tree:', error);
+                    container.innerHTML = \`
+                        <div class="text-center py-8 text-red-500 bg-white rounded-lg shadow">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>データの読み込みに失敗しました</p>
+                        </div>
+                    \`;
+                }
+            }
+            
+            // ツリーグループの開閉
+            function toggleCaseTreeGroup(header) {
+                const content = header.nextElementSibling;
+                const icon = header.querySelector('.tree-toggle-icon');
+                
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.style.transform = 'rotate(0deg)';
+                } else {
+                    content.style.display = 'none';
+                    icon.style.transform = 'rotate(-90deg)';
+                }
             }
 
             // 補助金種別読み込み
