@@ -10490,8 +10490,41 @@ app.get('/case/:id', async (c) => {
                                 <h3 class="text-lg font-bold mb-4">
                                     <i class="fas fa-list-check mr-2 text-green-600"></i>必要書類チェックリスト
                                 </h3>
-                                <div id="documentChecklist" class="space-y-2">
-                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                
+                                <!-- チェックリストタブ -->
+                                <div class="flex border-b mb-4">
+                                    <button id="checklistTabCommon" onclick="switchChecklistTab('common')" 
+                                            class="px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600 -mb-px">
+                                        <i class="fas fa-building mr-1"></i>共通書類
+                                        <span id="checklistCommonBadge" class="ml-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">0/0</span>
+                                    </button>
+                                    <button id="checklistTabCase" onclick="switchChecklistTab('case')" 
+                                            class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent -mb-px">
+                                        <i class="fas fa-file-alt mr-1"></i>申請書類
+                                        <span id="checklistCaseBadge" class="ml-1 px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs">0/0</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- 共通書類コンテンツ -->
+                                <div id="checklistContentCommon" class="space-y-2">
+                                    <p class="text-xs text-gray-500 mb-3 bg-green-50 p-3 rounded-lg">
+                                        <i class="fas fa-info-circle mr-1 text-green-600"></i>
+                                        登記簿謄本、決算書など会社全体で共通して使う書類です
+                                    </p>
+                                    <div id="checklistCommonList" class="space-y-2">
+                                        <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 申請書類コンテンツ -->
+                                <div id="checklistContentCase" class="space-y-2 hidden">
+                                    <p class="text-xs text-gray-500 mb-3 bg-blue-50 p-3 rounded-lg">
+                                        <i class="fas fa-info-circle mr-1 text-blue-600"></i>
+                                        この補助金申請に必要な専用の書類です
+                                    </p>
+                                    <div id="checklistCaseList" class="space-y-2">
+                                        <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="bg-white rounded-xl shadow-sm p-6">
@@ -11479,55 +11512,107 @@ app.get('/case/:id', async (c) => {
                 }
             });
             
+            // チェックリストタブ切り替え
+            window.switchChecklistTab = function(tab) {
+                const commonTab = document.getElementById('checklistTabCommon');
+                const caseTab = document.getElementById('checklistTabCase');
+                const commonContent = document.getElementById('checklistContentCommon');
+                const caseContent = document.getElementById('checklistContentCase');
+                
+                if (tab === 'common') {
+                    commonTab.className = 'px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600 -mb-px';
+                    caseTab.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent -mb-px';
+                    commonContent.classList.remove('hidden');
+                    caseContent.classList.add('hidden');
+                } else {
+                    caseTab.className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 -mb-px';
+                    commonTab.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent -mb-px';
+                    caseContent.classList.remove('hidden');
+                    commonContent.classList.add('hidden');
+                }
+            };
+            
             // 書類読み込み
             async function loadDocuments() {
                 try {
-                    const [checklistRes, docsRes] = await Promise.all([
+                    // 共通書類タイプ、案件チェックリスト、アップロード済み書類を取得
+                    const [commonTypesRes, checklistRes, docsRes, commonDocsRes] = await Promise.all([
+                        axios.get('/api/common-document-types'),
                         axios.get(\`/api/cases/\${CASE_ID}/document-checklist\`),
-                        axios.get(\`/api/cases/\${CASE_ID}/documents\`)
+                        axios.get(\`/api/cases/\${CASE_ID}/documents\`),
+                        axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`)
                     ]);
                     
-                    const checklist = checklistRes.data;
-                    const documents = docsRes.data;
+                    const commonTypes = commonTypesRes.data || [];
+                    const checklist = checklistRes.data || [];
+                    const documents = docsRes.data || [];
+                    const commonDocs = commonDocsRes.data || [];
                     
-                    // チェックリスト
-                    const checklistContainer = document.getElementById('documentChecklist');
-                    if (checklist.length === 0) {
-                        checklistContainer.innerHTML = '<div class="text-gray-500 text-center py-4">チェックリストがありません</div>';
-                    } else {
-                        // アップロード済み書類のタイプをセットと配列で保持（完全一致と部分一致両方チェック）
-                        const uploadedTypes = new Set(documents.map(d => d.document_type));
-                        const uploadedTypesArray = documents.map(d => d.document_type?.toLowerCase() || '');
+                    // 全書類を統合（共通書類 + 案件書類）
+                    const allDocuments = [...documents, ...commonDocs.map(d => ({...d, isCommon: true}))];
+                    const uploadedTypes = new Set(allDocuments.map(d => d.document_type || d.type_name));
+                    const uploadedTypesArray = allDocuments.map(d => (d.document_type || d.type_name || '').toLowerCase());
+                    
+                    // チェックリスト項目をレンダリングするヘルパー関数
+                    function renderChecklistItem(item, docs, isCommonType = false) {
+                        const itemType = (item.document_type || item.name || '').toLowerCase();
+                        const isUploaded = uploadedTypes.has(item.document_type || item.name) || 
+                            uploadedTypesArray.some(ut => ut && itemType && (ut.includes(itemType) || itemType.includes(ut)));
                         
-                        checklistContainer.innerHTML = checklist.map(item => {
-                            const checklistType = item.document_type?.toLowerCase() || '';
-                            // 完全一致または部分一致でチェック
-                            const isUploaded = uploadedTypes.has(item.document_type) || 
-                                uploadedTypesArray.some(ut => ut && checklistType && (ut.includes(checklistType) || checklistType.includes(ut)));
-                            
-                            // アップロード済みの場合、該当する書類を取得
-                            const matchedDocs = documents.filter(d => 
-                                d.document_type === item.document_type || 
-                                (d.document_type?.toLowerCase() || '').includes(checklistType) ||
-                                checklistType.includes(d.document_type?.toLowerCase() || '')
-                            );
-                            
-                            return \`
-                                <div class="flex items-center gap-3 p-3 rounded-lg border \${isUploaded ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}">
-                                    <i class="fas fa-\${isUploaded ? 'check-circle text-green-500' : 'circle text-gray-300'} text-lg"></i>
-                                    <div class="flex-1">
-                                        <div class="text-sm font-medium">\${item.document_type}</div>
-                                        \${item.description ? '<div class="text-xs text-gray-500">' + item.description + '</div>' : ''}
-                                        \${isUploaded && matchedDocs.length > 0 ? \`
-                                            <div class="text-xs text-green-600 mt-1">
-                                                <i class="fas fa-file mr-1"></i>\${matchedDocs.length}件アップロード済み
-                                            </div>
-                                        \` : ''}
-                                    </div>
-                                    \${item.is_required ? '<span class="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded">必須</span>' : ''}
+                        const matchedDocs = docs.filter(d => {
+                            const docType = (d.document_type || d.type_name || '').toLowerCase();
+                            return docType === itemType || docType.includes(itemType) || itemType.includes(docType);
+                        });
+                        
+                        const displayName = item.document_type || item.name;
+                        const description = item.description || '';
+                        const isRequired = item.is_required;
+                        
+                        return \`
+                            <div class="flex items-center gap-3 p-3 rounded-lg border \${isUploaded ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}">
+                                <i class="fas fa-\${isUploaded ? 'check-circle text-green-500' : 'circle text-gray-300'} text-lg"></i>
+                                <div class="flex-1">
+                                    <div class="text-sm font-medium">\${displayName}</div>
+                                    \${description ? '<div class="text-xs text-gray-500">' + description + '</div>' : ''}
+                                    \${isUploaded && matchedDocs.length > 0 ? \`
+                                        <div class="text-xs text-green-600 mt-1">
+                                            <i class="fas fa-file mr-1"></i>\${matchedDocs.length}件アップロード済み
+                                        </div>
+                                    \` : ''}
                                 </div>
-                            \`;
-                        }).join('');
+                                \${isRequired ? '<span class="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded">必須</span>' : ''}
+                            </div>
+                        \`;
+                    }
+                    
+                    // 共通書類チェックリスト
+                    const commonListContainer = document.getElementById('checklistCommonList');
+                    if (commonTypes.length === 0) {
+                        commonListContainer.innerHTML = '<div class="text-gray-500 text-center py-4">共通書類タイプがありません</div>';
+                    } else {
+                        const commonUploaded = commonTypes.filter(t => {
+                            const typeName = (t.name || '').toLowerCase();
+                            return uploadedTypesArray.some(ut => ut && typeName && (ut.includes(typeName) || typeName.includes(ut)));
+                        }).length;
+                        document.getElementById('checklistCommonBadge').textContent = \`\${commonUploaded}/\${commonTypes.length}\`;
+                        commonListContainer.innerHTML = commonTypes.map(t => renderChecklistItem({
+                            document_type: t.name,
+                            description: t.description,
+                            is_required: true
+                        }, allDocuments, true)).join('');
+                    }
+                    
+                    // 申請書類チェックリスト
+                    const caseListContainer = document.getElementById('checklistCaseList');
+                    if (checklist.length === 0) {
+                        caseListContainer.innerHTML = '<div class="text-gray-500 text-center py-4">申請書類チェックリストがありません</div>';
+                    } else {
+                        const caseUploaded = checklist.filter(item => {
+                            const itemType = (item.document_type || '').toLowerCase();
+                            return uploadedTypesArray.some(ut => ut && itemType && (ut.includes(itemType) || itemType.includes(ut)));
+                        }).length;
+                        document.getElementById('checklistCaseBadge').textContent = \`\${caseUploaded}/\${checklist.length}\`;
+                        caseListContainer.innerHTML = checklist.map(item => renderChecklistItem(item, allDocuments)).join('');
                     }
                     
                     // アップロード済み
