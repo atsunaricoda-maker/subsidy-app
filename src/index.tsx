@@ -11495,17 +11495,36 @@ app.get('/case/:id', async (c) => {
                     if (checklist.length === 0) {
                         checklistContainer.innerHTML = '<div class="text-gray-500 text-center py-4">チェックリストがありません</div>';
                     } else {
+                        // アップロード済み書類のタイプをセットと配列で保持（完全一致と部分一致両方チェック）
                         const uploadedTypes = new Set(documents.map(d => d.document_type));
+                        const uploadedTypesArray = documents.map(d => d.document_type?.toLowerCase() || '');
+                        
                         checklistContainer.innerHTML = checklist.map(item => {
-                            const isUploaded = uploadedTypes.has(item.document_type);
+                            const checklistType = item.document_type?.toLowerCase() || '';
+                            // 完全一致または部分一致でチェック
+                            const isUploaded = uploadedTypes.has(item.document_type) || 
+                                uploadedTypesArray.some(ut => ut && checklistType && (ut.includes(checklistType) || checklistType.includes(ut)));
+                            
+                            // アップロード済みの場合、該当する書類を取得
+                            const matchedDocs = documents.filter(d => 
+                                d.document_type === item.document_type || 
+                                (d.document_type?.toLowerCase() || '').includes(checklistType) ||
+                                checklistType.includes(d.document_type?.toLowerCase() || '')
+                            );
+                            
                             return \`
-                                <div class="flex items-center gap-3 p-2 rounded \${isUploaded ? 'bg-green-50' : 'bg-gray-50'}">
-                                    <i class="fas fa-\${isUploaded ? 'check-circle text-green-500' : 'circle text-gray-300'}"></i>
+                                <div class="flex items-center gap-3 p-3 rounded-lg border \${isUploaded ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}">
+                                    <i class="fas fa-\${isUploaded ? 'check-circle text-green-500' : 'circle text-gray-300'} text-lg"></i>
                                     <div class="flex-1">
                                         <div class="text-sm font-medium">\${item.document_type}</div>
                                         \${item.description ? '<div class="text-xs text-gray-500">' + item.description + '</div>' : ''}
+                                        \${isUploaded && matchedDocs.length > 0 ? \`
+                                            <div class="text-xs text-green-600 mt-1">
+                                                <i class="fas fa-file mr-1"></i>\${matchedDocs.length}件アップロード済み
+                                            </div>
+                                        \` : ''}
                                     </div>
-                                    \${item.is_required ? '<span class="text-xs text-red-500">必須</span>' : ''}
+                                    \${item.is_required ? '<span class="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded">必須</span>' : ''}
                                 </div>
                             \`;
                         }).join('');
