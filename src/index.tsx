@@ -2058,6 +2058,17 @@ app.get('/', (c) => {
                                 </h2>
                                 <div id="deadlineAlertList" class="space-y-2"></div>
                             </div>
+                            
+                            <!-- 振込待ちリスト -->
+                            <div id="pendingPaymentsSection" class="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl shadow-sm p-4 mb-6 hidden border border-yellow-100">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h2 class="text-base font-bold text-yellow-700 flex items-center gap-2">
+                                        <i class="fas fa-clock"></i>振込待ちリスト
+                                    </h2>
+                                    <span id="pendingPaymentsCount" class="text-sm bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full font-medium">0件</span>
+                                </div>
+                                <div id="pendingPaymentsList" class="space-y-2"></div>
+                            </div>
 
                             <!-- 案件一覧 -->
                             <div class="bg-white rounded-xl shadow-sm">
@@ -2954,12 +2965,125 @@ app.get('/', (c) => {
                     loadRecentActivity();
                     loadSlotBalance();
                     loadNotificationSummary();
+                    loadPendingPayments();
                 } catch (error) {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
                         '<div class="text-center py-8 text-red-500">データの読み込みに失敗しました</div>';
                 }
             }
+            
+            // 振込待ちリストを読み込む
+            async function loadPendingPayments() {
+                try {
+                    const response = await axios.get('/api/invoices/pending-payments');
+                    const invoices = response.data || [];
+                    
+                    const section = document.getElementById('pendingPaymentsSection');
+                    const list = document.getElementById('pendingPaymentsList');
+                    const countBadge = document.getElementById('pendingPaymentsCount');
+                    
+                    if (invoices.length === 0) {
+                        section.classList.add('hidden');
+                        return;
+                    }
+                    
+                    section.classList.remove('hidden');
+                    countBadge.textContent = invoices.length + '件';
+                    
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    list.innerHTML = invoices.map(inv => {
+                        const dueDate = inv.due_date ? new Date(inv.due_date) : null;
+                        let dueDateClass = 'text-gray-600';
+                        let dueDateIcon = 'fa-calendar';
+                        let dueDateLabel = '';
+                        
+                        if (dueDate) {
+                            dueDate.setHours(0, 0, 0, 0);
+                            const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+                            
+                            if (diffDays < 0) {
+                                dueDateClass = 'text-red-600 font-bold';
+                                dueDateIcon = 'fa-exclamation-circle';
+                                dueDateLabel = '（' + Math.abs(diffDays) + '日超過）';
+                            } else if (diffDays === 0) {
+                                dueDateClass = 'text-red-600 font-bold';
+                                dueDateIcon = 'fa-exclamation-triangle';
+                                dueDateLabel = '（本日期限）';
+                            } else if (diffDays <= 3) {
+                                dueDateClass = 'text-orange-600 font-medium';
+                                dueDateIcon = 'fa-clock';
+                                dueDateLabel = '（あと' + diffDays + '日）';
+                            } else if (diffDays <= 7) {
+                                dueDateClass = 'text-yellow-600';
+                                dueDateIcon = 'fa-calendar-alt';
+                                dueDateLabel = '（あと' + diffDays + '日）';
+                            }
+                        }
+                        
+                        const statusLabels = {
+                            issued: { label: '発行済', bg: 'bg-blue-100', text: 'text-blue-700' },
+                            sent: { label: '送付済', bg: 'bg-purple-100', text: 'text-purple-700' }
+                        };
+                        const status = statusLabels[inv.status] || statusLabels.issued;
+                        
+                        return \`
+                            <div class="bg-white rounded-lg p-3 border border-yellow-200 hover:shadow-md transition cursor-pointer"
+                                 onclick="window.location.href='/cases/\${inv.case_id}'">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="font-medium text-gray-800 truncate">\${inv.client_name || '顧客名未設定'}</span>
+                                            <span class="text-xs px-1.5 py-0.5 rounded \${status.bg} \${status.text}">\${status.label}</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 mb-1">
+                                            <span class="mr-2">\${inv.invoice_number || '請求書番号未設定'}</span>
+                                            <span>\${inv.company_name || ''}</span>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <span class="text-sm font-bold text-gray-800">¥\${Number(inv.total_amount || 0).toLocaleString()}</span>
+                                            <span class="\${dueDateClass} text-xs flex items-center gap-1">
+                                                <i class="fas \${dueDateIcon}"></i>
+                                                \${dueDate ? dueDate.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) : '期限未設定'}
+                                                \${dueDateLabel}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        <button onclick="event.stopPropagation(); confirmPayment(\${inv.id})" 
+                                                class="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                                            <i class="fas fa-check mr-1"></i>入金確認
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading pending payments:', error);
+                }
+            }
+            
+            // 入金確認処理
+            async function confirmPayment(invoiceId) {
+                if (!confirm('この請求書の入金を確認済みにしますか？')) {
+                    return;
+                }
+                
+                try {
+                    await axios.post(\`/api/invoices/\${invoiceId}/confirm-payment\`);
+                    showToast('入金を確認しました', 'success');
+                    loadPendingPayments();
+                    loadData();
+                } catch (error) {
+                    console.error('Error confirming payment:', error);
+                    showToast('入金確認に失敗しました', 'error');
+                }
+            }
+            window.confirmPayment = confirmPayment;
             
             // 通知サマリーを読み込む
             async function loadNotificationSummary() {
@@ -34734,6 +34858,46 @@ async function generateInvoiceNumber(DB: D1Database, organizationId: number): Pr
   const prefix = (seq as any).prefix || 'INV'
   return `${prefix}-${currentYear}-${String(newSequence).padStart(4, '0')}`
 }
+
+// 振込待ちリスト取得（管理画面用）
+app.get('/api/invoices/pending-payments', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // テーブルが存在するか確認
+    const tableCheck = await DB.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='invoices'
+    `).first()
+    
+    if (!tableCheck) {
+      return c.json([])
+    }
+    
+    // 発行済み(issued)または送付済み(sent)の請求書を取得（振込待ち状態）
+    const invoices = await DB.prepare(`
+      SELECT i.*, 
+             c.name as client_name, 
+             c.company_name,
+             cs.case_number
+      FROM invoices i
+      LEFT JOIN clients c ON i.client_id = c.id
+      LEFT JOIN cases cs ON i.case_id = cs.id
+      WHERE i.status IN ('issued', 'sent')
+      ORDER BY 
+        CASE WHEN i.due_date IS NULL THEN 1 ELSE 0 END,
+        i.due_date ASC,
+        i.created_at DESC
+    `).all()
+    
+    return c.json(invoices.results || [])
+  } catch (error: any) {
+    console.error('Error fetching pending payments:', error)
+    if (error.message?.includes('no such table')) {
+      return c.json([])
+    }
+    return c.json({ error: error.message || 'エラーが発生しました' }, 500)
+  }
+})
 
 // 請求書一覧取得（案件別）
 app.get('/api/cases/:caseId/invoices', async (c) => {
