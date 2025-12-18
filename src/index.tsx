@@ -18849,7 +18849,7 @@ app.get('/admin/guidelines', (c) => {
                         const { subsidy, cases, guideline } = group;
                         const isGyoseishoshi = subsidy.category === '行政書士管轄';
                         const categoryColor = isGyoseishoshi ? 'emerald' : 'blue';
-                        const deadline = guideline?.application_end ? new Date(guideline.application_end) : null;
+                        const deadline = guideline?.application_end_date ? new Date(guideline.application_end_date) : null;
                         const daysUntilDeadline = deadline ? Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
                         const deadlineStyle = getDeadlineStyle(daysUntilDeadline);
                         const isExpired = daysUntilDeadline !== null && daysUntilDeadline < 0;
@@ -18884,9 +18884,9 @@ app.get('/admin/guidelines', (c) => {
                                                             \${deadlineStyle.label}
                                                         </span>
                                                     </div>
-                                                    \${guideline?.application_start ? \`
+                                                    \${guideline?.application_start_date ? \`
                                                         <span class="text-xs text-gray-500">
-                                                            （開始: \${new Date(guideline.application_start).toLocaleDateString('ja-JP')}）
+                                                            （開始: \${new Date(guideline.application_start_date).toLocaleDateString('ja-JP')}）
                                                         </span>
                                                     \` : ''}
                                                 </div>
@@ -19568,6 +19568,14 @@ app.get('/admin/guidelines', (c) => {
                     });
                 }
                 
+                // 同じ補助金種別の重複を排除（最新の公募要領のみ表示）
+                const seenSubsidyTypes = new Set();
+                activeGuidelines = activeGuidelines.filter(g => {
+                    if (seenSubsidyTypes.has(g.subsidy_type_id)) return false;
+                    seenSubsidyTypes.add(g.subsidy_type_id);
+                    return true;
+                });
+                
                 const today = new Date();
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 
@@ -19680,6 +19688,14 @@ app.get('/admin/guidelines', (c) => {
                         return subsidy?.category === categoryFilter;
                     });
                 }
+                
+                // 同じ補助金種別の重複を排除（最新の公募要領のみ表示）
+                const seenSubsidyTypesCompare = new Set();
+                activeGuidelines = activeGuidelines.filter(g => {
+                    if (seenSubsidyTypesCompare.has(g.subsidy_type_id)) return false;
+                    seenSubsidyTypesCompare.add(g.subsidy_type_id);
+                    return true;
+                });
                 
                 const html = activeGuidelines.map(g => {
                     const subsidy = subsidyTypes.find(s => s.id == g.subsidy_type_id) || { name: g.subsidy_name || '不明' };
