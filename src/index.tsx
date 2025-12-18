@@ -18835,6 +18835,15 @@ app.get('/admin/guidelines', (c) => {
                         return;
                     }
                     
+                    // 締切日の色とラベルを決定するヘルパー関数
+                    function getDeadlineStyle(daysUntil) {
+                        if (daysUntil === null) return { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300', label: '期限未設定', icon: 'calendar' };
+                        if (daysUntil < 0) return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-400', label: '期限切れ', icon: 'exclamation-triangle' };
+                        if (daysUntil <= 7) return { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-400', label: \`あと\${daysUntil}日\`, icon: 'clock' };
+                        if (daysUntil <= 30) return { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-400', label: \`あと\${daysUntil}日\`, icon: 'calendar-alt' };
+                        return { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-300', label: \`あと\${daysUntil}日\`, icon: 'calendar-check' };
+                    }
+                    
                     // ツリー表示生成
                     container.innerHTML = subsidyGroups.map(group => {
                         const { subsidy, cases, guideline } = group;
@@ -18842,17 +18851,20 @@ app.get('/admin/guidelines', (c) => {
                         const categoryColor = isGyoseishoshi ? 'emerald' : 'blue';
                         const deadline = guideline?.application_end ? new Date(guideline.application_end) : null;
                         const daysUntilDeadline = deadline ? Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
+                        const deadlineStyle = getDeadlineStyle(daysUntilDeadline);
+                        const isExpired = daysUntilDeadline !== null && daysUntilDeadline < 0;
+                        const isUrgent = daysUntilDeadline !== null && daysUntilDeadline <= 7 && daysUntilDeadline >= 0;
                         
                         return \`
-                            <div class="bg-white rounded-lg shadow overflow-hidden">
+                            <div class="bg-white rounded-lg shadow overflow-hidden \${isExpired ? 'ring-2 ring-red-400' : isUrgent ? 'ring-2 ring-orange-400' : ''}">
                                 <!-- 補助金ヘッダー -->
                                 <div class="p-4 bg-gradient-to-r from-\${categoryColor}-50 to-\${categoryColor}-100 border-b border-\${categoryColor}-200 cursor-pointer"
                                      onclick="toggleCaseTreeGroup(this)">
-                                    <div class="flex items-center justify-between">
+                                    <div class="flex items-center justify-between flex-wrap gap-3">
                                         <div class="flex items-center gap-3">
                                             <i class="fas fa-chevron-down text-\${categoryColor}-600 transition-transform tree-toggle-icon"></i>
                                             <div>
-                                                <div class="flex items-center gap-2">
+                                                <div class="flex items-center gap-2 flex-wrap">
                                                     <span class="font-bold text-\${categoryColor}-800">\${subsidy.name}</span>
                                                     <span class="text-xs px-2 py-0.5 rounded bg-\${categoryColor}-200 text-\${categoryColor}-800">
                                                         \${isGyoseishoshi ? '補助金' : '助成金'}
@@ -18861,13 +18873,23 @@ app.get('/admin/guidelines', (c) => {
                                                         \${cases.length}件
                                                     </span>
                                                 </div>
-                                                \${deadline ? \`
-                                                    <div class="text-sm mt-1 \${daysUntilDeadline <= 7 ? 'text-red-600 font-medium' : daysUntilDeadline <= 30 ? 'text-orange-600' : 'text-gray-600'}">
-                                                        <i class="fas fa-calendar-alt mr-1"></i>
-                                                        締切: \${deadline.toLocaleDateString('ja-JP')}
-                                                        \${daysUntilDeadline !== null ? \`（あと\${daysUntilDeadline}日）\` : ''}
+                                                <!-- 申請期限バッジ -->
+                                                <div class="flex items-center gap-2 mt-2">
+                                                    <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border \${deadlineStyle.bg} \${deadlineStyle.border}">
+                                                        <i class="fas fa-\${deadlineStyle.icon} \${deadlineStyle.text}"></i>
+                                                        <span class="text-sm font-medium \${deadlineStyle.text}">
+                                                            申請期限: \${deadline ? deadline.toLocaleDateString('ja-JP') : '未設定'}
+                                                        </span>
+                                                        <span class="text-xs px-1.5 py-0.5 rounded \${deadlineStyle.bg} \${deadlineStyle.text} font-bold">
+                                                            \${deadlineStyle.label}
+                                                        </span>
                                                     </div>
-                                                \` : ''}
+                                                    \${guideline?.application_start ? \`
+                                                        <span class="text-xs text-gray-500">
+                                                            （開始: \${new Date(guideline.application_start).toLocaleDateString('ja-JP')}）
+                                                        </span>
+                                                    \` : ''}
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="flex items-center gap-4 text-sm">
