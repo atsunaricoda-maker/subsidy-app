@@ -25819,8 +25819,6 @@ app.get('/admin/pipelines', (c) => {
             // 初期読み込み
             loadTemplates();
             loadSubsidyTypesForCheckbox(); // 申請種別リストを事前に読み込み
-            
-            ${sidebarScripts}
         </script>
     </body>
     </html>
