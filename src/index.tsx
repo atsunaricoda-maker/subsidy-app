@@ -2059,17 +2059,6 @@ app.get('/', (c) => {
                                 <div id="deadlineAlertList" class="space-y-2"></div>
                             </div>
                             
-                            <!-- 振込待ちリスト -->
-                            <div id="pendingPaymentsSection" class="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl shadow-sm p-4 mb-6 hidden border border-yellow-100">
-                                <div class="flex items-center justify-between mb-3">
-                                    <h2 class="text-base font-bold text-yellow-700 flex items-center gap-2">
-                                        <i class="fas fa-clock"></i>振込待ちリスト
-                                    </h2>
-                                    <span id="pendingPaymentsCount" class="text-sm bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full font-medium">0件</span>
-                                </div>
-                                <div id="pendingPaymentsList" class="space-y-2"></div>
-                            </div>
-
                             <!-- 案件一覧 -->
                             <div class="bg-white rounded-xl shadow-sm">
                                 <div class="p-4 border-b border-gray-100 flex items-center justify-between">
@@ -2965,125 +2954,12 @@ app.get('/', (c) => {
                     loadRecentActivity();
                     loadSlotBalance();
                     loadNotificationSummary();
-                    loadPendingPayments();
                 } catch (error) {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
                         '<div class="text-center py-8 text-red-500">データの読み込みに失敗しました</div>';
                 }
             }
-            
-            // 振込待ちリストを読み込む
-            async function loadPendingPayments() {
-                try {
-                    const response = await axios.get('/api/invoices/pending-payments');
-                    const invoices = response.data || [];
-                    
-                    const section = document.getElementById('pendingPaymentsSection');
-                    const list = document.getElementById('pendingPaymentsList');
-                    const countBadge = document.getElementById('pendingPaymentsCount');
-                    
-                    if (invoices.length === 0) {
-                        section.classList.add('hidden');
-                        return;
-                    }
-                    
-                    section.classList.remove('hidden');
-                    countBadge.textContent = invoices.length + '件';
-                    
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    
-                    list.innerHTML = invoices.map(inv => {
-                        const dueDate = inv.due_date ? new Date(inv.due_date) : null;
-                        let dueDateClass = 'text-gray-600';
-                        let dueDateIcon = 'fa-calendar';
-                        let dueDateLabel = '';
-                        
-                        if (dueDate) {
-                            dueDate.setHours(0, 0, 0, 0);
-                            const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-                            
-                            if (diffDays < 0) {
-                                dueDateClass = 'text-red-600 font-bold';
-                                dueDateIcon = 'fa-exclamation-circle';
-                                dueDateLabel = '（' + Math.abs(diffDays) + '日超過）';
-                            } else if (diffDays === 0) {
-                                dueDateClass = 'text-red-600 font-bold';
-                                dueDateIcon = 'fa-exclamation-triangle';
-                                dueDateLabel = '（本日期限）';
-                            } else if (diffDays <= 3) {
-                                dueDateClass = 'text-orange-600 font-medium';
-                                dueDateIcon = 'fa-clock';
-                                dueDateLabel = '（あと' + diffDays + '日）';
-                            } else if (diffDays <= 7) {
-                                dueDateClass = 'text-yellow-600';
-                                dueDateIcon = 'fa-calendar-alt';
-                                dueDateLabel = '（あと' + diffDays + '日）';
-                            }
-                        }
-                        
-                        const statusLabels = {
-                            issued: { label: '発行済', bg: 'bg-blue-100', text: 'text-blue-700' },
-                            sent: { label: '送付済', bg: 'bg-purple-100', text: 'text-purple-700' }
-                        };
-                        const status = statusLabels[inv.status] || statusLabels.issued;
-                        
-                        return \`
-                            <div class="bg-white rounded-lg p-3 border border-yellow-200 hover:shadow-md transition cursor-pointer"
-                                 onclick="window.location.href='/cases/\${inv.case_id}'">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <span class="font-medium text-gray-800 truncate">\${inv.client_name || '顧客名未設定'}</span>
-                                            <span class="text-xs px-1.5 py-0.5 rounded \${status.bg} \${status.text}">\${status.label}</span>
-                                        </div>
-                                        <div class="text-xs text-gray-500 mb-1">
-                                            <span class="mr-2">\${inv.invoice_number || '請求書番号未設定'}</span>
-                                            <span>\${inv.company_name || ''}</span>
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <span class="text-sm font-bold text-gray-800">¥\${Number(inv.total_amount || 0).toLocaleString()}</span>
-                                            <span class="\${dueDateClass} text-xs flex items-center gap-1">
-                                                <i class="fas \${dueDateIcon}"></i>
-                                                \${dueDate ? dueDate.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }) : '期限未設定'}
-                                                \${dueDateLabel}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="flex-shrink-0">
-                                        <button onclick="event.stopPropagation(); confirmPayment(\${inv.id})" 
-                                                class="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-                                            <i class="fas fa-check mr-1"></i>入金確認
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        \`;
-                    }).join('');
-                    
-                } catch (error) {
-                    console.error('Error loading pending payments:', error);
-                }
-            }
-            
-            // 入金確認処理
-            async function confirmPayment(invoiceId) {
-                if (!confirm('この請求書の入金を確認済みにしますか？')) {
-                    return;
-                }
-                
-                try {
-                    await axios.post(\`/api/invoices/\${invoiceId}/confirm-payment\`);
-                    showToast('入金を確認しました', 'success');
-                    loadPendingPayments();
-                    loadData();
-                } catch (error) {
-                    console.error('Error confirming payment:', error);
-                    showToast('入金確認に失敗しました', 'error');
-                }
-            }
-            window.confirmPayment = confirmPayment;
             
             // 通知サマリーを読み込む
             async function loadNotificationSummary() {
@@ -28205,7 +28081,7 @@ app.get('/admin/settings', async (c) => {
   `)
 })
 
-// 支払い確認待ち一覧画面
+// 支払い管理画面（タブ形式）
 app.get('/admin/payments', async (c) => {
   return c.html(`
     <!DOCTYPE html>
@@ -28213,12 +28089,15 @@ app.get('/admin/payments', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>支払い確認 - 申請らくらく君</title>
+        <title>支払い管理 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <style>
             ${sidebarStyles}
+            .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+            .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
+            .tab-inactive:hover { color: #374151; background-color: #f3f4f6; }
         </style>
     </head>
     <body class="bg-gray-100">
@@ -28233,191 +28112,345 @@ app.get('/admin/payments', async (c) => {
                                 <i class="fas fa-bars text-xl"></i>
                             </button>
                             <h2 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-credit-card mr-2"></i>支払い確認
+                                <i class="fas fa-credit-card mr-2"></i>支払い管理
                             </h2>
                         </div>
-                        <button onclick="loadPayments()" class="text-blue-600 hover:text-blue-800">
+                        <button onclick="loadAllData()" class="text-blue-600 hover:text-blue-800">
                             <i class="fas fa-sync-alt"></i> 更新
                         </button>
                     </div>
                 </header>
 
-                <div class="p-4 lg:p-6 space-y-6">
-                    <!-- 振込確認待ち -->
-                    <div class="bg-white rounded-lg shadow">
-                        <div class="p-4 border-b flex justify-between items-center">
-                            <h2 class="text-lg font-bold">
-                                <i class="fas fa-clock text-yellow-500 mr-2"></i>振込確認待ち
-                            </h2>
-                            <span id="pendingCount" class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-sm">0件</span>
+                <div class="p-4 lg:p-6">
+                    <!-- サマリーカード -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-sm text-gray-500">振込待ち</div>
+                                    <div id="summaryWaiting" class="text-2xl font-bold text-blue-600">0件</div>
+                                    <div id="summaryWaitingAmount" class="text-xs text-gray-400">¥0</div>
+                                </div>
+                                <i class="fas fa-clock text-blue-200 text-3xl"></i>
+                            </div>
                         </div>
-                        <div id="paymentsList" class="divide-y">
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>読み込み中...</p>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-sm text-gray-500">確認待ち</div>
+                                    <div id="summaryPending" class="text-2xl font-bold text-yellow-600">0件</div>
+                                    <div id="summaryPendingAmount" class="text-xs text-gray-400">¥0</div>
+                                </div>
+                                <i class="fas fa-hourglass-half text-yellow-200 text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-sm text-gray-500">支払い済み（今月）</div>
+                                    <div id="summaryPaid" class="text-2xl font-bold text-green-600">0件</div>
+                                    <div id="summaryPaidAmount" class="text-xs text-gray-400">¥0</div>
+                                </div>
+                                <i class="fas fa-check-circle text-green-200 text-3xl"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- 支払い履歴 -->
+                    <!-- タブ -->
                     <div class="bg-white rounded-lg shadow">
-                        <div class="p-4 border-b flex justify-between items-center">
-                            <h2 class="text-lg font-bold">
-                                <i class="fas fa-history text-blue-500 mr-2"></i>支払い履歴
-                            </h2>
-                            <div class="flex items-center gap-2">
-                                <select id="historyFilter" onchange="loadPaymentHistory()" class="text-sm border rounded px-2 py-1">
-                                    <option value="all">すべて</option>
-                                    <option value="deposit">手付金のみ</option>
-                                    <option value="success_fee">成功報酬のみ</option>
-                                </select>
-                                <span id="historyCount" class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">0件</span>
-                            </div>
+                        <div class="border-b">
+                            <nav class="flex">
+                                <button onclick="switchTab('waiting')" id="tabWaiting" class="flex-1 px-4 py-3 text-sm font-medium tab-active">
+                                    <i class="fas fa-clock mr-2"></i>振込待ち
+                                    <span id="tabWaitingCount" class="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">0</span>
+                                </button>
+                                <button onclick="switchTab('pending')" id="tabPending" class="flex-1 px-4 py-3 text-sm font-medium tab-inactive">
+                                    <i class="fas fa-hourglass-half mr-2"></i>確認待ち
+                                    <span id="tabPendingCount" class="ml-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs">0</span>
+                                </button>
+                                <button onclick="switchTab('paid')" id="tabPaid" class="flex-1 px-4 py-3 text-sm font-medium tab-inactive">
+                                    <i class="fas fa-check-circle mr-2"></i>支払い済み
+                                    <span id="tabPaidCount" class="ml-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">0</span>
+                                </button>
+                            </nav>
                         </div>
-                        <div id="paymentHistory" class="divide-y max-h-96 overflow-y-auto">
-                            <div class="p-8 text-center text-gray-500">
+                        
+                        <!-- タブコンテンツ -->
+                        <div id="contentWaiting" class="p-4">
+                            <div class="text-center py-8 text-gray-500">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                                 <p>読み込み中...</p>
                             </div>
                         </div>
+                        <div id="contentPending" class="p-4 hidden">
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>読み込み中...</p>
+                            </div>
+                        </div>
+                        <div id="contentPaid" class="p-4 hidden">
+                            <div class="flex justify-end mb-3">
+                                <select id="paidFilter" onchange="loadPaidInvoices()" class="text-sm border rounded px-3 py-1.5">
+                                    <option value="month">今月</option>
+                                    <option value="all">すべて</option>
+                                </select>
+                            </div>
+                            <div id="paidList">
+                                <div class="text-center py-8 text-gray-500">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>読み込み中...</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </main>
+        </div>
         
         <script>
             ${sidebarScripts}
         </script>
         <script>
-            async function loadPayments() {
+            let currentTab = 'waiting';
+            
+            function switchTab(tabName) {
+                currentTab = tabName;
+                ['waiting', 'pending', 'paid'].forEach(t => {
+                    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className = 
+                        t === tabName ? 'flex-1 px-4 py-3 text-sm font-medium tab-active' : 'flex-1 px-4 py-3 text-sm font-medium tab-inactive';
+                    document.getElementById('content' + t.charAt(0).toUpperCase() + t.slice(1)).className = 
+                        t === tabName ? 'p-4' : 'p-4 hidden';
+                });
+            }
+            
+            // 期日計算ヘルパー
+            function getDueDateInfo(dueDate) {
+                if (!dueDate) return { class: 'text-gray-500', icon: 'fa-calendar', label: '期限未設定', badge: '' };
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const due = new Date(dueDate);
+                due.setHours(0, 0, 0, 0);
+                const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+                
+                if (diffDays < 0) {
+                    return { class: 'text-red-600 font-bold', icon: 'fa-exclamation-circle', label: due.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }), badge: Math.abs(diffDays) + '日超過', badgeClass: 'bg-red-100 text-red-700' };
+                } else if (diffDays === 0) {
+                    return { class: 'text-red-600 font-bold', icon: 'fa-exclamation-triangle', label: '本日期限', badge: '本日', badgeClass: 'bg-red-100 text-red-700' };
+                } else if (diffDays <= 3) {
+                    return { class: 'text-orange-600', icon: 'fa-clock', label: due.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }), badge: 'あと' + diffDays + '日', badgeClass: 'bg-orange-100 text-orange-700' };
+                } else if (diffDays <= 7) {
+                    return { class: 'text-yellow-600', icon: 'fa-calendar-alt', label: due.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }), badge: 'あと' + diffDays + '日', badgeClass: 'bg-yellow-100 text-yellow-700' };
+                }
+                return { class: 'text-gray-600', icon: 'fa-calendar', label: due.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' }), badge: '', badgeClass: '' };
+            }
+            
+            // 振込待ちを読み込む（issued/sent）
+            async function loadWaitingInvoices() {
                 try {
-                    const response = await axios.get('/api/payments/pending');
-                    const payments = response.data;
+                    const response = await axios.get('/api/invoices/pending-payments');
+                    const invoices = response.data || [];
                     
-                    document.getElementById('pendingCount').textContent = payments.length + '件';
+                    document.getElementById('tabWaitingCount').textContent = invoices.length;
+                    document.getElementById('summaryWaiting').textContent = invoices.length + '件';
+                    const totalAmount = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+                    document.getElementById('summaryWaitingAmount').textContent = '¥' + totalAmount.toLocaleString();
                     
-                    if (payments.length === 0) {
-                        document.getElementById('paymentsList').innerHTML = \`
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fas fa-check-circle text-4xl text-green-500 mb-3"></i>
-                                <p>確認待ちの支払いはありません</p>
+                    if (invoices.length === 0) {
+                        document.getElementById('contentWaiting').innerHTML = \`
+                            <div class="text-center py-12 text-gray-500">
+                                <i class="fas fa-inbox text-5xl text-gray-300 mb-4"></i>
+                                <p class="text-lg">振込待ちの請求書はありません</p>
                             </div>
                         \`;
                         return;
                     }
                     
-                    document.getElementById('paymentsList').innerHTML = payments.map(p => {
-                        const isInvoice = p.source === 'invoices';
-                        const typeLabel = p.payment_type === 'deposit' ? '手付金' : (p.payment_type === 'success_fee' ? '成功報酬' : 'その他');
-                        
-                        return \`
-                            <div class="p-4 flex items-center justify-between hover:bg-gray-50">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-10 h-10 rounded-full \${isInvoice ? 'bg-blue-100' : 'bg-yellow-100'} flex items-center justify-center">
-                                        <i class="fas \${isInvoice ? 'fa-file-invoice-dollar text-blue-600' : 'fa-university text-yellow-600'}"></i>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium">\${p.client_name}</div>
-                                        <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
-                                        \${isInvoice ? \`
-                                            <div class="text-xs text-blue-600">
-                                                <i class="fas fa-file-invoice mr-1"></i>\${p.invoice_number} - \${p.item_name || ''}
+                    document.getElementById('contentWaiting').innerHTML = \`
+                        <div class="space-y-3">
+                            \${invoices.map(inv => {
+                                const dueInfo = getDueDateInfo(inv.due_date);
+                                return \`
+                                    <div class="border rounded-lg p-4 hover:shadow-md transition bg-white">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="flex items-start gap-3">
+                                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                    <i class="fas fa-file-invoice-dollar text-blue-600"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="font-medium text-gray-800">\${inv.client_name || '顧客名未設定'}</div>
+                                                    <div class="text-sm text-gray-500">\${inv.company_name || ''}</div>
+                                                    <div class="text-xs text-gray-400 mt-1">
+                                                        <span class="mr-2">\${inv.invoice_number || '-'}</span>
+                                                        <span class="px-1.5 py-0.5 rounded \${inv.status === 'sent' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
+                                                            \${inv.status === 'sent' ? '送付済' : '発行済'}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            \${p.case_number ? \`<div class="text-xs text-gray-400">案件: \${p.case_number}</div>\` : ''}
-                                        \` : ''}
-                                        <div class="text-xs text-gray-400">
-                                            報告日時: \${p.bank_transfer_reported_at ? new Date(p.bank_transfer_reported_at).toLocaleString('ja-JP') : '-'}
+                                            <div class="text-right flex-shrink-0">
+                                                <div class="font-bold text-lg text-gray-800">¥\${(inv.total_amount || 0).toLocaleString()}</div>
+                                                <div class="\${dueInfo.class} text-sm flex items-center justify-end gap-1 mt-1">
+                                                    <i class="fas \${dueInfo.icon}"></i>
+                                                    <span>\${dueInfo.label}</span>
+                                                    \${dueInfo.badge ? \`<span class="ml-1 px-1.5 py-0.5 rounded text-xs \${dueInfo.badgeClass}">\${dueInfo.badge}</span>\` : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 pt-3 border-t flex justify-end gap-2">
+                                            <a href="/cases/\${inv.case_id}" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                                                <i class="fas fa-external-link-alt mr-1"></i>案件詳細
+                                            </a>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="flex items-center gap-4">
-                                    <div class="text-right">
-                                        <div class="font-bold text-lg">¥\${(p.amount || 0).toLocaleString()}</div>
-                                        <div class="text-xs \${isInvoice ? 'text-blue-500' : 'text-gray-500'}">
-                                            \${typeLabel}
-                                            \${isInvoice ? '<span class="ml-1 px-1 bg-blue-100 text-blue-600 rounded text-[10px]">請求書</span>' : ''}
-                                        </div>
-                                    </div>
-                                    <button onclick="confirmPayment(\${p.id}, '\${p.source || 'payment_history'}')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                                        <i class="fas fa-check mr-1"></i>確認
-                                    </button>
-                                    \${isInvoice && p.case_id ? \`
-                                        <a href="/case/\${p.case_id}" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">
-                                            <i class="fas fa-external-link-alt"></i>
-                                        </a>
-                                    \` : ''}
-                                </div>
-                            </div>
-                        \`;
-                    }).join('');
+                                \`;
+                            }).join('')}
+                        </div>
+                    \`;
                 } catch (error) {
                     console.error('Error:', error);
                 }
             }
             
-            async function loadPaymentHistory() {
+            // 確認待ちを読み込む（payment_reported）
+            async function loadPendingInvoices() {
                 try {
-                    const filter = document.getElementById('historyFilter').value;
-                    const response = await axios.get('/api/payments/history?type=' + filter);
-                    const payments = response.data;
+                    const response = await axios.get('/api/payments/pending');
+                    const payments = response.data || [];
                     
-                    document.getElementById('historyCount').textContent = payments.length + '件';
+                    document.getElementById('tabPendingCount').textContent = payments.length;
+                    document.getElementById('summaryPending').textContent = payments.length + '件';
+                    const totalAmount = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+                    document.getElementById('summaryPendingAmount').textContent = '¥' + totalAmount.toLocaleString();
                     
                     if (payments.length === 0) {
-                        document.getElementById('paymentHistory').innerHTML = \`
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
-                                <p>支払い履歴がありません</p>
+                        document.getElementById('contentPending').innerHTML = \`
+                            <div class="text-center py-12 text-gray-500">
+                                <i class="fas fa-check-circle text-5xl text-green-300 mb-4"></i>
+                                <p class="text-lg">確認待ちの支払いはありません</p>
                             </div>
                         \`;
                         return;
                     }
                     
-                    document.getElementById('paymentHistory').innerHTML = payments.map(p => {
-                        const isInvoice = p.source === 'invoices';
-                        return \`
-                            <div class="p-4 hover:bg-gray-50">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-4">
-                                        <div class="w-10 h-10 rounded-full \${isInvoice ? 'bg-blue-100' : 'bg-green-100'} flex items-center justify-center">
-                                            <i class="fas \${isInvoice ? 'fa-file-invoice-dollar text-blue-600' : 'fa-check text-green-600'}"></i>
-                                        </div>
-                                        <div>
-                                            <div class="font-medium">\${p.client_name}</div>
-                                            <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
-                                            \${isInvoice && p.invoice_number ? \`
-                                                <div class="text-xs text-blue-600">
-                                                    <i class="fas fa-file-invoice mr-1"></i>\${p.invoice_number}\${p.item_name ? ' - ' + p.item_name : ''}
+                    document.getElementById('contentPending').innerHTML = \`
+                        <div class="space-y-3">
+                            \${payments.map(p => {
+                                const isInvoice = p.source === 'invoices';
+                                return \`
+                                    <div class="border rounded-lg p-4 hover:shadow-md transition bg-yellow-50 border-yellow-200">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="flex items-start gap-3">
+                                                <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                                                    <i class="fas fa-hourglass-half text-yellow-600"></i>
                                                 </div>
+                                                <div>
+                                                    <div class="font-medium text-gray-800">\${p.client_name || '顧客名未設定'}</div>
+                                                    <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
+                                                    \${isInvoice ? \`
+                                                        <div class="text-xs text-blue-600 mt-1">
+                                                            <i class="fas fa-file-invoice mr-1"></i>\${p.invoice_number || '-'} - \${p.item_name || ''}
+                                                        </div>
+                                                    \` : ''}
+                                                    <div class="text-xs text-gray-400 mt-1">
+                                                        <i class="fas fa-clock mr-1"></i>報告日時: \${p.bank_transfer_reported_at ? new Date(p.bank_transfer_reported_at).toLocaleString('ja-JP') : '-'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="text-right flex-shrink-0">
+                                                <div class="font-bold text-lg text-yellow-700">¥\${(p.amount || 0).toLocaleString()}</div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    <span class="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700">振込報告済</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 pt-3 border-t border-yellow-200 flex justify-end gap-2">
+                                            \${isInvoice && p.case_id ? \`
+                                                <a href="/cases/\${p.case_id}" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                                                    <i class="fas fa-external-link-alt mr-1"></i>案件詳細
+                                                </a>
                                             \` : ''}
-                                            <div class="text-xs text-gray-400">
-                                                案件: \${p.case_number || '-'} | 
-                                                \${p.subsidy_type_name || '申請種別未設定'}
+                                            <button onclick="confirmPayment(\${p.id}, '\${p.source || 'payment_history'}')" class="px-4 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700">
+                                                <i class="fas fa-check mr-1"></i>入金確認
+                                            </button>
+                                        </div>
+                                    </div>
+                                \`;
+                            }).join('')}
+                        </div>
+                    \`;
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }
+            
+            // 支払い済みを読み込む
+            async function loadPaidInvoices() {
+                try {
+                    const filter = document.getElementById('paidFilter').value;
+                    const response = await axios.get('/api/payments/history?type=all&period=' + filter);
+                    const payments = response.data || [];
+                    
+                    document.getElementById('tabPaidCount').textContent = payments.length;
+                    if (filter === 'month') {
+                        document.getElementById('summaryPaid').textContent = payments.length + '件';
+                        const totalAmount = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+                        document.getElementById('summaryPaidAmount').textContent = '¥' + totalAmount.toLocaleString();
+                    }
+                    
+                    if (payments.length === 0) {
+                        document.getElementById('paidList').innerHTML = \`
+                            <div class="text-center py-12 text-gray-500">
+                                <i class="fas fa-inbox text-5xl text-gray-300 mb-4"></i>
+                                <p class="text-lg">支払い履歴がありません</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    document.getElementById('paidList').innerHTML = \`
+                        <div class="space-y-3">
+                            \${payments.map(p => {
+                                const isInvoice = p.source === 'invoices';
+                                return \`
+                                    <div class="border rounded-lg p-4 hover:shadow-md transition bg-green-50 border-green-200">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="flex items-start gap-3">
+                                                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                                                    <i class="fas fa-check text-green-600"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="font-medium text-gray-800">\${p.client_name || '顧客名未設定'}</div>
+                                                    <div class="text-sm text-gray-500">\${p.company_name || ''}</div>
+                                                    \${isInvoice && p.invoice_number ? \`
+                                                        <div class="text-xs text-blue-600 mt-1">
+                                                            <i class="fas fa-file-invoice mr-1"></i>\${p.invoice_number}\${p.item_name ? ' - ' + p.item_name : ''}
+                                                        </div>
+                                                    \` : ''}
+                                                    <div class="text-xs text-gray-400 mt-1">
+                                                        案件: \${p.case_number || '-'} | \${p.subsidy_type_name || '申請種別未設定'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="text-right flex-shrink-0">
+                                                <div class="font-bold text-lg text-green-600">¥\${(p.amount || 0).toLocaleString()}</div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    <span class="px-1.5 py-0.5 rounded \${p.payment_type === 'deposit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">
+                                                        \${p.payment_type === 'deposit' ? '手付金' : '成功報酬'}
+                                                    </span>
+                                                </div>
+                                                <div class="text-xs text-gray-400 mt-1">
+                                                    \${p.confirmed_at ? new Date(p.confirmed_at).toLocaleDateString('ja-JP') + ' 確認' : ''}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="text-right">
-                                        <div class="font-bold text-lg text-green-600">¥\${(p.amount || 0).toLocaleString()}</div>
-                                        <div class="text-xs text-gray-500">
-                                            <span class="px-1.5 py-0.5 rounded \${p.payment_type === 'deposit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">
-                                                \${p.payment_type === 'deposit' ? '手付金' : '成功報酬'}
-                                            </span>
-                                            \${isInvoice ? '<span class="ml-1 px-1 bg-blue-50 text-blue-500 rounded text-[10px]">請求書</span>' : ''}
-                                        </div>
-                                        <div class="text-xs text-gray-400 mt-1">
-                                            \${p.confirmed_at ? new Date(p.confirmed_at).toLocaleDateString('ja-JP') : ''}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        \`;
-                    }).join('');
-                } catch (error) {
-                    console.error('Error:', error);
-                    document.getElementById('paymentHistory').innerHTML = \`
-                        <div class="p-8 text-center text-gray-500">
-                            <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-3"></i>
-                            <p>読み込みに失敗しました</p>
+                                \`;
+                            }).join('')}
                         </div>
                     \`;
+                } catch (error) {
+                    console.error('Error:', error);
                 }
             }
             
@@ -28427,20 +28460,30 @@ app.get('/admin/payments', async (c) => {
                 try {
                     await axios.put(\`/api/payments/\${paymentId}/confirm\`, { source });
                     alert('支払いを確認しました');
-                    loadPayments();
-                    loadPaymentHistory();
+                    loadAllData();
                 } catch (error) {
                     alert('エラーが発生しました');
                 }
             }
             
-            // グローバルスコープに関数を公開（onclick対応）
-            window.loadPayments = loadPayments;
-            window.loadPaymentHistory = loadPaymentHistory;
-            window.confirmPayment = confirmPayment;
+            async function loadAllData() {
+                await Promise.all([
+                    loadWaitingInvoices(),
+                    loadPendingInvoices(),
+                    loadPaidInvoices()
+                ]);
+            }
             
-            loadPayments();
-            loadPaymentHistory();
+            // グローバルスコープに関数を公開
+            window.switchTab = switchTab;
+            window.loadWaitingInvoices = loadWaitingInvoices;
+            window.loadPendingInvoices = loadPendingInvoices;
+            window.loadPaidInvoices = loadPaidInvoices;
+            window.confirmPayment = confirmPayment;
+            window.loadAllData = loadAllData;
+            
+            // 初期読み込み
+            loadAllData();
         </script>
     </body>
     </html>
