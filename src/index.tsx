@@ -14594,7 +14594,7 @@ app.get('/portal/:token', async (c) => {
                 });
             }
             
-            // 案件一覧を読み込む（顧客の全案件を表示）
+            // 案件一覧を読み込む（顧客の全案件を表示）- パイプライン付き
             async function loadPortalCases() {
                 try {
                     const response = await axios.get(\`/api/clients/\${CLIENT_ID}/cases\`);
@@ -14620,35 +14620,170 @@ app.get('/portal/:token', async (c) => {
                         completed: { label: '完了', bg: 'bg-teal-100', text: 'text-teal-800' }
                     };
                     
+                    // 各案件のパイプラインを取得
+                    const pipelinesResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/pipelines\`);
+                    const allPipelines = pipelinesResponse.data || [];
+                    
                     container.innerHTML = cases.map(c => {
                         const statusInfo = statusLabels[c.status] || { label: c.status, bg: 'bg-gray-100', text: 'text-gray-700' };
                         const isCurrentCase = c.id === CASE_ID;
+                        const casePipelines = allPipelines.filter(p => p.case_id === c.id);
+                        const activePipeline = casePipelines.find(p => p.status === 'active') || casePipelines[0];
+                        const progress = activePipeline?.progress_percentage || 0;
                         
                         return \`
-                            <div class="flex items-center gap-3 p-3 rounded-lg border \${isCurrentCase ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'} cursor-pointer hover:shadow-md transition"
-                                 onclick="switchCase(\${c.id}, '\${c.access_token}')">
-                                <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center \${isCurrentCase ? 'bg-green-500' : 'bg-gray-400'}">
-                                    <i class="fas fa-file-alt text-white"></i>
-                                </div>
-                                <div class="flex-1 min-w-0">
+                            <div class="rounded-lg border \${isCurrentCase ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'} overflow-hidden">
+                                <div class="flex items-center gap-3 p-3 cursor-pointer hover:bg-opacity-80 transition"
+                                     onclick="switchCase(\${c.id}, '\${c.access_token}')">
+                                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center \${isCurrentCase ? 'bg-green-500' : 'bg-gray-400'}">
+                                        <i class="fas fa-file-alt text-white"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-medium text-sm \${isCurrentCase ? 'text-green-800' : 'text-gray-800'}">\${c.subsidy_type_name || '申請種別未設定'}</span>
+                                            \${isCurrentCase ? '<span class="text-xs bg-green-600 text-white px-2 py-0.5 rounded">現在表示中</span>' : ''}
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-0.5">
+                                            \${c.case_number || ''} 
+                                            <span class="inline-block px-2 py-0.5 rounded \${statusInfo.bg} \${statusInfo.text} ml-1">\${statusInfo.label}</span>
+                                        </div>
+                                    </div>
                                     <div class="flex items-center gap-2">
-                                        <span class="font-medium text-sm \${isCurrentCase ? 'text-green-800' : 'text-gray-800'}">\${c.subsidy_type_name || '申請種別未設定'}</span>
-                                        \${isCurrentCase ? '<span class="text-xs bg-green-600 text-white px-2 py-0.5 rounded">現在表示中</span>' : ''}
-                                    </div>
-                                    <div class="text-xs text-gray-500 mt-0.5">
-                                        \${c.case_number || ''} 
-                                        <span class="inline-block px-2 py-0.5 rounded \${statusInfo.bg} \${statusInfo.text} ml-1">\${statusInfo.label}</span>
+                                        \${activePipeline ? \`
+                                            <span class="text-xs font-bold \${progress >= 100 ? 'text-green-600' : 'text-blue-600'}">\${progress}%</span>
+                                        \` : ''}
+                                        <button onclick="event.stopPropagation(); toggleCasePipeline(\${c.id})" 
+                                                class="text-gray-400 hover:text-gray-600 p-1">
+                                            <i class="fas fa-chevron-down" id="caseChevron\${c.id}"></i>
+                                        </button>
                                     </div>
                                 </div>
-                                <i class="fas fa-chevron-right text-gray-400"></i>
+                                
+                                <!-- パイプライン詳細（折りたたみ） -->
+                                <div id="casePipeline\${c.id}" class="hidden border-t bg-white">
+                                    \${activePipeline ? \`
+                                        <div class="p-3">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-xs font-medium text-gray-600">
+                                                    <i class="fas fa-tasks mr-1 text-blue-500"></i>パイプライン進捗
+                                                </span>
+                                                <span class="text-xs font-bold \${progress >= 100 ? 'text-green-600' : 'text-blue-600'}">\${progress}%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-1.5 mb-3">
+                                                <div class="h-1.5 rounded-full transition-all \${progress >= 100 ? 'bg-green-500' : 'bg-blue-500'}" style="width: \${progress}%"></div>
+                                            </div>
+                                            <div id="casePipelineTasks\${c.id}" class="space-y-2 text-xs">
+                                                <div class="text-gray-400 py-2 text-center">
+                                                    <i class="fas fa-spinner fa-spin mr-1"></i>読み込み中...
+                                                </div>
+                                            </div>
+                                        </div>
+                                    \` : \`
+                                        <div class="p-3 text-xs text-gray-500 text-center">
+                                            パイプラインが設定されていません
+                                        </div>
+                                    \`}
+                                </div>
                             </div>
                         \`;
                     }).join('');
+                    
+                    // 各案件のパイプライン情報を保存
+                    window.portalCasePipelines = {};
+                    for (const c of cases) {
+                        const casePipelines = allPipelines.filter(p => p.case_id === c.id);
+                        window.portalCasePipelines[c.id] = casePipelines;
+                    }
                 } catch (error) {
                     console.error('Error loading portal cases:', error);
                     document.getElementById('portalCasesList').innerHTML = '<div class="text-sm text-red-500 py-2">案件の読み込みに失敗しました</div>';
                 }
             }
+            
+            // 案件のパイプライン表示を切り替え
+            async function toggleCasePipeline(caseId) {
+                const container = document.getElementById('casePipeline' + caseId);
+                const chevron = document.getElementById('caseChevron' + caseId);
+                
+                if (container.classList.contains('hidden')) {
+                    container.classList.remove('hidden');
+                    chevron.classList.remove('fa-chevron-down');
+                    chevron.classList.add('fa-chevron-up');
+                    
+                    // タスクを読み込み
+                    await loadCasePipelineTasks(caseId);
+                } else {
+                    container.classList.add('hidden');
+                    chevron.classList.remove('fa-chevron-up');
+                    chevron.classList.add('fa-chevron-down');
+                }
+            }
+            window.toggleCasePipeline = toggleCasePipeline;
+            
+            // 案件のパイプラインタスクを読み込み
+            async function loadCasePipelineTasks(caseId) {
+                const tasksContainer = document.getElementById('casePipelineTasks' + caseId);
+                const pipelines = window.portalCasePipelines?.[caseId] || [];
+                const activePipeline = pipelines.find(p => p.status === 'active') || pipelines[0];
+                
+                if (!activePipeline) {
+                    tasksContainer.innerHTML = '<div class="text-gray-400 text-center py-2">タスクがありません</div>';
+                    return;
+                }
+                
+                try {
+                    const response = await axios.get(\`/api/pipelines/\${activePipeline.id}/tasks\`);
+                    const tasks = response.data || [];
+                    
+                    if (tasks.length === 0) {
+                        tasksContainer.innerHTML = '<div class="text-gray-400 text-center py-2">タスクがありません</div>';
+                        return;
+                    }
+                    
+                    tasksContainer.innerHTML = tasks.map((task, index) => {
+                        const isCompleted = task.status === 'completed';
+                        const isCustomerTask = task.task_type === 'external' || task.task_type === 'both';
+                        const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
+                        
+                        return \`
+                            <div class="flex items-center gap-2 p-2 rounded \${isCompleted ? 'bg-green-50' : (isCustomerTask ? 'bg-blue-50' : 'bg-gray-50')}">
+                                <div class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold \${isCompleted ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-600'}">
+                                    \${isCompleted ? '<i class="fas fa-check text-xs"></i>' : (index + 1)}
+                                </div>
+                                <span class="flex-1 \${isCompleted ? 'text-green-700 line-through' : 'text-gray-700'}">\${task.task_name}</span>
+                                \${isCustomerTask && !isCompleted ? '<span class="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-xs">顧客</span>' : ''}
+                                \${canComplete ? \`
+                                    <button onclick="event.stopPropagation(); completeTaskFromList(\${task.id}, \${caseId})" 
+                                            class="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs">
+                                        完了
+                                    </button>
+                                \` : ''}
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading pipeline tasks:', error);
+                    tasksContainer.innerHTML = '<div class="text-red-400 text-center py-2">読み込みエラー</div>';
+                }
+            }
+            
+            // タスク完了（一覧から）
+            async function completeTaskFromList(taskId, caseId) {
+                if (!confirm('このタスクを完了にしますか？')) return;
+                
+                try {
+                    await axios.post(\`/api/portal/tasks/\${taskId}/complete\`, { client_id: CLIENT_ID });
+                    showMessage('タスクを完了しました！', 'success');
+                    await loadCasePipelineTasks(caseId);
+                    await loadPortalCases();
+                    if (caseId === CASE_ID) {
+                        loadPipelineProgress();
+                    }
+                } catch (error) {
+                    alert('タスクの完了に失敗しました');
+                }
+            }
+            window.completeTaskFromList = completeTaskFromList;
             
             // 案件を切り替える
             function switchCase(caseId, accessToken) {
