@@ -11523,18 +11523,51 @@ app.get('/case/:id', async (c) => {
                                 rejected: 'bg-red-100 text-red-700'
                             }[doc.status] || 'bg-gray-100';
                             const statusLabel = { pending: '確認待ち', approved: '承認済み', rejected: '差し戻し' }[doc.status] || doc.status;
+                            const isPending = doc.status === 'pending' || !doc.status;
+                            const isImage = /\\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(doc.file_name);
+                            const isPdf = /\\.pdf$/i.test(doc.file_name);
+                            const canPreview = isImage || isPdf;
                             
                             return \`
-                                <div class="flex items-center gap-3 p-2 border rounded">
-                                    <i class="fas fa-file text-blue-500"></i>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="text-sm font-medium truncate">\${doc.document_type}</div>
-                                        <div class="text-xs text-gray-500">\${doc.file_name}</div>
+                                <div class="border rounded-lg p-3 hover:shadow-md transition \${isPending ? 'bg-yellow-50 border-yellow-200' : ''}">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-10 h-10 rounded-lg \${isImage ? 'bg-purple-100' : isPdf ? 'bg-red-100' : 'bg-blue-100'} flex items-center justify-center flex-shrink-0">
+                                            <i class="fas \${isImage ? 'fa-image text-purple-600' : isPdf ? 'fa-file-pdf text-red-600' : 'fa-file text-blue-600'}"></i>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="text-sm font-medium text-gray-800 truncate">\${doc.document_type}</span>
+                                                <span class="px-2 py-0.5 rounded text-xs \${statusClass}">\${statusLabel}</span>
+                                            </div>
+                                            <div class="text-xs text-gray-500 truncate">\${doc.file_name}</div>
+                                            <div class="text-xs text-gray-400 mt-1">
+                                                \${doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString('ja-JP') : ''}
+                                                \${doc.uploaded_by === 'client' ? ' · 顧客アップロード' : ''}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <span class="px-2 py-0.5 rounded text-xs \${statusClass}">\${statusLabel}</span>
-                                    <a href="/api/documents/\${doc.id}/download" class="text-blue-600 hover:text-blue-700">
-                                        <i class="fas fa-download"></i>
-                                    </a>
+                                    <div class="flex items-center gap-2 mt-3 pt-3 border-t">
+                                        \${canPreview ? \`
+                                            <button onclick="previewDocument(\${doc.id}, '\${doc.file_name}', '\${doc.document_type}')" 
+                                                    class="flex-1 px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                                                <i class="fas fa-eye mr-1"></i>プレビュー
+                                            </button>
+                                        \` : ''}
+                                        <a href="/api/documents/\${doc.id}/download" 
+                                           class="flex-1 px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-center">
+                                            <i class="fas fa-download mr-1"></i>ダウンロード
+                                        </a>
+                                        \${isPending ? \`
+                                            <button onclick="approveDocument(\${doc.id})" 
+                                                    class="px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700">
+                                                <i class="fas fa-check mr-1"></i>承認
+                                            </button>
+                                            <button onclick="rejectDocument(\${doc.id})" 
+                                                    class="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700">
+                                                <i class="fas fa-times mr-1"></i>差戻
+                                            </button>
+                                        \` : ''}
+                                    </div>
                                 </div>
                             \`;
                         }).join('');
@@ -11543,6 +11576,89 @@ app.get('/case/:id', async (c) => {
                     console.error('Error loading documents:', error);
                 }
             }
+            
+            // 書類プレビューモーダル
+            async function previewDocument(docId, fileName, docType) {
+                const isImage = /\\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(fileName);
+                const isPdf = /\\.pdf$/i.test(fileName);
+                
+                const modal = document.createElement('div');
+                modal.id = 'documentPreviewModal';
+                modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4';
+                modal.innerHTML = \`
+                    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+                        <div class="p-4 border-b flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold text-lg">\${docType}</h3>
+                                <p class="text-sm text-gray-500">\${fileName}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <a href="/api/documents/\${docId}/download" 
+                                   class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                                    <i class="fas fa-download mr-1"></i>ダウンロード
+                                </a>
+                                <button onclick="document.getElementById('documentPreviewModal').remove()" 
+                                        class="p-2 text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-times text-xl"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex-1 overflow-auto p-4 bg-gray-100 flex items-center justify-center min-h-[400px]">
+                            \${isImage ? \`
+                                <img src="/api/documents/\${docId}/download" alt="\${fileName}" 
+                                     class="max-w-full max-h-full object-contain rounded shadow-lg" />
+                            \` : isPdf ? \`
+                                <iframe src="/api/documents/\${docId}/download#toolbar=0" 
+                                        class="w-full h-full min-h-[500px] rounded shadow-lg bg-white"></iframe>
+                            \` : \`
+                                <div class="text-gray-500 text-center">
+                                    <i class="fas fa-file text-6xl mb-4"></i>
+                                    <p>このファイル形式はプレビューできません</p>
+                                    <p class="text-sm mt-2">ダウンロードして確認してください</p>
+                                </div>
+                            \`}
+                        </div>
+                    </div>
+                \`;
+                document.body.appendChild(modal);
+                
+                // モーダル外クリックで閉じる
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.remove();
+                });
+            }
+            window.previewDocument = previewDocument;
+            
+            // 書類承認
+            async function approveDocument(docId) {
+                if (!confirm('この書類を承認しますか？')) return;
+                
+                try {
+                    await axios.put(\`/api/documents/\${docId}/status\`, { status: 'approved' });
+                    showToast('書類を承認しました', 'success');
+                    loadDocuments();
+                } catch (error) {
+                    console.error('Error approving document:', error);
+                    showToast('承認に失敗しました', 'error');
+                }
+            }
+            window.approveDocument = approveDocument;
+            
+            // 書類差し戻し
+            async function rejectDocument(docId) {
+                const reason = prompt('差し戻しの理由を入力してください（任意）:');
+                if (reason === null) return; // キャンセル
+                
+                try {
+                    await axios.put(\`/api/documents/\${docId}/status\`, { status: 'rejected', reason: reason });
+                    showToast('書類を差し戻しました', 'info');
+                    loadDocuments();
+                } catch (error) {
+                    console.error('Error rejecting document:', error);
+                    showToast('差し戻しに失敗しました', 'error');
+                }
+            }
+            window.rejectDocument = rejectDocument;
             
             // ヒアリングタブ切り替え
             function switchHearingAnswerTab(tab) {
