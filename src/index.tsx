@@ -10493,8 +10493,41 @@ app.get('/case/:id', async (c) => {
                                     <div id="hearingProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all" style="width: 0%"></div>
                                 </div>
                             </div>
-                            <div id="hearingAnswersList" class="space-y-4">
-                                <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                            
+                            <!-- ヒアリングタブ切り替え -->
+                            <div class="flex border-b mb-4">
+                                <button id="hearingTabCommon" onclick="switchHearingAnswerTab('common')" 
+                                        class="px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 -mb-px">
+                                    <i class="fas fa-globe mr-1"></i>共通質問
+                                    <span id="hearingCommonBadge" class="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">0/0</span>
+                                </button>
+                                <button id="hearingTabCase" onclick="switchHearingAnswerTab('case')" 
+                                        class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent -mb-px">
+                                    <i class="fas fa-clipboard-list mr-1"></i>案件固有の質問
+                                    <span id="hearingCaseBadge" class="ml-1 px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs">0/0</span>
+                                </button>
+                            </div>
+                            
+                            <!-- 共通質問コンテンツ -->
+                            <div id="hearingContentCommon" class="space-y-4">
+                                <p class="text-xs text-gray-500 mb-3 bg-blue-50 p-3 rounded-lg">
+                                    <i class="fas fa-info-circle mr-1 text-blue-600"></i>
+                                    共通質問の回答は、他の案件でも自動的に共有されます
+                                </p>
+                                <div id="hearingCommonList" class="space-y-3">
+                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 案件固有質問コンテンツ -->
+                            <div id="hearingContentCase" class="space-y-4 hidden">
+                                <p class="text-xs text-gray-500 mb-3 bg-indigo-50 p-3 rounded-lg">
+                                    <i class="fas fa-info-circle mr-1 text-indigo-600"></i>
+                                    この申請種別専用の質問です
+                                </p>
+                                <div id="hearingCaseList" class="space-y-3">
+                                    <div class="text-center py-4 text-gray-500">読み込み中...</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -11440,6 +11473,27 @@ app.get('/case/:id', async (c) => {
                 }
             }
             
+            // ヒアリングタブ切り替え
+            function switchHearingAnswerTab(tab) {
+                const commonTab = document.getElementById('hearingTabCommon');
+                const caseTab = document.getElementById('hearingTabCase');
+                const commonContent = document.getElementById('hearingContentCommon');
+                const caseContent = document.getElementById('hearingContentCase');
+                
+                if (tab === 'common') {
+                    commonTab.className = 'px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 -mb-px';
+                    caseTab.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent -mb-px';
+                    commonContent.classList.remove('hidden');
+                    caseContent.classList.add('hidden');
+                } else {
+                    caseTab.className = 'px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 -mb-px';
+                    commonTab.className = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent -mb-px';
+                    caseContent.classList.remove('hidden');
+                    commonContent.classList.add('hidden');
+                }
+            }
+            window.switchHearingAnswerTab = switchHearingAnswerTab;
+            
             // ヒアリング読み込み
             async function loadHearing() {
                 try {
@@ -11448,12 +11502,8 @@ app.get('/case/:id', async (c) => {
                     ]);
                     
                     const answers = answersRes.data;
-                    const container = document.getElementById('hearingAnswersList');
-                    
-                    if (answers.length === 0) {
-                        container.innerHTML = '<div class="text-gray-500 text-center py-4">ヒアリング回答がありません</div>';
-                        return;
-                    }
+                    const commonList = document.getElementById('hearingCommonList');
+                    const caseList = document.getElementById('hearingCaseList');
                     
                     // 共通質問（subsidy_type_id = 0）と案件固有の質問を分離
                     const commonQuestions = answers.filter(a => a.subsidy_type_id === 0);
@@ -11473,54 +11523,27 @@ app.get('/case/:id', async (c) => {
                         </div>
                     \`;
                     
-                    let html = '';
-                    
-                    // 共通質問セクション
+                    // 共通質問リスト
                     if (commonQuestions.length > 0) {
-                        html += \`
-                            <div class="mb-6">
-                                <div class="flex items-center gap-2 mb-3">
-                                    <i class="fas fa-globe text-blue-600"></i>
-                                    <h4 class="font-bold text-gray-800">共通質問</h4>
-                                    <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                                        \${commonQuestions.filter(q => q.answer_text).length}/\${commonQuestions.length}問回答済み
-                                    </span>
-                                </div>
-                                <p class="text-xs text-gray-500 mb-3">
-                                    <i class="fas fa-info-circle mr-1"></i>
-                                    共通質問の回答は、他の案件でも自動的に共有されます
-                                </p>
-                                <div class="space-y-3 pl-2 border-l-2 border-blue-200">
-                                    \${commonQuestions.map(renderQuestion).join('')}
-                                </div>
-                            </div>
-                        \`;
+                        commonList.innerHTML = commonQuestions.map(renderQuestion).join('');
+                    } else {
+                        commonList.innerHTML = '<div class="text-gray-500 text-center py-4">共通質問はありません</div>';
                     }
                     
-                    // 案件固有質問セクション
+                    // 案件固有質問リスト
                     if (caseQuestions.length > 0) {
-                        html += \`
-                            <div>
-                                <div class="flex items-center gap-2 mb-3">
-                                    <i class="fas fa-clipboard-list text-indigo-600"></i>
-                                    <h4 class="font-bold text-gray-800">申請種別固有の質問</h4>
-                                    <span class="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
-                                        \${caseQuestions.filter(q => q.answer_text).length}/\${caseQuestions.length}問回答済み
-                                    </span>
-                                </div>
-                                <p class="text-xs text-gray-500 mb-3">
-                                    <i class="fas fa-info-circle mr-1"></i>
-                                    この申請種別専用の質問です
-                                </p>
-                                <div class="space-y-3 pl-2 border-l-2 border-indigo-200">
-                                    \${caseQuestions.map(renderQuestion).join('')}
-                                </div>
-                            </div>
-                        \`;
+                        caseList.innerHTML = caseQuestions.map(renderQuestion).join('');
+                    } else {
+                        caseList.innerHTML = '<div class="text-gray-500 text-center py-4">案件固有の質問はありません</div>';
                     }
                     
-                    container.innerHTML = html;
+                    // バッジ更新
+                    const commonAnswered = commonQuestions.filter(q => q.answer_text).length;
+                    const caseAnswered = caseQuestions.filter(q => q.answer_text).length;
+                    document.getElementById('hearingCommonBadge').textContent = \`\${commonAnswered}/\${commonQuestions.length}\`;
+                    document.getElementById('hearingCaseBadge').textContent = \`\${caseAnswered}/\${caseQuestions.length}\`;
                     
+                    // 全体進捗
                     const total = answers.length;
                     const answered = answers.filter(a => a.answer_text).length;
                     const progress = total > 0 ? Math.round((answered / total) * 100) : 0;
