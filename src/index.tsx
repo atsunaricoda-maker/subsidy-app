@@ -5794,52 +5794,75 @@ app.get('/api/cases/:id/documents/download-all', async (c) => {
     return c.json({ error: 'Case not found' }, 404)
   }
   
-  // 案件に紐づく書類を取得
-  const documents = await DB.prepare(`
-    SELECT * FROM documents WHERE case_id = ?
-  `).bind(caseId).all()
+  // 案件に紐づく書類を取得（case_idまたはclient_idで取得）
+  let documents: any = { results: [] }
+  try {
+    documents = await DB.prepare(`
+      SELECT * FROM documents 
+      WHERE case_id = ? OR (case_id IS NULL AND client_id = ?)
+    `).bind(caseId, caseInfo.client_id).all()
+  } catch (e) {
+    console.error('Error fetching documents:', e)
+  }
   
-  // 顧客の共通書類も取得
-  const commonDocs = await DB.prepare(`
-    SELECT cd.*, cdt.name as type_name
-    FROM common_documents cd
-    LEFT JOIN common_document_types cdt ON cd.document_type_id = cdt.id
-    WHERE cd.client_id = ?
-  `).bind(caseInfo.client_id).all()
+  // 顧客の共通書類も取得（テーブルが存在しない場合はスキップ）
+  let commonDocs: any = { results: [] }
+  try {
+    commonDocs = await DB.prepare(`
+      SELECT cd.*, cdt.name as type_name
+      FROM client_common_documents cd
+      LEFT JOIN common_document_types cdt ON cd.document_type = cdt.name
+      WHERE cd.client_id = ? AND cd.status = 'active'
+    `).bind(caseInfo.client_id).all()
+  } catch (e) {
+    console.error('Error fetching common documents:', e)
+    // テーブルが存在しない場合は空配列
+  }
   
   const allDocs = [
-    ...(documents.results || []).map(d => ({ ...d, isCommon: false })),
-    ...(commonDocs.results || []).map(d => ({ ...d, isCommon: true }))
+    ...(documents.results || []).map((d: any) => ({ ...d, isCommon: false })),
+    ...(commonDocs.results || []).map((d: any) => ({ ...d, isCommon: true }))
   ]
   
   if (allDocs.length === 0) {
-    return c.json({ error: 'No documents found for this case' }, 404)
+    return c.json({ error: 'No documents found for this case', success: false }, 404)
   }
   
-  // JSZipを使わずシンプルなtar形式で出力（または各ファイルを個別にダウンロード案内）
   // Cloudflare WorkersではJSZipが重いため、ファイルリストをJSON返却
-  const fileList = []
+  const fileList: any[] = []
   
   for (const doc of allDocs) {
     const filePath = doc.file_path
+    if (!filePath) continue
+    
     try {
       const object = await R2.get(filePath)
       
       if (object) {
         const arrayBuffer = await object.arrayBuffer()
-        const uint8Array = new Uint8Array(arrayBuffer)
         
-        // 大きなファイルでもスタックオーバーフローを避けるためチャンクで処理
-        let base64 = ''
-        const chunkSize = 8192
-        for (let i = 0; i < uint8Array.length; i += chunkSize) {
-          const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
-          base64 += String.fromCharCode.apply(null, chunk as any)
+        // ArrayBufferを直接Base64に変換（btoa/atoaを使わずに安全に変換）
+        const bytes = new Uint8Array(arrayBuffer)
+        
+        // ファイルサイズ制限チェック（10MB以上はスキップ）
+        if (bytes.length > 10 * 1024 * 1024) {
+          console.warn(`File ${doc.file_name} is too large (${bytes.length} bytes), skipping`)
+          continue
         }
-        base64 = btoa(base64)
+        
+        // チャンクごとに文字列に変換（スタックオーバーフロー回避）
+        let binaryString = ''
+        const chunkSize = 1024  // 小さなチャンクで処理
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length))
+          for (let j = 0; j < chunk.length; j++) {
+            binaryString += String.fromCharCode(chunk[j])
+          }
+        }
+        const base64 = btoa(binaryString)
         
         fileList.push({
-          name: doc.isCommon ? `共通書類/${doc.type_name || 'その他'}/${doc.file_name}` : `案件書類/${doc.document_type || 'その他'}/${doc.file_name}`,
+          name: doc.isCommon ? `共通書類/${doc.type_name || doc.document_type || 'その他'}/${doc.file_name}` : `案件書類/${doc.document_type || 'その他'}/${doc.file_name}`,
           data: base64,
           contentType: object.httpMetadata?.contentType || 'application/octet-stream'
         })
