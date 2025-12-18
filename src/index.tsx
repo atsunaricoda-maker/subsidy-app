@@ -5861,8 +5861,14 @@ app.get('/api/cases/:id/documents/download-all', async (c) => {
         }
         const base64 = btoa(binaryString)
         
+        // フォルダ構成: 共通書類/書類タイプ/ファイル または 案件名_補助金名/書類タイプ/ファイル
+        const caseFolderName = `${caseInfo.company_name || caseInfo.client_name || '案件'}_${caseInfo.subsidy_name || '申請'}`.replace(/[\\/:*?"<>|]/g, '_')
+        const folderPath = doc.isCommon 
+          ? `共通書類/${doc.type_name || doc.document_type || 'その他'}` 
+          : `${caseFolderName}/${doc.document_type || 'その他'}`
+        
         fileList.push({
-          name: doc.isCommon ? `共通書類/${doc.type_name || doc.document_type || 'その他'}/${doc.file_name}` : `案件書類/${doc.document_type || 'その他'}/${doc.file_name}`,
+          name: `${folderPath}/${doc.file_name}`,
           data: base64,
           contentType: object.httpMetadata?.contentType || 'application/octet-stream'
         })
