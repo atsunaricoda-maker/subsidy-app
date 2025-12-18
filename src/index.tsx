@@ -10381,7 +10381,7 @@ app.get('/case/:id', async (c) => {
                                         案件を開始するには、ステータスを「書類準備中」以降に変更してください。変更時に<span class="font-bold">1枠</span>を消費します。
                                     </p>
                                 </div>
-                                <button onclick="document.getElementById('statusSelect').focus()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
+                                <button onclick="startCase()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
                                     <i class="fas fa-play-circle mr-1"></i>案件を開始
                                 </button>
                             </div>
@@ -10927,6 +10927,50 @@ app.get('/case/:id', async (c) => {
             
             // 現在のステータスを追跡
             let currentCaseStatus = '${caseData.status || 'inquiry'}';
+            
+            // 案件を開始（見込み→書類準備中）
+            async function startCase() {
+                // 見込みステータスでない場合は何もしない
+                if (currentCaseStatus !== 'inquiry') {
+                    showToast('既に案件は開始されています', 'info');
+                    return;
+                }
+                
+                // 確認モーダルを表示
+                const confirmed = await showSlotConfirmDialog();
+                if (!confirmed) {
+                    return;
+                }
+                
+                try {
+                    // ステータスを「書類準備中(preparing)」に変更
+                    await axios.put(\`/api/cases/\${CASE_ID}\`, { status: 'preparing' });
+                    currentCaseStatus = 'preparing';
+                    
+                    // UIを更新
+                    document.getElementById('statusSelect').value = 'preparing';
+                    updateStatusBadge('preparing');
+                    
+                    // 見込みバナーを非表示
+                    const inquiryBanner = document.getElementById('inquiryRestrictionBanner');
+                    if (inquiryBanner) {
+                        inquiryBanner.classList.add('hidden');
+                    }
+                    
+                    showToast('案件を開始しました！', 'success');
+                } catch (error) {
+                    console.error('Start case error:', error);
+                    const errorMessage = error.response?.data?.error || '案件の開始に失敗しました';
+                    
+                    // 枠不足エラーの場合は特別なメッセージを表示
+                    if (errorMessage.includes('枠') || errorMessage.includes('slot')) {
+                        alert('枠が不足しています。\\n\\n案件を開始するには、利用可能な枠が必要です。\\n\\n管理画面の「プラン・枠管理」から追加枠を購入してください。');
+                    } else {
+                        alert(errorMessage);
+                    }
+                }
+            }
+            window.startCase = startCase;
             
             // ステータス更新
             async function updateStatus() {
