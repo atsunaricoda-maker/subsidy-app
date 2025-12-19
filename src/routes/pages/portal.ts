@@ -175,9 +175,10 @@ routes.get('/portal/:token', async (c) => {
                             <div class="bg-white rounded-lg shadow p-3">
                                 <div class="flex items-center justify-between mb-2">
                                     <span class="text-sm font-bold"><i class="fas fa-file-invoice-dollar mr-1 text-green-600"></i>請求書</span>
+                                    <span id="invoiceCountBadge" class="hidden text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full"></span>
                                 </div>
-                                <div id="portalInvoicesContent" class="space-y-1.5 max-h-32 overflow-y-auto text-xs">
-                                    <div class="text-gray-500 py-2"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</div>
+                                <div id="portalInvoicesContent" class="space-y-2 max-h-48 overflow-y-auto text-xs">
+                                    <div class="text-gray-500 py-2 text-center"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</div>
                                 </div>
                                 <!-- 契約書リンク -->
                                 <div id="contractSection" class="hidden mt-2 pt-2 border-t">
@@ -1414,90 +1415,46 @@ routes.get('/portal/:token', async (c) => {
                             other: { label: 'その他', icon: 'fa-file-invoice', color: 'text-gray-600' }
                         };
                         
-                        content.innerHTML = issuedInvoices.map(inv => {
+                        // 件数バッジを更新
+                        const badge = document.getElementById('invoiceCountBadge');
+                        if (badge) {
+                            const unpaidCount = issuedInvoices.filter(inv => inv.status === 'issued' || inv.status === 'sent').length;
+                            badge.textContent = unpaidCount > 0 ? \`未払い \${unpaidCount}件\` : \`\${issuedInvoices.length}件\`;
+                            badge.className = unpaidCount > 0 
+                                ? 'text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full'
+                                : 'text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full';
+                            badge.classList.remove('hidden');
+                        }
+                        
+                        content.innerHTML = issuedInvoices.map((inv, index) => {
                             const status = statusLabels[inv.status] || statusLabels.issued;
                             const type = typeLabels[inv.invoice_type] || typeLabels.other;
                             const needsPayment = inv.status === 'issued' || inv.status === 'sent';
                             const isOverdue = inv.due_date && new Date(inv.due_date) < new Date() && needsPayment;
                             
                             return \`
-                                <div class="bg-white border rounded-lg overflow-hidden \${needsPayment ? 'border-yellow-300' : ''} \${isOverdue ? 'border-red-400' : ''}">
-                                    <!-- 期限警告バナー -->
-                                    \${isOverdue ? \`
-                                        <div class="bg-red-500 text-white text-xs py-1 px-3 text-center">
-                                            <i class="fas fa-exclamation-triangle mr-1"></i>支払期限を過ぎています
-                                        </div>
-                                    \` : ''}
-                                    
-                                    <div class="p-4">
-                                        <div class="flex items-start gap-3">
-                                            <div class="text-2xl \${type.color}">
-                                                <i class="fas \${type.icon}"></i>
-                                            </div>
-                                            <div class="flex-1 min-w-0">
-                                                <div class="flex items-center gap-2 flex-wrap">
-                                                    <span class="font-bold text-sm">\${inv.invoice_number}</span>
-                                                    <span class="text-xs px-2 py-0.5 rounded-full \${status.color}">
-                                                        <i class="fas \${status.icon} mr-1"></i>\${status.label}
-                                                    </span>
+                                <div class="border rounded-lg p-2 \${needsPayment ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 bg-white'} \${isOverdue ? 'border-red-400 bg-red-50' : ''} cursor-pointer hover:shadow-md transition-shadow"
+                                     onclick="showInvoiceDetailModal(\${inv.id})">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs font-bold">\${index + 1}</span>
+                                            <div>
+                                                <div class="flex items-center gap-1">
+                                                    <i class="fas \${type.icon} \${type.color} text-xs"></i>
+                                                    <span class="font-medium text-xs">\${inv.item_name || type.label}</span>
                                                 </div>
-                                                <div class="text-sm text-gray-600 mt-1">\${inv.item_name}</div>
+                                                <div class="text-xs text-gray-500">\${inv.invoice_number}</div>
                                             </div>
                                         </div>
-                                        
-                                        <!-- 金額・期限情報 -->
-                                        <div class="mt-3 bg-gray-50 rounded-lg p-3">
-                                            <div class="flex justify-between items-center">
-                                                <span class="text-sm text-gray-600">請求金額</span>
-                                                <span class="text-xl font-bold text-gray-900">¥\${inv.total_amount.toLocaleString()}</span>
-                                            </div>
-                                            <div class="flex justify-between items-center mt-2 text-sm">
-                                                <span class="text-gray-500">発行日</span>
-                                                <span>\${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP') : '-'}</span>
-                                            </div>
-                                            <div class="flex justify-between items-center mt-1 text-sm \${isOverdue ? 'text-red-600 font-bold' : ''}">
-                                                <span class="\${isOverdue ? 'text-red-600' : 'text-gray-500'}">支払期限</span>
-                                                <span>\${inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP') : '-'}</span>
-                                            </div>
+                                        <div class="text-right">
+                                            <div class="font-bold text-sm">¥\${inv.total_amount.toLocaleString()}</div>
+                                            <span class="text-xs px-1.5 py-0.5 rounded \${status.color}">
+                                                <i class="fas \${status.icon} mr-0.5"></i>\${status.label}
+                                            </span>
                                         </div>
-                                        
-                                        <!-- アクションボタン -->
-                                        <div class="mt-3 space-y-2">
-                                            <button onclick="showInvoiceDetailModal(\${inv.id})" 
-                                                    class="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200">
-                                                <i class="fas fa-file-alt"></i>
-                                                <span>請求書詳細を見る</span>
-                                            </button>
-                                            
-                                            \${needsPayment ? \`
-                                                <button onclick="showInvoiceBankTransfer(\${inv.id})" 
-                                                        class="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
-                                                    <i class="fas fa-university"></i>
-                                                    <span>振込先を確認・支払う</span>
-                                                </button>
-                                                <button onclick="reportInvoicePayment(\${inv.id})" 
-                                                        class="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-                                                    <i class="fas fa-check"></i>
-                                                    <span>振込完了を報告する</span>
-                                                </button>
-                                            \` : ''}
-                                        </div>
-                                        
-                                        \${inv.status === 'payment_reported' ? \`
-                                            <div class="mt-3 text-sm text-purple-700 bg-purple-50 p-3 rounded-lg">
-                                                <i class="fas fa-hourglass-half mr-1"></i>
-                                                振込報告を受け付けました。担当者の確認をお待ちください。
-                                            </div>
-                                        \` : ''}
-                                        
-                                        \${inv.status === 'paid' ? \`
-                                            <div class="mt-3 text-sm text-green-700 bg-green-50 p-3 rounded-lg">
-                                                <i class="fas fa-check-circle mr-1"></i>
-                                                お支払いを確認しました。ありがとうございました。
-                                                \${inv.paid_at ? '<div class="text-xs mt-1">入金確認日: ' + new Date(inv.paid_at).toLocaleDateString('ja-JP') + '</div>' : ''}
-                                            </div>
-                                        \` : ''}
                                     </div>
+                                    \${isOverdue ? '<div class="text-xs text-red-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>期限超過</div>' : ''}
+                                    \${needsPayment && !isOverdue ? '<div class="text-xs text-yellow-700 mt-1">期限: ' + (inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP') : '-') + '</div>' : ''}
                                 </div>
                             \`;
                         }).join('');
