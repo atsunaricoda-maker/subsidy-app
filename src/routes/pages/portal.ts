@@ -200,40 +200,45 @@ routes.get('/portal/:token', async (c) => {
                     </div>
 
                     <!-- ========================================== -->
-                    <!-- 書類タブ -->
+                    <!-- 書類タブ（3カラムレイアウト） -->
                     <!-- ========================================== -->
                     <div id="tabPanelDocuments" class="main-tab-content tab-panel">
-                        <div class="bg-white rounded-lg shadow h-full flex flex-col">
-                            <div class="p-3 border-b flex-shrink-0">
-                                <h2 class="text-sm font-bold"><i class="fas fa-file-upload mr-2 text-green-600"></i>書類提出</h2>
-                            </div>
-                            <div class="flex-1 overflow-y-auto p-3">
-                                <!-- 共通書類セクション -->
-                                <div class="mb-4 pb-3 border-b border-gray-200">
-                                    <h3 class="text-xs font-medium mb-2">
-                                        <i class="fas fa-building mr-1 text-blue-600"></i>共通書類
-                                        <span class="text-gray-400 font-normal ml-1">（全申請で使用）</span>
-                                    </h3>
-                                    <div id="commonDocumentsList" class="space-y-1.5 text-xs">
-                                        <div class="text-gray-500 py-1">読み込み中...</div>
+                        <div class="h-full">
+                            <!-- 3カラムグリッド -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 h-full">
+                                <!-- 左カラム: 共通書類 -->
+                                <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
+                                    <div class="p-2 border-b bg-blue-50 flex-shrink-0">
+                                        <h3 class="text-xs font-bold text-blue-700">
+                                            <i class="fas fa-building mr-1"></i>共通書類
+                                        </h3>
+                                        <p class="text-xs text-blue-500 mt-0.5">全申請で使用</p>
+                                    </div>
+                                    <div id="commonDocumentsList" class="flex-1 overflow-y-auto p-2 space-y-1 text-xs">
+                                        <div class="text-gray-500 py-2 text-center">読み込み中...</div>
                                     </div>
                                 </div>
                                 
-                                <!-- 案件別必要書類 -->
-                                <div class="mb-4">
-                                    <h3 class="text-xs font-medium mb-2">
-                                        <i class="fas fa-folder-open mr-1 text-green-600"></i>案件別必要書類
-                                        <span class="text-gray-400 font-normal ml-1">（タップでアップロード）</span>
-                                    </h3>
-                                    <div id="checklistItems" class="space-y-1.5 text-xs"></div>
+                                <!-- 中央カラム: 案件別必要書類 -->
+                                <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
+                                    <div class="p-2 border-b bg-green-50 flex-shrink-0">
+                                        <h3 class="text-xs font-bold text-green-700">
+                                            <i class="fas fa-folder-open mr-1"></i>案件別必要書類
+                                        </h3>
+                                        <p class="text-xs text-green-500 mt-0.5">タップでアップロード</p>
+                                    </div>
+                                    <div id="checklistItems" class="flex-1 overflow-y-auto p-2 space-y-1 text-xs"></div>
                                 </div>
                                 
-                                <!-- アップロード済み -->
-                                <div>
-                                    <h3 class="text-xs font-medium mb-2">
-                                        <i class="fas fa-check-circle mr-1 text-green-600"></i>アップロード済み
-                                    </h3>
-                                    <div id="uploadedDocuments" class="max-h-40 overflow-y-auto text-xs"></div>
+                                <!-- 右カラム: アップロード済み -->
+                                <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
+                                    <div class="p-2 border-b bg-gray-50 flex-shrink-0">
+                                        <h3 class="text-xs font-bold text-gray-700">
+                                            <i class="fas fa-check-circle mr-1 text-green-600"></i>アップロード済み
+                                        </h3>
+                                        <p class="text-xs text-gray-500 mt-0.5">提出完了した書類</p>
+                                    </div>
+                                    <div id="uploadedDocuments" class="flex-1 overflow-y-auto p-2 text-xs"></div>
                                 </div>
                             </div>
                         </div>
