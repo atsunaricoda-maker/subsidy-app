@@ -94,6 +94,9 @@ routes.get('/portal/:token', async (c) => {
                             <i class="fas fa-file-upload mr-1"></i><span class="hidden sm:inline">書類</span>
                             <span id="docBadge" class="ml-1 text-xs bg-white/30 px-1.5 rounded-full hidden">0</span>
                         </button>
+                        <button onclick="switchMainTab('create')" id="mainTabCreate" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
+                            <i class="fas fa-file-signature mr-1"></i><span class="hidden sm:inline">書類作成</span>
+                        </button>
                         <button onclick="switchMainTab('hearing')" id="mainTabHearing" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
                             <i class="fas fa-clipboard-list mr-1"></i><span class="hidden sm:inline">ヒアリング</span>
                             <span id="hearingBadge" class="ml-1 text-xs bg-white/30 px-1.5 rounded-full hidden">0/0</span>
@@ -240,6 +243,118 @@ routes.get('/portal/:token', async (c) => {
                                         <p class="text-xs text-gray-500 mt-0.5">提出完了した書類</p>
                                     </div>
                                     <div id="uploadedDocuments" class="flex-1 overflow-y-auto p-2 text-xs"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========================================== -->
+                    <!-- 書類作成タブ -->
+                    <!-- ========================================== -->
+                    <div id="tabPanelCreate" class="main-tab-content tab-panel">
+                        <div class="h-full">
+                            <!-- 組織資格ステータスによる分岐表示 -->
+                            <div id="docCreationLoading" class="bg-white rounded-lg shadow p-8 text-center">
+                                <i class="fas fa-spinner fa-spin text-3xl text-gray-400 mb-3"></i>
+                                <p class="text-gray-500">読み込み中...</p>
+                            </div>
+                            
+                            <!-- 顧客自己作成モード（資格なし組織向け） -->
+                            <div id="selfCreationMode" class="hidden h-full">
+                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 h-full">
+                                    <!-- 左カラム: 法的注意事項と同意 -->
+                                    <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
+                                        <div class="p-2 border-b bg-amber-50 flex-shrink-0">
+                                            <h3 class="text-xs font-bold text-amber-700">
+                                                <i class="fas fa-exclamation-triangle mr-1"></i>重要事項
+                                            </h3>
+                                        </div>
+                                        <div class="flex-1 overflow-y-auto p-3 text-xs">
+                                            <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                                                <p class="font-bold text-red-700 mb-2">法的注意事項</p>
+                                                <ul class="space-y-1 text-red-600 list-disc list-inside">
+                                                    <li>行政書士法第19条により、官公署提出書類の作成は行政書士の独占業務です</li>
+                                                    <li>本サービスはAIによる作成支援ツールであり、<strong>最終的な書類作成と提出は申請者ご自身の責任</strong>で行ってください</li>
+                                                    <li>生成された内容は必ず確認・修正の上ご使用ください</li>
+                                                </ul>
+                                            </div>
+                                            <div id="selfCreationConsentArea">
+                                                <label class="flex items-start gap-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                                    <input type="checkbox" id="selfCreationConsent" class="mt-0.5">
+                                                    <span class="text-gray-700">上記の法的注意事項を理解し、自己責任で書類を作成することに同意します</span>
+                                                </label>
+                                            </div>
+                                            <div id="selfCreationConsentDone" class="hidden">
+                                                <div class="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                                                    <i class="fas fa-check-circle text-green-600"></i>
+                                                    <span class="text-green-700">同意済み</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 中央カラム: 作成可能書類一覧 -->
+                                    <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
+                                        <div class="p-2 border-b bg-blue-50 flex-shrink-0">
+                                            <h3 class="text-xs font-bold text-blue-700">
+                                                <i class="fas fa-file-alt mr-1"></i>作成可能書類
+                                            </h3>
+                                            <p class="text-xs text-blue-500 mt-0.5">AIが作成を支援します</p>
+                                        </div>
+                                        <div id="availableDocTemplates" class="flex-1 overflow-y-auto p-2 space-y-2 text-xs">
+                                            <div class="text-gray-500 py-2 text-center">読み込み中...</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 右カラム: 作成済み書類 -->
+                                    <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
+                                        <div class="p-2 border-b bg-green-50 flex-shrink-0">
+                                            <h3 class="text-xs font-bold text-green-700">
+                                                <i class="fas fa-check-circle mr-1"></i>作成済み書類
+                                            </h3>
+                                            <p class="text-xs text-green-500 mt-0.5">ダウンロード・編集可能</p>
+                                        </div>
+                                        <div id="generatedDocuments" class="flex-1 overflow-y-auto p-2 space-y-2 text-xs">
+                                            <div class="text-gray-500 py-2 text-center">まだ作成された書類はありません</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 代行作成モード（有資格組織向け） -->
+                            <div id="proxyCreationMode" class="hidden h-full">
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 h-full">
+                                    <!-- 左カラム: 代行作成済み書類 -->
+                                    <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
+                                        <div class="p-2 border-b bg-purple-50 flex-shrink-0">
+                                            <h3 class="text-xs font-bold text-purple-700">
+                                                <i class="fas fa-user-tie mr-1"></i>作成済み書類
+                                            </h3>
+                                            <p class="text-xs text-purple-500 mt-0.5">専門家が作成した書類</p>
+                                        </div>
+                                        <div id="proxyCreatedDocuments" class="flex-1 overflow-y-auto p-2 space-y-2 text-xs">
+                                            <div class="text-gray-500 py-2 text-center">まだ書類は作成されていません</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 右カラム: 確認・承認 -->
+                                    <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
+                                        <div class="p-2 border-b bg-amber-50 flex-shrink-0">
+                                            <h3 class="text-xs font-bold text-amber-700">
+                                                <i class="fas fa-clipboard-check mr-1"></i>確認・承認
+                                            </h3>
+                                            <p class="text-xs text-amber-500 mt-0.5">内容を確認して承認してください</p>
+                                        </div>
+                                        <div class="flex-1 overflow-y-auto p-3 text-xs">
+                                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                                                <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+                                                <span class="text-blue-700">書類の内容を確認し、問題なければ「承認」ボタンを押してください。修正が必要な場合は「修正依頼」ボタンからコメントを送信できます。</span>
+                                            </div>
+                                            <div id="pendingApprovalDocs" class="space-y-2">
+                                                <div class="text-gray-500 py-2 text-center">承認待ちの書類はありません</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -689,8 +804,8 @@ routes.get('/portal/:token', async (c) => {
             // ========================================
             function switchMainTab(tabId) {
                 // すべてのタブボタンとパネルを取得
-                const tabButtons = ['mainTabHome', 'mainTabDocuments', 'mainTabHearing', 'mainTabMessages'];
-                const tabPanels = ['tabPanelHome', 'tabPanelDocuments', 'tabPanelHearing', 'tabPanelMessages'];
+                const tabButtons = ['mainTabHome', 'mainTabDocuments', 'mainTabCreate', 'mainTabHearing', 'mainTabMessages'];
+                const tabPanels = ['tabPanelHome', 'tabPanelDocuments', 'tabPanelCreate', 'tabPanelHearing', 'tabPanelMessages'];
                 
                 // タブボタンのスタイルをリセット
                 tabButtons.forEach(id => {
@@ -710,6 +825,11 @@ routes.get('/portal/:token', async (c) => {
                 
                 if (activeBtn) activeBtn.classList.add('active');
                 if (activePanel) activePanel.classList.add('active');
+                
+                // 書類作成タブの場合、資格ステータスを取得して表示切り替え
+                if (tabId === 'create') {
+                    loadDocumentCreationMode();
+                }
                 
                 // やり取りタブの時はAIボタンを非表示にする
                 const aiBtn = document.getElementById('aiFloatingBtn');
@@ -4274,6 +4394,359 @@ routes.get('/portal/:token', async (c) => {
             window.showWritingGuide = showWritingGuide;
             window.applyTemplate = applyTemplate;
             window.showMessage = showMessage;
+            
+            // ===============================
+            // 書類作成機能
+            // ===============================
+            
+            // 組織の資格ステータスをキャッシュ
+            let orgLicenseStatus = null;
+            let selfCreationConsentGiven = false;
+            
+            // 書類作成モードを読み込み
+            async function loadDocumentCreationMode() {
+                try {
+                    // 読み込み中表示
+                    document.getElementById('docCreationLoading').classList.remove('hidden');
+                    document.getElementById('selfCreationMode').classList.add('hidden');
+                    document.getElementById('proxyCreationMode').classList.add('hidden');
+                    
+                    // 組織の資格ステータスを取得
+                    const res = await axios.get('/api/portal/license-status?case_id=' + CASE_ID);
+                    orgLicenseStatus = res.data;
+                    
+                    // 読み込み完了
+                    document.getElementById('docCreationLoading').classList.add('hidden');
+                    
+                    if (orgLicenseStatus.effectiveMode === 'client_self') {
+                        // 顧客自己作成モード
+                        document.getElementById('selfCreationMode').classList.remove('hidden');
+                        loadAvailableDocTemplates();
+                        loadGeneratedDocuments();
+                        checkSelfCreationConsent();
+                    } else {
+                        // 代行作成モード
+                        document.getElementById('proxyCreationMode').classList.remove('hidden');
+                        loadProxyCreatedDocuments();
+                        loadPendingApprovalDocs();
+                    }
+                } catch (error) {
+                    console.error('Failed to load license status:', error);
+                    document.getElementById('docCreationLoading').innerHTML = \`
+                        <div class="text-center py-8">
+                            <i class="fas fa-exclamation-triangle text-3xl text-yellow-500 mb-3"></i>
+                            <p class="text-gray-600">書類作成機能を読み込めませんでした</p>
+                            <button onclick="loadDocumentCreationMode()" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">
+                                再読み込み
+                            </button>
+                        </div>
+                    \`;
+                }
+            }
+            
+            // 自己作成同意状態を確認
+            function checkSelfCreationConsent() {
+                // ローカルストレージから同意状態を確認
+                const consentKey = 'self_creation_consent_' + CLIENT_ID;
+                selfCreationConsentGiven = localStorage.getItem(consentKey) === 'true';
+                
+                if (selfCreationConsentGiven) {
+                    document.getElementById('selfCreationConsentArea').classList.add('hidden');
+                    document.getElementById('selfCreationConsentDone').classList.remove('hidden');
+                    enableDocCreationButtons();
+                } else {
+                    document.getElementById('selfCreationConsentArea').classList.remove('hidden');
+                    document.getElementById('selfCreationConsentDone').classList.add('hidden');
+                    disableDocCreationButtons();
+                }
+            }
+            
+            // 同意チェックボックスのイベント
+            document.getElementById('selfCreationConsent')?.addEventListener('change', async function() {
+                if (this.checked) {
+                    // 同意をサーバーに記録
+                    try {
+                        await axios.post('/api/portal/document-consent', {
+                            case_id: CASE_ID,
+                            consent_type: 'self_creation',
+                            consent_text: '行政書士法第19条に基づき、自己責任で書類を作成することに同意しました。'
+                        });
+                        
+                        // ローカルストレージにも保存
+                        localStorage.setItem('self_creation_consent_' + CLIENT_ID, 'true');
+                        selfCreationConsentGiven = true;
+                        
+                        document.getElementById('selfCreationConsentArea').classList.add('hidden');
+                        document.getElementById('selfCreationConsentDone').classList.remove('hidden');
+                        enableDocCreationButtons();
+                    } catch (error) {
+                        console.error('Failed to save consent:', error);
+                        this.checked = false;
+                        alert('同意の保存に失敗しました。再度お試しください。');
+                    }
+                }
+            });
+            
+            // 書類作成ボタンを有効化
+            function enableDocCreationButtons() {
+                document.querySelectorAll('.doc-create-btn').forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                });
+            }
+            
+            // 書類作成ボタンを無効化
+            function disableDocCreationButtons() {
+                document.querySelectorAll('.doc-create-btn').forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                });
+            }
+            
+            // 作成可能書類テンプレート一覧を読み込み
+            async function loadAvailableDocTemplates() {
+                try {
+                    const container = document.getElementById('availableDocTemplates');
+                    // 案件に関連する補助金タイプの必要書類を取得
+                    const res = await axios.get('/api/cases/' + CASE_ID + '/document-templates');
+                    const templates = res.data.templates || [];
+                    
+                    if (templates.length === 0) {
+                        container.innerHTML = \`
+                            <div class="text-center py-4 text-gray-500">
+                                <i class="fas fa-file-alt text-2xl mb-2 text-gray-300"></i>
+                                <p>作成可能な書類テンプレートはありません</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    container.innerHTML = templates.map(t => \`
+                        <div class="border rounded-lg p-3 hover:bg-blue-50 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-file-alt text-blue-600"></i>
+                                    <span class="font-medium">\${t.name}</span>
+                                </div>
+                                <button onclick="startDocCreation('\${t.id}', '\${t.name}')" 
+                                        class="doc-create-btn px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 \${selfCreationConsentGiven ? '' : 'opacity-50 cursor-not-allowed'}"
+                                        \${selfCreationConsentGiven ? '' : 'disabled'}>
+                                    <i class="fas fa-magic mr-1"></i>作成開始
+                                </button>
+                            </div>
+                            \${t.description ? \`<p class="text-xs text-gray-500 mt-1">\${t.description}</p>\` : ''}
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Failed to load document templates:', error);
+                    document.getElementById('availableDocTemplates').innerHTML = \`
+                        <div class="text-center py-4 text-red-500">
+                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                            <p>テンプレートの読み込みに失敗しました</p>
+                        </div>
+                    \`;
+                }
+            }
+            
+            // 作成済み書類一覧を読み込み
+            async function loadGeneratedDocuments() {
+                try {
+                    const container = document.getElementById('generatedDocuments');
+                    const res = await axios.get('/api/cases/' + CASE_ID + '/generated-documents');
+                    const docs = res.data.documents || [];
+                    
+                    if (docs.length === 0) {
+                        container.innerHTML = \`
+                            <div class="text-center py-4 text-gray-500">
+                                <i class="fas fa-file-alt text-2xl mb-2 text-gray-300"></i>
+                                <p>まだ作成された書類はありません</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    container.innerHTML = docs.map(d => \`
+                        <div class="border rounded-lg p-3 bg-green-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-file-check text-green-600"></i>
+                                    <span class="font-medium">\${d.name}</span>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button onclick="previewDocument(\${d.id})" class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button onclick="downloadDocument(\${d.id})" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <button onclick="editDocument(\${d.id})" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">作成日: \${new Date(d.created_at).toLocaleDateString('ja-JP')}</p>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Failed to load generated documents:', error);
+                }
+            }
+            
+            // 代行作成済み書類を読み込み
+            async function loadProxyCreatedDocuments() {
+                try {
+                    const container = document.getElementById('proxyCreatedDocuments');
+                    const res = await axios.get('/api/cases/' + CASE_ID + '/generated-documents?is_licensed=1');
+                    const docs = res.data.documents || [];
+                    
+                    if (docs.length === 0) {
+                        container.innerHTML = \`
+                            <div class="text-center py-4 text-gray-500">
+                                <i class="fas fa-user-tie text-2xl mb-2 text-gray-300"></i>
+                                <p>専門家が作成した書類はまだありません</p>
+                                <p class="text-xs mt-1">担当者が書類を作成するとここに表示されます</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    container.innerHTML = docs.map(d => \`
+                        <div class="border rounded-lg p-3 \${d.status === 'approved' ? 'bg-green-50' : d.status === 'pending' ? 'bg-yellow-50' : 'bg-white'}">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas \${d.status === 'approved' ? 'fa-check-circle text-green-600' : 'fa-clock text-yellow-600'}"></i>
+                                    <span class="font-medium">\${d.name}</span>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-xs \${d.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
+                                    \${d.status === 'approved' ? '承認済み' : '確認待ち'}
+                                </span>
+                            </div>
+                            <div class="flex gap-2 mt-2">
+                                <button onclick="previewDocument(\${d.id})" class="flex-1 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200">
+                                    <i class="fas fa-eye mr-1"></i>プレビュー
+                                </button>
+                                <button onclick="downloadDocument(\${d.id})" class="flex-1 px-2 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700">
+                                    <i class="fas fa-download mr-1"></i>ダウンロード
+                                </button>
+                            </div>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Failed to load proxy created documents:', error);
+                }
+            }
+            
+            // 承認待ち書類を読み込み
+            async function loadPendingApprovalDocs() {
+                try {
+                    const container = document.getElementById('pendingApprovalDocs');
+                    const res = await axios.get('/api/cases/' + CASE_ID + '/generated-documents?status=pending');
+                    const docs = res.data.documents || [];
+                    
+                    if (docs.length === 0) {
+                        container.innerHTML = \`
+                            <div class="text-center py-4 text-gray-500">
+                                <i class="fas fa-clipboard-check text-2xl mb-2 text-gray-300"></i>
+                                <p>承認待ちの書類はありません</p>
+                            </div>
+                        \`;
+                        return;
+                    }
+                    
+                    container.innerHTML = docs.map(d => \`
+                        <div class="border border-yellow-200 rounded-lg p-3 bg-yellow-50">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-file-alt text-yellow-600"></i>
+                                <span class="font-medium">\${d.name}</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="previewDocument(\${d.id})" class="flex-1 px-2 py-1 bg-white text-gray-700 rounded text-xs hover:bg-gray-50 border">
+                                    <i class="fas fa-eye mr-1"></i>確認
+                                </button>
+                                <button onclick="approveDocument(\${d.id})" class="flex-1 px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                                    <i class="fas fa-check mr-1"></i>承認
+                                </button>
+                                <button onclick="requestRevision(\${d.id})" class="flex-1 px-2 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700">
+                                    <i class="fas fa-edit mr-1"></i>修正依頼
+                                </button>
+                            </div>
+                        </div>
+                    \`).join('');
+                } catch (error) {
+                    console.error('Failed to load pending approval docs:', error);
+                }
+            }
+            
+            // 書類作成を開始
+            function startDocCreation(templateId, templateName) {
+                if (!selfCreationConsentGiven) {
+                    alert('書類作成には免責事項への同意が必要です。');
+                    return;
+                }
+                // AIアシスタントモーダルを開いて書類作成を開始
+                openAiModal();
+                // AI に書類作成を依頼
+                const aiInput = document.getElementById('aiQuestionInput');
+                if (aiInput) {
+                    aiInput.value = \`「\${templateName}」の作成を手伝ってください。ヒアリング回答に基づいて、必要な情報を確認しながら書類を作成してください。\`;
+                }
+            }
+            
+            // 書類をプレビュー
+            function previewDocument(docId) {
+                window.open('/api/generated-documents/' + docId + '/preview', '_blank');
+            }
+            
+            // 書類をダウンロード
+            function downloadDocument(docId) {
+                window.location.href = '/api/generated-documents/' + docId + '/download';
+            }
+            
+            // 書類を編集
+            function editDocument(docId) {
+                // TODO: 編集モーダルを実装
+                alert('編集機能は準備中です');
+            }
+            
+            // 書類を承認
+            async function approveDocument(docId) {
+                if (!confirm('この書類を承認しますか？')) return;
+                try {
+                    await axios.post('/api/generated-documents/' + docId + '/approve');
+                    loadProxyCreatedDocuments();
+                    loadPendingApprovalDocs();
+                    alert('書類を承認しました');
+                } catch (error) {
+                    console.error('Failed to approve document:', error);
+                    alert('承認に失敗しました');
+                }
+            }
+            
+            // 修正を依頼
+            function requestRevision(docId) {
+                const comment = prompt('修正が必要な箇所を入力してください:');
+                if (!comment) return;
+                
+                axios.post('/api/generated-documents/' + docId + '/revision', { comment })
+                    .then(() => {
+                        loadProxyCreatedDocuments();
+                        loadPendingApprovalDocs();
+                        alert('修正依頼を送信しました');
+                    })
+                    .catch(error => {
+                        console.error('Failed to request revision:', error);
+                        alert('修正依頼の送信に失敗しました');
+                    });
+            }
+            
+            // グローバル関数登録
+            window.loadDocumentCreationMode = loadDocumentCreationMode;
+            window.startDocCreation = startDocCreation;
+            window.previewDocument = previewDocument;
+            window.downloadDocument = downloadDocument;
+            window.editDocument = editDocument;
+            window.approveDocument = approveDocument;
+            window.requestRevision = requestRevision;
             
             // ===============================
             // 初期化

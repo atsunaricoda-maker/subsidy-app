@@ -986,4 +986,261 @@ routes.get('/cases/:id/document-checklist', async (c) => {
   return c.json(defaultResult.results)
 })
 
+// ================================
+// 顧客ポータル用 API
+// ================================
+
+// ポータル: 組織の資格ステータス取得（案件経由）
+routes.get('/portal/license-status', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.query('case_id')
+  
+  if (!caseId) {
+    return c.json({ error: 'case_id is required' }, 400)
+  }
+  
+  // 案件から組織IDを取得
+  const caseData = await DB.prepare(`
+    SELECT c.organization_id
+    FROM cases c
+    WHERE c.id = ?
+  `).bind(caseId).first() as any
+  
+  if (!caseData) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  // 組織の資格情報を取得
+  const org = await DB.prepare(`
+    SELECT 
+      gyoseishoshi_license_number,
+      sharoshi_license_number,
+      document_creation_mode,
+      license_verified,
+      legal_disclaimer_agreed
+    FROM organizations
+    WHERE id = ?
+  `).bind(caseData.organization_id).first() as any
+  
+  if (!org) {
+    // 組織がない場合はデフォルトで顧客自己作成モード
+    return c.json({
+      hasGyoseishoshi: false,
+      hasSharoshi: false,
+      isLicensed: false,
+      isVerified: false,
+      documentCreationMode: 'client_self',
+      effectiveMode: 'client_self',
+      canCreateDocumentsForClient: false
+    })
+  }
+  
+  // 資格ステータスを判定
+  const hasGyoseishoshi = !!org.gyoseishoshi_license_number
+  const hasSharoshi = !!org.sharoshi_license_number
+  const isLicensed = hasGyoseishoshi || hasSharoshi
+  const isVerified = org.license_verified === 1
+  
+  // 書類作成モードの判定
+  let effectiveMode = org.document_creation_mode || 'client_self'
+  
+  // 資格がない場合は強制的に顧客自己作成モード
+  if (!isLicensed) {
+    effectiveMode = 'client_self'
+  }
+  
+  return c.json({
+    hasGyoseishoshi,
+    hasSharoshi,
+    isLicensed,
+    isVerified,
+    documentCreationMode: org.document_creation_mode,
+    effectiveMode,
+    canCreateDocumentsForClient: isLicensed && isVerified && effectiveMode !== 'client_self'
+  })
+})
+
+// ポータル: 書類作成同意を記録
+routes.post('/portal/document-consent', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  const { case_id, consent_type, consent_text } = body
+  
+  if (!case_id || !consent_type || !consent_text) {
+    return c.json({ error: 'case_id, consent_type, and consent_text are required' }, 400)
+  }
+  
+  // 案件からclient_idを取得
+  const caseData = await DB.prepare(`
+    SELECT client_id FROM cases WHERE id = ?
+  `).bind(case_id).first() as any
+  
+  if (!caseData) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  // 同意を記録
+  await DB.prepare(`
+    INSERT INTO client_document_consents (client_id, case_id, consent_type, consent_text, consented_at)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `).bind(caseData.client_id, case_id, consent_type, consent_text).run()
+  
+  return c.json({ success: true })
+})
+
+// 案件の書類テンプレート一覧取得
+routes.get('/cases/:id/document-templates', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('id')
+  
+  // 案件の補助金タイプを取得
+  const caseData = await DB.prepare(`
+    SELECT subsidy_type_id FROM cases WHERE id = ?
+  `).bind(caseId).first() as any
+  
+  if (!caseData || !caseData.subsidy_type_id) {
+    return c.json({ templates: [] })
+  }
+  
+  // 補助金タイプに紐づくドキュメントテンプレート（生成可能な書類）を取得
+  // subsidy_type_documentsテーブルから取得
+  const templates = await DB.prepare(`
+    SELECT 
+      id,
+      document_type as name,
+      description,
+      category
+    FROM subsidy_type_documents
+    WHERE subsidy_type_id = ?
+    ORDER BY display_order ASC
+  `).bind(caseData.subsidy_type_id).all()
+  
+  return c.json({ templates: templates.results || [] })
+})
+
+// 案件の生成済み書類一覧取得
+routes.get('/cases/:id/generated-documents', async (c) => {
+  const { DB } = c.env
+  const caseId = c.req.param('id')
+  const isLicensed = c.req.query('is_licensed')
+  const status = c.req.query('status')
+  
+  let query = `
+    SELECT 
+      id, case_id, document_type as name, file_path, status,
+      created_by_type, is_licensed_creation, created_at, updated_at
+    FROM generated_documents
+    WHERE case_id = ?
+  `
+  const params: any[] = [caseId]
+  
+  if (isLicensed === '1') {
+    query += ` AND is_licensed_creation = 1`
+  } else if (isLicensed === '0') {
+    query += ` AND (is_licensed_creation = 0 OR is_licensed_creation IS NULL)`
+  }
+  
+  if (status) {
+    query += ` AND status = ?`
+    params.push(status)
+  }
+  
+  query += ` ORDER BY created_at DESC`
+  
+  const result = await DB.prepare(query).bind(...params).all()
+  
+  return c.json({ documents: result.results || [] })
+})
+
+// 生成書類のプレビュー
+routes.get('/generated-documents/:id/preview', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('id')
+  
+  const doc = await DB.prepare(`
+    SELECT * FROM generated_documents WHERE id = ?
+  `).bind(docId).first() as any
+  
+  if (!doc) {
+    return c.json({ error: 'Document not found' }, 404)
+  }
+  
+  // 実際の実装では、file_pathからファイルを取得してプレビューを返す
+  // ここでは簡易的にHTMLを返す
+  return c.html(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${doc.document_type} - プレビュー</title>
+      <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>${doc.document_type}</h1>
+        <p>作成日: ${doc.created_at}</p>
+        <hr>
+        <div>${doc.content || 'コンテンツはまだ生成されていません'}</div>
+      </div>
+    </body>
+    </html>
+  `)
+})
+
+// 生成書類のダウンロード
+routes.get('/generated-documents/:id/download', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('id')
+  
+  const doc = await DB.prepare(`
+    SELECT * FROM generated_documents WHERE id = ?
+  `).bind(docId).first() as any
+  
+  if (!doc) {
+    return c.json({ error: 'Document not found' }, 404)
+  }
+  
+  // 実際の実装では、file_pathからファイルを取得
+  // ここでは簡易的にテキストファイルとして返す
+  const content = doc.content || 'ファイルが見つかりません'
+  
+  return new Response(content, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${doc.document_type}.txt"`
+    }
+  })
+})
+
+// 生成書類の承認
+routes.post('/generated-documents/:id/approve', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('id')
+  
+  await DB.prepare(`
+    UPDATE generated_documents
+    SET status = 'approved', updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(docId).run()
+  
+  return c.json({ success: true })
+})
+
+// 生成書類の修正依頼
+routes.post('/generated-documents/:id/revision', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('id')
+  const { comment } = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE generated_documents
+    SET status = 'revision_requested', revision_comment = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(comment, docId).run()
+  
+  return c.json({ success: true })
+})
+
 export default routes
