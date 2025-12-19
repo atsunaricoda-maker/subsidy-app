@@ -1453,7 +1453,7 @@ routes.get('/portal/:token', async (c) => {
                         const caseNumber = caseData.case_number || '';
                         const progress = activePipeline.progress_percentage || 0;
                         const expectedDate = activePipeline.expected_completion_date 
-                            ? new Date(activePipeline.expected_completion_date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
+                            ? new Date(activePipeline.expected_completion_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric', weekday: 'short' })
                             : '';
                         const isCurrentCase = caseId === CASE_ID;
                         
@@ -2725,7 +2725,7 @@ routes.get('/portal/:token', async (c) => {
                         <div class="flex \${isClient ? 'justify-end' : 'justify-start'}">
                             <div class="max-w-[85%] \${isClient ? 'bg-green-100' : 'bg-gray-100'} rounded-lg px-2.5 py-1.5">
                                 <div class="text-xs">\${comm.message}</div>
-                                <div class="text-xs text-gray-400 mt-0.5">\${comm.sender_name} · \${new Date(comm.created_at).toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'})}</div>
+                                <div class="text-xs text-gray-400 mt-0.5">\${comm.sender_name} · \${new Date(comm.created_at).toLocaleTimeString('ja-JP', {timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit'})}</div>
                             </div>
                         </div>
                     \`;
