@@ -414,7 +414,8 @@ routes.get('/master/ai-models', async (c) => {
     const models: Record<string, string> = {
       // デフォルト値
       ai_model_claude: 'claude-haiku-4-5-20251001',
-      ai_model_claude_multimodal: 'claude-haiku-4-5-20251001'
+      ai_model_claude_multimodal: 'claude-haiku-4-5-20251001',
+      ai_model_gemini: 'gemini-2.0-flash'
     }
     
     for (const s of (settings.results || [])) {
@@ -426,7 +427,8 @@ routes.get('/master/ai-models', async (c) => {
     console.error('Error getting AI models:', error)
     return c.json({
       ai_model_claude: 'claude-haiku-4-5-20251001',
-      ai_model_claude_multimodal: 'claude-haiku-4-5-20251001'
+      ai_model_claude_multimodal: 'claude-haiku-4-5-20251001',
+      ai_model_gemini: 'gemini-2.0-flash'
     })
   }
 })

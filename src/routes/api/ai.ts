@@ -9,7 +9,8 @@ const routes = new Hono<AppEnv>()
 async function getAIModelName(DB: any, modelKey: string = 'ai_model_claude'): Promise<string> {
   const defaultModels: Record<string, string> = {
     'ai_model_claude': 'claude-haiku-4-5-20251001',
-    'ai_model_claude_multimodal': 'claude-haiku-4-5-20251001'
+    'ai_model_claude_multimodal': 'claude-haiku-4-5-20251001',
+    'ai_model_gemini': 'gemini-2.0-flash'
   }
   
   try {
@@ -24,8 +25,8 @@ async function getAIModelName(DB: any, modelKey: string = 'ai_model_claude'): Pr
   }
 }
 
-// Gemini API呼び出しヘルパー（フォールバック用、gemini-2.0-flash使用）
-async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number): Promise<string> {
+// Gemini API呼び出しヘルパー（モデル名を指定可能）
+async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number, modelName: string = 'gemini-2.0-flash'): Promise<string> {
   if (!apiKey) {
     throw new Error('Gemini APIキーが設定されていません')
   }
@@ -41,9 +42,8 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
       
-      // フォールバック用にgemini-2.0-flashを使用
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -199,8 +199,9 @@ async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: numbe
       
       // Geminiフォールバック
       if (geminiApiKey) {
-        console.log('Falling back to Gemini API')
-        return await callGeminiAPI(prompt, geminiApiKey, maxRetries, maxChars)
+        const geminiModel = await getAIModelName(DB, 'ai_model_gemini')
+        console.log(`Falling back to Gemini API (${geminiModel})`)
+        return await callGeminiAPI(prompt, geminiApiKey, maxRetries, maxChars, geminiModel)
       }
       
       throw claudeError
@@ -209,8 +210,9 @@ async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: numbe
   
   // Claude APIキーがない場合はGeminiを試行
   if (geminiApiKey) {
-    console.log('Claude API key not set, using Gemini API')
-    return await callGeminiAPI(prompt, geminiApiKey, maxRetries, maxChars)
+    const geminiModel = await getAIModelName(DB, 'ai_model_gemini')
+    console.log(`Claude API key not set, using Gemini API (${geminiModel})`)
+    return await callGeminiAPI(prompt, geminiApiKey, maxRetries, maxChars, geminiModel)
   }
   
   throw new Error('AIのAPIキーが設定されていません。システム設定からClaude APIキーまたはGemini APIキーを設定してください。')

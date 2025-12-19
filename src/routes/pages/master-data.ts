@@ -476,11 +476,11 @@ routes.get('/master/ai-models', async (c) => {
                         </div>
                     </div>
                     
-                    <!-- モデル名の例 -->
+                    <!-- Claudeモデル名の例 -->
                     <div class="mt-6 p-4 bg-gray-50 rounded-lg">
                         <h3 class="text-sm font-medium text-gray-700 mb-2">
                             <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
-                            利用可能なモデル名の例
+                            利用可能なClaudeモデル名の例
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm font-mono">
                             <div class="flex items-center gap-2">
@@ -509,6 +509,73 @@ routes.get('/master/ai-models', async (c) => {
                             最新のモデル名は 
                             <a href="https://docs.anthropic.com/en/docs/about-claude/models" target="_blank" class="text-blue-600 hover:underline">
                                 Anthropic公式ドキュメント
+                            </a>
+                            で確認できます
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Gemini設定セクション -->
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-robot text-blue-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold">Gemini API モデル</h2>
+                            <p class="text-sm text-gray-500">Google Gemini APIで使用するモデル名を指定します（フォールバック用）</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <!-- Geminiモデル -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-cog text-blue-500 mr-1"></i>
+                                Geminiモデル
+                            </label>
+                            <input type="text" id="ai_model_gemini" 
+                                class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                                placeholder="gemini-2.0-flash">
+                            <p class="text-xs text-gray-500 mt-1">
+                                Claude APIが利用できない場合のフォールバックとして使用されます
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Geminiモデル名の例 -->
+                    <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
+                            利用可能なGeminiモデル名の例
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm font-mono">
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600">•</span>
+                                <code class="bg-white px-2 py-1 rounded border">gemini-2.0-flash</code>
+                                <span class="text-xs text-gray-500">（高速・推奨）</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600">•</span>
+                                <code class="bg-white px-2 py-1 rounded border">gemini-2.0-flash-lite</code>
+                                <span class="text-xs text-gray-500">（最軽量）</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600">•</span>
+                                <code class="bg-white px-2 py-1 rounded border">gemini-1.5-flash</code>
+                                <span class="text-xs text-gray-500">（安定版）</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600">•</span>
+                                <code class="bg-white px-2 py-1 rounded border">gemini-1.5-pro</code>
+                                <span class="text-xs text-gray-500">（高性能）</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-3">
+                            <i class="fas fa-external-link-alt mr-1"></i>
+                            最新のモデル名は 
+                            <a href="https://ai.google.dev/models/gemini" target="_blank" class="text-blue-600 hover:underline">
+                                Google AI公式ドキュメント
                             </a>
                             で確認できます
                         </p>
@@ -555,6 +622,7 @@ routes.get('/master/ai-models', async (c) => {
                     
                     document.getElementById('ai_model_claude').value = models.ai_model_claude || 'claude-haiku-4-5-20251001';
                     document.getElementById('ai_model_claude_multimodal').value = models.ai_model_claude_multimodal || 'claude-haiku-4-5-20251001';
+                    document.getElementById('ai_model_gemini').value = models.ai_model_gemini || 'gemini-2.0-flash';
                 } catch (error) {
                     console.error('Error loading AI models:', error);
                 }
@@ -565,7 +633,8 @@ routes.get('/master/ai-models', async (c) => {
                 try {
                     const models = {
                         ai_model_claude: document.getElementById('ai_model_claude').value,
-                        ai_model_claude_multimodal: document.getElementById('ai_model_claude_multimodal').value
+                        ai_model_claude_multimodal: document.getElementById('ai_model_claude_multimodal').value,
+                        ai_model_gemini: document.getElementById('ai_model_gemini').value
                     };
                     
                     await axios.put('/api/master/ai-models', models);
