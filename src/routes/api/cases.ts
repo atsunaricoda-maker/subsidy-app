@@ -1126,7 +1126,10 @@ routes.get('/cases/:id/generated-documents', async (c) => {
   
   let query = `
     SELECT 
-      id, case_id, document_type as name, file_path, status,
+      id, case_id, 
+      COALESCE(document_type, document_title) as name,
+      document_title,
+      file_path, status,
       created_by_type, is_licensed_creation, created_at, updated_at
     FROM generated_documents
     WHERE case_id = ?

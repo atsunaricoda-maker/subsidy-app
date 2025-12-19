@@ -4566,11 +4566,11 @@ routes.get('/portal/:token', async (c) => {
                     }
                     
                     container.innerHTML = docs.map(d => \`
-                        <div class="border rounded-lg p-3 bg-green-50">
+                        <div class="border rounded-lg p-3 \${d.status === 'final' || d.status === 'approved' ? 'bg-green-50' : d.status === 'draft' ? 'bg-gray-50' : 'bg-yellow-50'}">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2">
-                                    <i class="fas fa-file-check text-green-600"></i>
-                                    <span class="font-medium">\${d.name}</span>
+                                    <i class="fas \${d.status === 'final' || d.status === 'approved' ? 'fa-file-check text-green-600' : 'fa-file-alt text-gray-400'}"></i>
+                                    <span class="font-medium">\${d.name || '無題の書類'}</span>
                                 </div>
                                 <div class="flex gap-1">
                                     <button onclick="previewDocument(\${d.id})" class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200">
@@ -4596,31 +4596,52 @@ routes.get('/portal/:token', async (c) => {
             async function loadProxyCreatedDocuments() {
                 try {
                     const container = document.getElementById('proxyCreatedDocuments');
-                    const res = await axios.get('/api/cases/' + CASE_ID + '/generated-documents?is_licensed=1');
+                    // 全ての生成書類を取得（代行作成モードでは全書類を表示）
+                    const res = await axios.get('/api/cases/' + CASE_ID + '/generated-documents');
                     const docs = res.data.documents || [];
                     
                     if (docs.length === 0) {
                         container.innerHTML = \`
                             <div class="text-center py-4 text-gray-500">
                                 <i class="fas fa-user-tie text-2xl mb-2 text-gray-300"></i>
-                                <p>専門家が作成した書類はまだありません</p>
+                                <p>作成された書類はまだありません</p>
                                 <p class="text-xs mt-1">担当者が書類を作成するとここに表示されます</p>
                             </div>
                         \`;
                         return;
                     }
                     
+                    // ステータスラベルを取得
+                    const getStatusLabel = (status) => {
+                        const labels = {
+                            'draft': '下書き',
+                            'review': '確認中',
+                            'final': '完成',
+                            'approved': '承認済み',
+                            'pending': '確認待ち'
+                        };
+                        return labels[status] || status;
+                    };
+                    
+                    // ステータスに応じたスタイル
+                    const getStatusStyle = (status) => {
+                        if (status === 'approved' || status === 'final') return 'bg-green-100 text-green-700';
+                        if (status === 'pending' || status === 'review') return 'bg-yellow-100 text-yellow-700';
+                        return 'bg-gray-100 text-gray-700';
+                    };
+                    
                     container.innerHTML = docs.map(d => \`
-                        <div class="border rounded-lg p-3 \${d.status === 'approved' ? 'bg-green-50' : d.status === 'pending' ? 'bg-yellow-50' : 'bg-white'}">
+                        <div class="border rounded-lg p-3 \${d.status === 'approved' || d.status === 'final' ? 'bg-green-50' : d.status === 'pending' || d.status === 'review' ? 'bg-yellow-50' : 'bg-white'}">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2">
-                                    <i class="fas \${d.status === 'approved' ? 'fa-check-circle text-green-600' : 'fa-clock text-yellow-600'}"></i>
-                                    <span class="font-medium">\${d.name}</span>
+                                    <i class="fas \${d.status === 'approved' || d.status === 'final' ? 'fa-check-circle text-green-600' : d.status === 'draft' ? 'fa-file-alt text-gray-400' : 'fa-clock text-yellow-600'}"></i>
+                                    <span class="font-medium">\${d.name || '無題の書類'}</span>
                                 </div>
-                                <span class="px-2 py-0.5 rounded text-xs \${d.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
-                                    \${d.status === 'approved' ? '承認済み' : '確認待ち'}
+                                <span class="px-2 py-0.5 rounded text-xs \${getStatusStyle(d.status)}">
+                                    \${getStatusLabel(d.status)}
                                 </span>
                             </div>
+                            <p class="text-xs text-gray-500 mt-1">作成日: \${new Date(d.created_at).toLocaleDateString('ja-JP')}</p>
                             <div class="flex gap-2 mt-2">
                                 <button onclick="previewDocument(\${d.id})" class="flex-1 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200">
                                     <i class="fas fa-eye mr-1"></i>プレビュー
