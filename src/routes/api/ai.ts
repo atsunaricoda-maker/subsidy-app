@@ -24,11 +24,10 @@ async function getAIModelName(DB: any, modelKey: string = 'ai_model_claude'): Pr
   }
 }
 
-// Gemini API呼び出しヘルパー（リトライ機能付き）
+// Gemini API呼び出しヘルパー（フォールバック用、gemini-2.0-flash使用）
 async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number): Promise<string> {
   if (!apiKey) {
-    // デモモード：APIキーがない場合はダミーレスポンス
-    return `【デモモード】\n\nAPIキーが設定されていないため、実際のAI生成は行われません。\n\n本番環境では、以下のプロンプトに基づいてAIが文章を生成します：\n\n${prompt.substring(0, 200)}...`
+    throw new Error('Gemini APIキーが設定されていません')
   }
   
   let lastError: Error | null = null
@@ -42,8 +41,9 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
       
+      // フォールバック用にgemini-2.0-flashを使用
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -89,15 +89,32 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
   throw lastError || new Error('Gemini API failed after retries')
 }
 
-// チャット用Gemini API呼び出し（軽量・高速なチャット向け）
-async function callGeminiForChat(prompt: string, env: any): Promise<string> {
-  const { GEMINI_API_KEY } = env
+// APIキー取得ヘルパー関数
+async function getAPIKeys(env: any): Promise<{ claudeApiKey: string, geminiApiKey: string }> {
+  const { DB, CLAUDE_API_KEY, GEMINI_API_KEY } = env
   
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini APIキーが設定されていません。環境変数 GEMINI_API_KEY を設定してください。')
+  let claudeApiKey = CLAUDE_API_KEY || ''
+  let geminiApiKey = GEMINI_API_KEY || ''
+  
+  try {
+    const aiSettings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key IN ('claude_api_key', 'gemini_api_key')
+    `).all()
+    
+    for (const setting of (aiSettings.results || [])) {
+      if ((setting as any).setting_key === 'claude_api_key' && (setting as any).setting_value) {
+        claudeApiKey = (setting as any).setting_value
+      }
+      if ((setting as any).setting_key === 'gemini_api_key' && (setting as any).setting_value) {
+        geminiApiKey = (setting as any).setting_value
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load AI settings:', e)
   }
   
-  return callGeminiAPI(prompt, GEMINI_API_KEY, 3)
+  return { claudeApiKey, geminiApiKey }
 }
 
 // Claude API呼び出しヘルパー（モデル名を指定可能）
@@ -166,37 +183,42 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
   throw lastError || new Error('Claude API failed after retries')
 }
 
-// 統合AI API呼び出し（Claude Haiku 4.5をメインで使用）
+// 統合AI API呼び出し（Claude優先、Geminiフォールバック）
 async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: number): Promise<string> {
-  const { DB, CLAUDE_API_KEY } = env
+  const { DB } = env
+  const { claudeApiKey, geminiApiKey } = await getAPIKeys(env)
   
-  // DB設定からClaude APIキーを取得
-  let claudeApiKey = CLAUDE_API_KEY || ''
-  
-  try {
-    const aiSettings = await DB.prepare(`
-      SELECT setting_key, setting_value FROM site_settings 
-      WHERE setting_key = 'claude_api_key'
-    `).all()
-    
-    for (const setting of (aiSettings.results || [])) {
-      if ((setting as any).setting_key === 'claude_api_key' && (setting as any).setting_value) {
-        claudeApiKey = (setting as any).setting_value
+  // Claude APIキーがある場合はClaudeを優先
+  if (claudeApiKey) {
+    try {
+      const modelName = await getAIModelName(DB, 'ai_model_claude')
+      console.log('Using Claude API (primary)')
+      return await callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars, modelName)
+    } catch (claudeError) {
+      console.error('Claude API failed, attempting Gemini fallback:', claudeError)
+      
+      // Geminiフォールバック
+      if (geminiApiKey) {
+        console.log('Falling back to Gemini API')
+        return await callGeminiAPI(prompt, geminiApiKey, maxRetries, maxChars)
       }
+      
+      throw claudeError
     }
-  } catch (e) {
-    console.error('Failed to load AI settings:', e)
   }
   
-  // Claude APIキーがない場合はエラー
-  if (!claudeApiKey) {
-    throw new Error('Claude APIキーが設定されていません。システム設定からAPIキーを設定してください。')
+  // Claude APIキーがない場合はGeminiを試行
+  if (geminiApiKey) {
+    console.log('Claude API key not set, using Gemini API')
+    return await callGeminiAPI(prompt, geminiApiKey, maxRetries, maxChars)
   }
   
-  // DBからモデル名を取得
-  const modelName = await getAIModelName(DB, 'ai_model_claude')
-  
-  return callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars, modelName)
+  throw new Error('AIのAPIキーが設定されていません。システム設定からClaude APIキーまたはGemini APIキーを設定してください。')
+}
+
+// チャット用AI呼び出し（Claude優先、Geminiフォールバック）
+async function callAIForChat(prompt: string, env: any): Promise<string> {
+  return callAI(prompt, env, 3)
 }
 
 // マルチモーダルClaude API呼び出し（画像/PDF対応、モデル名指定可能）
@@ -308,6 +330,6 @@ async function extractTextFromDocument(
 }
 
 // 関数エクスポート（他のルートファイルから利用可能）
-export { callAI, callClaudeAPI, callGeminiAPI, callClaudeAPIWithFile, extractTextFromDocument, getAIModelName }
+export { callAI, callAIForChat, callClaudeAPI, callGeminiAPI, callClaudeAPIWithFile, extractTextFromDocument, getAIModelName, getAPIKeys }
 
 export default routes

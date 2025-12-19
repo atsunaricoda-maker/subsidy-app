@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser } from '../../utils/auth'
+import { callAIForChat } from './ai'
 
 const routes = new Hono<AppEnv>()
 
@@ -112,8 +113,8 @@ ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? '
   const prompt = `${systemPrompt}\n\nユーザー: ${data.message}`
   
   try {
-    // チャットはGeminiを使用（軽量・高速）
-    const aiResponse = await callGeminiForChat(prompt, env)
+    // Claude優先、Geminiフォールバック
+    const aiResponse = await callAIForChat(prompt, env)
     
     // AIレスポンスを保存
     await DB.prepare(`
@@ -190,8 +191,8 @@ ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text |
 
 質問: ${data.question_text}`
 
-    // 回答提案はGeminiを使用（軽量・高速）
-    const suggestion = await callGeminiForChat(prompt, env)
+    // Claude優先、Geminiフォールバック
+    const suggestion = await callAIForChat(prompt, env)
     return c.json({ suggestion })
     
   } catch (error: any) {
