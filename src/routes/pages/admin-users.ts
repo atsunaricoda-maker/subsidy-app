@@ -253,7 +253,7 @@ routes.get('/admin/users', (c) => {
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500 hidden sm:table-cell">
-                                \${new Date(user.created_at).toLocaleDateString('ja-JP')}
+                                \${new Date(user.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex gap-2">

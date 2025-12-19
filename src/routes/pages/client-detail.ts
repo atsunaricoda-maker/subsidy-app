@@ -1149,7 +1149,7 @@ routes.get('/client/:id', async (c) => {
                                                 <div class="flex items-center gap-2 min-w-0">
                                                     <span class="text-purple-600 font-medium">\${doc.fiscal_year ? doc.fiscal_year + '期' : (idx + 1) + '件目'}</span>
                                                     <span class="text-gray-600 truncate">\${doc.file_name}</span>
-                                                    <span class="text-gray-400">\${new Date(doc.uploaded_at).toLocaleDateString('ja-JP')}</span>
+                                                    <span class="text-gray-400">\${new Date(doc.uploaded_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</span>
                                                 </div>
                                                 <div class="flex items-center gap-1 ml-2 flex-shrink-0">
                                                     <a href="/api/common-documents/\${doc.id}/download" 
@@ -1172,7 +1172,7 @@ routes.get('/client/:id', async (c) => {
                                     <div class="mt-1 ml-11 flex items-center justify-between text-xs group">
                                         <div class="text-gray-600">
                                             \${latestDoc.fiscal_year ? latestDoc.fiscal_year + '年度 - ' : ''}\${latestDoc.file_name}
-                                            <span class="text-gray-400 ml-1">\${new Date(latestDoc.uploaded_at).toLocaleDateString('ja-JP')}</span>
+                                            <span class="text-gray-400 ml-1">\${new Date(latestDoc.uploaded_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</span>
                                         </div>
                                         <button onclick="deleteCommonDocumentAdmin(\${latestDoc.id})" 
                                                 class="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity ml-2" title="削除">
@@ -1225,7 +1225,7 @@ routes.get('/client/:id', async (c) => {
                             <div class="max-w-xs \${isStaff ? 'bg-blue-100' : 'bg-gray-100'} rounded-lg p-3">
                                 <div class="font-medium text-sm mb-1">\${comm.sender_name}</div>
                                 <div class="text-sm">\${comm.message}</div>
-                                <div class="text-xs text-gray-500 mt-1">\${new Date(comm.created_at).toLocaleString('ja-JP')}</div>
+                                <div class="text-xs text-gray-500 mt-1">\${new Date(comm.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                             </div>
                         </div>
                     \`;
@@ -1783,7 +1783,7 @@ routes.get('/client/:id', async (c) => {
                     docs.forEach(doc => {
                         const option = document.createElement('option');
                         option.value = doc.id;
-                        option.textContent = doc.document_title + ' (' + new Date(doc.created_at).toLocaleDateString('ja-JP') + ')';
+                        option.textContent = doc.document_title + ' (' + new Date(doc.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ')';
                         select.appendChild(option);
                     });
                 } catch (error) {
@@ -2274,8 +2274,8 @@ routes.get('/client/:id', async (c) => {
                                 <span class="px-2 py-1 rounded text-xs \${statusLabels[doc.status]?.class || ''}">\${statusLabels[doc.status]?.label || doc.status}</span>
                             </div>
                             <div class="text-xs text-gray-400 mb-3">
-                                作成: \${new Date(doc.created_at).toLocaleString('ja-JP')}
-                                \${doc.updated_at !== doc.created_at ? \` / 更新: \${new Date(doc.updated_at).toLocaleString('ja-JP')}\` : ''}
+                                作成: \${new Date(doc.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                                \${doc.updated_at !== doc.created_at ? \` / 更新: \${new Date(doc.updated_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}\` : ''}
                             </div>
                             <div class="flex gap-2">
                                 <button onclick="viewDocument(\${doc.id})" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm">
@@ -2333,7 +2333,7 @@ routes.get('/client/:id', async (c) => {
                             const caseNo = 'No.' + String(c.id).padStart(4, '0');
                             const subsidyName = c.subsidy_type_name || '補助金種別未設定';
                             const status = statusMap[c.status] || c.status;
-                            const createdDate = c.created_at ? new Date(c.created_at).toLocaleDateString('ja-JP') : '';
+                            const createdDate = c.created_at ? new Date(c.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '';
                             return \`<option value="\${c.id}">[\${caseNo}] \${subsidyName}（\${status}）\${createdDate ? ' - ' + createdDate + '作成' : ''}</option>\`;
                         }).join('');
                     
@@ -2742,7 +2742,7 @@ routes.get('/client/:id', async (c) => {
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="px-2 py-0.5 rounded text-xs \${editTypeLabels[h.edit_type]?.class || 'bg-gray-100'}">\${editTypeLabels[h.edit_type]?.label || h.edit_type}</span>
                                         <span class="text-gray-600">\${h.section_id}</span>
-                                        <span class="text-xs text-gray-400">\${new Date(h.created_at).toLocaleString('ja-JP')}</span>
+                                        <span class="text-xs text-gray-400">\${new Date(h.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</span>
                                     </div>
                                     <div class="text-xs text-gray-500">編集者: \${h.editor_name || '不明'}</div>
                                 </div>

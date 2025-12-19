@@ -100,7 +100,7 @@ routes.get('/master/logs', (c) => {
                                 <p class="font-medium">\${log.message}</p>
                                 <p class="text-sm text-gray-500">\${log.org_name || 'システム'}</p>
                             </div>
-                            <span class="text-sm text-gray-400">\${new Date(log.created_at).toLocaleString('ja-JP')}</span>
+                            <span class="text-sm text-gray-400">\${new Date(log.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</span>
                         </div>
                     \`).join('') || '<p class="text-gray-500 p-4">ログがありません</p>';
                     

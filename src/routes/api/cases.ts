@@ -1203,7 +1203,7 @@ routes.get('/generated-documents/:id/preview', async (c) => {
   
   // ステータスラベル
   const statusLabel = doc.status === 'draft' ? '下書き' : doc.status === 'final' ? '完成' : doc.status
-  const createdAt = new Date(doc.created_at).toLocaleString('ja-JP')
+  const createdAt = new Date(doc.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
   
   const html = `<!DOCTYPE html>
 <html lang="ja">

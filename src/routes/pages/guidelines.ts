@@ -879,7 +879,7 @@ routes.get('/admin/guidelines', (c) => {
                                                     <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border \${deadlineStyle.bg} \${deadlineStyle.border}">
                                                         <i class="fas fa-\${deadlineStyle.icon} \${deadlineStyle.text}"></i>
                                                         <span class="text-sm font-medium \${deadlineStyle.text}">
-                                                            申請期限: \${deadline ? deadline.toLocaleDateString('ja-JP') : '未設定'}
+                                                            申請期限: \${deadline ? deadline.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未設定'}
                                                         </span>
                                                         <span class="text-xs px-1.5 py-0.5 rounded \${deadlineStyle.bg} \${deadlineStyle.text} font-bold">
                                                             \${deadlineStyle.label}
@@ -887,7 +887,7 @@ routes.get('/admin/guidelines', (c) => {
                                                     </div>
                                                     \${guideline?.application_start_date ? \`
                                                         <span class="text-xs text-gray-500">
-                                                            （開始: \${new Date(guideline.application_start_date).toLocaleDateString('ja-JP')}）
+                                                            （開始: \${new Date(guideline.application_start_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}）
                                                         </span>
                                                     \` : ''}
                                                 </div>
@@ -1177,7 +1177,7 @@ routes.get('/admin/guidelines', (c) => {
                             </a>
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-500">
-                            \${url.last_checked_at ? new Date(url.last_checked_at).toLocaleString('ja-JP') : '未チェック'}
+                            \${url.last_checked_at ? new Date(url.last_checked_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未チェック'}
                         </td>
                         <td class="px-4 py-3">
                             <button onclick="deleteWatchUrl(\${url.id})" class="text-red-600 hover:text-red-800">
@@ -1208,7 +1208,7 @@ routes.get('/admin/guidelines', (c) => {
                 
                 tbody.innerHTML = logs.map(log => \`
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm">\${new Date(log.detected_at).toLocaleString('ja-JP')}</td>
+                        <td class="px-4 py-3 text-sm">\${new Date(log.detected_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">\${log.subsidy_name}</span>
                         </td>
@@ -1891,7 +1891,7 @@ routes.get('/admin/guidelines', (c) => {
                             </div>
                         </div>
                         <p class="text-xs text-gray-600 mt-1 whitespace-pre-wrap">\${n.message}</p>
-                        <div class="text-xs text-gray-400 mt-2">\${new Date(n.created_at).toLocaleString('ja-JP')}</div>
+                        <div class="text-xs text-gray-400 mt-2">\${new Date(n.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                     </div>
                 \`).join('');
             }

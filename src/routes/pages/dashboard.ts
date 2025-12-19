@@ -1385,7 +1385,7 @@ routes.get('/', (c) => {
                                 </div>
                             </div>
                             <p class="text-xs text-gray-600 mt-1 whitespace-pre-wrap">\${n.message}</p>
-                            <div class="text-xs text-gray-400 mt-2">\${new Date(n.created_at).toLocaleString('ja-JP')}</div>
+                            <div class="text-xs text-gray-400 mt-2">\${new Date(n.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                         </div>
                     \`).join('');
                 } catch (error) {
@@ -1530,7 +1530,7 @@ routes.get('/', (c) => {
                 if (diffMins < 60) return diffMins + '分前';
                 if (diffHours < 24) return diffHours + '時間前';
                 if (diffDays < 7) return diffDays + '日前';
-                return date.toLocaleDateString('ja-JP');
+                return date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
             }
             
             // 申請期限アラート表示

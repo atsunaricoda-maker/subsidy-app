@@ -384,7 +384,7 @@ routes.get('/clients', async (c) => {
                             </div>
                             <div class="quick-view-item">
                                 <div class="quick-view-label">登録日</div>
-                                <div class="quick-view-value">\${data.created_at ? new Date(data.created_at).toLocaleDateString('ja-JP') : '-'}</div>
+                                <div class="quick-view-value">\${data.created_at ? new Date(data.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}</div>
                             </div>
                             <div class="quick-view-item">
                                 <div class="quick-view-label">案件数</div>
@@ -470,7 +470,7 @@ routes.get('/clients', async (c) => {
                                     <i class="fas fa-file text-gray-400"></i>
                                     <div>
                                         <div class="font-medium text-sm">\${doc.document_type || doc.file_name}</div>
-                                        <div class="text-xs text-gray-500">\${doc.file_name} • \${new Date(doc.created_at).toLocaleDateString('ja-JP')}</div>
+                                        <div class="text-xs text-gray-500">\${doc.file_name} • \${new Date(doc.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                                     </div>
                                 </div>
                                 <a href="/api/documents/\${doc.id}/download" class="text-blue-600 hover:text-blue-800 text-sm">

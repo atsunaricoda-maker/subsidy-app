@@ -100,7 +100,7 @@ routes.get('/master/billing', (c) => {
                             </div>
                             <div class="text-right">
                                 <p class="font-medium">¥\${(s.price || 0).toLocaleString()}/月</p>
-                                <p class="text-xs text-gray-500">\${new Date(s.created_at).toLocaleDateString('ja-JP')}</p>
+                                <p class="text-xs text-gray-500">\${new Date(s.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
                             </div>
                         </div>
                     \`).join('') || '<p class="text-gray-500 p-3">データがありません</p>';

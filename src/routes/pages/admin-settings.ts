@@ -265,7 +265,7 @@ routes.get('/admin/subscription', async (c) => {
                     if (data.scheduled_plan && data.scheduled_plan_date) {
                         const scheduledDate = new Date(data.scheduled_plan_date);
                         document.getElementById('scheduledPlanText').textContent = 
-                            scheduledDate.toLocaleDateString('ja-JP') + 'から「' + data.scheduled_plan.plan_name + '」に変更予定';
+                            scheduledDate.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) + 'から「' + data.scheduled_plan.plan_name + '」に変更予定';
                         scheduledInfo.classList.remove('hidden');
                     } else {
                         scheduledInfo.classList.add('hidden');
@@ -479,7 +479,7 @@ routes.get('/admin/subscription', async (c) => {
                             borderClass = 'border-blue-500 bg-blue-50';
                             buttonHtml = '';
                         } else if (isScheduled) {
-                            statusBadge = '<div class="text-xs font-bold text-yellow-600 mb-2"><i class="fas fa-clock mr-1"></i>変更予約済み（' + new Date(nextResetDateData).toLocaleDateString('ja-JP') + 'から適用）</div>';
+                            statusBadge = '<div class="text-xs font-bold text-yellow-600 mb-2"><i class="fas fa-clock mr-1"></i>変更予約済み（' + new Date(nextResetDateData).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) + 'から適用）</div>';
                             borderClass = 'border-yellow-500 bg-yellow-50';
                             // キャンセルボタンは上部の通知エリアにあるので、ここではボタンを表示しない
                             buttonHtml = '';
@@ -577,7 +577,7 @@ routes.get('/admin/subscription', async (c) => {
                                 </div>
                                 <div class="text-right">
                                     <div class="font-bold \${isPositive ? 'text-green-600' : 'text-red-600'}">\${isPositive ? '+' : ''}\${h.slots_changed}枠</div>
-                                    <div class="text-xs text-gray-500">\${new Date(h.created_at).toLocaleString('ja-JP')}</div>
+                                    <div class="text-xs text-gray-500">\${new Date(h.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                                 </div>
                             </div>
                         \`;
@@ -1656,7 +1656,7 @@ routes.get('/admin/payments', async (c) => {
                                                         </div>
                                                     \` : ''}
                                                     <div class="text-xs text-gray-400 mt-1">
-                                                        <i class="fas fa-clock mr-1"></i>報告日時: \${p.bank_transfer_reported_at ? new Date(p.bank_transfer_reported_at).toLocaleString('ja-JP') : '-'}
+                                                        <i class="fas fa-clock mr-1"></i>報告日時: \${p.bank_transfer_reported_at ? new Date(p.bank_transfer_reported_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1743,7 +1743,7 @@ routes.get('/admin/payments', async (c) => {
                                                     </span>
                                                 </div>
                                                 <div class="text-xs text-gray-400 mt-1">
-                                                    \${p.confirmed_at ? new Date(p.confirmed_at).toLocaleDateString('ja-JP') + ' 確認' : ''}
+                                                    \${p.confirmed_at ? new Date(p.confirmed_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ' 確認' : ''}
                                                 </div>
                                             </div>
                                         </div>

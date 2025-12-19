@@ -1620,7 +1620,7 @@ routes.get('/portal/:token', async (c) => {
                                         </div>
                                     </div>
                                     \${isOverdue ? '<div class="text-xs text-red-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>期限超過</div>' : ''}
-                                    \${needsPayment && !isOverdue ? '<div class="text-xs text-yellow-700 mt-1">期限: ' + (inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP') : '-') + '</div>' : ''}
+                                    \${needsPayment && !isOverdue ? '<div class="text-xs text-yellow-700 mt-1">期限: ' + (inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-') + '</div>' : ''}
                                 </div>
                             \`;
                         }).join('');
@@ -1785,11 +1785,11 @@ routes.get('/portal/:token', async (c) => {
                                 <div class="flex flex-wrap gap-4 mb-6 text-sm">
                                     <div class="bg-gray-100 px-4 py-2 rounded-lg">
                                         <span class="text-gray-500">発行日:</span>
-                                        <span class="font-medium ml-1">\${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP') : '-'}</span>
+                                        <span class="font-medium ml-1">\${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}</span>
                                     </div>
                                     <div class="bg-yellow-100 px-4 py-2 rounded-lg">
                                         <span class="text-yellow-700">支払期限:</span>
-                                        <span class="font-bold text-yellow-800 ml-1">\${inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP') : '-'}</span>
+                                        <span class="font-bold text-yellow-800 ml-1">\${inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}</span>
                                     </div>
                                 </div>
                                 
@@ -4630,7 +4630,7 @@ routes.get('/portal/:token', async (c) => {
                                     </button>
                                 </div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1">作成日: \${new Date(d.created_at).toLocaleDateString('ja-JP')}</p>
+                            <p class="text-xs text-gray-500 mt-1">作成日: \${new Date(d.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
                         </div>
                     \`).join('');
                 } catch (error) {
@@ -4687,7 +4687,7 @@ routes.get('/portal/:token', async (c) => {
                                     \${getStatusLabel(d.status)}
                                 </span>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1">作成日: \${new Date(d.created_at).toLocaleDateString('ja-JP')}</p>
+                            <p class="text-xs text-gray-500 mt-1">作成日: \${new Date(d.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
                             <div class="flex gap-2 mt-2">
                                 <button onclick="previewDocument(\${d.id})" class="flex-1 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200">
                                     <i class="fas fa-eye mr-1"></i>プレビュー

@@ -519,7 +519,7 @@ routes.get('/cases', async (c) => {
                             </div>
                             <div class="quick-view-item">
                                 <div class="quick-view-label">登録日</div>
-                                <div class="quick-view-value">\${data.created_at ? new Date(data.created_at).toLocaleDateString('ja-JP') : '-'}</div>
+                                <div class="quick-view-value">\${data.created_at ? new Date(data.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}</div>
                             </div>
                             \${data.approved_amount ? \`
                             <div class="quick-view-item">
@@ -595,7 +595,7 @@ routes.get('/cases', async (c) => {
                                     <i class="fas fa-file text-gray-400"></i>
                                     <div>
                                         <div class="font-medium text-sm">\${doc.document_type || doc.file_name}</div>
-                                        <div class="text-xs text-gray-500">\${doc.file_name} • \${new Date(doc.created_at).toLocaleDateString('ja-JP')}</div>
+                                        <div class="text-xs text-gray-500">\${doc.file_name} • \${new Date(doc.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -633,7 +633,7 @@ routes.get('/cases', async (c) => {
                                 </div>
                                 <div class="flex-1">
                                     <div class="text-sm font-medium">\${item.action}</div>
-                                    <div class="text-xs text-gray-500">\${item.user || ''} • \${new Date(item.created_at).toLocaleString('ja-JP')}</div>
+                                    <div class="text-xs text-gray-500">\${item.user || ''} • \${new Date(item.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                                     \${item.details ? '<div class="text-sm text-gray-600 mt-1">' + item.details + '</div>' : ''}
                                 </div>
                             </div>

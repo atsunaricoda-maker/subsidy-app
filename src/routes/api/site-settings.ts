@@ -1078,7 +1078,7 @@ routes.get('/master/organizations', async (c) => {
                                     <span class="px-2 py-1 rounded text-sm \${status.class}">\${status.text}</span>
                                 </td>
                                 <td class="px-6 py-4 text-gray-600">\${org.case_count || 0}件</td>
-                                <td class="px-6 py-4 text-gray-600">\${new Date(org.created_at).toLocaleDateString('ja-JP')}</td>
+                                <td class="px-6 py-4 text-gray-600">\${new Date(org.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td>
                                 <td class="px-6 py-4">
                                     <div class="flex gap-2">
                                         <a href="/master/organizations/\${org.id}" class="text-blue-600 hover:text-blue-800">
@@ -1782,7 +1782,7 @@ routes.get('/master/organizations/:id', async (c) => {
                         </div>
                         <div>
                             <p class="text-sm text-gray-500">登録日</p>
-                            <p class="mt-1 font-medium">\${new Date(org.created_at).toLocaleDateString('ja-JP')}</p>
+                            <p class="mt-1 font-medium">\${new Date(org.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
                         </div>
                         <div>
                             <p class="text-sm text-gray-500">電話番号</p>
@@ -1821,7 +1821,7 @@ routes.get('/master/organizations/:id', async (c) => {
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-500">次回更新</span>
-                            <span class="font-medium">\${org.subscription?.current_period_end ? new Date(org.subscription.current_period_end).toLocaleDateString('ja-JP') : '-'}</span>
+                            <span class="font-medium">\${org.subscription?.current_period_end ? new Date(org.subscription.current_period_end).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}</span>
                         </div>
                     \`;
                     

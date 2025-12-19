@@ -1417,7 +1417,7 @@ routes.get('/case/:id', async (c) => {
                                             </div>
                                             <div class="text-xs text-gray-500 truncate">\${doc.file_name}</div>
                                             <div class="text-xs text-gray-400 mt-1">
-                                                \${doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString('ja-JP') : ''}
+                                                \${doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
                                                 \${doc.uploaded_by === 'client' ? ' · 顧客アップロード' : ''}
                                             </div>
                                         </div>
@@ -1669,8 +1669,8 @@ routes.get('/case/:id', async (c) => {
                                             </div>
                                             <div class="text-sm text-gray-600">\${inv.item_name}</div>
                                             <div class="text-xs text-gray-400">
-                                                発行日: \${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP') : '未設定'}
-                                                \${inv.due_date ? ' / 期限: ' + new Date(inv.due_date).toLocaleDateString('ja-JP') : ''}
+                                                発行日: \${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未設定'}
+                                                \${inv.due_date ? ' / 期限: ' + new Date(inv.due_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : ''}
                                             </div>
                                         </div>
                                         <div class="text-right">
@@ -2144,11 +2144,11 @@ routes.get('/case/:id', async (c) => {
                                 <div class="flex gap-4 text-sm">
                                     <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded">
                                         <i class="fas fa-calendar text-gray-500"></i>
-                                        <span>発行日: \${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP') : '未設定'}</span>
+                                        <span>発行日: \${inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未設定'}</span>
                                     </div>
                                     <div class="flex items-center gap-2 px-3 py-1.5 bg-orange-100 text-orange-700 rounded">
                                         <i class="fas fa-clock"></i>
-                                        <span>支払期限: \${inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP') : '未設定'}</span>
+                                        <span>支払期限: \${inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未設定'}</span>
                                     </div>
                                 </div>
                                 
@@ -2298,7 +2298,7 @@ routes.get('/case/:id', async (c) => {
                                 <div class="inline-block max-w-[80%] p-3 rounded-lg \${comm.sender_type === 'staff' ? 'bg-blue-50' : 'bg-green-50'}">
                                     <div class="text-sm">\${comm.message}</div>
                                 </div>
-                                <div class="text-xs text-gray-400 mt-1">\${comm.sender_name} - \${new Date(comm.created_at).toLocaleString('ja-JP')}</div>
+                                <div class="text-xs text-gray-400 mt-1">\${comm.sender_name} - \${new Date(comm.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                             </div>
                         </div>
                     \`).join('');

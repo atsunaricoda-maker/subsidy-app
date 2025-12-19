@@ -508,7 +508,7 @@ routes.post('/subscription/change-plan', async (c) => {
     success: true, 
     new_plan: plan,
     scheduled_date: nextResetDate.toISOString().split('T')[0],
-    message: `${nextResetDate.toLocaleDateString('ja-JP')}からプランが変更されます`
+    message: `${nextResetDate.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}からプランが変更されます`
   })
 })
 

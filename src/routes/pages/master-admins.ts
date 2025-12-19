@@ -96,7 +96,7 @@ routes.get('/master/admins', (c) => {
                                 </div>
                             </div>
                             <div class="flex items-center gap-4">
-                                <span class="text-sm text-gray-500">\${new Date(admin.created_at).toLocaleDateString('ja-JP')}</span>
+                                <span class="text-sm text-gray-500">\${new Date(admin.created_at).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</span>
                                 \${admin.id !== 1 ? \`
                                     <button onclick="deleteAdmin(\${admin.id})" class="text-red-500 hover:text-red-700">
                                         <i class="fas fa-trash"></i>

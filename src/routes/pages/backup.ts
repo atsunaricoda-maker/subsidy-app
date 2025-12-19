@@ -431,7 +431,7 @@ routes.get('/admin/backup', (c) => {
                 
                 const previewMeta = document.getElementById('previewMeta');
                 previewMeta.innerHTML = \`
-                    <div>バックアップ日時: \${new Date(data.exported_at).toLocaleString('ja-JP')}</div>
+                    <div>バックアップ日時: \${new Date(data.exported_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                     <div>バージョン: \${data.version}</div>
                 \`;
             }
