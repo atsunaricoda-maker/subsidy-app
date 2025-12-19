@@ -589,73 +589,82 @@ routes.get('/invoices/:id/pdf', async (c) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
-            font-size: 12px;
-            line-height: 1.6;
+            font-size: 11px;
+            line-height: 1.5;
             color: #333;
             background: #fff;
         }
         .invoice-container {
             max-width: 210mm;
+            min-height: 297mm;
             margin: 0 auto;
-            padding: 15mm;
+            padding: 10mm 12mm;
             background: white;
         }
         @media print {
+            @page {
+                size: A4;
+                margin: 8mm;
+            }
             body { background: white; }
-            .invoice-container { padding: 10mm; }
+            .invoice-container { 
+                padding: 0;
+                min-height: auto;
+            }
             .no-print { display: none !important; }
         }
-        .header { text-align: center; margin-bottom: 30px; }
+        .header { text-align: center; margin-bottom: 15px; }
         .header h1 { 
-            font-size: 28px; 
+            font-size: 24px; 
             font-weight: bold;
-            letter-spacing: 8px;
-            border-bottom: 3px double #333;
-            padding-bottom: 10px;
+            letter-spacing: 6px;
+            border-bottom: 2px double #333;
+            padding-bottom: 8px;
             display: inline-block;
         }
         .invoice-number { 
             text-align: right; 
-            margin: 20px 0;
-            font-size: 11px;
+            margin: 12px 0;
+            font-size: 10px;
         }
-        .parties { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .parties { display: flex; justify-content: space-between; margin-bottom: 15px; }
         .client { flex: 1; }
         .client-name { 
-            font-size: 18px; 
+            font-size: 16px; 
             font-weight: bold;
             border-bottom: 1px solid #333;
-            padding-bottom: 5px;
-            margin-bottom: 5px;
+            padding-bottom: 4px;
+            margin-bottom: 4px;
         }
-        .client-name::after { content: " 御中"; font-size: 14px; }
+        .client-name::after { content: " 御中"; font-size: 12px; }
         .issuer { 
             text-align: right; 
-            font-size: 11px;
-            line-height: 1.8;
+            font-size: 10px;
+            line-height: 1.6;
         }
-        .issuer-name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+        .issuer-name { font-size: 12px; font-weight: bold; margin-bottom: 3px; }
         .total-box {
             background: #f5f5f5;
             border: 2px solid #333;
-            padding: 15px 20px;
-            margin: 20px 0;
+            padding: 10px 15px;
+            margin: 12px 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .total-label { font-size: 14px; font-weight: bold; }
-        .total-amount { font-size: 24px; font-weight: bold; }
+        .total-label { font-size: 12px; font-weight: bold; }
+        .total-amount { font-size: 20px; font-weight: bold; }
         .total-amount::before { content: "¥"; }
         .details-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 12px 0;
         }
         .details-table th, .details-table td {
             border: 1px solid #ddd;
-            padding: 10px;
+            padding: 6px 8px;
             text-align: left;
+            font-size: 10px;
         }
         .details-table th {
             background: #f0f0f0;
@@ -665,19 +674,19 @@ routes.get('/invoices/:id/pdf', async (c) => {
         .bank-info {
             background: #f9f9f9;
             border: 1px solid #ddd;
-            padding: 15px;
-            margin: 20px 0;
+            padding: 10px;
+            margin: 12px 0;
         }
         .bank-info h3 { 
-            font-size: 13px; 
-            margin-bottom: 10px;
+            font-size: 11px; 
+            margin-bottom: 6px;
             border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
+            padding-bottom: 4px;
         }
-        .bank-info table { width: 100%; }
-        .bank-info td { padding: 3px 10px; }
-        .bank-info td:first-child { width: 80px; color: #666; }
-        .notes { margin-top: 20px; font-size: 11px; color: #666; }
+        .bank-info table { width: 100%; font-size: 10px; }
+        .bank-info td { padding: 2px 8px; }
+        .bank-info td:first-child { width: 70px; color: #666; }
+        .notes { margin-top: 12px; font-size: 10px; color: #666; }
         .print-btn {
             position: fixed;
             top: 20px;
@@ -691,6 +700,20 @@ routes.get('/invoices/:id/pdf', async (c) => {
             font-size: 14px;
         }
         .print-btn:hover { background: #1d4ed8; }
+        .invoice-reg-box {
+            margin: 12px 0;
+            padding: 10px;
+            background: #f0f9ff;
+            border: 1px solid #0284c7;
+            border-radius: 4px;
+        }
+        .due-date-box {
+            margin: 12px 0;
+            padding: 8px 10px;
+            background: #fff3cd;
+            border-radius: 4px;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
@@ -798,17 +821,17 @@ routes.get('/invoices/:id/pdf', async (c) => {
         </div>
         
         ${inv.invoice_registration_number ? `
-        <div style="margin: 20px 0; padding: 15px; background: #f0f9ff; border: 1px solid #0284c7; border-radius: 5px;">
-            <div style="font-size: 11px; color: #0369a1; margin-bottom: 5px;">
+        <div class="invoice-reg-box">
+            <div style="font-size: 10px; color: #0369a1; margin-bottom: 3px;">
                 📋 適格請求書発行事業者登録番号
             </div>
-            <div style="font-size: 14px; font-weight: bold; font-family: monospace; color: #0c4a6e;">
+            <div style="font-size: 12px; font-weight: bold; font-family: monospace; color: #0c4a6e;">
                 ${inv.invoice_registration_number}
             </div>
         </div>
         ` : ''}
         
-        <div style="margin: 20px 0; padding: 10px; background: #fff3cd; border-radius: 5px;">
+        <div class="due-date-box">
             <strong>📅 お支払期限: ${formatDate(inv.due_date)}</strong>
         </div>
         
