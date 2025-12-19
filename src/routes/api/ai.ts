@@ -1,0 +1,310 @@
+// AI機能 API
+import { Hono } from 'hono'
+import type { AppEnv } from '../../types'
+import { getCurrentUser } from '../../utils/auth'
+
+const routes = new Hono<AppEnv>()
+
+// DBからAIモデル名を取得するヘルパー関数
+async function getAIModelName(DB: any, modelKey: string = 'ai_model_claude'): Promise<string> {
+  const defaultModels: Record<string, string> = {
+    'ai_model_claude': 'claude-haiku-4-5-20251001',
+    'ai_model_claude_multimodal': 'claude-haiku-4-5-20251001'
+  }
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT setting_value FROM site_settings WHERE setting_key = ?
+    `).bind(modelKey).first()
+    
+    return (result as any)?.setting_value || defaultModels[modelKey] || defaultModels['ai_model_claude']
+  } catch (e) {
+    console.error('Failed to get AI model name:', e)
+    return defaultModels[modelKey] || defaultModels['ai_model_claude']
+  }
+}
+
+// Gemini API呼び出しヘルパー（リトライ機能付き）
+async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number): Promise<string> {
+  if (!apiKey) {
+    // デモモード：APIキーがない場合はダミーレスポンス
+    return `【デモモード】\n\nAPIキーが設定されていないため、実際のAI生成は行われません。\n\n本番環境では、以下のプロンプトに基づいてAIが文章を生成します：\n\n${prompt.substring(0, 200)}...`
+  }
+  
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // レート制限対策：リトライ時は待機（指数バックオフ）
+      if (attempt > 0) {
+        const waitTime = Math.min(3000 * Math.pow(2, attempt), 15000) // 3秒, 6秒, 12秒, 最大15秒
+        console.log(`Gemini API retry ${attempt}/${maxRetries}, waiting ${waitTime}ms...`)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              // maxOutputTokensは制限しない（プロンプトで文字数を指示）
+              maxOutputTokens: 4096,
+            }
+          })
+        }
+      )
+      
+      // 429（レート制限）または5xx（サーバーエラー）の場合はリトライ
+      if (response.status === 429 || response.status >= 500) {
+        const errorBody = await response.text().catch(() => '')
+        lastError = new Error(`Gemini API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+        console.error(`Gemini API attempt ${attempt + 1}/${maxRetries} failed: ${response.status}`, errorBody.substring(0, 500))
+        continue
+      }
+      
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '')
+        // RESOURCE_EXHAUSTED（クォータ超過）もリトライ対象にする
+        if (errorBody.includes('RESOURCE_EXHAUSTED') || errorBody.includes('quota')) {
+          lastError = new Error(`Gemini API quota exceeded: ${response.status}`)
+          console.error(`Gemini API quota exceeded, attempt ${attempt + 1}/${maxRetries}`)
+          continue
+        }
+        throw new Error(`Gemini API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+      }
+      
+      const data = await response.json()
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      
+    } catch (error) {
+      lastError = error as Error
+      console.error(`Gemini API attempt ${attempt + 1}/${maxRetries} error:`, error)
+    }
+  }
+  
+  throw lastError || new Error('Gemini API failed after retries')
+}
+
+// チャット用Gemini API呼び出し（軽量・高速なチャット向け）
+async function callGeminiForChat(prompt: string, env: any): Promise<string> {
+  const { GEMINI_API_KEY } = env
+  
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini APIキーが設定されていません。環境変数 GEMINI_API_KEY を設定してください。')
+  }
+  
+  return callGeminiAPI(prompt, GEMINI_API_KEY, 3)
+}
+
+// Claude API呼び出しヘルパー（モデル名を指定可能）
+async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, maxChars?: number, modelName: string = 'claude-haiku-4-5-20251001'): Promise<string> {
+  if (!apiKey) {
+    return `【デモモード】\n\nClaude APIキーが設定されていないため、実際のAI生成は行われません。\n\nシステム設定からClaude APIキーを設定してください。`
+  }
+  
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // レート制限対策：リトライ時は待機（指数バックオフ）
+      if (attempt > 0) {
+        const waitTime = Math.min(3000 * Math.pow(2, attempt), 15000)
+        console.log(`Claude API retry ${attempt}/${maxRetries}, waiting ${waitTime}ms...`)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+      
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          max_tokens: maxChars ? Math.min(maxChars * 2, 8192) : 4096,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        })
+      })
+      
+      // 429（レート制限）または5xx（サーバーエラー）の場合はリトライ
+      if (response.status === 429 || response.status >= 500) {
+        const errorBody = await response.text().catch(() => '')
+        lastError = new Error(`Claude API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+        console.error(`Claude API attempt ${attempt + 1}/${maxRetries} failed: ${response.status}`, errorBody.substring(0, 500))
+        continue
+      }
+      
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '')
+        if (errorBody.includes('rate_limit') || errorBody.includes('overloaded')) {
+          lastError = new Error(`Claude API rate limited: ${response.status}`)
+          console.error(`Claude API rate limited, attempt ${attempt + 1}/${maxRetries}`)
+          continue
+        }
+        throw new Error(`Claude API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+      }
+      
+      const data = await response.json()
+      return data.content?.[0]?.text || ''
+      
+    } catch (error) {
+      lastError = error as Error
+      console.error(`Claude API attempt ${attempt + 1}/${maxRetries} error:`, error)
+    }
+  }
+  
+  throw lastError || new Error('Claude API failed after retries')
+}
+
+// 統合AI API呼び出し（Claude Haiku 4.5をメインで使用）
+async function callAI(prompt: string, env: any, maxRetries = 3, maxChars?: number): Promise<string> {
+  const { DB, CLAUDE_API_KEY } = env
+  
+  // DB設定からClaude APIキーを取得
+  let claudeApiKey = CLAUDE_API_KEY || ''
+  
+  try {
+    const aiSettings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key = 'claude_api_key'
+    `).all()
+    
+    for (const setting of (aiSettings.results || [])) {
+      if ((setting as any).setting_key === 'claude_api_key' && (setting as any).setting_value) {
+        claudeApiKey = (setting as any).setting_value
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load AI settings:', e)
+  }
+  
+  // Claude APIキーがない場合はエラー
+  if (!claudeApiKey) {
+    throw new Error('Claude APIキーが設定されていません。システム設定からAPIキーを設定してください。')
+  }
+  
+  // DBからモデル名を取得
+  const modelName = await getAIModelName(DB, 'ai_model_claude')
+  
+  return callClaudeAPI(prompt, claudeApiKey, maxRetries, maxChars, modelName)
+}
+
+// マルチモーダルClaude API呼び出し（画像/PDF対応、モデル名指定可能）
+async function callClaudeAPIWithFile(prompt: string, fileData: ArrayBuffer, mimeType: string, apiKey: string, modelName: string = 'claude-haiku-4-5-20251001'): Promise<string> {
+  if (!apiKey) {
+    return `【デモモード】書類解析はAPIキーが必要です。システム設定からClaude APIキーを設定してください。`
+  }
+  
+  // ArrayBufferをBase64に変換
+  const base64Data = btoa(
+    new Uint8Array(fileData).reduce((data, byte) => data + String.fromCharCode(byte), '')
+  )
+  
+  // Claude APIはPDF/画像をサポート
+  // Claude 3 Haiku/Sonnet/OpusはPDF対応（直接インライン）
+  const mediaType = mimeType.includes('pdf') ? 'application/pdf' : mimeType
+  
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: modelName,
+      max_tokens: 8192,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: mimeType.includes('pdf') ? 'document' : 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: base64Data
+            }
+          },
+          {
+            type: 'text',
+            text: prompt
+          }
+        ]
+      }]
+    })
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Claude multimodal API error:', response.status, errorText)
+    throw new Error(`Claude API error: ${response.status}`)
+  }
+  
+  const data = await response.json()
+  return data.content?.[0]?.text || ''
+}
+
+// 書類からテキストを抽出する関数（Claude使用）
+async function extractTextFromDocument(
+  r2: R2Bucket,
+  filePath: string,
+  documentType: string,
+  fileName: string,
+  claudeApiKey: string,
+  modelName: string = 'claude-haiku-4-5-20251001'
+): Promise<string> {
+  try {
+    const object = await r2.get(filePath)
+    if (!object) {
+      return ''
+    }
+    
+    const arrayBuffer = await object.arrayBuffer()
+    const mimeType = object.httpMetadata?.contentType || 'application/octet-stream'
+    
+    // サポートされるファイル形式をチェック（Claude対応形式）
+    const supportedMimeTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp'
+    ]
+    
+    if (!supportedMimeTypes.some(t => mimeType.includes(t.split('/')[1]))) {
+      return `【${documentType}】ファイル形式（${mimeType}）はテキスト抽出に対応していません。`
+    }
+    
+    const extractionPrompt = `この書類（${documentType}: ${fileName}）の内容を詳細にテキスト化してください。
+
+【抽出すべき情報】
+- 会社情報（会社名、住所、代表者名など）
+- 数値情報（売上、利益、従業員数、資本金など）
+- 日付情報（設立日、決算期など）
+- 事業内容や業種
+- その他重要な情報
+
+【出力形式】
+- 重要な項目は「項目名: 値」の形式で
+- 箇条書きで整理
+- 不明瞭な部分は「（読み取り困難）」と記載
+- マークダウン記法は使用しないでください`
+
+    return await callClaudeAPIWithFile(extractionPrompt, arrayBuffer, mimeType, claudeApiKey, modelName)
+  } catch (error) {
+    console.error(`Document extraction error for ${filePath}:`, error)
+    return `【${documentType}】テキスト抽出に失敗しました。`
+  }
+}
+
+export default routes

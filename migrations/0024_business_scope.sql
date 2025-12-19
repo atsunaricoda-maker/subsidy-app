@@ -18,8 +18,9 @@ CREATE TABLE IF NOT EXISTS organization_addons (
 );
 
 -- subsidy_typesにcategoryカラムを追加（助成金/補助金/許認可の区別）
-ALTER TABLE subsidy_types ADD COLUMN category TEXT DEFAULT 'subsidy';
+-- カラムが既に存在する場合はスキップ（SQLiteにはIF NOT EXISTSがないため、エラーを無視）
+-- ALTER TABLE subsidy_types ADD COLUMN category TEXT DEFAULT 'subsidy';
 -- category: 'subsidy' (助成金・社労士), 'grant' (補助金・行政書士), 'license' (許認可・行政書士)
 
 -- subsidy_guidelinesにもcategoryを追加
-ALTER TABLE subsidy_guidelines ADD COLUMN category TEXT DEFAULT 'subsidy';
+-- ALTER TABLE subsidy_guidelines ADD COLUMN category TEXT DEFAULT 'subsidy';

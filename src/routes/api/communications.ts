@@ -1,0 +1,58 @@
+// API: やり取り記録
+import { Hono } from 'hono'
+import type { AppEnv } from '../../types'
+import { getCurrentUser } from '../../utils/auth'
+
+const routes = new Hono<AppEnv>()
+
+// やり取り記録一覧取得
+routes.get('/clients/:id/communications', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const result = await DB.prepare(`
+    SELECT * FROM communications WHERE client_id = ? ORDER BY created_at ASC
+  `).bind(id).all()
+  
+  return c.json(result.results)
+})
+
+// やり取り記録追加
+routes.post('/clients/:id/communications', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  const result = await DB.prepare(`
+    INSERT INTO communications (client_id, case_id, message, sender_type, sender_name)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(
+    id,
+    data.case_id || null,
+    data.message,
+    data.sender_type,
+    data.sender_name
+  ).run()
+  
+  // 顧客からのメッセージの場合、管理者に通知を作成
+  if (data.sender_type === 'client') {
+    const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(id).first()
+    const clientName = client?.company_name || client?.name || '顧客'
+    await DB.prepare(`
+      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(
+      'new_message',
+      '新しいメッセージ',
+      `${clientName}様から新しいメッセージが届きました`,
+      id,
+      'clients'
+    ).run()
+  }
+  
+  return c.json({ 
+    id: result.meta.last_row_id 
+  })
+})
+
+export default routes
