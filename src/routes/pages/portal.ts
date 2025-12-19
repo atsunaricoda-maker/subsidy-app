@@ -44,356 +44,347 @@ routes.get('/portal/:token', async (c) => {
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
     <body class="bg-gray-50">
-        <div class="min-h-screen">
-            <header class="bg-green-600 text-white shadow-lg">
-                <div class="container mx-auto px-4 py-3 md:py-4">
+        <style>
+            /* タブ切り替え対応 */
+            .main-tab-btn { transition: all 0.2s; }
+            .main-tab-btn.active { background: white; color: #16a34a; font-weight: 600; }
+            .main-tab-content { display: none; }
+            .main-tab-content.active { display: block; }
+            /* 1画面に収まるレイアウト */
+            .portal-container { height: calc(100vh - 120px); overflow: hidden; }
+            .tab-panel { height: 100%; overflow-y: auto; }
+            /* モバイル対応 */
+            @media (max-width: 768px) {
+                .portal-container { height: calc(100vh - 140px); }
+            }
+        </style>
+        <div class="h-screen flex flex-col">
+            <!-- ヘッダー（コンパクト） -->
+            <header class="bg-green-600 text-white shadow-lg flex-shrink-0">
+                <div class="container mx-auto px-3 py-2">
                     <div class="flex items-center justify-between">
-                        <div>
-                            <h1 class="text-lg md:text-2xl font-bold">
-                                <i class="fas fa-user-circle mr-1 md:mr-2"></i>
+                        <div class="flex items-center gap-3">
+                            <h1 class="text-base md:text-lg font-bold">
+                                <i class="fas fa-user-circle mr-1"></i>
                                 ${client.name} 様
                             </h1>
-                            <p class="text-xs md:text-sm mt-1">助成金申請の書類提出とやり取り</p>
+                            <!-- 案件セレクター -->
+                            <select id="caseSelector" onchange="switchCase(this.value)" 
+                                    class="bg-white/20 text-white text-xs px-2 py-1 rounded border-0 focus:ring-2 focus:ring-white/50">
+                                <option value="">案件を選択...</option>
+                            </select>
                         </div>
-                        <button onclick="openNewApplicationModal()" 
-                                class="bg-white text-green-600 px-3 py-2 rounded-lg hover:bg-green-50 text-sm font-medium flex items-center gap-2 shadow">
-                            <i class="fas fa-plus-circle"></i>
-                            <span class="hidden sm:inline">新規申込</span>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openAiModal()" class="text-white/80 hover:text-white p-1.5" title="AIサポート">
+                                <i class="fas fa-robot"></i>
+                            </button>
+                            <button onclick="openNewApplicationModal()" 
+                                    class="bg-white text-green-600 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                                <i class="fas fa-plus"></i>
+                                <span class="hidden sm:inline">新規</span>
+                            </button>
+                        </div>
                     </div>
-                    <!-- ポータルメニュー -->
-                    <nav class="flex gap-2 mt-3 overflow-x-auto pb-1">
-                        <a href="#status" onclick="scrollToSection('statusSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
-                            <i class="fas fa-home mr-1"></i>申請状況
-                        </a>
-                        <a href="#documents" onclick="switchPortalTab('documents'); scrollToSection('documentSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
-                            <i class="fas fa-file-upload mr-1"></i>書類提出
-                        </a>
-                        <a href="#hearing" onclick="scrollToSection('hearingSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
-                            <i class="fas fa-clipboard-list mr-1"></i>ヒアリング
-                        </a>
-                        <a href="#communications" onclick="switchPortalTab('communications'); scrollToSection('documentSection')" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
-                            <i class="fas fa-comments mr-1"></i>やり取り
-                        </a>
-                        <a href="#ai-support" onclick="openAiModal(); return false;" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
-                            <i class="fas fa-robot mr-1"></i>AIサポート
-                        </a>
-                        <a href="/privacy-policy" target="_blank" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
-                            <i class="fas fa-shield-alt mr-1"></i>プライバシーポリシー
-                        </a>
-                        <a href="/legal" target="_blank" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded text-sm whitespace-nowrap">
-                            <i class="fas fa-gavel mr-1"></i>特定商取引法
-                        </a>
+                    <!-- メインタブナビゲーション -->
+                    <nav class="flex gap-1 mt-2">
+                        <button onclick="switchMainTab('home')" id="mainTabHome" class="main-tab-btn active flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
+                            <i class="fas fa-home mr-1"></i><span class="hidden sm:inline">ホーム</span>
+                        </button>
+                        <button onclick="switchMainTab('documents')" id="mainTabDocuments" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
+                            <i class="fas fa-file-upload mr-1"></i><span class="hidden sm:inline">書類</span>
+                            <span id="docBadge" class="ml-1 text-xs bg-white/30 px-1.5 rounded-full hidden">0</span>
+                        </button>
+                        <button onclick="switchMainTab('hearing')" id="mainTabHearing" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
+                            <i class="fas fa-clipboard-list mr-1"></i><span class="hidden sm:inline">ヒアリング</span>
+                            <span id="hearingBadge" class="ml-1 text-xs bg-white/30 px-1.5 rounded-full hidden">0/0</span>
+                        </button>
+                        <button onclick="switchMainTab('messages')" id="mainTabMessages" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
+                            <i class="fas fa-comments mr-1"></i><span class="hidden sm:inline">やり取り</span>
+                            <span id="msgBadge" class="ml-1 text-xs bg-red-500 px-1.5 rounded-full hidden">0</span>
+                        </button>
                     </nav>
                 </div>
             </header>
 
-            <div class="container mx-auto px-4 py-4 lg:py-6">
-                <!-- 見込みステータス時の制限バナー -->
-                <div id="inquiryRestrictionBanner" class="hidden mb-4">
-                    <div class="bg-gradient-to-r from-yellow-400 to-amber-400 rounded-lg shadow-lg p-4 text-white">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                                <i class="fas fa-info-circle text-xl"></i>
-                            </div>
-                            <div>
-                                <h3 class="font-bold">現在「見込み」ステータスです</h3>
-                                <p class="text-sm opacity-90 mt-1">担当者が案件を開始すると、ヒアリング回答や書類アップロードが可能になります。<br>ご不明点はお気軽にお問い合わせください。</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 案件一覧セクション -->
-                <div id="casesListSection" class="mb-4">
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-bold">
-                                <i class="fas fa-folder-open mr-2 text-green-600"></i>申請中の案件
-                            </h2>
-                            <button onclick="openNewApplicationModal()" class="text-sm text-green-600 hover:text-green-800">
-                                <i class="fas fa-plus mr-1"></i>新規申込
-                            </button>
-                        </div>
-                        <div id="portalCasesList" class="space-y-2">
-                            <div class="text-sm text-gray-500 py-2">読み込み中...</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- お知らせバナー -->
-                <div id="announcementBanner" class="hidden mb-4">
-                    <!-- お知らせが動的に挿入される -->
-                </div>
-                
-                <!-- 次にやるべきこと（顧客タスク）セクション -->
-                <div id="nextActionsSection" class="hidden mb-4">
-                    <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg shadow-lg p-4 text-white">
-                        <div class="flex items-center gap-2 mb-3">
-                            <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                                <i class="fas fa-bell"></i>
-                            </div>
-                            <h2 class="text-lg font-bold">次にやるべきこと</h2>
-                        </div>
-                        <div id="nextActionsList" class="space-y-2">
-                            <!-- 動的に挿入される -->
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 電子契約セクション -->
-                <div id="contractSection" class="hidden mb-4">
-                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                    <i class="fas fa-file-signature text-blue-600"></i>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800">電子契約書</h3>
-                                    <p class="text-sm text-gray-500">契約内容をご確認いただけます</p>
-                                </div>
-                            </div>
-                            <a id="contractLink" href="#" target="_blank" 
-                               class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                                <i class="fas fa-external-link-alt"></i>
-                                契約書を開く
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- サービス進捗状況（横型バー表示）要件15 -->
-                <div id="serviceProgressSection" class="hidden mb-4">
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <h2 class="text-lg font-bold mb-4">
-                            <i class="fas fa-tasks mr-2 text-blue-600"></i>サービス進捗状況
-                        </h2>
-                        <div id="serviceProgressList" class="space-y-6">
-                            <!-- 動的に挿入される -->
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- PC: 2カラムレイアウト / モバイル: 縦並び -->
-                <div class="lg:grid lg:grid-cols-12 lg:gap-6">
-                    
-                    <!-- 左カラム: ステータス + パイプライン進捗 + ヒアリング質問 -->
-                    <div class="lg:col-span-8 space-y-4 lg:space-y-6">
-                        <!-- 現在のステータスとパイプライン進捗 -->
-                        <div id="statusSection" class="bg-white rounded-lg shadow p-4">
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="text-2xl" id="statusIcon"></div>
+            <!-- メインコンテンツ（タブで切り替え） -->
+            <div class="flex-1 overflow-hidden portal-container">
+                <div class="container mx-auto h-full px-3 py-3">
+                    <!-- ========================================== -->
+                    <!-- ホームタブ -->
+                    <!-- ========================================== -->
+                    <div id="tabPanelHome" class="main-tab-content active tab-panel">
+                        <!-- 見込みステータス時の制限バナー -->
+                        <div id="inquiryRestrictionBanner" class="hidden mb-3">
+                            <div class="bg-gradient-to-r from-yellow-400 to-amber-400 rounded-lg shadow p-3 text-white">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-info-circle"></i>
                                     <div>
-                                        <div class="text-lg font-bold" id="statusText"></div>
-                                        <div class="text-xs text-gray-600" id="statusDescription"></div>
+                                        <span class="font-bold text-sm">現在「見込み」ステータスです</span>
+                                        <span class="text-xs opacity-90 ml-2">担当者が案件を開始すると、各機能が利用可能になります</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 次にやるべきこと -->
+                        <div id="nextActionsSection" class="hidden mb-3">
+                            <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg shadow p-3 text-white">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <i class="fas fa-bell"></i>
+                                    <span class="font-bold text-sm">次にやるべきこと</span>
+                                </div>
+                                <div id="nextActionsList" class="space-y-1 text-sm"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- ステータスカード -->
+                        <div class="bg-white rounded-lg shadow p-3 mb-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <div class="text-xl" id="statusIcon"></div>
+                                    <div>
+                                        <div class="text-sm font-bold" id="statusText"></div>
+                                        <div class="text-xs text-gray-500" id="statusDescription"></div>
                                     </div>
                                 </div>
                                 <div class="text-right">
-                                    <div class="text-xs text-gray-500">回答進捗（必須質問基準）</div>
-                                    <div id="hearingProgress" class="text-sm font-medium text-indigo-600">必須: 0/0問</div>
+                                    <div class="text-xs text-gray-500">ヒアリング進捗</div>
+                                    <div id="hearingProgress" class="text-xs font-medium text-indigo-600">0/0</div>
                                 </div>
                             </div>
-                            <div class="mt-3 w-full bg-indigo-200 rounded-full h-2">
-                                <div id="hearingProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                            <div class="mt-2 w-full bg-indigo-200 rounded-full h-1.5">
+                                <div id="hearingProgressBar" class="bg-indigo-600 h-1.5 rounded-full transition-all" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 2カラムレイアウト: パイプライン + 請求書/契約 -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            <!-- パイプライン進捗 -->
+                            <div id="pipelineProgressSection" class="hidden bg-white rounded-lg shadow p-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-bold"><i class="fas fa-list-ol mr-1 text-blue-600"></i>進捗状況</span>
+                                    <span id="pipelineProgressText" class="text-xs font-bold text-blue-600">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                                    <div id="pipelineProgressBar" class="bg-blue-500 h-1.5 rounded-full transition-all" style="width: 0%"></div>
+                                </div>
+                                <div id="pipelineTasksList" class="space-y-1.5 max-h-48 overflow-y-auto text-xs"></div>
                             </div>
                             
-                            <!-- パイプライン進捗（STEP形式・完了ボタン付き）要件13 -->
-                            <div id="pipelineProgressSection" class="mt-4 pt-4 border-t hidden">
-                                <div class="flex items-center justify-between mb-3">
-                                    <h3 class="text-sm font-medium text-gray-700">
-                                        <i class="fas fa-list-ol mr-1 text-blue-600"></i>パイプライン進捗状況
-                                    </h3>
-                                    <span id="pipelineProgressText" class="text-sm font-bold text-blue-600">0%</span>
+                            <!-- 請求書・契約 -->
+                            <div class="bg-white rounded-lg shadow p-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-bold"><i class="fas fa-file-invoice-dollar mr-1 text-green-600"></i>請求書</span>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
-                                    <div id="pipelineProgressBar" class="bg-blue-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                <div id="portalInvoicesContent" class="space-y-1.5 max-h-32 overflow-y-auto text-xs">
+                                    <div class="text-gray-500 py-2"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</div>
                                 </div>
-                                <div id="pipelineTasksList" class="space-y-3">
-                                    <!-- STEP形式のタスク一覧が表示される -->
+                                <!-- 契約書リンク -->
+                                <div id="contractSection" class="hidden mt-2 pt-2 border-t">
+                                    <a id="contractLink" href="#" target="_blank" class="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-file-signature"></i>電子契約書を開く
+                                    </a>
                                 </div>
                             </div>
-                            
-                            <!-- 請求書セクション -->
-                            <div id="invoicesSection" class="mt-4 pt-4 border-t">
-                                <div class="flex items-center justify-between mb-3">
-                                    <h3 class="text-sm font-medium text-gray-700">
-                                        <i class="fas fa-file-invoice-dollar mr-1 text-green-600"></i>請求書一覧
+                        </div>
+                        
+                        <!-- フッターリンク -->
+                        <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                            <a href="/privacy-policy" target="_blank" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-shield-alt mr-1"></i>プライバシーポリシー
+                            </a>
+                            <a href="/legal" target="_blank" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-gavel mr-1"></i>特定商取引法
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- ========================================== -->
+                    <!-- 書類タブ -->
+                    <!-- ========================================== -->
+                    <div id="tabPanelDocuments" class="main-tab-content tab-panel">
+                        <div class="bg-white rounded-lg shadow h-full flex flex-col">
+                            <div class="p-3 border-b flex-shrink-0">
+                                <h2 class="text-sm font-bold"><i class="fas fa-file-upload mr-2 text-green-600"></i>書類提出</h2>
+                            </div>
+                            <div class="flex-1 overflow-y-auto p-3">
+                                <!-- 共通書類セクション -->
+                                <div class="mb-4 pb-3 border-b border-gray-200">
+                                    <h3 class="text-xs font-medium mb-2">
+                                        <i class="fas fa-building mr-1 text-blue-600"></i>共通書類
+                                        <span class="text-gray-400 font-normal ml-1">（全申請で使用）</span>
                                     </h3>
+                                    <div id="commonDocumentsList" class="space-y-1.5 text-xs">
+                                        <div class="text-gray-500 py-1">読み込み中...</div>
+                                    </div>
                                 </div>
                                 
-                                <div id="portalInvoicesContent" class="space-y-3">
-                                    <!-- 請求書一覧が表示される -->
-                                    <div class="text-center py-4 text-gray-500">
+                                <!-- 案件別必要書類 -->
+                                <div class="mb-4">
+                                    <h3 class="text-xs font-medium mb-2">
+                                        <i class="fas fa-folder-open mr-1 text-green-600"></i>案件別必要書類
+                                        <span class="text-gray-400 font-normal ml-1">（タップでアップロード）</span>
+                                    </h3>
+                                    <div id="checklistItems" class="space-y-1.5 text-xs"></div>
+                                </div>
+                                
+                                <!-- アップロード済み -->
+                                <div>
+                                    <h3 class="text-xs font-medium mb-2">
+                                        <i class="fas fa-check-circle mr-1 text-green-600"></i>アップロード済み
+                                    </h3>
+                                    <div id="uploadedDocuments" class="max-h-40 overflow-y-auto text-xs"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========================================== -->
+                    <!-- ヒアリングタブ -->
+                    <!-- ========================================== -->
+                    <div id="tabPanelHearing" class="main-tab-content tab-panel">
+                        <div class="bg-white rounded-lg shadow h-full flex flex-col">
+                            <div class="p-3 border-b flex-shrink-0">
+                                <div class="flex items-center justify-between">
+                                    <h2 class="text-sm font-bold"><i class="fas fa-clipboard-list mr-2 text-indigo-600"></i>ヒアリング質問</h2>
+                                    <button id="hearingSaveButton" onclick="saveAllHearingAnswers()" 
+                                            class="bg-indigo-600 text-white px-2 py-1 text-xs rounded hover:bg-indigo-700">
+                                        <i class="fas fa-save mr-1"></i>保存
+                                    </button>
+                                </div>
+                                <!-- 共通/案件別 切り替え -->
+                                <div class="flex mt-2 border rounded overflow-hidden text-xs">
+                                    <button onclick="switchHearingTab('common')" id="hearingTabCommon"
+                                            class="flex-1 px-2 py-1 bg-blue-600 text-white">
+                                        <i class="fas fa-building mr-1"></i>会社情報
+                                        <span id="commonQuestionsBadge" class="ml-1 bg-white/30 px-1 rounded">0/0</span>
+                                    </button>
+                                    <button onclick="switchHearingTab('specific')" id="hearingTabSpecific"
+                                            class="flex-1 px-2 py-1 bg-gray-100 text-gray-600">
+                                        <i class="fas fa-folder mr-1"></i>案件別
+                                        <span id="specificQuestionsBadge" class="ml-1 bg-gray-200 px-1 rounded">0/0</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- ヒアリング説明 -->
+                            <div id="commonQuestionsInfo" class="px-3 pt-2">
+                                <p class="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                                    <i class="fas fa-info-circle mr-1"></i>会社情報は一度入力すると、すべての申請案件で自動参照されます。
+                                </p>
+                            </div>
+                            <div id="specificQuestionsInfo" class="hidden px-3 pt-2">
+                                <p class="text-xs text-indigo-600 bg-indigo-50 p-2 rounded">
+                                    <i class="fas fa-info-circle mr-1"></i>この申請に固有の質問です。
+                                </p>
+                            </div>
+                            <!-- カテゴリタブ -->
+                            <div class="px-3 pt-2 flex-shrink-0">
+                                <div id="hearingCategoryTabs" class="flex overflow-x-auto gap-1 text-xs">
+                                    <div class="text-gray-500 py-1">読み込み中...</div>
+                                </div>
+                            </div>
+                            <!-- 質問一覧 -->
+                            <div class="flex-1 overflow-y-auto p-3">
+                                <div id="hearingQuestionsList" class="space-y-3">
+                                    <div class="text-center py-4 text-gray-500 text-sm">
                                         <i class="fas fa-spinner fa-spin"></i> 読み込み中...
                                     </div>
                                 </div>
                             </div>
-                            
-                            <!-- 契約情報セクション -->
-                            <div id="contractSection" class="mt-4 pt-4 border-t hidden">
-                                <div class="flex items-center justify-between mb-3">
-                                    <h3 class="text-sm font-medium text-gray-700">
-                                        <i class="fas fa-file-signature mr-1 text-blue-600"></i>契約書
-                                    </h3>
-                                </div>
-                                <div id="portalContractContent" class="space-y-3">
-                                    <!-- 契約URL情報が表示される -->
-                                </div>
-                            </div>
                         </div>
+                    </div>
 
-                        <!-- ヒアリング質問セクション -->
-                        <div id="hearingSection" class="bg-white rounded-lg shadow p-4 lg:p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <h2 class="text-lg font-bold">
-                                    <i class="fas fa-clipboard-list mr-2 text-indigo-600"></i>ヒアリング質問
-                                </h2>
-                                <button id="hearingSaveButton" onclick="saveAllHearingAnswers()" 
-                                        class="bg-indigo-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-indigo-700">
-                                    <i class="fas fa-save mr-1"></i>保存
-                                </button>
+                    <!-- ========================================== -->
+                    <!-- やり取りタブ -->
+                    <!-- ========================================== -->
+                    <div id="tabPanelMessages" class="main-tab-content tab-panel">
+                        <div class="bg-white rounded-lg shadow h-full flex flex-col">
+                            <div class="p-3 border-b flex-shrink-0">
+                                <h2 class="text-sm font-bold"><i class="fas fa-comments mr-2 text-green-600"></i>やり取り</h2>
                             </div>
-                            
-                            <!-- 共通質問 / 案件別質問 切り替えタブ -->
-                            <div class="mb-4 flex border-b">
-                                <button onclick="switchHearingTab('common')" id="hearingTabCommon"
-                                        class="flex-1 px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
-                                    <i class="fas fa-building mr-1"></i>会社情報（共通）
-                                    <span id="commonQuestionsBadge" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">0/0</span>
-                                </button>
-                                <button onclick="switchHearingTab('specific')" id="hearingTabSpecific"
-                                        class="flex-1 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-                                    <i class="fas fa-folder mr-1"></i>案件別質問
-                                    <span id="specificQuestionsBadge" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">0/0</span>
-                                </button>
-                            </div>
-                            
-                            <!-- 共通質問の説明 -->
-                            <div id="commonQuestionsInfo" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p class="text-sm text-blue-700">
-                                    <i class="fas fa-info-circle mr-1"></i>
-                                    会社情報は一度入力すると、すべての申請案件で自動的に参照されます。
-                                </p>
-                            </div>
-                            
-                            <!-- 案件別質問の説明（非表示デフォルト） -->
-                            <div id="specificQuestionsInfo" class="hidden mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                                <p class="text-sm text-indigo-700">
-                                    <i class="fas fa-info-circle mr-1"></i>
-                                    この申請に固有の質問です。各申請種別ごとに回答してください。
-                                </p>
-                            </div>
-                            
-                            <!-- カテゴリ別タブ -->
-                            <div class="mb-4 border-b">
-                                <div id="hearingCategoryTabs" class="flex overflow-x-auto gap-1">
-                                    <div class="text-gray-500 text-sm py-2">読み込み中...</div>
-                                </div>
-                            </div>
-                            
-                            <!-- 質問一覧 (スクロール可能) -->
-                            <div id="hearingQuestionsList" class="space-y-4 max-h-[60vh] lg:max-h-[70vh] overflow-y-auto pr-2">
-                                <div class="text-center py-8 text-gray-500">
-                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                    <p>ヒアリング質問を読み込み中...</p>
-                                </div>
+                            <div id="clientCommunications" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm"></div>
+                            <div class="p-3 border-t flex-shrink-0">
+                                <form id="clientMessageForm" class="flex gap-2">
+                                    <input type="text" id="clientMessageInput" 
+                                           placeholder="メッセージを入力..." 
+                                           class="flex-1 px-3 py-2 border rounded text-sm" required>
+                                    <button type="submit" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 右カラム: 書類 + やり取り -->
-                    <div id="documentSection" class="lg:col-span-4 mt-4 lg:mt-0">
-                        <div class="lg:sticky lg:top-4 space-y-4">
-                            <!-- タブで切り替え: 書類 / やり取り -->
-                            <div class="bg-white rounded-lg shadow">
-                                <div class="flex border-b">
-                                    <button onclick="switchPortalTab('documents')" id="tabDocuments"
-                                            class="flex-1 px-4 py-2 text-sm font-medium border-b-2 border-green-600 text-green-600">
-                                        <i class="fas fa-upload mr-1"></i>書類
-                                    </button>
-                                    <button onclick="switchPortalTab('communications')" id="tabCommunications"
-                                            class="flex-1 px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-                                        <i class="fas fa-comments mr-1"></i>やり取り
-                                    </button>
-                                </div>
-                                
-                                <!-- 書類アップロードタブ -->
-                                <div id="panelDocuments" class="p-4">
-                                    <!-- 共通書類セクション -->
-                                    <div class="mb-4 pb-3 border-b border-gray-200">
-                                        <h3 class="text-sm font-medium mb-2">
-                                            <i class="fas fa-building mr-1 text-blue-600"></i>共通書類
-                                            <span class="text-xs text-gray-500 font-normal ml-1">（全申請で使える書類）</span>
-                                        </h3>
-                                        <div id="commonDocumentsList" class="space-y-1.5">
-                                            <div class="text-xs text-gray-500 py-2">読み込み中...</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- 案件別必要書類セクション -->
-                                    <div class="mb-3">
-                                        <h3 class="text-sm font-medium mb-2">
-                                            <i class="fas fa-folder-open mr-1 text-green-600"></i>案件別必要書類
-                                            <span class="text-xs text-gray-500 font-normal ml-1">（タップでアップロード）</span>
-                                        </h3>
-                                        <div id="checklistItems" class="space-y-1.5"></div>
-                                    </div>
-
-                                    <div>
-                                        <h3 class="text-sm font-medium mb-2">
-                                            <i class="fas fa-check-circle mr-1 text-green-600"></i>アップロード済み
-                                        </h3>
-                                        <div id="uploadedDocuments" class="max-h-40 overflow-y-auto text-sm"></div>
-                                    </div>
-                                </div>
-                                
-                                <!-- 書類アップロードモーダル -->
-                                <div id="documentUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-                                    <div class="bg-white rounded-xl w-full max-w-sm shadow-xl">
-                                        <div class="flex items-center justify-between p-4 border-b bg-green-600 text-white rounded-t-xl">
-                                            <h3 id="uploadModalTitle" class="font-bold text-sm">
-                                                <i class="fas fa-upload mr-2"></i>書類アップロード
-                                            </h3>
-                                            <button onclick="closeUploadModal()" class="text-white hover:text-green-200">
-                                                <i class="fas fa-times text-lg"></i>
-                                            </button>
-                                        </div>
-                                        <div class="p-4">
-                                            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-green-500 hover:bg-green-50 cursor-pointer">
-                                                <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
-                                                <p class="text-sm text-gray-600 mb-3">ファイルをドラッグ&ドロップ</p>
-                                                <input type="file" id="fileInput" class="hidden" multiple>
-                                                <input type="hidden" id="selectedDocumentType" value="">
-                                                <button onclick="document.getElementById('fileInput').click()" 
-                                                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-                                                    <i class="fas fa-folder-open mr-1"></i>ファイルを選択
-                                                </button>
-                                            </div>
-                                            <p class="text-xs text-gray-500 mt-3 text-center">
-                                                対応形式: PDF, Word, Excel, 画像ファイル
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- やり取りタブ -->
-                                <div id="panelCommunications" class="p-4 hidden">
-                                    <div id="clientCommunications" class="space-y-2 mb-3 max-h-48 overflow-y-auto text-sm"></div>
-                                    
-                                    <form id="clientMessageForm" class="flex gap-2">
-                                        <input type="text" id="clientMessageInput" 
-                                               placeholder="メッセージを入力..." 
-                                               class="flex-1 px-3 py-2 border rounded-lg text-sm" required>
-                                        <button type="submit" 
-                                                class="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700">
-                                            <i class="fas fa-paper-plane"></i>
-                                        </button>
-                                    </form>
-                                </div>
+                    <!-- ========================================== -->
+                    <!-- 旧コンテンツ（互換性のため非表示で保持） -->
+                    <!-- ========================================== -->
+                    <div id="legacyContent" class="hidden">
+                        <!-- お知らせバナー -->
+                        <div id="announcementBanner" class="hidden mb-4"></div>
+                        
+                        <!-- サービス進捗状況 -->
+                        <div id="serviceProgressSection" class="hidden mb-4">
+                            <div class="bg-white rounded-lg shadow p-4">
+                                <h2 class="text-lg font-bold mb-4">
+                                    <i class="fas fa-tasks mr-2 text-blue-600"></i>サービス進捗状況
+                                </h2>
+                                <div id="serviceProgressList" class="space-y-6"></div>
                             </div>
                         </div>
+                        
+                        <!-- 案件一覧 (セレクター用データ) -->
+                        <div id="casesListSection" class="hidden">
+                            <div id="portalCasesList"></div>
+                        </div>
+
+                        <!-- 旧ステータスセクション（データ互換用） -->
+                        <div id="statusSection" class="hidden">
+                            <div id="invoicesSection" class="hidden">
+                                <!-- 旧請求書セクション -->
+                            </div>
+                        </div>
+
+                        <!-- 旧ヒアリングセクション（参照用） -->
+                        <div id="hearingSection" class="hidden"></div>
+                        
+                        <!-- 旧書類セクション -->
+                        <div id="documentSection" class="hidden">
+                            <div id="panelDocuments" class="hidden"></div>
+                            <div id="panelCommunications" class="hidden"></div>
+                            <div id="tabDocuments" class="hidden"></div>
+                            <div id="tabCommunications" class="hidden"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+            <!-- 書類アップロードモーダル -->
+            <div id="documentUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl w-full max-w-sm shadow-xl">
+                    <div class="flex items-center justify-between p-4 border-b bg-green-600 text-white rounded-t-xl">
+                        <h3 id="uploadModalTitle" class="font-bold text-sm">
+                            <i class="fas fa-upload mr-2"></i>書類アップロード
+                        </h3>
+                        <button onclick="closeUploadModal()" class="text-white hover:text-green-200">
+                            <i class="fas fa-times text-lg"></i>
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-green-500 hover:bg-green-50 cursor-pointer">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                            <p class="text-sm text-gray-600 mb-3">ファイルをドラッグ&ドロップ</p>
+                            <input type="file" id="fileInput" class="hidden" multiple>
+                            <input type="hidden" id="selectedDocumentType" value="">
+                            <button onclick="document.getElementById('fileInput').click()" 
+                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                <i class="fas fa-folder-open mr-1"></i>ファイルを選択
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-3 text-center">
+                            対応形式: PDF, Word, Excel, 画像ファイル
+                        </p>
                     </div>
                 </div>
             </div>
@@ -687,7 +678,63 @@ routes.get('/portal/:token', async (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
-            // タブ切り替え関数
+            // ========================================
+            // メインタブ切り替え関数
+            // ========================================
+            function switchMainTab(tabId) {
+                // すべてのタブボタンとパネルを取得
+                const tabButtons = ['mainTabHome', 'mainTabDocuments', 'mainTabHearing', 'mainTabMessages'];
+                const tabPanels = ['tabPanelHome', 'tabPanelDocuments', 'tabPanelHearing', 'tabPanelMessages'];
+                
+                // タブボタンのスタイルをリセット
+                tabButtons.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.classList.remove('active');
+                });
+                
+                // パネルを非表示
+                tabPanels.forEach(id => {
+                    const panel = document.getElementById(id);
+                    if (panel) panel.classList.remove('active');
+                });
+                
+                // 選択されたタブをアクティブに
+                const activeBtn = document.getElementById('mainTab' + tabId.charAt(0).toUpperCase() + tabId.slice(1));
+                const activePanel = document.getElementById('tabPanel' + tabId.charAt(0).toUpperCase() + tabId.slice(1));
+                
+                if (activeBtn) activeBtn.classList.add('active');
+                if (activePanel) activePanel.classList.add('active');
+            }
+            
+            // 案件切り替え関数
+            function switchCase(caseId) {
+                if (caseId) {
+                    // 新しいトークンでポータルをリロード
+                    window.location.href = '/portal/' + caseId;
+                }
+            }
+            
+            // 案件セレクターを更新
+            async function updateCaseSelector() {
+                try {
+                    const res = await axios.get('/api/clients/' + CLIENT_ID + '/cases');
+                    const cases = res.data || [];
+                    const selector = document.getElementById('caseSelector');
+                    if (selector && cases.length > 0) {
+                        selector.innerHTML = cases.map(c => 
+                            '<option value="' + c.access_token + '"' + (c.id === CASE_ID ? ' selected' : '') + '>' +
+                            (c.subsidy_type_name || '案件 #' + c.id) +
+                            '</option>'
+                        ).join('');
+                    }
+                } catch (e) {
+                    console.log('Failed to load cases for selector');
+                }
+            }
+            
+            // ========================================
+            // 旧タブ切り替え関数（互換性のため維持）
+            // ========================================
             function switchPortalTab(tab) {
                 const tabDocs = document.getElementById('tabDocuments');
                 const tabComms = document.getElementById('tabCommunications');
@@ -4276,6 +4323,9 @@ routes.get('/portal/:token', async (c) => {
             async function initPortal() {
                 // まずステータスを読み込む（見込みステータスの判定に必要）
                 await loadStatus();
+                
+                // 案件セレクターを更新
+                updateCaseSelector();
                 
                 // 案件一覧を読み込む
                 loadPortalCases();
