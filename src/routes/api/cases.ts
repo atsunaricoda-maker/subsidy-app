@@ -1134,7 +1134,7 @@ routes.post('/portal/document-consent', async (c) => {
   return c.json({ success: true })
 })
 
-// 案件の書類テンプレート一覧取得
+// 案件の書類テンプレート一覧取得（AI生成対象：事業計画書など）
 routes.get('/cases/:id/document-templates', async (c) => {
   const { DB } = c.env
   const caseId = c.req.param('id')
@@ -1148,16 +1148,18 @@ routes.get('/cases/:id/document-templates', async (c) => {
     return c.json({ templates: [] })
   }
   
-  // 補助金タイプに紐づくドキュメントテンプレート（生成可能な書類）を取得
-  // subsidy_type_documentsテーブルから取得
+  // 補助金タイプに紐づく「事業計画書テンプレート」（AI生成対象）を取得
+  // document_templatesテーブルから取得（subsidy_type_documentsは必要書類リスト）
   const templates = await DB.prepare(`
     SELECT 
       id,
-      document_type as name,
-      description
-    FROM subsidy_type_documents
-    WHERE subsidy_type_id = ?
-    ORDER BY display_order ASC
+      template_name as name,
+      template_version as version,
+      sections,
+      ai_prompt_base as description
+    FROM document_templates
+    WHERE subsidy_type_id = ? AND is_active = 1
+    ORDER BY id ASC
   `).bind(caseData.subsidy_type_id).all()
   
   return c.json({ templates: templates.results || [] })

@@ -305,13 +305,13 @@ routes.get('/portal/:token', async (c) => {
                                         </div>
                                     </div>
                                     
-                                    <!-- 中央カラム: 作成可能書類一覧 -->
+                                    <!-- 中央カラム: 事業計画書テンプレート -->
                                     <div class="bg-white rounded-lg shadow flex flex-col overflow-hidden">
                                         <div class="p-2 border-b bg-blue-50 flex-shrink-0">
                                             <h3 class="text-xs font-bold text-blue-700">
-                                                <i class="fas fa-file-alt mr-1"></i>作成可能書類
+                                                <i class="fas fa-file-contract mr-1"></i>事業計画書を作成
                                             </h3>
-                                            <p class="text-xs text-blue-500 mt-0.5">AIが作成を支援します</p>
+                                            <p class="text-xs text-blue-500 mt-0.5">ヒアリング回答からAIが自動作成</p>
                                         </div>
                                         <div id="availableDocTemplates" class="flex-1 overflow-y-auto p-2 space-y-2 text-xs">
                                             <div class="text-gray-500 py-2 text-center">読み込み中...</div>
@@ -4765,18 +4765,62 @@ routes.get('/portal/:token', async (c) => {
                 }
             }
             
-            // 書類作成を開始
-            function startDocCreation(templateId, templateName) {
+            // 書類作成を開始（事業計画書をAI生成）
+            async function startDocCreation(templateId, templateName) {
                 if (!selfCreationConsentGiven) {
                     alert('書類作成には免責事項への同意が必要です。');
                     return;
                 }
-                // AIアシスタントモーダルを開いて書類作成を開始
-                openAiModal();
-                // AI に書類作成を依頼
-                const aiInput = document.getElementById('aiQuestionInput');
-                if (aiInput) {
-                    aiInput.value = \`「\${templateName}」の作成を手伝ってください。ヒアリング回答に基づいて、必要な情報を確認しながら書類を作成してください。\`;
+                
+                // 確認ダイアログ
+                if (!confirm(\`「\${templateName}」を生成します。\\n\\nヒアリング回答に基づいてAIが事業計画書を作成します。\\n生成には1〜2分かかる場合があります。\\n\\n続行しますか？\`)) {
+                    return;
+                }
+                
+                // ボタンを無効化
+                const buttons = document.querySelectorAll('.doc-create-btn');
+                buttons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                });
+                
+                // 作成可能書類エリアに生成中表示
+                const container = document.getElementById('availableDocTemplates');
+                const originalContent = container.innerHTML;
+                container.innerHTML = \`
+                    <div class="text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-3xl text-blue-600 mb-3"></i>
+                        <p class="text-blue-700 font-medium">\${templateName} を生成中...</p>
+                        <p class="text-xs text-gray-500 mt-2">ヒアリング回答を分析してAIが作成しています</p>
+                        <p class="text-xs text-gray-400 mt-1">（1〜2分程度かかります）</p>
+                    </div>
+                \`;
+                
+                try {
+                    // 事業計画書を生成
+                    const res = await axios.post('/api/clients/' + CLIENT_ID + '/generate-document', {
+                        templateId: templateId,
+                        caseId: CASE_ID
+                    });
+                    
+                    alert('「' + templateName + '」の生成が完了しました！\\n\\n作成済み書類から確認・編集できます。');
+                    
+                    // 書類一覧を再読み込み
+                    await loadAvailableDocTemplates();
+                    await loadGeneratedDocuments();
+                    
+                } catch (error) {
+                    console.error('Document generation error:', error);
+                    const errorMsg = error.response?.data?.error || '書類の生成に失敗しました';
+                    alert('エラー: ' + errorMsg);
+                    // 元の内容に戻す
+                    container.innerHTML = originalContent;
+                } finally {
+                    // ボタンを再有効化
+                    buttons.forEach(btn => {
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    });
                 }
             }
             
