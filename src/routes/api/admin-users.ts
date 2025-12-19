@@ -23,6 +23,28 @@ routes.get('/admin/users', async (c) => {
   return c.json(users.results || [])
 })
 
+// 従業員詳細取得
+routes.get('/admin/users/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離
+  const orgId = user?.organization_id || 1
+  
+  const result = await DB.prepare(`
+    SELECT id, username, name, role, created_at 
+    FROM admin_users 
+    WHERE id = ? AND organization_id = ?
+  `).bind(id, orgId).first()
+  
+  if (!result) {
+    return c.json({ error: 'User not found' }, 404)
+  }
+  
+  return c.json(result)
+})
+
 // 従業員追加
 routes.post('/admin/users', async (c) => {
   const { DB } = c.env

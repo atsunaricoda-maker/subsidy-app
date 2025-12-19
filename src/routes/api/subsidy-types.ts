@@ -60,6 +60,22 @@ routes.get('/subsidy-types', async (c) => {
   return c.json(result.results)
 })
 
+// 助成金種別詳細取得
+routes.get('/subsidy-types/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const result = await DB.prepare(`
+    SELECT * FROM subsidy_types WHERE id = ?
+  `).bind(id).first()
+  
+  if (!result) {
+    return c.json({ error: 'Subsidy type not found' }, 404)
+  }
+  
+  return c.json(result)
+})
+
 // 助成金種別の必要書類取得
 routes.get('/subsidy-types/:id/documents', async (c) => {
   const { DB } = c.env
