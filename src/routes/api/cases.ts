@@ -1108,8 +1108,7 @@ routes.get('/cases/:id/document-templates', async (c) => {
     SELECT 
       id,
       document_type as name,
-      description,
-      category
+      description
     FROM subsidy_type_documents
     WHERE subsidy_type_id = ?
     ORDER BY display_order ASC
