@@ -31,54 +31,76 @@ routes.get('/client/:id', async (c) => {
             ${sidebarStyles}
         </style>
     </head>
-    <body class="bg-gray-100">
+    <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div class="min-h-screen flex">
             ${generateSidebar('clients')}
             
             <!-- メインコンテンツ -->
             <main class="flex-1 min-h-screen">
-                <header class="bg-white shadow-sm sticky top-0 z-30">
-                    <div class="flex items-center justify-between px-4 py-3">
+                <!-- グラデーションヘッダー -->
+                <header class="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white shadow-lg sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-4">
                         <div class="flex items-center gap-4">
-                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-white/80 hover:text-white">
                                 <i class="fas fa-bars text-xl"></i>
                             </button>
-                            <div>
-                                <div class="text-sm text-gray-500">顧客詳細</div>
-                                <h2 class="text-lg font-bold text-gray-800">${client.name}</h2>
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-building text-xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-blue-100 text-sm">顧客詳細</p>
+                                    <h2 class="text-xl font-bold">${client.name}</h2>
+                                </div>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
-                            <a href="/clients" class="text-gray-500 hover:text-gray-700 text-sm">
-                                <i class="fas fa-arrow-left mr-1"></i>一覧に戻る
+                            <a href="/clients" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-all flex items-center gap-2">
+                                <i class="fas fa-arrow-left"></i>
+                                <span class="hidden sm:inline">一覧に戻る</span>
                             </a>
                         </div>
                     </div>
                 </header>
 
                 <div class="p-4 lg:p-6">
-                <!-- タブナビゲーション -->
-                <div class="bg-white rounded-lg shadow mb-6">
-                    <div class="border-b flex overflow-x-auto">
+                <!-- タブナビゲーション（モダンスタイル） -->
+                <div class="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
+                    <div class="flex overflow-x-auto scrollbar-hide">
                         <button onclick="switchClientTab('overview')" id="client-tab-overview" 
-                                class="px-6 py-3 font-medium text-blue-600 border-b-2 border-blue-600 whitespace-nowrap">
-                            <i class="fas fa-user mr-2"></i>基本情報
+                                class="px-6 py-4 font-medium text-blue-600 bg-blue-50 border-b-3 border-blue-600 whitespace-nowrap flex items-center gap-2 transition-all">
+                            <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-user text-blue-600"></i>
+                            </div>
+                            <span>基本情報</span>
                         </button>
                         <button onclick="switchClientTab('cases')" id="client-tab-cases" 
-                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                            <i class="fas fa-folder-open mr-2"></i>案件一覧
+                                class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 whitespace-nowrap flex items-center gap-2 transition-all border-b-3 border-transparent">
+                            <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-folder-open text-gray-500"></i>
+                            </div>
+                            <span>案件一覧</span>
                         </button>
                         <button onclick="switchClientTab('ai')" id="client-tab-ai" 
-                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                            <i class="fas fa-robot mr-2"></i>AIアシスタント
+                                class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 whitespace-nowrap flex items-center gap-2 transition-all border-b-3 border-transparent">
+                            <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-robot text-gray-500"></i>
+                            </div>
+                            <span>AIアシスタント</span>
                         </button>
                         <button onclick="switchClientTab('documents')" id="client-tab-documents" 
-                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                            <i class="fas fa-file-alt mr-2"></i>生成文書
+                                class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 whitespace-nowrap flex items-center gap-2 transition-all border-b-3 border-transparent">
+                            <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-file-alt text-gray-500"></i>
+                            </div>
+                            <span>生成文書</span>
                         </button>
                         <button onclick="switchClientTab('pipeline')" id="client-tab-pipeline" 
-                                class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
-                            <i class="fas fa-tasks mr-2"></i>タスク進捗
+                                class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 whitespace-nowrap flex items-center gap-2 transition-all border-b-3 border-transparent">
+                            <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-tasks text-gray-500"></i>
+                            </div>
+                            <span>タスク進捗</span>
                         </button>
                     </div>
                 </div>
@@ -88,27 +110,33 @@ routes.get('/client/:id', async (c) => {
                     <!-- 左カラム：顧客情報 -->
                     <div class="lg:col-span-1 space-y-6">
                         <!-- 顧客情報カード -->
-                        <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow p-6 border-t-4 border-blue-500">
                             <h2 class="text-lg font-bold mb-4 flex items-center">
-                                <i class="fas fa-user-circle mr-2 text-blue-600"></i>顧客情報
+                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-user-circle text-blue-600 text-lg"></i>
+                                </div>
+                                顧客情報
                             </h2>
                             <div class="space-y-3 text-sm" id="clientInfo"></div>
                             <div class="flex gap-2 mt-4">
-                                <button onclick="editClient()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                <button onclick="editClient()" class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 text-sm font-medium shadow-md hover:shadow-lg transition-all">
                                     <i class="fas fa-edit mr-1"></i>編集
                                 </button>
-                                <button onclick="deleteCurrentClient()" id="deleteClientBtn" class="hidden flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 text-sm">
+                                <button onclick="deleteCurrentClient()" id="deleteClientBtn" class="hidden flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-2.5 rounded-lg hover:from-red-600 hover:to-red-700 text-sm font-medium shadow-md">
                                     <i class="fas fa-trash mr-1"></i>削除
                                 </button>
                             </div>
                         </div>
 
                         <!-- 共通書類カード -->
-                        <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow p-6 border-t-4 border-yellow-500">
                             <h2 class="text-lg font-bold mb-3 flex items-center">
-                                <i class="fas fa-folder mr-2 text-yellow-600"></i>共通書類
+                                <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-folder text-yellow-600 text-lg"></i>
+                                </div>
+                                共通書類
                             </h2>
-                            <p class="text-xs text-gray-500 mb-3">全申請で共通利用できる書類</p>
+                            <p class="text-xs text-gray-500 mb-3 ml-13">全申請で共通利用できる書類</p>
                             <div id="commonDocumentsListAdmin" class="space-y-2 max-h-64 overflow-y-auto">
                                 <div class="text-sm text-gray-500 py-2">読み込み中...</div>
                             </div>
@@ -117,9 +145,12 @@ routes.get('/client/:id', async (c) => {
 
                     <!-- 右カラム：やり取り記録 -->
                     <div class="lg:col-span-2">
-                        <div class="bg-white rounded-xl shadow-sm p-6 h-full flex flex-col">
+                        <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow p-6 h-full flex flex-col border-t-4 border-green-500">
                             <h2 class="text-lg font-bold mb-4 flex items-center">
-                                <i class="fas fa-comments mr-2 text-green-600"></i>やり取り記録
+                                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-comments text-green-600 text-lg"></i>
+                                </div>
+                                やり取り記録
                             </h2>
                             <div id="communicationsList" class="space-y-4 mb-4 flex-1 max-h-[500px] overflow-y-auto"></div>
                             
@@ -1325,16 +1356,40 @@ routes.get('/client/:id', async (c) => {
                     const tabBtn = document.getElementById('client-tab-' + t);
                     if (content) content.classList.add('hidden');
                     if (tabBtn) {
-                        tabBtn.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
-                        tabBtn.classList.add('text-gray-500');
+                        // アクティブスタイルを削除
+                        tabBtn.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-600');
+                        tabBtn.classList.add('text-gray-500', 'border-transparent');
+                        // アイコンコンテナのスタイルも変更
+                        const iconDiv = tabBtn.querySelector('div');
+                        if (iconDiv) {
+                            iconDiv.classList.remove('bg-blue-100');
+                            iconDiv.classList.add('bg-gray-100');
+                            const icon = iconDiv.querySelector('i');
+                            if (icon) {
+                                icon.classList.remove('text-blue-600');
+                                icon.classList.add('text-gray-500');
+                            }
+                        }
                     }
                 });
                 const activeContent = document.getElementById('client-content-' + tab);
                 const activeTab = document.getElementById('client-tab-' + tab);
                 if (activeContent) activeContent.classList.remove('hidden');
                 if (activeTab) {
-                    activeTab.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
-                    activeTab.classList.remove('text-gray-500');
+                    // アクティブスタイルを適用
+                    activeTab.classList.add('text-blue-600', 'bg-blue-50', 'border-blue-600');
+                    activeTab.classList.remove('text-gray-500', 'border-transparent');
+                    // アイコンコンテナのスタイルも変更
+                    const iconDiv = activeTab.querySelector('div');
+                    if (iconDiv) {
+                        iconDiv.classList.remove('bg-gray-100');
+                        iconDiv.classList.add('bg-blue-100');
+                        const icon = iconDiv.querySelector('i');
+                        if (icon) {
+                            icon.classList.remove('text-gray-500');
+                            icon.classList.add('text-blue-600');
+                        }
+                    }
                 }
                 
                 // タブ固有のデータ読み込み

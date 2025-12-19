@@ -43,67 +43,79 @@ routes.get('/portal/:token', async (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
-    <body class="bg-gray-50">
+    <body class="bg-gradient-to-br from-slate-50 to-green-50 min-h-screen">
         <style>
             /* タブ切り替え対応 */
-            .main-tab-btn { transition: all 0.2s; }
-            .main-tab-btn.active { background: white; color: #16a34a; font-weight: 600; }
+            .main-tab-btn { transition: all 0.3s; border-radius: 12px 12px 0 0; }
+            .main-tab-btn.active { background: white; color: #16a34a; font-weight: 600; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
+            .main-tab-btn:not(.active):hover { background: rgba(255,255,255,0.2); }
             .main-tab-content { display: none; }
             .main-tab-content.active { display: block; }
             /* 1画面に収まるレイアウト */
-            .portal-container { height: calc(100vh - 120px); overflow: hidden; }
+            .portal-container { height: calc(100vh - 140px); overflow: hidden; }
             .tab-panel { height: 100%; overflow-y: auto; }
             /* モバイル対応 */
             @media (max-width: 768px) {
-                .portal-container { height: calc(100vh - 140px); }
+                .portal-container { height: calc(100vh - 160px); }
             }
+            /* カスタムアニメーション */
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         </style>
         <div class="h-screen flex flex-col">
-            <!-- ヘッダー（コンパクト） -->
-            <header class="bg-green-600 text-white shadow-lg flex-shrink-0">
-                <div class="container mx-auto px-3 py-2">
+            <!-- ヘッダー（モダンスタイル） -->
+            <header class="bg-gradient-to-r from-green-600 via-green-700 to-emerald-700 text-white shadow-xl flex-shrink-0">
+                <div class="container mx-auto px-4 py-3">
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <h1 class="text-base md:text-lg font-bold">
-                                <i class="fas fa-user-circle mr-1"></i>
-                                ${client.name} 様
-                            </h1>
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                    <i class="fas fa-user-circle text-lg"></i>
+                                </div>
+                                <div>
+                                    <p class="text-green-100 text-xs">顧客ポータル</p>
+                                    <h1 class="text-base md:text-lg font-bold">${client.name} 様</h1>
+                                </div>
+                            </div>
                             <!-- 案件セレクター -->
                             <select id="caseSelector" onchange="if(this.value) window.location.href='/portal/'+this.value" 
-                                    class="bg-white/20 text-white text-xs px-2 py-1 rounded border-0 focus:ring-2 focus:ring-white/50">
+                                    class="bg-white/20 text-white text-xs px-3 py-2 rounded-lg border-0 focus:ring-2 focus:ring-white/50 backdrop-blur-sm">
                                 <option value="">案件を選択...</option>
                             </select>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="openAiModal()" class="text-white/80 hover:text-white p-1.5" title="AIサポート">
+                        <div class="flex items-center gap-3">
+                            <button onclick="openAiModal()" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all" title="AIサポート">
                                 <i class="fas fa-robot"></i>
                             </button>
                             <button onclick="openNewApplicationModal()" 
-                                    class="bg-white text-green-600 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                                    class="bg-white text-green-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition-all hover:scale-105">
                                 <i class="fas fa-plus"></i>
-                                <span class="hidden sm:inline">新規</span>
+                                <span class="hidden sm:inline">新規申請</span>
                             </button>
                         </div>
                     </div>
                     <!-- メインタブナビゲーション -->
-                    <nav class="flex gap-1 mt-2">
-                        <button onclick="switchMainTab('home')" id="mainTabHome" class="main-tab-btn active flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
-                            <i class="fas fa-home mr-1"></i><span class="hidden sm:inline">ホーム</span>
+                    <nav class="flex gap-2 mt-3 -mb-1">
+                        <button onclick="switchMainTab('home')" id="mainTabHome" class="main-tab-btn active flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-home"></i><span class="hidden sm:inline">ホーム</span>
                         </button>
-                        <button onclick="switchMainTab('documents')" id="mainTabDocuments" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
-                            <i class="fas fa-file-upload mr-1"></i><span class="hidden sm:inline">書類</span>
-                            <span id="docBadge" class="ml-1 text-xs bg-white/30 px-1.5 rounded-full hidden">0</span>
+                        <button onclick="switchMainTab('documents')" id="mainTabDocuments" class="main-tab-btn flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-file-upload"></i><span class="hidden sm:inline">書類</span>
+                            <span id="docBadge" class="text-xs bg-white/30 px-2 py-0.5 rounded-full hidden">0</span>
                         </button>
-                        <button onclick="switchMainTab('create')" id="mainTabCreate" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
-                            <i class="fas fa-file-signature mr-1"></i><span class="hidden sm:inline">書類作成</span>
+                        <button onclick="switchMainTab('create')" id="mainTabCreate" class="main-tab-btn flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-file-signature"></i><span class="hidden sm:inline">書類作成</span>
                         </button>
-                        <button onclick="switchMainTab('hearing')" id="mainTabHearing" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
-                            <i class="fas fa-clipboard-list mr-1"></i><span class="hidden sm:inline">ヒアリング</span>
-                            <span id="hearingBadge" class="ml-1 text-xs bg-white/30 px-1.5 rounded-full hidden">0/0</span>
+                        <button onclick="switchMainTab('hearing')" id="mainTabHearing" class="main-tab-btn flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-clipboard-list"></i><span class="hidden sm:inline">ヒアリング</span>
+                            <span id="hearingBadge" class="text-xs bg-white/30 px-2 py-0.5 rounded-full hidden">0/0</span>
                         </button>
-                        <button onclick="switchMainTab('messages')" id="mainTabMessages" class="main-tab-btn flex-1 px-3 py-1.5 rounded-t text-xs sm:text-sm">
-                            <i class="fas fa-comments mr-1"></i><span class="hidden sm:inline">やり取り</span>
-                            <span id="msgBadge" class="ml-1 text-xs bg-red-500 px-1.5 rounded-full hidden">0</span>
+                        <button onclick="switchMainTab('messages')" id="mainTabMessages" class="main-tab-btn flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-comments"></i><span class="hidden sm:inline">やり取り</span>
+                            <span id="msgBadge" class="text-xs bg-red-500 px-2 py-0.5 rounded-full hidden">0</span>
                         </button>
                     </nav>
                 </div>

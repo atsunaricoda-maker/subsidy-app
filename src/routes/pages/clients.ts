@@ -24,60 +24,132 @@ routes.get('/clients', async (c) => {
             ${modalStyles}
         </style>
     </head>
-    <body class="bg-gray-100">
+    <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div class="min-h-screen flex">
             ${generateSidebar('clients')}
             
             <main class="flex-1 min-h-screen">
-                <header class="bg-white shadow-sm sticky top-0 z-30">
-                    <div class="flex items-center justify-between px-4 py-3">
+                <!-- ヘッダー：グラデーション背景 -->
+                <header class="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white shadow-lg sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 py-4">
                         <div class="flex items-center gap-4">
-                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-white/80 hover:text-white">
                                 <i class="fas fa-bars text-xl"></i>
                             </button>
-                            <h2 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-address-book mr-2"></i>顧客一覧
-                            </h2>
+                            <div>
+                                <h2 class="text-xl font-bold flex items-center gap-2">
+                                    <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-address-book"></i>
+                                    </div>
+                                    顧客管理
+                                </h2>
+                                <p class="text-blue-100 text-sm mt-0.5">Customer Management</p>
+                            </div>
                         </div>
-                        <button onclick="openNewCustomerModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                            <i class="fas fa-user-plus mr-2"></i>新規顧客追加
+                        <button onclick="openNewCustomerModal()" class="bg-white text-blue-700 px-5 py-2.5 rounded-xl hover:bg-blue-50 font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
+                            <i class="fas fa-user-plus"></i>
+                            <span>新規顧客追加</span>
                         </button>
                     </div>
                 </header>
 
                 <div class="p-4 lg:p-6">
+                    <!-- 統計カード -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-blue-500 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">総顧客数</p>
+                                    <p id="statTotalClients" class="text-2xl font-bold text-gray-800">-</p>
+                                </div>
+                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-users text-blue-600 text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-green-500 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">今月の新規</p>
+                                    <p id="statNewClients" class="text-2xl font-bold text-gray-800">-</p>
+                                </div>
+                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-user-plus text-green-600 text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-purple-500 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">進行中案件</p>
+                                    <p id="statActiveCases" class="text-2xl font-bold text-gray-800">-</p>
+                                </div>
+                                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-briefcase text-purple-600 text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-orange-500 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">対応待ち</p>
+                                    <p id="statPendingActions" class="text-2xl font-bold text-gray-800">-</p>
+                                </div>
+                                <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-clock text-orange-600 text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- 検索・フィルター -->
-                    <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
                         <div class="flex flex-col sm:flex-row gap-3">
                             <div class="flex-1 relative">
-                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
                                 <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
-                                       class="w-full pl-10 pr-4 py-2 border rounded-lg" onkeyup="filterCustomers()">
+                                       class="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" onkeyup="filterCustomers()">
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="setViewMode('table')" id="viewModeTable" class="px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                                <button onclick="setViewMode('card')" id="viewModeCard" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                                    <i class="fas fa-th-large"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 顧客一覧 -->
-                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <!-- 顧客一覧（テーブル表示） -->
+                    <div id="tableView" class="bg-white rounded-xl shadow-sm overflow-hidden">
                         <table class="w-full">
-                            <thead class="bg-gray-50">
+                            <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
                                 <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">顧客名</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">会社名</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">連絡先</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">案件数</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">登録日</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">顧客名</th>
+                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">会社名</th>
+                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">連絡先</th>
+                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">案件数</th>
+                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">登録日</th>
+                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">操作</th>
                                 </tr>
                             </thead>
-                            <tbody id="customerList" class="divide-y divide-gray-200">
+                            <tbody id="customerList" class="divide-y divide-gray-100">
                                 <tr>
-                                    <td colspan="6" class="px-4 py-8 text-center text-gray-500">
-                                        <i class="fas fa-spinner fa-spin mr-2"></i>読み込み中...
+                                    <td colspan="6" class="px-4 py-12 text-center text-gray-500">
+                                        <div class="flex flex-col items-center">
+                                            <i class="fas fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                                            <p>読み込み中...</p>
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- 顧客一覧（カード表示） -->
+                    <div id="cardView" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- カードが動的に生成される -->
                     </div>
                 </div>
             </main>
@@ -247,50 +319,120 @@ routes.get('/clients', async (c) => {
             let currentClientId = null;
             let currentClientTab = 'info';
             
+            let viewMode = 'table';
+            
+            // 表示モード切り替え
+            function setViewMode(mode) {
+                viewMode = mode;
+                document.getElementById('viewModeTable').className = mode === 'table' 
+                    ? 'px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors'
+                    : 'px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors';
+                document.getElementById('viewModeCard').className = mode === 'card'
+                    ? 'px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors'
+                    : 'px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors';
+                document.getElementById('tableView').classList.toggle('hidden', mode !== 'table');
+                document.getElementById('cardView').classList.toggle('hidden', mode !== 'card');
+                renderClients(allClients);
+            }
+            
             // データ読み込み
             async function loadClients() {
                 try {
                     const response = await axios.get('/api/clients?include_cases=true');
                     allClients = response.data;
                     renderClients(allClients);
+                    updateStats(allClients);
                 } catch (error) {
                     console.error('Error loading clients:', error);
                     document.getElementById('customerList').innerHTML = 
-                        '<tr><td colspan="6" class="px-4 py-8 text-center text-red-500">データの読み込みに失敗しました</td></tr>';
+                        '<tr><td colspan="6" class="px-4 py-12 text-center text-red-500"><i class="fas fa-exclamation-circle text-3xl mb-3"></i><p>データの読み込みに失敗しました</p></td></tr>';
                 }
+            }
+            
+            // 統計を更新
+            function updateStats(clients) {
+                document.getElementById('statTotalClients').textContent = clients.length;
+                
+                const now = new Date();
+                const thisMonth = clients.filter(c => {
+                    const created = new Date(c.created_at);
+                    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+                }).length;
+                document.getElementById('statNewClients').textContent = thisMonth;
+                
+                let activeCases = 0;
+                let pendingActions = 0;
+                clients.forEach(c => {
+                    if (c.cases) {
+                        activeCases += c.cases.filter(cs => cs.status !== 'completed' && cs.status !== 'rejected').length;
+                        pendingActions += c.cases.filter(cs => cs.status === 'preparing').length;
+                    }
+                });
+                document.getElementById('statActiveCases').textContent = activeCases;
+                document.getElementById('statPendingActions').textContent = pendingActions;
             }
             
             // 顧客一覧の表示
             function renderClients(clients) {
-                const container = document.getElementById('customerList');
-                if (!clients || clients.length === 0) {
-                    container.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">顧客が登録されていません</td></tr>';
+                if (viewMode === 'card') {
+                    renderClientsAsCards(clients);
                     return;
                 }
                 
-                container.innerHTML = clients.map(client => {
+                const container = document.getElementById('customerList');
+                if (!clients || clients.length === 0) {
+                    container.innerHTML = '<tr><td colspan="6" class="px-4 py-12 text-center text-gray-500"><i class="fas fa-users text-4xl text-gray-300 mb-3"></i><p>顧客が登録されていません</p></td></tr>';
+                    return;
+                }
+                
+                // アバターカラーを生成
+                const avatarColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500'];
+                
+                container.innerHTML = clients.map((client, index) => {
                     const caseCount = client.cases?.length || 0;
+                    const activeCases = client.cases?.filter(c => c.status !== 'completed' && c.status !== 'rejected').length || 0;
+                    const avatarColor = avatarColors[index % avatarColors.length];
+                    const initial = (client.company_name || client.name || '?')[0].toUpperCase();
+                    
                     return \`
-                        <tr class="hover:bg-blue-50 customer-row cursor-pointer transition-colors" 
+                        <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent customer-row cursor-pointer transition-all group" 
                             data-name="\${client.name}" 
                             data-company="\${client.company_name || ''}"
                             onclick="openClientQuickView(\${client.id})">
-                            <td class="px-4 py-3">
-                                <div class="font-medium text-gray-900">\${client.name}</div>
+                            <td class="px-4 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 \${avatarColor} rounded-full flex items-center justify-center text-white font-bold shadow-sm">
+                                        \${initial}
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-gray-900">\${client.name}</div>
+                                        <div class="text-xs text-gray-500">\${client.company_name || ''}</div>
+                                    </div>
+                                </div>
                             </td>
-                            <td class="px-4 py-3 text-gray-600">\${client.company_name || '-'}</td>
-                            <td class="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
-                                \${client.email ? '<div><i class="fas fa-envelope mr-1"></i>' + client.email + '</div>' : ''}
-                                \${client.phone ? '<div><i class="fas fa-phone mr-1"></i>' + client.phone + '</div>' : ''}
+                            <td class="px-4 py-4 text-gray-600">\${client.company_name || '-'}</td>
+                            <td class="px-4 py-4 text-sm text-gray-500 hidden md:table-cell">
+                                \${client.email ? '<div class="flex items-center gap-1"><i class="fas fa-envelope text-gray-400"></i>' + client.email + '</div>' : ''}
+                                \${client.phone ? '<div class="flex items-center gap-1 mt-1"><i class="fas fa-phone text-gray-400"></i>' + client.phone + '</div>' : ''}
                             </td>
-                            <td class="px-4 py-3">
-                                <span class="\${caseCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded text-sm">\${caseCount}件</span>
+                            <td class="px-4 py-4">
+                                <div class="flex flex-col gap-1">
+                                    <span class="\${caseCount > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'} px-3 py-1 rounded-full text-xs font-medium inline-flex items-center w-fit">
+                                        <i class="fas fa-folder mr-1"></i>\${caseCount}件
+                                    </span>
+                                    \${activeCases > 0 ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs inline-flex items-center w-fit"><i class="fas fa-play-circle mr-1"></i>進行中 ' + activeCases + '</span>' : ''}
+                                </div>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">\${client.created_at?.split(' ')[0] || '-'}</td>
-                            <td class="px-4 py-3">
-                                <span class="text-blue-600 hover:text-blue-800">
-                                    <i class="fas fa-eye"></i> 詳細
-                                </span>
+                            <td class="px-4 py-4 text-sm text-gray-500 hidden sm:table-cell">
+                                <div class="flex items-center gap-1">
+                                    <i class="fas fa-calendar text-gray-400"></i>
+                                    \${client.created_at?.split(' ')[0]?.replace(/-/g, '/') || '-'}
+                                </div>
+                            </td>
+                            <td class="px-4 py-4">
+                                <button class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
                             </td>
                         </tr>
                     \`;
