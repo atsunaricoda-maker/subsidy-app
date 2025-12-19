@@ -37,6 +37,7 @@ import subscriptionRoutes from './routes/api/subscription'
 import subsidy_matchingRoutes from './routes/api/subsidy-matching'
 import subsidy_typesRoutes from './routes/api/subsidy-types'
 import success_casesRoutes from './routes/api/success-cases'
+import organizationsRoutes from './routes/api/organizations'
 import admin_settingsPages from './routes/pages/admin-settings'
 import admin_usersPages from './routes/pages/admin-users'
 import backupPages from './routes/pages/backup'
@@ -99,6 +100,7 @@ app.route('/api', subscriptionRoutes)
 app.route('/api', subsidy_matchingRoutes)
 app.route('/api', subsidy_typesRoutes)
 app.route('/api', success_casesRoutes)
+app.route('/api', organizationsRoutes)
 app.route('', admin_settingsPages)
 app.route('', admin_usersPages)
 app.route('', backupPages)

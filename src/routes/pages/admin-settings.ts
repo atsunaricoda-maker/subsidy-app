@@ -792,6 +792,126 @@ routes.get('/admin/settings', async (c) => {
                 </div>
             </div>
             
+            <!-- 資格情報・書類作成モード -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="p-4 border-b bg-gradient-to-r from-amber-50 to-orange-50">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold flex items-center gap-2">
+                                <i class="fas fa-certificate text-amber-600"></i>
+                                資格情報・書類作成モード
+                            </h2>
+                            <p class="text-sm text-gray-500 mt-1">行政書士法・社労士法に準拠した業務範囲を設定します</p>
+                        </div>
+                        <span id="licenseVerifiedBadge" class="hidden px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                            <i class="fas fa-check-circle mr-1"></i>確認済み
+                        </span>
+                    </div>
+                </div>
+                <div class="p-4 space-y-6">
+                    <!-- 法的注意事項 -->
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-red-600 mt-0.5"></i>
+                            <div class="text-sm text-red-800">
+                                <p class="font-bold mb-2">重要な法的注意事項</p>
+                                <ul class="space-y-1 list-disc list-inside">
+                                    <li><strong>行政書士法第19条</strong>：官公署に提出する書類の作成は行政書士でなければできません</li>
+                                    <li><strong>社会保険労務士法第27条</strong>：労働社会保険諸法令に基づく申請書類の作成は社労士でなければできません</li>
+                                    <li>資格を持たない場合、顧客自身が書類を作成する必要があります（AIアドバイス・テンプレート提供は可能）</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 行政書士資格 -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-user-tie text-blue-600"></i>
+                            行政書士資格
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">登録番号</label>
+                                <input type="text" id="gyoseishoshi_license_number" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 第00000号">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">登録者名</label>
+                                <input type="text" id="gyoseishoshi_license_name" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 山田 太郎">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">登録年月日</label>
+                                <input type="date" id="gyoseishoshi_registered_at" class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 社会保険労務士資格 -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-user-shield text-green-600"></i>
+                            社会保険労務士資格
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">登録番号</label>
+                                <input type="text" id="sharoshi_license_number" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 第00000000号">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">登録者名</label>
+                                <input type="text" id="sharoshi_license_name" class="w-full px-3 py-2 border rounded-lg" placeholder="例: 山田 太郎">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">登録年月日</label>
+                                <input type="date" id="sharoshi_registered_at" class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 書類作成モード -->
+                    <div class="border rounded-lg p-4 bg-gray-50">
+                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-file-signature text-purple-600"></i>
+                            書類作成モード
+                        </h3>
+                        <div class="space-y-3">
+                            <label class="flex items-start gap-3 p-3 border rounded-lg bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                                <input type="radio" name="document_creation_mode" value="client_self" class="mt-1">
+                                <div>
+                                    <span class="font-medium text-gray-800">顧客自己作成モード</span>
+                                    <p class="text-sm text-gray-500 mt-1">顧客が自分で書類を作成します。AIアドバイス・テンプレート提供のみ行います。<br>
+                                    <span class="text-amber-600"><i class="fas fa-info-circle mr-1"></i>資格がない場合はこのモードのみ選択可能</span></p>
+                                </div>
+                            </label>
+                            <label id="licensedModeOption" class="flex items-start gap-3 p-3 border rounded-lg bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                                <input type="radio" name="document_creation_mode" value="licensed_full">
+                                <div>
+                                    <span class="font-medium text-gray-800">資格者代行作成モード</span>
+                                    <p class="text-sm text-gray-500 mt-1">行政書士/社労士が代行して書類を作成します。<br>
+                                    <span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>資格登録が必要です</span></p>
+                                </div>
+                            </label>
+                            <label id="bothModeOption" class="flex items-start gap-3 p-3 border rounded-lg bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                                <input type="radio" name="document_creation_mode" value="both">
+                                <div>
+                                    <span class="font-medium text-gray-800">案件ごとに選択</span>
+                                    <p class="text-sm text-gray-500 mt-1">案件ごとに代行作成か顧客自己作成かを選択できます。<br>
+                                    <span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>資格登録が必要です</span></p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- 資格情報保存ボタン -->
+                    <div class="flex justify-end">
+                        <button onclick="saveLicenseInfo()" class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex items-center gap-2">
+                            <i class="fas fa-save"></i>
+                            資格情報を保存
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 法務設定 -->
             <div class="bg-white rounded-lg shadow mb-6">
                 <div class="p-4 border-b bg-gradient-to-r from-indigo-50 to-purple-50">
@@ -1146,7 +1266,118 @@ routes.get('/admin/settings', async (c) => {
             window.saveSettings = saveSettings;
             window.applyLegalTemplates = applyLegalTemplates;
             
+            // 資格情報の読み込み
+            async function loadLicenseInfo() {
+                try {
+                    const response = await axios.get('/api/organizations/current');
+                    const org = response.data;
+                    
+                    // ヘルパー関数
+                    const setValue = (id, value) => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = value || '';
+                    };
+                    
+                    // 行政書士資格
+                    setValue('gyoseishoshi_license_number', org.gyoseishoshi_license_number);
+                    setValue('gyoseishoshi_license_name', org.gyoseishoshi_license_name);
+                    setValue('gyoseishoshi_registered_at', org.gyoseishoshi_registered_at);
+                    
+                    // 社労士資格
+                    setValue('sharoshi_license_number', org.sharoshi_license_number);
+                    setValue('sharoshi_license_name', org.sharoshi_license_name);
+                    setValue('sharoshi_registered_at', org.sharoshi_registered_at);
+                    
+                    // 書類作成モード
+                    const mode = org.document_creation_mode || 'client_self';
+                    const modeRadio = document.querySelector(\`input[name="document_creation_mode"][value="\${mode}"]\`);
+                    if (modeRadio) modeRadio.checked = true;
+                    
+                    // 確認済みバッジの表示
+                    if (org.license_verified) {
+                        document.getElementById('licenseVerifiedBadge').classList.remove('hidden');
+                    }
+                    
+                    // 資格がない場合は代行作成モードを無効化
+                    updateLicenseModeAvailability();
+                } catch (error) {
+                    console.error('Error loading license info:', error);
+                }
+            }
+            
+            // 資格有無に基づいてモード選択肢を更新
+            function updateLicenseModeAvailability() {
+                const gyosei = document.getElementById('gyoseishoshi_license_number')?.value;
+                const sharoshi = document.getElementById('sharoshi_license_number')?.value;
+                const hasLicense = gyosei || sharoshi;
+                
+                const licensedOption = document.getElementById('licensedModeOption');
+                const bothOption = document.getElementById('bothModeOption');
+                
+                if (!hasLicense) {
+                    // 資格がない場合、代行作成モードを無効化
+                    licensedOption.classList.add('opacity-50', 'pointer-events-none');
+                    bothOption.classList.add('opacity-50', 'pointer-events-none');
+                    licensedOption.querySelector('input').disabled = true;
+                    bothOption.querySelector('input').disabled = true;
+                    
+                    // 強制的に顧客自己作成モードを選択
+                    document.querySelector('input[name="document_creation_mode"][value="client_self"]').checked = true;
+                } else {
+                    licensedOption.classList.remove('opacity-50', 'pointer-events-none');
+                    bothOption.classList.remove('opacity-50', 'pointer-events-none');
+                    licensedOption.querySelector('input').disabled = false;
+                    bothOption.querySelector('input').disabled = false;
+                }
+            }
+            
+            // 資格情報を保存
+            async function saveLicenseInfo() {
+                try {
+                    // 保存前にモード選択肢を更新
+                    updateLicenseModeAvailability();
+                    
+                    const getValue = (id) => {
+                        const el = document.getElementById(id);
+                        return el ? el.value : '';
+                    };
+                    
+                    const selectedMode = document.querySelector('input[name="document_creation_mode"]:checked')?.value || 'client_self';
+                    
+                    const licenseData = {
+                        gyoseishoshi_license_number: getValue('gyoseishoshi_license_number'),
+                        gyoseishoshi_license_name: getValue('gyoseishoshi_license_name'),
+                        gyoseishoshi_registered_at: getValue('gyoseishoshi_registered_at'),
+                        sharoshi_license_number: getValue('sharoshi_license_number'),
+                        sharoshi_license_name: getValue('sharoshi_license_name'),
+                        sharoshi_registered_at: getValue('sharoshi_registered_at'),
+                        document_creation_mode: selectedMode
+                    };
+                    
+                    await axios.put('/api/organizations/current/licenses', licenseData);
+                    
+                    // 確認済みバッジを非表示にする（新しい情報は再確認が必要）
+                    document.getElementById('licenseVerifiedBadge').classList.add('hidden');
+                    
+                    alert('資格情報を保存しました。\\n\\n※資格情報の変更は管理者による確認後に有効になります。');
+                } catch (error) {
+                    console.error('Error saving license info:', error);
+                    if (error.response?.status === 403) {
+                        alert('権限がありません。管理者またはオーナーのみが資格情報を更新できます。');
+                    } else {
+                        alert('資格情報の保存に失敗しました');
+                    }
+                }
+            }
+            
+            // 資格番号入力時のリアルタイム更新
+            document.getElementById('gyoseishoshi_license_number')?.addEventListener('input', updateLicenseModeAvailability);
+            document.getElementById('sharoshi_license_number')?.addEventListener('input', updateLicenseModeAvailability);
+            
+            window.saveLicenseInfo = saveLicenseInfo;
+            
             loadSettings();
+            loadLicenseInfo();
         </script>
     </body>
     </html>
