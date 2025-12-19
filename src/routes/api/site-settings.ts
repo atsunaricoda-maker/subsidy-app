@@ -1417,7 +1417,7 @@ routes.get('/master/organizations/list', async (c) => {
 })
 
 // 法人一覧API（/api/master/organizations として使用 - master-logs.tsから呼び出し）
-routes.get('/api/master/organizations', async (c) => {
+routes.get('/master/organizations', async (c) => {
   const { DB } = c.env
   
   try {
@@ -1569,11 +1569,14 @@ routes.get('/master/organizations/new', async (c) => {
                     response.data.forEach(plan => {
                         const option = document.createElement('option');
                         option.value = plan.id;
-                        option.textContent = plan.name + ' - ¥' + plan.price.toLocaleString() + '/月';
+                        option.textContent = plan.plan_name + ' - ¥' + (plan.monthly_price || 0).toLocaleString() + '/月';
                         select.appendChild(option);
                     });
                 } catch (error) {
                     console.error('Load plans error:', error);
+                    // エラー時でもフォームが使えるように基本プランを追加
+                    const select = document.getElementById('planSelect');
+                    select.innerHTML = '<option value="">プランを取得できませんでした</option>';
                 }
             }
             

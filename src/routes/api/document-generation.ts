@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser } from '../../utils/auth'
+import { callAI, extractTextFromDocument, getAIModelName } from './ai'
 
 const routes = new Hono<AppEnv>()
 

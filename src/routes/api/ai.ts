@@ -307,4 +307,7 @@ async function extractTextFromDocument(
   }
 }
 
+// 関数エクスポート（他のルートファイルから利用可能）
+export { callAI, callClaudeAPI, callGeminiAPI, callClaudeAPIWithFile, extractTextFromDocument, getAIModelName }
+
 export default routes
