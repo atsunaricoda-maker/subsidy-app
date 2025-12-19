@@ -2708,11 +2708,10 @@ routes.get('/portal/:token', async (c) => {
             // DB時刻文字列(UTC)をJSTに変換して時刻部分を表示
             function formatJSTTime(dateStr) {
                 if (!dateStr) return '';
-                // DBはUTCで保存されているので、9時間足してJSTに変換
-                const utc = new Date(dateStr + 'Z'); // Zを付けてUTCとして解釈
-                const jst = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
-                return String(jst.getHours()).padStart(2, '0') + ':' + 
-                       String(jst.getMinutes()).padStart(2, '0');
+                // DBはUTCで保存されているので、JSTタイムゾーンで表示
+                const isoStr = dateStr.replace(' ', 'T') + 'Z';
+                const utc = new Date(isoStr);
+                return utc.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
             }
             
             async function loadCommunications() {

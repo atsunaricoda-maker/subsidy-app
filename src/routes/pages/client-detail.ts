@@ -1212,14 +1212,11 @@ routes.get('/client/:id', async (c) => {
             function formatJSTDateTime(dateStr) {
                 if (!dateStr) return '';
                 // DBはUTCで保存されているので、9時間足してJSTに変換
-                const utc = new Date(dateStr + 'Z'); // Zを付けてUTCとして解釈
-                const jst = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
-                return jst.getFullYear() + '/' + 
-                       String(jst.getMonth() + 1).padStart(2, '0') + '/' + 
-                       String(jst.getDate()).padStart(2, '0') + ' ' + 
-                       String(jst.getHours()).padStart(2, '0') + ':' + 
-                       String(jst.getMinutes()).padStart(2, '0') + ':' + 
-                       String(jst.getSeconds()).padStart(2, '0');
+                // ISO形式に変換してからパース
+                const isoStr = dateStr.replace(' ', 'T') + 'Z';
+                const utc = new Date(isoStr);
+                // toLocaleStringでJSTタイムゾーンを指定
+                return utc.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
             }
             
             async function loadCommunications() {
