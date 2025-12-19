@@ -205,6 +205,19 @@ routes.get('/admin/pipelines', (c) => {
             ${sidebarScripts}
         </script>
         <script>
+            // トースト通知
+            function showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transition-all duration-300 ' + 
+                    (type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white');
+                toast.innerHTML = '<i class="fas ' + (type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle') + ' mr-2"></i>' + message;
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+            
             // タスク行テンプレート
             let taskCounter = 0;
             
@@ -797,6 +810,12 @@ routes.get('/admin/pipelines', (c) => {
                 const file = fileInput.files[0];
                 if (!file) return;
                 
+                // ファイルサイズ制限（10MB）
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast('ファイルサイズは10MB以下にしてください', 'error');
+                    return;
+                }
+                
                 try {
                     showToast('アップロード中...');
                     
@@ -804,19 +823,34 @@ routes.get('/admin/pipelines', (c) => {
                     formData.append('file', file);
                     formData.append('upload_type', 'pipeline_attachment');
                     
-                    const response = await axios.post('/api/documents/upload-file', formData);
+                    const response = await axios.post('/api/documents/upload-file', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    });
                     
-                    if (response.data.url) {
+                    if (response.data.success && response.data.url) {
                         // フォームのhidden inputを更新
                         const row = document.getElementById('task-row-' + taskId);
                         row.querySelector('input[name$="[attachment_url]"]').value = response.data.url;
                         row.querySelector('input[name$="[attachment_name]"]').value = file.name;
                         
-                        showToast('ファイルをアップロードしました');
+                        // ファイル名表示も更新（読み取り専用フィールド）
+                        const fileNameInput = row.querySelector('input[placeholder="ファイル名"]');
+                        if (fileNameInput) {
+                            fileNameInput.value = file.name;
+                            fileNameInput.classList.remove('bg-gray-50');
+                            fileNameInput.classList.add('bg-green-50');
+                        }
+                        
+                        showToast('✓ ' + file.name + ' をアップロードしました');
+                    } else {
+                        showToast('アップロードに失敗しました: ' + (response.data.error || '不明なエラー'), 'error');
                     }
                 } catch (error) {
                     console.error('File upload error:', error);
-                    showToast('アップロードに失敗しました', 'error');
+                    const errorMsg = error.response?.data?.error || error.message || '不明なエラー';
+                    showToast('アップロードに失敗しました: ' + errorMsg, 'error');
                 }
             }
             
@@ -824,6 +858,14 @@ routes.get('/admin/pipelines', (c) => {
                 const row = document.getElementById('task-row-' + taskId);
                 row.querySelector('input[name$="[attachment_url]"]').value = '';
                 row.querySelector('input[name$="[attachment_name]"]').value = '';
+                
+                const fileNameInput = row.querySelector('input[placeholder="ファイル名"]');
+                if (fileNameInput) {
+                    fileNameInput.value = '';
+                    fileNameInput.classList.remove('bg-green-50');
+                    fileNameInput.classList.add('bg-gray-50');
+                }
+                
                 showToast('添付ファイルを削除しました');
             }
             
