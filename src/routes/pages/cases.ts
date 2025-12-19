@@ -164,40 +164,31 @@ routes.get('/cases', async (c) => {
       const colors = colorMap[status.color]
       
       const cardsHtml = statusCases.length === 0 
-        ? '<div class="text-center py-6 text-gray-400 text-sm">案件なし</div>'
+        ? '<div class="text-center py-4 text-gray-400 text-xs">案件なし</div>'
         : statusCases.map((c: any) => {
           // 採択/不採択バッジ
           let resultBadge = ''
           if (c.result === 'approved') {
-            resultBadge = '<span class="px-2 py-0.5 rounded text-xs bg-blue-500 text-white"><i class="fas fa-check mr-1"></i>採択</span>'
+            resultBadge = '<span class="px-1.5 py-0.5 rounded text-xs bg-blue-500 text-white">採択</span>'
           } else if (c.result === 'rejected') {
-            resultBadge = '<span class="px-2 py-0.5 rounded text-xs bg-red-500 text-white"><i class="fas fa-times mr-1"></i>不採択</span>'
-          } else if (c.status === 'completed' && !c.result) {
-            resultBadge = '<span class="px-2 py-0.5 rounded text-xs bg-gray-300 text-gray-700"><i class="fas fa-clock mr-1"></i>結果待ち</span>'
+            resultBadge = '<span class="px-1.5 py-0.5 rounded text-xs bg-red-500 text-white">不採択</span>'
           }
           
           return `
-          <div onclick="openCaseQuickView(${c.id})" class="block bg-white rounded-lg shadow-sm border hover:shadow-md hover:border-blue-300 transition-all cursor-pointer">
-            <div class="p-3">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-mono text-xs text-gray-500">${c.case_number || '#' + c.id}</span>
+          <div onclick="openCaseQuickView(${c.id})" class="block bg-white rounded shadow-sm border hover:shadow hover:border-blue-300 transition-all cursor-pointer mb-1.5">
+            <div class="p-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-mono text-xs text-gray-400">${c.case_number || '#' + c.id}</span>
                 <div class="flex items-center gap-1">
                   ${c.deposit_required && !c.deposit_paid ? '<span class="text-yellow-600 text-xs" title="手付金未払"><i class="fas fa-yen-sign"></i></span>' : ''}
-                  ${c.is_archived && status.key !== 'archived' ? '<span class="text-green-600 text-xs" title="完了済み"><i class="fas fa-check-circle"></i></span>' : ''}
+                  ${resultBadge}
                 </div>
               </div>
-              <div class="font-bold text-gray-900 mb-1">${c.client_name || '名称未設定'}</div>
-              ${c.company_name ? '<div class="text-xs text-gray-500 mb-2">' + c.company_name + '</div>' : ''}
-              <div class="flex flex-wrap gap-1 mb-2">
-                ${c.subsidy_type_name ? '<span class="inline-block px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800">' + c.subsidy_type_name + '</span>' : ''}
-                ${resultBadge}
-              </div>
-              ${c.approved_amount ? '<div class="text-xs text-blue-600 mb-2"><i class="fas fa-check-circle mr-1"></i>採択額: ¥' + c.approved_amount.toLocaleString() + '</div>' : ''}
-              <div class="flex items-center gap-2 text-xs text-gray-500 mt-2">
-                ${c.assigned_to_name ? '<span><i class="fas fa-user mr-1"></i>' + c.assigned_to_name + '</span>' : ''}
-              </div>
-              ${c.deposit_required ? '<div class="mt-2 text-xs ' + (c.deposit_paid ? 'text-green-600' : 'text-yellow-600') + '"><i class="fas fa-hand-holding-usd mr-1"></i>¥' + (c.deposit_amount || 0).toLocaleString() + (c.deposit_paid ? '<span class="ml-1">✓支払済</span>' : '<span class="ml-1">未払</span>') + '</div>' : ''}
-              ${c.success_fee_enabled ? '<div class="mt-1 text-xs ' + (c.success_fee_invoice_status === 'paid' ? 'text-green-600' : (c.success_fee_invoice_status === 'payment_reported' ? 'text-purple-600' : (c.success_fee_invoice_count > 0 ? 'text-blue-600' : 'text-gray-400'))) + '"><i class="fas fa-trophy mr-1"></i>' + (c.success_fee_rate ? c.success_fee_rate + '%' : '¥' + (c.success_fee_amount || 0).toLocaleString()) + '<span class="ml-1">' + (c.success_fee_invoice_status === 'paid' ? '✓支払済' : (c.success_fee_invoice_status === 'payment_reported' ? '確認中' : (c.success_fee_invoice_count > 0 ? '請求中' : '未発行'))) + '</span></div>' : ''}
+              <div class="font-semibold text-gray-900 text-sm truncate">${c.client_name || '名称未設定'}</div>
+              ${c.company_name ? '<div class="text-xs text-gray-400 truncate">' + c.company_name + '</div>' : ''}
+              ${c.subsidy_type_name ? '<div class="mt-1"><span class="inline-block px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 truncate max-w-full">' + c.subsidy_type_name + '</span></div>' : ''}
+              ${c.approved_amount ? '<div class="text-xs text-blue-600 mt-1">¥' + c.approved_amount.toLocaleString() + '</div>' : ''}
+              ${c.assigned_to_name ? '<div class="text-xs text-gray-400 mt-1 truncate"><i class="fas fa-user mr-1"></i>' + c.assigned_to_name + '</div>' : ''}
             </div>
           </div>
         `}).join('')
@@ -209,29 +200,25 @@ routes.get('/cases', async (c) => {
       
       // 完了済み列のサブヘッダー（採択額合計と全件表示リンク）
       const archivedSubHeader = status.key === 'archived' ? `
-        <div class="px-4 py-2 bg-green-50 border-b border-green-200 text-sm">
+        <div class="px-2 py-1.5 bg-green-50 border-b border-green-200 text-xs">
           <div class="flex items-center justify-between">
-            <span class="text-green-700">
-              <i class="fas fa-coins mr-1"></i>採択総額: <strong>¥${totalApprovedAmount.toLocaleString()}</strong>
-            </span>
-            <a href="/cases?archived=true" class="text-green-600 hover:text-green-800 text-xs">
-              全件表示 <i class="fas fa-external-link-alt ml-1"></i>
-            </a>
+            <span class="text-green-700">¥${totalApprovedAmount.toLocaleString()}</span>
+            <a href="/cases?archived=true" class="text-green-600 hover:text-green-800">全件</a>
           </div>
         </div>
       ` : ''
       
       return `
-        <div class="flex flex-col rounded-lg ${colors.bg} border ${colors.border} overflow-hidden min-w-[280px]">
-          <div class="${colors.header} px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <i class="fas ${status.icon}"></i>
-              <span class="font-bold">${status.label}</span>
+        <div class="kanban-column flex flex-col rounded-lg ${colors.bg} border ${colors.border} overflow-hidden">
+          <div class="${colors.header} px-2 py-2 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-1.5">
+              <i class="fas ${status.icon} text-sm"></i>
+              <span class="font-semibold text-sm">${status.label}</span>
             </div>
-            <span class="${colors.badge} text-white text-xs px-2 py-0.5 rounded-full">${status.key === 'archived' ? archivedCount : statusCases.length}</span>
+            <span class="${colors.badge} text-white text-xs px-1.5 py-0.5 rounded-full">${status.key === 'archived' ? archivedCount : statusCases.length}</span>
           </div>
           ${archivedSubHeader}
-          <div class="p-3 space-y-3 flex-1 overflow-y-auto" style="max-height: calc(100vh - 250px);">
+          <div class="p-2 flex-1 overflow-y-auto">
             ${cardsHtml}
           </div>
         </div>
@@ -253,25 +240,49 @@ routes.get('/cases', async (c) => {
             ${modalStyles}
             .kanban-container {
                 display: grid;
-                grid-template-columns: repeat(5, minmax(280px, 1fr));
-                gap: 1rem;
-                overflow-x: auto;
-                padding-bottom: 1rem;
+                grid-template-columns: repeat(6, minmax(180px, 1fr));
+                gap: 0.75rem;
+                padding-bottom: 0.5rem;
+                min-height: 0;
             }
-            @media (max-width: 1400px) {
+            @media (max-width: 1600px) {
                 .kanban-container {
-                    grid-template-columns: repeat(3, minmax(280px, 1fr));
+                    grid-template-columns: repeat(6, minmax(160px, 1fr));
+                    gap: 0.5rem;
                 }
             }
-            @media (max-width: 900px) {
+            @media (max-width: 1200px) {
                 .kanban-container {
-                    grid-template-columns: repeat(2, minmax(280px, 1fr));
+                    grid-template-columns: repeat(3, minmax(200px, 1fr));
                 }
             }
-            @media (max-width: 640px) {
+            @media (max-width: 768px) {
+                .kanban-container {
+                    grid-template-columns: repeat(2, minmax(160px, 1fr));
+                }
+            }
+            @media (max-width: 480px) {
                 .kanban-container {
                     grid-template-columns: 1fr;
                 }
+            }
+            .kanban-column {
+                max-height: calc(100vh - 180px);
+                overflow-y: auto;
+            }
+            .kanban-column::-webkit-scrollbar {
+                width: 4px;
+            }
+            .kanban-column::-webkit-scrollbar-thumb {
+                background: #cbd5e1;
+                border-radius: 2px;
+            }
+            .case-card {
+                font-size: 0.8rem;
+                padding: 0.625rem;
+            }
+            .case-card-title {
+                font-size: 0.75rem;
             }
         </style>
     </head>

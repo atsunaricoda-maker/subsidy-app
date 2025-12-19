@@ -116,6 +116,8 @@ app.route('', master_legalPages)
 app.route('', master_logsPages)
 app.route('', master_plansPages)
 app.route('', masterPages)
+// site_settingsには/master/organizations等のページルートも含まれている
+app.route('', site_settingsRoutes)
 app.route('', pipelinesPages)
 app.route('', portalPages)
 app.route('', statisticsPages)

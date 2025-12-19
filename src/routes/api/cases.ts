@@ -124,10 +124,16 @@ routes.get('/cases/:id/quick-view', async (c) => {
   
   // タブごとに追加データを取得
   if (tab === 'documents') {
+    // 案件のclient_idを取得
+    const clientId = (caseData as any).client_id
+    
+    // case_id または client_id で書類を取得（案件に紐づく書類 + 顧客に紐づく共通書類）
     const docs = await DB.prepare(`
       SELECT id, client_id, case_id, document_type, file_name, file_path, file_size, uploaded_by, status, uploaded_at as created_at
-      FROM documents WHERE case_id = ? ORDER BY uploaded_at DESC
-    `).bind(id).all()
+      FROM documents 
+      WHERE case_id = ? OR (client_id = ? AND case_id IS NULL)
+      ORDER BY uploaded_at DESC
+    `).bind(id, clientId).all()
     result.documents = docs.results || []
   }
   

@@ -1048,7 +1048,7 @@ routes.get('/master/organizations', async (c) => {
                     if (status) params.set('status', status);
                     if (plan) params.set('plan', plan);
                     
-                    const response = await axios.get('/api/master/organizations?' + params.toString(), {
+                    const response = await axios.get('/api/master/organizations/list?' + params.toString(), {
                         headers: { 'Authorization': 'Bearer ' + token }
                     });
                     
@@ -1154,8 +1154,8 @@ routes.get('/master/organizations', async (c) => {
   `)
 })
 
-// 法人一覧API
-routes.get('/master/organizations', async (c) => {
+// 法人一覧API（/api/master/organizations/list として使用）
+routes.get('/master/organizations/list', async (c) => {
   const { DB } = c.env
   const search = c.req.query('search') || ''
   const status = c.req.query('status') || ''
@@ -1749,7 +1749,7 @@ routes.get('/master/organizations/:id', async (c) => {
             async function loadOrgDetails() {
                 try {
                     const token = localStorage.getItem('master_token');
-                    const response = await axios.get('/api/master/organizations/' + ORG_ID, {
+                    const response = await axios.get('/api/master/organizations/' + ORG_ID + '/detail', {
                         headers: { 'Authorization': 'Bearer ' + token }
                     });
                     const org = response.data;
@@ -1910,7 +1910,7 @@ routes.get('/master/organizations/:id', async (c) => {
                 e.preventDefault();
                 try {
                     const token = localStorage.getItem('master_token');
-                    await axios.put('/api/master/organizations/' + ORG_ID, {
+                    await axios.put('/api/master/organizations/' + ORG_ID + '/detail', {
                         name: document.getElementById('edit_name').value,
                         email: document.getElementById('edit_email').value,
                         phone: document.getElementById('edit_phone').value,
@@ -2107,7 +2107,7 @@ routes.get('/master/organizations/:id', async (c) => {
                 
                 try {
                     const token = localStorage.getItem('master_token');
-                    await axios.delete('/api/master/organizations/' + ORG_ID, {
+                    await axios.delete('/api/master/organizations/' + ORG_ID + '/detail', {
                         headers: { 'Authorization': 'Bearer ' + token }
                     });
                     alert('法人を削除しました');
@@ -2125,7 +2125,7 @@ routes.get('/master/organizations/:id', async (c) => {
 })
 
 // 法人詳細API
-routes.get('/master/organizations/:id', async (c) => {
+routes.get('/master/organizations/:id/detail', async (c) => {
   const { DB } = c.env
   const orgId = c.req.param('id')
   

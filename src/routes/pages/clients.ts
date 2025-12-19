@@ -115,6 +115,9 @@ routes.get('/clients', async (c) => {
               <button onclick="modalManager.close('clientQuickViewModal')" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
                 閉じる
               </button>
+              <button onclick="openEditClientModal(currentClientId)" class="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50">
+                <i class="fas fa-edit mr-1"></i>編集
+              </button>
               <a id="clientDetailLink" href="#" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 <i class="fas fa-external-link-alt mr-1"></i>詳細ページへ
               </a>
@@ -169,6 +172,59 @@ routes.get('/clients', async (c) => {
               </button>
               <button onclick="saveNewClient()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 <i class="fas fa-save mr-1"></i>登録
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 顧客編集モーダル -->
+        <div id="editClientModal" class="modal-overlay">
+          <div class="modal-container modal-md">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                <i class="fas fa-user-edit"></i>顧客情報編集
+              </h3>
+              <button class="modal-close" onclick="modalManager.close('editClientModal')">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <form id="editClientForm" class="space-y-4">
+                <input type="hidden" name="id" id="editClientId">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">顧客名 <span class="text-red-500">*</span></label>
+                  <input type="text" name="name" id="editClientName" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">会社名</label>
+                  <input type="text" name="company_name" id="editClientCompany" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                    <input type="email" name="email" id="editClientEmail" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                    <input type="tel" name="phone" id="editClientPhone" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">住所</label>
+                  <input type="text" name="address" id="editClientAddress" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">備考</label>
+                  <textarea name="notes" id="editClientNotes" rows="3" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button onclick="modalManager.close('editClientModal')" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                キャンセル
+              </button>
+              <button onclick="saveEditClient()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <i class="fas fa-save mr-1"></i>保存
               </button>
             </div>
           </div>
@@ -463,11 +519,71 @@ routes.get('/clients', async (c) => {
                 try {
                     await axios.post('/api/clients', data);
                     modalManager.close('newClientModal');
+                    showToast('顧客を登録しました');
                     await loadClients();
                 } catch (error) {
                     console.error('Error saving client:', error);
                     alert('顧客の登録に失敗しました');
                 }
+            }
+            
+            // 顧客編集モーダルを開く
+            async function openEditClientModal(clientId) {
+                try {
+                    const response = await axios.get('/api/clients/' + clientId);
+                    const client = response.data;
+                    
+                    document.getElementById('editClientId').value = client.id;
+                    document.getElementById('editClientName').value = client.name || '';
+                    document.getElementById('editClientCompany').value = client.company_name || '';
+                    document.getElementById('editClientEmail').value = client.email || '';
+                    document.getElementById('editClientPhone').value = client.phone || '';
+                    document.getElementById('editClientAddress').value = client.address || '';
+                    document.getElementById('editClientNotes').value = client.notes || '';
+                    
+                    modalManager.close('clientQuickViewModal');
+                    modalManager.open('editClientModal');
+                } catch (error) {
+                    console.error('Error loading client:', error);
+                    alert('顧客情報の取得に失敗しました');
+                }
+            }
+            
+            // 顧客情報を保存
+            async function saveEditClient() {
+                const form = document.getElementById('editClientForm');
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData);
+                const clientId = data.id;
+                
+                if (!data.name) {
+                    alert('顧客名を入力してください');
+                    return;
+                }
+                
+                try {
+                    await axios.put('/api/clients/' + clientId, data);
+                    modalManager.close('editClientModal');
+                    showToast('顧客情報を更新しました');
+                    await loadClients();
+                } catch (error) {
+                    console.error('Error saving client:', error);
+                    alert('顧客情報の更新に失敗しました');
+                }
+            }
+            
+            // トースト通知
+            function showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ' + 
+                    (type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white');
+                toast.innerHTML = '<i class="fas ' + (type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle') + ' mr-2"></i>' + message;
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.3s';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
             }
             
             // 初期化
