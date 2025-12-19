@@ -69,7 +69,7 @@ routes.get('/portal/:token', async (c) => {
                                 ${client.name} 様
                             </h1>
                             <!-- 案件セレクター -->
-                            <select id="caseSelector" onchange="switchCase(this.value)" 
+                            <select id="caseSelector" onchange="if(this.value) window.location.href='/portal/'+this.value" 
                                     class="bg-white/20 text-white text-xs px-2 py-1 rounded border-0 focus:ring-2 focus:ring-white/50">
                                 <option value="">案件を選択...</option>
                             </select>
@@ -704,14 +704,6 @@ routes.get('/portal/:token', async (c) => {
                 
                 if (activeBtn) activeBtn.classList.add('active');
                 if (activePanel) activePanel.classList.add('active');
-            }
-            
-            // 案件切り替え関数
-            function switchCase(caseId) {
-                if (caseId) {
-                    // 新しいトークンでポータルをリロード
-                    window.location.href = '/portal/' + caseId;
-                }
             }
             
             // 案件セレクターを更新
