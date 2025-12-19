@@ -1208,11 +1208,18 @@ routes.get('/client/:id', async (c) => {
             
             window.deleteCommonDocumentAdmin = deleteCommonDocumentAdmin;
 
-            // DB時刻文字列(YYYY-MM-DD HH:MM:SS形式、既にJST)を日本語フォーマットに変換
+            // DB時刻文字列(UTC)をJSTに変換して日本語フォーマットで表示
             function formatJSTDateTime(dateStr) {
                 if (!dateStr) return '';
-                // "2025-12-19 14:40:23" → "2025/12/19 14:40:23"
-                return dateStr.replace(/-/g, '/');
+                // DBはUTCで保存されているので、9時間足してJSTに変換
+                const utc = new Date(dateStr + 'Z'); // Zを付けてUTCとして解釈
+                const jst = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
+                return jst.getFullYear() + '/' + 
+                       String(jst.getMonth() + 1).padStart(2, '0') + '/' + 
+                       String(jst.getDate()).padStart(2, '0') + ' ' + 
+                       String(jst.getHours()).padStart(2, '0') + ':' + 
+                       String(jst.getMinutes()).padStart(2, '0') + ':' + 
+                       String(jst.getSeconds()).padStart(2, '0');
             }
             
             async function loadCommunications() {
