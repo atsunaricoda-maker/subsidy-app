@@ -1441,16 +1441,11 @@ routes.put('/generated-documents/:id', async (c) => {
 
 // AI書類添削
 routes.post('/ai/refine-document', async (c) => {
-  const { DB, CLAUDE_API_KEY } = c.env as any
+  const { DB } = c.env
   const { section_key, content, case_id } = await c.req.json()
   
   if (!content || !content.trim()) {
     return c.json({ error: 'Content is required' }, 400)
-  }
-  
-  if (!CLAUDE_API_KEY) {
-    console.error('CLAUDE_API_KEY is not configured')
-    return c.json({ error: 'AI service not configured' }, 500)
   }
   
   // セクションラベル
@@ -1479,7 +1474,7 @@ routes.post('/ai/refine-document', async (c) => {
     }
   }
   
-  const systemPrompt = `あなたは補助金申請書類の専門家です。${subsidyType}の申請書類を添削・改善します。
+  const prompt = `あなたは補助金申請書類の専門家です。${subsidyType}の申請書類を添削・改善します。
 
 以下の観点で添削してください：
 1. 審査員に伝わりやすい明確な表現になっているか
@@ -1491,39 +1486,16 @@ routes.post('/ai/refine-document', async (c) => {
 【重要】
 - 元の内容の意図を保ちながら改善してください
 - 添削後の文章のみを出力してください（説明は不要）
-- 文体は「です・ます調」を維持してください`
+- 文体は「です・ます調」を維持してください
 
-  const userPrompt = `【${sectionName}】の以下の文章を添削してください：
+【${sectionName}】の以下の文章を添削してください：
 
 ${content}`
 
   try {
-    // Claude APIを使用
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2000,
-        system: systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt }
-        ]
-      })
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Claude API error:', errorText)
-      return c.json({ error: 'AI service error' }, 500)
-    }
-    
-    const data = await response.json() as any
-    const refined = data.content?.[0]?.text || ''
+    // callAIを使用（Claude優先、Geminiフォールバック）
+    const { callAI } = await import('./ai')
+    const refined = await callAI(prompt, c.env)
     
     return c.json({ refined, original: content })
   } catch (error) {

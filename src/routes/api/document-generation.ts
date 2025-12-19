@@ -392,6 +392,9 @@ ${sectionSpecific}
   const companyName = (client as any).company_name || (client as any).name || '未設定'
   const documentTitle = `${subsidyName} 事業計画書 - ${companyName}`
   
+  // 使用モデル名を取得（設定から）
+  const usedModel = await getAIModelName(DB, 'ai_model_claude')
+  
   const result = await DB.prepare(`
     INSERT INTO generated_documents 
     (client_id, template_id, document_title, sections_content, ai_model_used, case_id)
@@ -401,7 +404,7 @@ ${sectionSpecific}
     data.template_id,
     documentTitle,
     JSON.stringify(generatedSections),
-    'gemini-2.5-flash-lite',
+    usedModel,
     caseId || null
   ).run()
   
