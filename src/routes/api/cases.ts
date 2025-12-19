@@ -600,14 +600,27 @@ routes.delete('/cases/:id', async (c) => {
   }
   
   try {
-    // 案件に紐づく関連データを明示的に削除
+    // 案件に紐づく関連データを明示的に削除（順序が重要：子テーブルから先に）
+    
+    // 1. client_pipelinesに関連するtasksを削除
+    const pipelines = await DB.prepare(`SELECT id FROM client_pipelines WHERE case_id = ?`).bind(id).all()
+    if (pipelines.results && pipelines.results.length > 0) {
+      for (const pipeline of pipelines.results) {
+        await DB.prepare(`DELETE FROM client_pipeline_tasks WHERE pipeline_id = ?`).bind(pipeline.id).run()
+      }
+    }
+    
+    // 2. 通知を削除
+    await DB.prepare(`DELETE FROM admin_notifications WHERE case_id = ?`).bind(id).run()
+    
+    // 3. その他の関連データを削除
     await DB.prepare(`DELETE FROM documents WHERE case_id = ?`).bind(id).run()
     await DB.prepare(`DELETE FROM communications WHERE case_id = ?`).bind(id).run()
     await DB.prepare(`DELETE FROM hearing_answers WHERE case_id = ?`).bind(id).run()
     await DB.prepare(`DELETE FROM client_pipelines WHERE case_id = ?`).bind(id).run()
     await DB.prepare(`DELETE FROM generated_documents WHERE case_id = ?`).bind(id).run()
     
-    // 案件自体を削除
+    // 4. 案件自体を削除
     await DB.prepare(`DELETE FROM cases WHERE id = ?`).bind(id).run()
     
     return c.json({ success: true })

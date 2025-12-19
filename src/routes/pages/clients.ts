@@ -446,6 +446,68 @@ routes.get('/clients', async (c) => {
                     const company = row.dataset.company.toLowerCase();
                     row.style.display = (name.includes(query) || company.includes(query)) ? '' : 'none';
                 });
+                // カードビューもフィルター
+                document.querySelectorAll('.customer-card').forEach(card => {
+                    const name = card.dataset.name?.toLowerCase() || '';
+                    const company = card.dataset.company?.toLowerCase() || '';
+                    card.style.display = (name.includes(query) || company.includes(query)) ? '' : 'none';
+                });
+            }
+            
+            // カード表示で顧客一覧を描画
+            function renderClientsAsCards(clients) {
+                const container = document.getElementById('cardView');
+                if (!clients || clients.length === 0) {
+                    container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500"><i class="fas fa-users text-4xl text-gray-300 mb-3"></i><p>顧客が登録されていません</p></div>';
+                    return;
+                }
+                
+                const avatarColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500'];
+                
+                container.innerHTML = clients.map((client, index) => {
+                    const caseCount = client.cases?.length || 0;
+                    const activeCases = client.cases?.filter(c => c.status !== 'completed' && c.status !== 'rejected').length || 0;
+                    const avatarColor = avatarColors[index % avatarColors.length];
+                    const initial = (client.company_name || client.name || '?')[0].toUpperCase();
+                    
+                    return \`
+                        <div class="customer-card bg-white rounded-xl shadow-sm hover:shadow-lg transition-all cursor-pointer border border-gray-100 hover:border-blue-200 overflow-hidden"
+                             data-name="\${client.name}" 
+                             data-company="\${client.company_name || ''}"
+                             onclick="openClientQuickView(\${client.id})">
+                            <div class="p-5">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-14 h-14 \${avatarColor} rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-md flex-shrink-0">
+                                        \${initial}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="font-bold text-gray-900 truncate">\${client.name}</h3>
+                                        <p class="text-sm text-gray-500 truncate">\${client.company_name || '-'}</p>
+                                        <div class="flex flex-wrap gap-2 mt-2">
+                                            <span class="\${caseCount > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'} px-2 py-0.5 rounded-full text-xs font-medium">
+                                                <i class="fas fa-folder mr-1"></i>\${caseCount}件
+                                            </span>
+                                            \${activeCases > 0 ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs"><i class="fas fa-play-circle mr-1"></i>進行中 ' + activeCases + '</span>' : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
+                                    <div class="text-gray-500">
+                                        \${client.email ? '<i class="fas fa-envelope mr-1"></i>' + client.email : ''}
+                                    </div>
+                                    <div class="text-gray-400 text-xs">
+                                        <i class="fas fa-calendar mr-1"></i>\${client.created_at?.split(' ')[0]?.replace(/-/g, '/') || '-'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-3 flex justify-end">
+                                <span class="text-blue-600 text-sm font-medium flex items-center gap-1">
+                                    詳細を見る <i class="fas fa-arrow-right"></i>
+                                </span>
+                            </div>
+                        </div>
+                    \`;
+                }).join('');
             }
             
             // 顧客クイックビューを開く
