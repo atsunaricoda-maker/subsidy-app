@@ -1167,28 +1167,87 @@ routes.get('/generated-documents/:id/preview', async (c) => {
     return c.json({ error: 'Document not found' }, 404)
   }
   
-  // 実際の実装では、file_pathからファイルを取得してプレビューを返す
-  // ここでは簡易的にHTMLを返す
-  return c.html(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>${doc.document_type} - プレビュー</title>
-      <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h1>${doc.document_type}</h1>
-        <p>作成日: ${doc.created_at}</p>
-        <hr>
-        <div>${doc.content || 'コンテンツはまだ生成されていません'}</div>
+  // タイトルを取得
+  const title = doc.document_type || doc.document_title || '無題の書類'
+  
+  // コンテンツを取得（sections_contentまたはcontent）
+  let contentHtml = ''
+  
+  if (doc.sections_content) {
+    try {
+      const sections = JSON.parse(doc.sections_content)
+      // セクションラベルのマッピング
+      const sectionLabels: Record<string, string> = {
+        'company_overview': '1. 会社概要・事業概要',
+        'innovation_plan': '2. 革新的な取組内容',
+        'equipment_plan': '3. 設備投資計画',
+        'expected_results': '4. 期待される成果',
+        'implementation_schedule': '5. 実施スケジュール',
+        'business_plan': '事業計画',
+        'financial_plan': '資金計画'
+      }
+      
+      contentHtml = Object.entries(sections).map(([key, value]) => {
+        const label = sectionLabels[key] || key
+        const content = String(value).replace(/\\n/g, '<br>')
+        return '<div class="section"><h2>' + label + '</h2><div class="content">' + content + '</div></div>'
+      }).join('')
+    } catch (e) {
+      contentHtml = '<p>セクションの解析に失敗しました</p>'
+    }
+  } else if (doc.content) {
+    contentHtml = doc.content.replace(/\\n/g, '<br>')
+  } else {
+    contentHtml = '<p class="empty">コンテンツはまだ生成されていません</p>'
+  }
+  
+  // ステータスラベル
+  const statusLabel = doc.status === 'draft' ? '下書き' : doc.status === 'final' ? '完成' : doc.status
+  const createdAt = new Date(doc.created_at).toLocaleString('ja-JP')
+  
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} - プレビュー</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif; }
+    .section { margin-bottom: 2rem; padding: 1.5rem; background: #f9fafb; border-radius: 0.5rem; }
+    .section h2 { font-size: 1.25rem; font-weight: bold; color: #1f2937; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #3b82f6; }
+    .section .content { color: #374151; line-height: 1.8; white-space: pre-wrap; }
+    .empty { color: #9ca3af; text-align: center; padding: 2rem; }
+    @media print { .no-print { display: none; } .section { break-inside: avoid; } }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div class="max-w-4xl mx-auto p-6">
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-800">${title}</h1>
+          <p class="text-sm text-gray-500 mt-1">作成日: ${createdAt}</p>
+          <p class="text-sm text-gray-500">ステータス: ${statusLabel}</p>
+        </div>
+        <div class="no-print flex gap-2">
+          <button onclick="window.print()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+            <i class="fas fa-print mr-1"></i>印刷
+          </button>
+          <a href="/api/generated-documents/${doc.id}/download" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <i class="fas fa-download mr-1"></i>ダウンロード
+          </a>
+        </div>
       </div>
-    </body>
-    </html>
-  `)
+    </div>
+    <div class="bg-white rounded-lg shadow-sm p-6">${contentHtml}</div>
+    <div class="text-center text-sm text-gray-400 mt-6 no-print">このプレビューは印刷可能です</div>
+  </div>
+</body>
+</html>`
+  
+  return c.html(html)
 })
 
 // 生成書類のダウンロード
@@ -1204,14 +1263,47 @@ routes.get('/generated-documents/:id/download', async (c) => {
     return c.json({ error: 'Document not found' }, 404)
   }
   
-  // 実際の実装では、file_pathからファイルを取得
-  // ここでは簡易的にテキストファイルとして返す
-  const content = doc.content || 'ファイルが見つかりません'
+  // タイトルを取得
+  const title = doc.document_type || doc.document_title || '書類'
   
-  return new Response(content, {
+  // コンテンツを取得（sections_contentまたはcontent）
+  let textContent = ''
+  
+  if (doc.sections_content) {
+    try {
+      const sections = JSON.parse(doc.sections_content)
+      const sectionLabels: Record<string, string> = {
+        'company_overview': '1. 会社概要・事業概要',
+        'innovation_plan': '2. 革新的な取組内容',
+        'equipment_plan': '3. 設備投資計画',
+        'expected_results': '4. 期待される成果',
+        'implementation_schedule': '5. 実施スケジュール',
+        'business_plan': '事業計画',
+        'financial_plan': '資金計画'
+      }
+      
+      textContent = `${title}\n作成日: ${doc.created_at}\n${'='.repeat(50)}\n\n`
+      
+      for (const [key, value] of Object.entries(sections)) {
+        const label = sectionLabels[key] || key
+        textContent += `【${label}】\n${String(value).replace(/\\n/g, '\n')}\n\n`
+      }
+    } catch (e) {
+      textContent = 'セクションの解析に失敗しました'
+    }
+  } else if (doc.content) {
+    textContent = doc.content
+  } else {
+    textContent = 'コンテンツがありません'
+  }
+  
+  // ファイル名をURLエンコード
+  const filename = encodeURIComponent(`${title}.txt`)
+  
+  return new Response(textContent, {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${doc.document_type}.txt"`
+      'Content-Disposition': `attachment; filename*=UTF-8''${filename}`
     }
   })
 })
