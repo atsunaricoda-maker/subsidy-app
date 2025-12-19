@@ -2517,7 +2517,6 @@ routes.get('/client/:id', async (c) => {
                 
                 const btn = document.getElementById('generateDocBtn');
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>生成中... (数十秒かかります)';
                 
                 // 生成オプションを収集
                 const options = {
@@ -2526,19 +2525,64 @@ routes.get('/client/:id', async (c) => {
                     future_vision: document.getElementById('optFutureVision').checked
                 };
                 
+                // 進捗更新関数
+                function updateBtnProgress(current, total, sectionTitle) {
+                    btn.innerHTML = \`<i class="fas fa-spinner fa-spin mr-1"></i>生成中... (\${current}/\${total}) \${sectionTitle}\`;
+                }
+                
                 try {
-                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/generate-document\`, {
+                    // Step 1: 文書の準備（文書レコード作成）
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>準備中...';
+                    
+                    const prepareResponse = await axios.post(\`/api/clients/\${CLIENT_ID}/generate-document\`, {
                         template_id: parseInt(templateId),
                         case_id: parseInt(caseId),
                         options: options
                     });
                     
+                    const docId = prepareResponse.data.id;
+                    const sections = prepareResponse.data.sections;
+                    const totalSections = sections.length;
+                    
+                    // Step 2: 各セクションを順次生成
+                    let successCount = 0;
+                    let errorCount = 0;
+                    
+                    for (let i = 0; i < sections.length; i++) {
+                        const section = sections[i];
+                        updateBtnProgress(i + 1, totalSections, section.title);
+                        
+                        try {
+                            await axios.post(\`/api/generated-documents/\${docId}/generate-section\`, {
+                                section_id: section.id
+                            });
+                            successCount++;
+                        } catch (sectionError) {
+                            console.error('Section generation error:', section.id, sectionError);
+                            errorCount++;
+                            // エラーでも次に進む
+                        }
+                        
+                        // レート制限回避のため待機
+                        if (i < sections.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+                    }
+                    
+                    // Step 3: 生成完了を通知
+                    await axios.post(\`/api/generated-documents/\${docId}/complete-generation\`);
+                    
                     closeGenerateDocumentModal();
-                    showToast('文書が生成されました！');
+                    
+                    if (errorCount > 0) {
+                        showToast(\`文書生成完了（\${successCount}成功、\${errorCount}エラー）\`, 'warning');
+                    } else {
+                        showToast('文書が生成されました！');
+                    }
                     loadGeneratedDocuments();
                     
                     // 生成した文書を表示
-                    viewDocument(response.data.id);
+                    viewDocument(docId);
                 } catch (error) {
                     alert('文書生成に失敗しました: ' + (error.response?.data?.error || error.message));
                 } finally {

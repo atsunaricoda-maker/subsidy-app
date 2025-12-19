@@ -66,10 +66,89 @@ routes.get('/generated-documents/:id', async (c) => {
   return c.json(doc)
 })
 
-// AI文書生成
+// AI文書生成（レガシー - 一括生成、タイムアウトの可能性あり）
+// 新しいフロントエンドは prepare-document + generate-section を使用
 routes.post('/clients/:clientId/generate-document', async (c) => {
   const { DB, CLAUDE_API_KEY } = c.env
   const env = c.env
+  const clientId = c.req.param('clientId')
+  const data = await c.req.json()
+  
+  // 新しい段階的生成APIにリダイレクト
+  // フロントエンドが対応するまでの間、セクション単位で順次生成を試みる
+  
+  // 顧客情報取得
+  const client = await DB.prepare(`
+    SELECT c.*, st.name as subsidy_name
+    FROM clients c
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    WHERE c.id = ?
+  `).bind(clientId).first()
+  
+  if (!client) {
+    return c.json({ error: '顧客が見つかりません' }, 404)
+  }
+  
+  // テンプレート取得
+  const templateId = data.templateId || data.template_id
+  const template = await DB.prepare(`
+    SELECT * FROM document_templates WHERE id = ?
+  `).bind(templateId).first()
+  
+  if (!template) {
+    return c.json({ error: 'テンプレートが見つかりません' }, 404)
+  }
+  
+  const caseId = data.caseId || data.case_id
+  const sections = JSON.parse(template.sections)
+  
+  // 空のセクション内容で文書を作成
+  const subsidyName = (client as any).subsidy_name || '補助金'
+  const companyName = (client as any).company_name || (client as any).name || '未設定'
+  const documentTitle = `${subsidyName} 事業計画書 - ${companyName}`
+  
+  const emptySections: Record<string, string> = {}
+  sections.forEach((s: any) => {
+    emptySections[s.id] = '生成中...'
+  })
+  
+  const usedModel = await getAIModelName(DB, 'ai_model_claude')
+  
+  // 文書を先に作成（生成中ステータス）
+  const result = await DB.prepare(`
+    INSERT INTO generated_documents 
+    (client_id, template_id, document_title, sections_content, ai_model_used, case_id, status)
+    VALUES (?, ?, ?, ?, ?, ?, 'generating')
+  `).bind(
+    clientId,
+    templateId,
+    documentTitle,
+    JSON.stringify(emptySections),
+    usedModel,
+    caseId || null
+  ).run()
+  
+  const docId = result.meta.last_row_id
+  
+  // セクション情報と文書IDを返す（フロントエンドがセクション単位で生成を呼び出す）
+  return c.json({ 
+    id: docId,
+    document_title: documentTitle,
+    sections: sections.map((s: any) => ({
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      max_chars: s.max_chars
+    })),
+    total_sections: sections.length,
+    message: 'セクション単位で生成を呼び出してください',
+    generate_endpoint: `/api/generated-documents/${docId}/generate-section`
+  })
+})
+
+// 文書生成の準備（文書レコード作成のみ、AI生成なし）
+routes.post('/clients/:clientId/prepare-document', async (c) => {
+  const { DB, R2, CLAUDE_API_KEY } = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
   
@@ -85,7 +164,7 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
     return c.json({ error: '顧客が見つかりません' }, 404)
   }
   
-  // テンプレート取得（templateId または template_id に対応）
+  // テンプレート取得
   const templateId = data.templateId || data.template_id
   const template = await DB.prepare(`
     SELECT * FROM document_templates WHERE id = ?
@@ -95,46 +174,10 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
     return c.json({ error: 'テンプレートが見つかりません' }, 404)
   }
   
-  // 公募要領情報取得
-  const guidelines = await DB.prepare(`
-    SELECT * FROM subsidy_guidelines 
-    WHERE subsidy_type_id = ? AND status = 'active'
-    ORDER BY created_at DESC LIMIT 1
-  `).bind(client.subsidy_type_id).first()
-  
-  // ヒアリング回答取得（案件IDが指定されている場合はその案件のみ）
+  const sections = JSON.parse(template.sections)
   const caseId = data.caseId || data.case_id
-  let answers
-  if (caseId) {
-    // 案件に紐づくヒアリング回答のみ取得
-    answers = await DB.prepare(`
-      SELECT hq.question_key, hq.question_text, hq.category, ha.answer_text
-      FROM hearing_answers ha
-      JOIN hearing_questions hq ON ha.question_id = hq.id
-      WHERE ha.case_id = ?
-      ORDER BY hq.display_order
-    `).bind(caseId).all()
-  } else {
-    // 後方互換性: case_idがない場合はclient_idで取得
-    answers = await DB.prepare(`
-      SELECT hq.question_key, hq.question_text, hq.category, ha.answer_text
-      FROM hearing_answers ha
-      JOIN hearing_questions hq ON ha.question_id = hq.id
-      WHERE ha.client_id = ?
-      ORDER BY hq.display_order
-    `).bind(clientId).all()
-  }
   
-  // 採択事例取得
-  const successCases = await DB.prepare(`
-    SELECT success_summary, key_factors 
-    FROM success_cases 
-    WHERE subsidy_type_id = ? AND is_public = 1
-    LIMIT 3
-  `).bind(client.subsidy_type_id).all()
-  
-  // 提出書類の取得とテキスト抽出
-  const { R2 } = c.env
+  // 重要書類のテキスト抽出（バックグラウンドで並列処理）
   const uploadedDocs = await DB.prepare(`
     SELECT id, document_type, file_name, file_path, status
     FROM documents 
@@ -142,19 +185,16 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
     ORDER BY uploaded_at DESC
   `).bind(clientId).all()
   
-  // 重要書類のテキスト抽出（並列処理で高速化）
   const documentExtractions: string[] = []
   const importantDocTypes = ['決算書', '登記簿謄本', '財務諸表', '会社概要', '事業計画', '見積書', '貸借対照表', '損益計算書']
   
   if (uploadedDocs.results && uploadedDocs.results.length > 0) {
     const extractionPromises = (uploadedDocs.results as any[])
       .filter((doc: any) => {
-        // 重要書類のみ抽出対象
         return importantDocTypes.some(t => doc.document_type?.includes(t)) || doc.file_name?.endsWith('.pdf')
       })
-      .slice(0, 5) // 最大5件まで
+      .slice(0, 5)
       .map(async (doc: any) => {
-        // DB設定からClaude APIキーとモデル名を取得
         let claudeKey = CLAUDE_API_KEY || ''
         let multimodalModel = 'claude-haiku-4-5-20251001'
         try {
@@ -188,14 +228,146 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
     })
   }
   
-  const sections = JSON.parse(template.sections)
-  const generatedSections: Record<string, string> = {}
+  // 空のセクション内容で文書を作成
+  const subsidyName = (client as any).subsidy_name || '補助金'
+  const companyName = (client as any).company_name || (client as any).name || '未設定'
+  const documentTitle = `${subsidyName} 事業計画書 - ${companyName}`
+  
+  const emptySections: Record<string, string> = {}
+  sections.forEach((s: any) => {
+    emptySections[s.id] = ''
+  })
+  
+  const usedModel = await getAIModelName(DB, 'ai_model_claude')
+  
+  const result = await DB.prepare(`
+    INSERT INTO generated_documents 
+    (client_id, template_id, document_title, sections_content, ai_model_used, case_id, status)
+    VALUES (?, ?, ?, ?, ?, ?, 'generating')
+  `).bind(
+    clientId,
+    templateId,
+    documentTitle,
+    JSON.stringify(emptySections),
+    usedModel,
+    caseId || null
+  ).run()
+  
+  const docId = result.meta.last_row_id
+  
+  // 抽出したドキュメント情報をセッションとして保存（後のセクション生成で使用）
+  if (documentExtractions.length > 0) {
+    await DB.prepare(`
+      UPDATE generated_documents 
+      SET metadata = ?
+      WHERE id = ?
+    `).bind(JSON.stringify({ documentExtractions }), docId).run()
+  }
+  
+  // セクション情報を返す
+  return c.json({
+    id: docId,
+    document_title: documentTitle,
+    sections: sections.map((s: any) => ({
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      max_chars: s.max_chars
+    })),
+    total_sections: sections.length
+  })
+})
+
+// 単一セクションのAI生成
+routes.post('/generated-documents/:id/generate-section', async (c) => {
+  const { DB, CLAUDE_API_KEY } = c.env
+  const env = c.env
+  const docId = c.req.param('id')
+  const data = await c.req.json()
+  const sectionId = data.section_id
+  
+  if (!sectionId) {
+    return c.json({ error: 'section_id is required' }, 400)
+  }
+  
+  // 文書とテンプレート取得
+  const doc = await DB.prepare(`
+    SELECT gd.*, dt.sections as template_sections, dt.ai_prompt_base
+    FROM generated_documents gd
+    JOIN document_templates dt ON gd.template_id = dt.id
+    WHERE gd.id = ?
+  `).bind(docId).first()
+  
+  if (!doc) {
+    return c.json({ error: '文書が見つかりません' }, 404)
+  }
+  
+  const sections = JSON.parse(doc.template_sections)
+  const section = sections.find((s: any) => s.id === sectionId)
+  
+  if (!section) {
+    return c.json({ error: 'セクションが見つかりません' }, 404)
+  }
+  
+  // 顧客情報取得
+  const client = await DB.prepare(`
+    SELECT c.*, st.name as subsidy_name
+    FROM clients c
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    WHERE c.id = ?
+  `).bind(doc.client_id).first()
+  
+  // 公募要領情報取得
+  const guidelines = await DB.prepare(`
+    SELECT * FROM subsidy_guidelines 
+    WHERE subsidy_type_id = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(client?.subsidy_type_id).first()
+  
+  // ヒアリング回答取得
+  let answers
+  if (doc.case_id) {
+    answers = await DB.prepare(`
+      SELECT hq.question_key, hq.question_text, hq.category, ha.answer_text
+      FROM hearing_answers ha
+      JOIN hearing_questions hq ON ha.question_id = hq.id
+      WHERE ha.case_id = ?
+      ORDER BY hq.display_order
+    `).bind(doc.case_id).all()
+  } else {
+    answers = await DB.prepare(`
+      SELECT hq.question_key, hq.question_text, hq.category, ha.answer_text
+      FROM hearing_answers ha
+      JOIN hearing_questions hq ON ha.question_id = hq.id
+      WHERE ha.client_id = ?
+      ORDER BY hq.display_order
+    `).bind(doc.client_id).all()
+  }
+  
+  // 採択事例取得
+  const successCases = await DB.prepare(`
+    SELECT success_summary, key_factors 
+    FROM success_cases 
+    WHERE subsidy_type_id = ? AND is_public = 1
+    LIMIT 3
+  `).bind(client?.subsidy_type_id).all()
+  
+  // 抽出したドキュメント情報を取得
+  let documentExtractions: string[] = []
+  if (doc.metadata) {
+    try {
+      const metadata = JSON.parse(doc.metadata as string)
+      documentExtractions = metadata.documentExtractions || []
+    } catch (e) {
+      console.error('Failed to parse metadata:', e)
+    }
+  }
   
   // 補助金情報を整形
   const g = guidelines as any
   const guidelinesInfo = guidelines ? `
 【補助金制度情報】
-- 補助金名: ${client.subsidy_name}
+- 補助金名: ${client?.subsidy_name}
 - 年度・公募回: ${g?.fiscal_year || ''}年度 ${g?.version || ''}
 - 補助率: ${g?.subsidy_rate || '未設定'}
 - 補助上限額: ${g?.max_amount ? `${(g.max_amount / 10000).toLocaleString()}万円` : '未設定'}
@@ -204,21 +376,12 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
 - 対象者要件: ${g?.eligibility_requirements || '未設定'}
 - 申請期限: ${g?.application_end_date || '未設定'}` : `
 【補助金制度情報】
-- 補助金名: ${client.subsidy_name}
+- 補助金名: ${client?.subsidy_name}
 - その他詳細情報: 未登録`
   
-  // 各セクションをAIで生成（レート制限回避のため間隔を空ける）
-  let sectionIndex = 0
-  for (const section of sections) {
-    // 2番目以降のセクションは3秒待機（レート制限回避）
-    if (sectionIndex > 0) {
-      await new Promise(resolve => setTimeout(resolve, 3000))
-    }
-    sectionIndex++
-    
-    // セクション別の専用プロンプトを定義
-    const sectionSpecificPrompts: Record<string, string> = {
-      'company_overview': `【このセクションの目的】
+  // セクション別の専用プロンプト
+  const sectionSpecificPrompts: Record<string, string> = {
+    'company_overview': `【このセクションの目的】
 企業の信頼性と事業基盤の強さを審査員にアピールする。
 
 【必須記載事項】
@@ -234,7 +397,7 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
 【文体】
 客観的な事実を淡々と記載。自社の強みを控えめながらも確実に伝える。`,
 
-      'current_situation': `【このセクションの目的】
+    'current_situation': `【このセクションの目的】
 現状の業務課題を明確にし、IT導入の必要性・緊急性を訴える。
 
 【必須記載事項】
@@ -250,7 +413,7 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
 【文体】
 課題の深刻さを具体的な数値で示し、解決の緊急性を伝える。`,
 
-      'implementation_plan': `【このセクションの目的】
+    'implementation_plan': `【このセクションの目的】
 導入するITツールと実施計画の具体性・実現可能性を示す。
 
 【必須記載事項】
@@ -267,7 +430,7 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
 【文体】
 計画の具体性と実現可能性を示す。スケジュールは明確に。`,
 
-      'expected_results': `【このセクションの目的】
+    'expected_results': `【このセクションの目的】
 IT導入による具体的な効果を定量的に示し、投資対効果を明確にする。
 
 【必須記載事項】
@@ -283,7 +446,7 @@ IT導入による具体的な効果を定量的に示し、投資対効果を明
 【文体】
 効果は必ず数値で示す。「〜が期待される」ではなく「〜を達成する」と断定的に。`,
 
-      'future_plan': `【このセクションの目的】
+    'future_plan': `【このセクションの目的】
 IT導入を起点とした中長期的な成長ビジョンを示し、事業の発展性をアピール。
 
 【必須記載事項】
@@ -298,17 +461,16 @@ IT導入を起点とした中長期的な成長ビジョンを示し、事業の
 
 【文体】
 将来への意欲と具体的なビジョンを示す。成長への確信を伝える。`
-    }
-
-    // セクション固有のプロンプトを取得（なければデフォルト）
-    const sectionSpecific = sectionSpecificPrompts[section.id] || `【このセクションの目的】
+  }
+  
+  const sectionSpecific = sectionSpecificPrompts[sectionId] || `【このセクションの目的】
 ${section.description}
 
 【記載のポイント】
 ・他のセクションと内容が重複しないよう注意
 ・具体的な数値やデータを含める`
-
-    const sectionPrompt = `${template.ai_prompt_base}
+  
+  const prompt = `${doc.ai_prompt_base}
 
 ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 【最重要ルール】ヒアリング回答に記載された情報のみを使用すること
@@ -318,8 +480,8 @@ ${section.description}
 ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
 【顧客情報】
-- 会社名: ${client.company_name || '未設定'}
-- 申請補助金: ${client.subsidy_name}
+- 会社名: ${client?.company_name || '未設定'}
+- 申請補助金: ${client?.subsidy_name}
 ${guidelinesInfo}
 
 【ヒアリング回答】※この内容のみを情報源として使用すること
@@ -352,66 +514,82 @@ ${sectionSpecific}
 ・連続する空行禁止
 ・冗長な前置きを省き本題から開始
 ・断定的な文体で記載`
-
-    try {
-      let content = await callAI(sectionPrompt, env, 2, section.max_chars)
-      
-      // マークダウン記法を除去
-      if (content) {
-        content = content
-          .replace(/\*\*([^*]+)\*\*/g, '$1')  // **太字** → 太字
-          .replace(/\*([^*]+)\*/g, '$1')      // *斜体* → 斜体
-          .replace(/^#+\s*/gm, '')            // # 見出し → 見出し
-          .replace(/^[-*]\s+/gm, '・')        // - や * の箇条書き → ・
-          .replace(/^\d+\.\s+/gm, '')         // 1. 番号付き → 削除
-          .trim()
-      }
-      
-      // 文字数チェック：超過している場合は警告を追加
-      if (content && content.length > section.max_chars) {
-        const overCount = content.length - section.max_chars
-        content = `【文字数超過】現在${content.length}文字（上限${section.max_chars}文字を${overCount}文字超過）\n編集して${section.max_chars}文字以内に収めてください。\n\n---\n\n${content}`
-      }
-      
-      generatedSections[section.id] = content || `【生成エラー】セクション「${section.title}」の生成結果が空でした。再生成をお試しください。`
-    } catch (error: any) {
-      console.error(`Section ${section.id} generation error:`, error)
-      const errorMessage = error?.message || '不明なエラー'
-      const isRateLimited = errorMessage.includes('429')
-      
-      if (isRateLimited) {
-        generatedSections[section.id] = `【API制限】このセクションは一時的に生成できませんでした。\n\n「再生成」ボタンをクリックするか、数分後に再度お試しください。\n\n以下に手動で内容を入力することもできます：\n\n《${section.title}》\n・${section.description}\n・推奨文字数: ${section.max_chars}文字以内`
-      } else {
-        generatedSections[section.id] = `【生成エラー】セクション「${section.title}」の生成に失敗しました。\n\n原因: ${errorMessage}\n\nヒアリング回答を追加してから再度お試しいただくか、手動で内容を入力してください。`
-      }
+  
+  try {
+    let content = await callAI(prompt, env, 2, section.max_chars)
+    
+    // マークダウン記法を除去
+    if (content) {
+      content = content
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/^#+\s*/gm, '')
+        .replace(/^[-*]\s+/gm, '・')
+        .replace(/^\d+\.\s+/gm, '')
+        .trim()
     }
+    
+    // 文字数チェック
+    if (content && content.length > section.max_chars) {
+      const overCount = content.length - section.max_chars
+      content = `【文字数超過】現在${content.length}文字（上限${section.max_chars}文字を${overCount}文字超過）\n編集して${section.max_chars}文字以内に収めてください。\n\n---\n\n${content}`
+    }
+    
+    // セクション内容を更新
+    const sectionsContent = JSON.parse(doc.sections_content || '{}')
+    sectionsContent[sectionId] = content || `【生成エラー】セクション「${section.title}」の生成結果が空でした。再生成をお試しください。`
+    
+    await DB.prepare(`
+      UPDATE generated_documents 
+      SET sections_content = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(JSON.stringify(sectionsContent), docId).run()
+    
+    return c.json({ 
+      section_id: sectionId,
+      content: sectionsContent[sectionId],
+      success: true
+    })
+  } catch (error: any) {
+    console.error(`Section ${sectionId} generation error:`, error)
+    const errorMessage = error?.message || '不明なエラー'
+    const isRateLimited = errorMessage.includes('429')
+    
+    // エラーでもセクションを更新
+    const sectionsContent = JSON.parse(doc.sections_content || '{}')
+    if (isRateLimited) {
+      sectionsContent[sectionId] = `【API制限】このセクションは一時的に生成できませんでした。\n\n「再生成」ボタンをクリックするか、数分後に再度お試しください。`
+    } else {
+      sectionsContent[sectionId] = `【生成エラー】セクション「${section.title}」の生成に失敗しました。\n\n原因: ${errorMessage}\n\n再生成をお試しください。`
+    }
+    
+    await DB.prepare(`
+      UPDATE generated_documents 
+      SET sections_content = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(JSON.stringify(sectionsContent), docId).run()
+    
+    return c.json({ 
+      section_id: sectionId,
+      content: sectionsContent[sectionId],
+      success: false,
+      error: errorMessage
+    })
   }
+})
+
+// 文書生成完了（ステータス更新）
+routes.post('/generated-documents/:id/complete-generation', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('id')
   
-  // 生成文書を保存
-  const subsidyName = (client as any).subsidy_name || '補助金'
-  const companyName = (client as any).company_name || (client as any).name || '未設定'
-  const documentTitle = `${subsidyName} 事業計画書 - ${companyName}`
+  await DB.prepare(`
+    UPDATE generated_documents 
+    SET status = 'draft', updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(docId).run()
   
-  // 使用モデル名を取得（設定から）
-  const usedModel = await getAIModelName(DB, 'ai_model_claude')
-  
-  const result = await DB.prepare(`
-    INSERT INTO generated_documents 
-    (client_id, template_id, document_title, sections_content, ai_model_used, case_id)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(
-    clientId,
-    data.template_id,
-    documentTitle,
-    JSON.stringify(generatedSections),
-    usedModel,
-    caseId || null
-  ).run()
-  
-  return c.json({ 
-    id: result.meta.last_row_id,
-    sections: generatedSections
-  })
+  return c.json({ success: true })
 })
 
 // 文書セクション更新
