@@ -251,6 +251,27 @@ routes.get('/admin/pipelines', (c) => {
                             <label class="block text-xs font-medium mb-1">説明</label>
                             <input type="text" name="tasks[\${taskCounter}][description]" value="\${task?.description || ''}" class="w-full px-3 py-2 border rounded-lg text-sm">
                         </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium mb-1">
+                                <i class="fas fa-paperclip mr-1"></i>添付ファイル（申請書の書き方など）
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="file" id="taskFile\${taskCounter}" onchange="handleTaskFileUpload(\${taskCounter})" class="hidden">
+                                <input type="text" name="tasks[\${taskCounter}][attachment_name]" value="\${task?.attachment_name || ''}" placeholder="ファイル名" class="flex-1 px-3 py-2 border rounded-lg text-sm bg-gray-50" readonly>
+                                <input type="hidden" name="tasks[\${taskCounter}][attachment_url]" value="\${task?.attachment_url || ''}">
+                                <button type="button" onclick="document.getElementById('taskFile\${taskCounter}').click()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border rounded-lg text-sm">
+                                    <i class="fas fa-upload"></i>
+                                </button>
+                                \${task?.attachment_url ? \`
+                                <a href="\${task.attachment_url}" target="_blank" class="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 border border-blue-300 rounded-lg text-sm">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                                <button type="button" onclick="clearTaskAttachment(\${taskCounter})" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-600 border border-red-300 rounded-lg text-sm">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                \` : ''}
+                            </div>
+                        </div>
                     </div>
                 \`;
                 
@@ -770,6 +791,42 @@ routes.get('/admin/pipelines', (c) => {
                 originalCloseNewTemplateModal();
             };
             
+            // タスク添付ファイルのアップロード処理
+            async function handleTaskFileUpload(taskId) {
+                const fileInput = document.getElementById('taskFile' + taskId);
+                const file = fileInput.files[0];
+                if (!file) return;
+                
+                try {
+                    showToast('アップロード中...');
+                    
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('upload_type', 'pipeline_attachment');
+                    
+                    const response = await axios.post('/api/documents/upload-file', formData);
+                    
+                    if (response.data.url) {
+                        // フォームのhidden inputを更新
+                        const row = document.getElementById('task-row-' + taskId);
+                        row.querySelector('input[name$="[attachment_url]"]').value = response.data.url;
+                        row.querySelector('input[name$="[attachment_name]"]').value = file.name;
+                        
+                        showToast('ファイルをアップロードしました');
+                    }
+                } catch (error) {
+                    console.error('File upload error:', error);
+                    showToast('アップロードに失敗しました', 'error');
+                }
+            }
+            
+            function clearTaskAttachment(taskId) {
+                const row = document.getElementById('task-row-' + taskId);
+                row.querySelector('input[name$="[attachment_url]"]').value = '';
+                row.querySelector('input[name$="[attachment_name]"]').value = '';
+                showToast('添付ファイルを削除しました');
+            }
+            
             // グローバルスコープに関数を公開（onclick対応）
             window.toggleSidebar = toggleSidebar;
             window.openNewTemplateModal = openNewTemplateModal;
@@ -780,6 +837,8 @@ routes.get('/admin/pipelines', (c) => {
             window.showTemplateDetail = showTemplateDetail;
             window.editTemplate = editTemplate;
             window.deleteTemplate = deleteTemplate;
+            window.handleTaskFileUpload = handleTaskFileUpload;
+            window.clearTaskAttachment = clearTaskAttachment;
             
             // 初期読み込み
             loadTemplates();

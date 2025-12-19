@@ -101,6 +101,77 @@ routes.post('/clients/:id/documents/upload', async (c) => {
   }
 })
 
+// 汎用ファイルアップロード（パイプラインタスク添付など）
+routes.post('/documents/upload-file', async (c) => {
+  const { R2 } = c.env
+  
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    const uploadType = formData.get('upload_type') as string || 'general'
+    
+    if (!file) {
+      return c.json({ error: 'No file provided' }, 400)
+    }
+    
+    // ファイルサイズ制限（10MB）
+    if (file.size > 10 * 1024 * 1024) {
+      return c.json({ error: 'File size exceeds 10MB limit' }, 400)
+    }
+    
+    const timestamp = Date.now()
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const filePath = `${uploadType}/${timestamp}_${safeName}`
+    
+    // R2にファイル保存
+    await R2.put(filePath, file.stream(), {
+      httpMetadata: {
+        contentType: file.type
+      }
+    })
+    
+    // ダウンロード用URLを返す
+    const downloadUrl = `/api/documents/download-file/${encodeURIComponent(filePath)}`
+    
+    return c.json({
+      success: true,
+      url: downloadUrl,
+      file_name: file.name,
+      file_path: filePath,
+      file_size: file.size
+    })
+  } catch (error) {
+    console.error('Generic upload error:', error)
+    return c.json({ error: 'Upload failed' }, 500)
+  }
+})
+
+// 汎用ファイルダウンロード
+routes.get('/documents/download-file/:path{.+}', async (c) => {
+  const { R2 } = c.env
+  const filePath = decodeURIComponent(c.req.param('path'))
+  
+  try {
+    const object = await R2.get(filePath)
+    
+    if (!object) {
+      return c.json({ error: 'File not found' }, 404)
+    }
+    
+    const fileName = filePath.split('/').pop() || 'download'
+    
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': object.httpMetadata?.contentType || 'application/octet-stream',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`
+      }
+    })
+  } catch (error) {
+    console.error('Download error:', error)
+    return c.json({ error: 'Download failed' }, 500)
+  }
+})
+
 // ファイルダウンロード
 routes.get('/documents/:id/download', async (c) => {
   const { DB, R2 } = c.env

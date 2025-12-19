@@ -113,8 +113,9 @@ routes.post('/pipeline-templates', async (c) => {
         await DB.prepare(`
           INSERT INTO pipeline_template_tasks 
           (template_id, task_name, task_type, description, sort_order, 
-           days_offset_start, days_offset_end, is_required, default_assignee_role)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           days_offset_start, days_offset_end, is_required, default_assignee_role,
+           attachment_url, attachment_name)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           templateId,
           task.task_name,
@@ -124,7 +125,9 @@ routes.post('/pipeline-templates', async (c) => {
           parseInt(task.days_offset_start) || 0,
           parseInt(task.days_offset_end) || 7,
           task.is_required !== false ? 1 : 0,
-          task.default_assignee_role || null
+          task.default_assignee_role || null,
+          task.attachment_url || null,
+          task.attachment_name || null
         ).run()
       }
     }
@@ -187,8 +190,9 @@ routes.put('/pipeline-templates/:id', async (c) => {
         await DB.prepare(`
           INSERT INTO pipeline_template_tasks 
           (template_id, task_name, task_type, description, sort_order, 
-           days_offset_start, days_offset_end, is_required, default_assignee_role)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           days_offset_start, days_offset_end, is_required, default_assignee_role,
+           attachment_url, attachment_name)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           templateId,
           task.task_name,
@@ -198,7 +202,9 @@ routes.put('/pipeline-templates/:id', async (c) => {
           parseInt(task.days_offset_start) || 0,
           parseInt(task.days_offset_end) || 7,
           task.is_required !== false ? 1 : 0,
-          task.default_assignee_role || null
+          task.default_assignee_role || null,
+          task.attachment_url || null,
+          task.attachment_name || null
         ).run()
       }
     }

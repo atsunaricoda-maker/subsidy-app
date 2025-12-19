@@ -286,14 +286,13 @@ routes.get('/clients/:id/quick-view', async (c) => {
     }
     
     if (tab === 'documents') {
-      // 書類一覧（casesテーブル経由で取得）
+      // 書類一覧（client_idで直接取得、またはcasesテーブル経由）
       const docsResult = await DB.prepare(`
         SELECT 
-          d.id, d.document_type, d.file_name, d.status, d.created_at
+          d.id, d.document_type, d.file_name, d.status, d.uploaded_at as created_at
         FROM documents d
-        JOIN cases c ON d.case_id = c.id
-        WHERE c.client_id = ?
-        ORDER BY d.created_at DESC
+        WHERE d.client_id = ?
+        ORDER BY d.uploaded_at DESC
         LIMIT 20
       `).bind(id).all()
       
