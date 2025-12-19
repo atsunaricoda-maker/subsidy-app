@@ -125,37 +125,41 @@ routes.get('/cases/:id/quick-view', async (c) => {
   // タブごとに追加データを取得
   if (tab === 'documents') {
     const docs = await DB.prepare(`
-      SELECT * FROM documents WHERE case_id = ? ORDER BY created_at DESC
+      SELECT id, client_id, case_id, document_type, file_name, file_path, file_size, uploaded_by, status, uploaded_at as created_at
+      FROM documents WHERE case_id = ? ORDER BY uploaded_at DESC
     `).bind(id).all()
     result.documents = docs.results || []
   }
   
   if (tab === 'timeline') {
-    // コミュニケーション履歴を取得
+    // 案件のclient_idを使ってコミュニケーション履歴を取得
+    const clientId = (caseData as any).client_id
+    
+    // コミュニケーション履歴を取得（client_id経由）
     const communications = await DB.prepare(`
       SELECT 
         'communication' as type,
         message as action,
-        sender as user,
+        sender_name as user,
         created_at,
         'fa-comment' as icon
       FROM communications 
-      WHERE case_id = ? 
+      WHERE client_id = ? 
       ORDER BY created_at DESC 
       LIMIT 20
-    `).bind(id).all()
+    `).bind(clientId).all()
     
-    // 書類アップロード履歴
+    // 書類アップロード履歴（case_id経由）
     const uploads = await DB.prepare(`
       SELECT 
         'upload' as type,
         '書類アップロード: ' || file_name as action,
         uploaded_by as user,
-        created_at,
+        uploaded_at as created_at,
         'fa-upload' as icon
       FROM documents 
       WHERE case_id = ? 
-      ORDER BY created_at DESC 
+      ORDER BY uploaded_at DESC 
       LIMIT 20
     `).bind(id).all()
     
