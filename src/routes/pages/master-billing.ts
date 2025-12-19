@@ -118,7 +118,7 @@ routes.get('/master/billing', (c) => {
 })
 
 // 売上API
-routes.get('/master/billing', async (c) => {
+routes.get('/api/master/billing', async (c) => {
   const { DB } = c.env
   
   // 月次売上

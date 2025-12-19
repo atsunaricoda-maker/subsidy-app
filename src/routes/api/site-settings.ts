@@ -1416,6 +1416,24 @@ routes.get('/master/organizations/list', async (c) => {
   return c.json(result?.results || [])
 })
 
+// 法人一覧API（/api/master/organizations として使用 - master-logs.tsから呼び出し）
+routes.get('/api/master/organizations', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT id, name, email, status, created_at
+      FROM organizations
+      ORDER BY name
+    `).all()
+    
+    return c.json({ organizations: result?.results || [] })
+  } catch (error) {
+    console.error('Error fetching organizations:', error)
+    return c.json({ organizations: [] })
+  }
+})
+
 // 新規法人登録ページ
 routes.get('/master/organizations/new', async (c) => {
   return c.html(`

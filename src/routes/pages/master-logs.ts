@@ -119,7 +119,7 @@ routes.get('/master/logs', (c) => {
 })
 
 // 操作ログAPI
-routes.get('/master/logs', async (c) => {
+routes.get('/api/master/logs', async (c) => {
   const { DB } = c.env
   const type = c.req.query('type')
   const orgId = c.req.query('org_id')
