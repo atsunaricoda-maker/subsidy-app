@@ -466,11 +466,11 @@ routes.get('/portal/:token', async (c) => {
             </div>
 
             <!-- AIアシスタント フローティングボタン -->
-            <div class="fixed bottom-4 right-4 z-40">
+            <div id="aiFloatingBtn" class="fixed bottom-20 right-4 z-40">
                 <button onclick="openAiModal()" 
-                        class="bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 flex items-center gap-2">
-                    <i class="fas fa-robot text-xl"></i>
-                    <span class="hidden sm:inline text-sm font-medium">AIに相談</span>
+                        class="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-700 flex items-center gap-2">
+                    <i class="fas fa-robot text-lg"></i>
+                    <span class="hidden sm:inline text-xs font-medium">AIに相談</span>
                 </button>
             </div>
 
@@ -704,6 +704,12 @@ routes.get('/portal/:token', async (c) => {
                 
                 if (activeBtn) activeBtn.classList.add('active');
                 if (activePanel) activePanel.classList.add('active');
+                
+                // やり取りタブの時はAIボタンを非表示にする
+                const aiBtn = document.getElementById('aiFloatingBtn');
+                if (aiBtn) {
+                    aiBtn.style.display = (tabId === 'messages') ? 'none' : 'block';
+                }
             }
             
             // 案件セレクターを更新
