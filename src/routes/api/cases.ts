@@ -10,7 +10,8 @@ routes.get('/cases', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   const clientId = c.req.query('client_id')
-  const showArchived = c.req.query('show_archived') === 'true'
+  const showArchived = c.req.query('archived') === 'true'
+  const statusFilter = c.req.query('status') // 'inquiry', 'preparing', 'applying', 'adopted', 'rejected'
   const resultFilter = c.req.query('result') // 'approved', 'rejected', 'pending'
   
   // organization_idでテナント分離
@@ -32,9 +33,16 @@ routes.get('/cases', async (c) => {
     WHERE cases.organization_id = ?
   `
   
-  // アーカイブフィルタ（デフォルトはアーカイブを非表示）
-  if (!showArchived) {
+  // アーカイブフィルタ
+  if (showArchived) {
+    query += ` AND cases.is_archived = 1`
+  } else {
     query += ` AND (cases.is_archived = 0 OR cases.is_archived IS NULL)`
+  }
+  
+  // ステータスフィルタ
+  if (statusFilter) {
+    query += ` AND cases.status = '${statusFilter}'`
   }
   
   // 結果フィルタ

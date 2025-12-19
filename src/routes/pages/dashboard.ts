@@ -143,7 +143,7 @@ routes.get('/', (c) => {
                     
                     <!-- ステータスカード -->
                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4 mb-6" id="statusCards">
-                        <a href="/cases?status=inquiry" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-yellow-400 hover:shadow-md transition cursor-pointer block">
+                        <button onclick="openStatusModal('inquiry', '見込み')" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-yellow-400 hover:shadow-md transition cursor-pointer block w-full text-left">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs mb-1">見込み</div>
@@ -151,8 +151,8 @@ routes.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-search text-yellow-200 text-xl lg:text-2xl"></i>
                             </div>
-                        </a>
-                        <a href="/cases?status=preparing" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition cursor-pointer block">
+                        </button>
+                        <button onclick="openStatusModal('preparing', '書類準備中')" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-orange-400 hover:shadow-md transition cursor-pointer block w-full text-left">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs mb-1">書類準備</div>
@@ -160,8 +160,8 @@ routes.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-folder-open text-orange-200 text-xl lg:text-2xl"></i>
                             </div>
-                        </a>
-                        <a href="/cases?status=applying" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-purple-400 hover:shadow-md transition cursor-pointer block">
+                        </button>
+                        <button onclick="openStatusModal('applying', '申請中')" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-purple-400 hover:shadow-md transition cursor-pointer block w-full text-left">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs mb-1">申請中</div>
@@ -169,8 +169,8 @@ routes.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-paper-plane text-purple-200 text-xl lg:text-2xl"></i>
                             </div>
-                        </a>
-                        <a href="/cases?status=adopted" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-blue-400 hover:shadow-md transition cursor-pointer block">
+                        </button>
+                        <button onclick="openStatusModal('adopted', '採択・入金待')" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-blue-400 hover:shadow-md transition cursor-pointer block w-full text-left">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs mb-1">採択・入金待</div>
@@ -178,8 +178,8 @@ routes.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-trophy text-blue-200 text-xl lg:text-2xl"></i>
                             </div>
-                        </a>
-                        <a href="/cases?status=rejected" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-red-400 hover:shadow-md transition cursor-pointer block">
+                        </button>
+                        <button onclick="openStatusModal('rejected', '不採択')" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-red-400 hover:shadow-md transition cursor-pointer block w-full text-left">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs mb-1">不採択</div>
@@ -187,8 +187,8 @@ routes.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-times-circle text-red-200 text-xl lg:text-2xl"></i>
                             </div>
-                        </a>
-                        <a href="/cases?archived=true" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer block">
+                        </button>
+                        <button onclick="openStatusModal('archived', '完了済み')" class="bg-white p-3 lg:p-4 rounded-xl shadow-sm border-l-4 border-green-400 hover:shadow-md transition cursor-pointer block w-full text-left">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-gray-500 text-xs mb-1">完了済み</div>
@@ -196,7 +196,7 @@ routes.get('/', (c) => {
                                 </div>
                                 <i class="fas fa-check-circle text-green-200 text-xl lg:text-2xl"></i>
                             </div>
-                        </a>
+                        </button>
                     </div>
 
                     <!-- 検索・新規登録 -->
@@ -600,10 +600,135 @@ routes.get('/', (c) => {
                 </form>
             </div>
         </div>
+        
+        <!-- ステータス別案件モーダル -->
+        <div id="statusCasesModal" class="modal-overlay">
+            <div class="modal-container modal-lg">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="fas fa-folder-open" id="statusModalIcon"></i>
+                        <span id="statusModalTitle">案件一覧</span>
+                    </h3>
+                    <button class="modal-close" onclick="modalManager.close('statusCasesModal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body" id="statusModalContent">
+                    <div class="modal-loading">
+                        <div class="modal-spinner"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="modalManager.close('statusCasesModal')" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                        閉じる
+                    </button>
+                    <a id="statusModalLink" href="/cases" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-external-link-alt mr-1"></i>案件一覧へ
+                    </a>
+                </div>
+            </div>
+        </div>
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             ${modalScripts}
+            
+            // ステータス別案件モーダルを開く
+            async function openStatusModal(status, label) {
+                const iconMap = {
+                    inquiry: 'fa-search text-yellow-500',
+                    preparing: 'fa-folder-open text-orange-500',
+                    applying: 'fa-paper-plane text-purple-500',
+                    adopted: 'fa-trophy text-blue-500',
+                    rejected: 'fa-times-circle text-red-500',
+                    archived: 'fa-check-circle text-green-500'
+                };
+                
+                document.getElementById('statusModalIcon').className = 'fas ' + (iconMap[status] || 'fa-folder');
+                document.getElementById('statusModalTitle').textContent = label + 'の案件';
+                document.getElementById('statusModalLink').href = status === 'archived' ? '/cases?archived=true' : '/cases?status=' + status;
+                document.getElementById('statusModalContent').innerHTML = '<div class="modal-loading"><div class="modal-spinner"></div></div>';
+                
+                modalManager.open('statusCasesModal');
+                
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    let url = '/api/cases?status=' + status;
+                    if (status === 'archived') {
+                        url = '/api/cases?archived=true';
+                    }
+                    
+                    const response = await axios.get(url, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    
+                    const cases = response.data || [];
+                    renderStatusModalContent(cases, status, label);
+                } catch (error) {
+                    console.error('Status modal error:', error);
+                    document.getElementById('statusModalContent').innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-circle mr-2"></i>データの読み込みに失敗しました</div>';
+                }
+            }
+            
+            // ステータスモーダルのコンテンツを描画
+            function renderStatusModalContent(cases, status, label) {
+                if (cases.length === 0) {
+                    document.getElementById('statusModalContent').innerHTML = \`
+                        <div class="text-center py-12 text-gray-500">
+                            <i class="fas fa-inbox text-4xl mb-4"></i>
+                            <p>\${label}の案件はありません</p>
+                        </div>
+                    \`;
+                    return;
+                }
+                
+                const statusColors = {
+                    inquiry: 'border-l-yellow-400',
+                    preparing: 'border-l-orange-400',
+                    applying: 'border-l-purple-400',
+                    adopted: 'border-l-blue-400',
+                    rejected: 'border-l-red-400',
+                    archived: 'border-l-green-400'
+                };
+                
+                const html = \`
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        \${cases.map(c => \`
+                            <div onclick="goToCaseDetail(\${c.id})" 
+                                 class="p-4 bg-white border-l-4 \${statusColors[status] || 'border-l-gray-400'} rounded-lg shadow-sm hover:shadow-md cursor-pointer transition">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="font-mono text-xs text-gray-500">\${c.case_number || '#' + c.id}</span>
+                                            \${c.result === 'approved' ? '<span class="px-2 py-0.5 rounded text-xs bg-blue-500 text-white">採択</span>' : ''}
+                                            \${c.result === 'rejected' ? '<span class="px-2 py-0.5 rounded text-xs bg-red-500 text-white">不採択</span>' : ''}
+                                        </div>
+                                        <div class="font-bold text-gray-900">\${c.client_name || '名称未設定'}</div>
+                                        \${c.company_name ? '<div class="text-sm text-gray-500">' + c.company_name + '</div>' : ''}
+                                        <div class="flex flex-wrap gap-2 mt-2">
+                                            \${c.subsidy_type_name ? '<span class="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800">' + c.subsidy_type_name + '</span>' : ''}
+                                            \${c.assigned_to_name ? '<span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600"><i class="fas fa-user mr-1"></i>' + c.assigned_to_name + '</span>' : ''}
+                                        </div>
+                                        \${c.approved_amount ? '<div class="mt-2 text-sm text-blue-600"><i class="fas fa-coins mr-1"></i>採択額: ¥' + Number(c.approved_amount).toLocaleString() + '</div>' : ''}
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-300"></i>
+                                </div>
+                            </div>
+                        \`).join('')}
+                    </div>
+                    <div class="mt-4 pt-4 border-t text-center text-sm text-gray-500">
+                        \${cases.length}件の案件
+                    </div>
+                \`;
+                
+                document.getElementById('statusModalContent').innerHTML = html;
+            }
+            
+            // 案件詳細ページへ移動
+            function goToCaseDetail(caseId) {
+                modalManager.close('statusCasesModal');
+                window.location.href = '/case/' + caseId;
+            }
             
             // サイドバートグル
             function toggleSidebar() {
