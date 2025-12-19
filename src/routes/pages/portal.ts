@@ -662,6 +662,52 @@ routes.get('/portal/:token', async (c) => {
                 </div>
             </div>
 
+            <!-- AI書類添削モーダル -->
+            <div id="aiEditDocModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+                <div class="bg-white w-full max-w-4xl rounded-lg max-h-[90vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-magic text-xl"></i>
+                            <div>
+                                <h3 class="font-bold">AI書類添削</h3>
+                                <p id="editDocTitle" class="text-sm text-white/80"></p>
+                            </div>
+                        </div>
+                        <button onclick="closeAiEditDocModal()" class="text-white hover:text-white/80">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                        <div id="editDocLoading" class="text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-3xl text-purple-600 mb-3"></i>
+                            <p class="text-gray-600">書類を読み込んでいます...</p>
+                        </div>
+                        
+                        <div id="editDocContent" class="hidden space-y-4">
+                            <!-- セクションごとの編集エリアが動的に生成される -->
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border-t bg-white rounded-b-lg">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-2 text-sm text-gray-500">
+                                <i class="fas fa-lightbulb text-yellow-500"></i>
+                                <span>セクションを選択して「AI添削」で改善提案を受けられます</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="closeAiEditDocModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+                                    キャンセル
+                                </button>
+                                <button onclick="saveEditedDocument()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                    <i class="fas fa-save mr-1"></i>保存
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- テンプレート選択モーダル -->
             <div id="templateModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                 <div class="bg-white w-full max-w-lg rounded-lg max-h-[70vh] flex flex-col">
@@ -4723,11 +4769,205 @@ routes.get('/portal/:token', async (c) => {
                 window.location.href = '/api/generated-documents/' + docId + '/download';
             }
             
-            // 書類を編集
-            function editDocument(docId) {
-                // TODO: 編集モーダルを実装
-                alert('編集機能は準備中です');
+            // 書類を編集（AI添削モーダルを開く）
+            let currentEditDocId = null;
+            let currentEditSections = {};
+            
+            async function editDocument(docId) {
+                currentEditDocId = docId;
+                const modal = document.getElementById('aiEditDocModal');
+                const loading = document.getElementById('editDocLoading');
+                const content = document.getElementById('editDocContent');
+                const titleEl = document.getElementById('editDocTitle');
+                
+                modal.classList.remove('hidden');
+                loading.classList.remove('hidden');
+                content.classList.add('hidden');
+                
+                try {
+                    // 書類データを取得
+                    const res = await axios.get('/api/generated-documents/' + docId);
+                    const doc = res.data.document;
+                    
+                    titleEl.textContent = doc.document_title || doc.document_type || '無題の書類';
+                    
+                    // セクションを解析
+                    let sections = {};
+                    if (doc.sections_content) {
+                        try {
+                            sections = typeof doc.sections_content === 'string' 
+                                ? JSON.parse(doc.sections_content) 
+                                : doc.sections_content;
+                        } catch (e) {
+                            sections = { content: doc.sections_content };
+                        }
+                    } else if (doc.content) {
+                        sections = { content: doc.content };
+                    }
+                    
+                    currentEditSections = sections;
+                    
+                    // セクションラベル
+                    const sectionLabels = {
+                        'company_overview': '会社概要・事業概要',
+                        'innovation': '革新的な取組内容',
+                        'equipment_plan': '設備投資計画',
+                        'future_outlook': '将来の展望・期待される効果',
+                        'schedule': '実施スケジュール',
+                        'content': '本文'
+                    };
+                    
+                    // 編集UIを生成
+                    let html = '';
+                    let sectionIndex = 0;
+                    for (const [key, value] of Object.entries(sections)) {
+                        sectionIndex++;
+                        const label = sectionLabels[key] || key;
+                        html += \`
+                            <div class="bg-white rounded-lg border shadow-sm" data-section-key="\${key}">
+                                <div class="flex items-center justify-between p-3 border-b bg-gray-50 rounded-t-lg">
+                                    <h4 class="font-bold text-gray-800">
+                                        <span class="text-purple-600 mr-2">\${sectionIndex}.</span>\${label}
+                                    </h4>
+                                    <button onclick="aiRefineSection('\${key}')" 
+                                            class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 flex items-center gap-1">
+                                        <i class="fas fa-magic"></i>
+                                        <span>AI添削</span>
+                                    </button>
+                                </div>
+                                <div class="p-3">
+                                    <textarea id="section_\${key}" 
+                                              class="w-full min-h-[150px] p-3 border rounded-lg text-sm leading-relaxed resize-y focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                              placeholder="内容を入力...">\${value || ''}</textarea>
+                                    <div id="aiSuggestion_\${key}" class="hidden mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <i class="fas fa-robot text-purple-600"></i>
+                                            <span class="font-medium text-purple-800">AI添削提案</span>
+                                        </div>
+                                        <div id="suggestionContent_\${key}" class="text-sm text-gray-700 whitespace-pre-wrap"></div>
+                                        <div class="flex gap-2 mt-3">
+                                            <button onclick="applySectionSuggestion('\${key}')" 
+                                                    class="px-3 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+                                                <i class="fas fa-check mr-1"></i>この提案を適用
+                                            </button>
+                                            <button onclick="hideSectionSuggestion('\${key}')" 
+                                                    class="px-3 py-1.5 border rounded text-sm hover:bg-gray-100">
+                                                閉じる
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                    }
+                    
+                    if (Object.keys(sections).length === 0) {
+                        html = \`
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-file-alt text-4xl mb-3 text-gray-300"></i>
+                                <p>編集可能なセクションがありません</p>
+                            </div>
+                        \`;
+                    }
+                    
+                    content.innerHTML = html;
+                    loading.classList.add('hidden');
+                    content.classList.remove('hidden');
+                    
+                } catch (error) {
+                    console.error('Failed to load document:', error);
+                    loading.innerHTML = \`
+                        <div class="text-center text-red-500">
+                            <i class="fas fa-exclamation-circle text-3xl mb-3"></i>
+                            <p>書類の読み込みに失敗しました</p>
+                        </div>
+                    \`;
+                }
             }
+            
+            function closeAiEditDocModal() {
+                document.getElementById('aiEditDocModal').classList.add('hidden');
+                currentEditDocId = null;
+                currentEditSections = {};
+            }
+            
+            // AI添削を実行
+            async function aiRefineSection(sectionKey) {
+                const textarea = document.getElementById('section_' + sectionKey);
+                const suggestionDiv = document.getElementById('aiSuggestion_' + sectionKey);
+                const suggestionContent = document.getElementById('suggestionContent_' + sectionKey);
+                
+                const currentText = textarea.value;
+                if (!currentText.trim()) {
+                    alert('添削する内容がありません');
+                    return;
+                }
+                
+                suggestionDiv.classList.remove('hidden');
+                suggestionContent.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>AIが添削しています...';
+                
+                try {
+                    const res = await axios.post('/api/ai/refine-document', {
+                        section_key: sectionKey,
+                        content: currentText,
+                        case_id: CASE_ID
+                    });
+                    
+                    suggestionContent.textContent = res.data.refined || res.data.suggestion || '添削結果を取得できませんでした';
+                } catch (error) {
+                    console.error('AI refine error:', error);
+                    suggestionContent.innerHTML = '<span class="text-red-500">添削に失敗しました。もう一度お試しください。</span>';
+                }
+            }
+            
+            // AI提案を適用
+            function applySectionSuggestion(sectionKey) {
+                const textarea = document.getElementById('section_' + sectionKey);
+                const suggestionContent = document.getElementById('suggestionContent_' + sectionKey);
+                
+                textarea.value = suggestionContent.textContent;
+                hideSectionSuggestion(sectionKey);
+            }
+            
+            // AI提案を閉じる
+            function hideSectionSuggestion(sectionKey) {
+                document.getElementById('aiSuggestion_' + sectionKey).classList.add('hidden');
+            }
+            
+            // 編集内容を保存
+            async function saveEditedDocument() {
+                if (!currentEditDocId) return;
+                
+                // 各セクションの値を収集
+                const updatedSections = {};
+                for (const key of Object.keys(currentEditSections)) {
+                    const textarea = document.getElementById('section_' + key);
+                    if (textarea) {
+                        updatedSections[key] = textarea.value;
+                    }
+                }
+                
+                try {
+                    await axios.put('/api/generated-documents/' + currentEditDocId, {
+                        sections_content: JSON.stringify(updatedSections)
+                    });
+                    
+                    alert('保存しました');
+                    closeAiEditDocModal();
+                    loadGeneratedDocuments();
+                    loadProxyCreatedDocuments();
+                } catch (error) {
+                    console.error('Save error:', error);
+                    alert('保存に失敗しました');
+                }
+            }
+            
+            // グローバル関数登録
+            window.aiRefineSection = aiRefineSection;
+            window.applySectionSuggestion = applySectionSuggestion;
+            window.hideSectionSuggestion = hideSectionSuggestion;
+            window.closeAiEditDocModal = closeAiEditDocModal;
+            window.saveEditedDocument = saveEditedDocument;
             
             // 書類を承認
             async function approveDocument(docId) {

@@ -1337,4 +1337,143 @@ routes.post('/generated-documents/:id/revision', async (c) => {
   return c.json({ success: true })
 })
 
+// 生成書類の詳細取得
+routes.get('/generated-documents/:id', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('id')
+  
+  const doc = await DB.prepare(`
+    SELECT * FROM generated_documents WHERE id = ?
+  `).bind(docId).first()
+  
+  if (!doc) {
+    return c.json({ error: 'Document not found' }, 404)
+  }
+  
+  return c.json({ document: doc })
+})
+
+// 生成書類の更新
+routes.put('/generated-documents/:id', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('id')
+  const body = await c.req.json()
+  
+  const updates: string[] = []
+  const values: any[] = []
+  
+  if (body.sections_content !== undefined) {
+    updates.push('sections_content = ?')
+    values.push(body.sections_content)
+  }
+  if (body.content !== undefined) {
+    updates.push('content = ?')
+    values.push(body.content)
+  }
+  if (body.status !== undefined) {
+    updates.push('status = ?')
+    values.push(body.status)
+  }
+  
+  if (updates.length === 0) {
+    return c.json({ error: 'No fields to update' }, 400)
+  }
+  
+  updates.push('updated_at = CURRENT_TIMESTAMP')
+  values.push(docId)
+  
+  await DB.prepare(`
+    UPDATE generated_documents
+    SET ${updates.join(', ')}
+    WHERE id = ?
+  `).bind(...values).run()
+  
+  return c.json({ success: true })
+})
+
+// AI書類添削
+routes.post('/ai/refine-document', async (c) => {
+  const { DB, AI_API_KEY } = c.env as any
+  const { section_key, content, case_id } = await c.req.json()
+  
+  if (!content || !content.trim()) {
+    return c.json({ error: 'Content is required' }, 400)
+  }
+  
+  // セクションラベル
+  const sectionLabels: Record<string, string> = {
+    'company_overview': '会社概要・事業概要',
+    'innovation': '革新的な取組内容',
+    'equipment_plan': '設備投資計画',
+    'future_outlook': '将来の展望・期待される効果',
+    'schedule': '実施スケジュール',
+    'content': '本文'
+  }
+  
+  const sectionName = sectionLabels[section_key] || section_key
+  
+  // ケース情報を取得（補助金の種類など）
+  let subsidyType = '補助金'
+  if (case_id) {
+    const caseInfo = await DB.prepare(`
+      SELECT subsidy_type FROM cases WHERE id = ?
+    `).bind(case_id).first() as any
+    if (caseInfo) {
+      subsidyType = caseInfo.subsidy_type || '補助金'
+    }
+  }
+  
+  const systemPrompt = `あなたは補助金申請書類の専門家です。${subsidyType}の申請書類を添削・改善します。
+
+以下の観点で添削してください：
+1. 審査員に伝わりやすい明確な表現になっているか
+2. 具体的な数値やデータが含まれているか
+3. 補助金の審査基準に沿った内容になっているか
+4. 論理的な構成になっているか
+5. 専門用語の適切な使用
+
+【重要】
+- 元の内容の意図を保ちながら改善してください
+- 添削後の文章のみを出力してください（説明は不要）
+- 文体は「です・ます調」を維持してください`
+
+  const userPrompt = `【${sectionName}】の以下の文章を添削してください：
+
+${content}`
+
+  try {
+    // OpenAI APIを使用
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${AI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('OpenAI API error:', errorText)
+      return c.json({ error: 'AI service error' }, 500)
+    }
+    
+    const data = await response.json() as any
+    const refined = data.choices?.[0]?.message?.content || ''
+    
+    return c.json({ refined, original: content })
+  } catch (error) {
+    console.error('AI refine error:', error)
+    return c.json({ error: 'Failed to refine document' }, 500)
+  }
+})
+
 export default routes
