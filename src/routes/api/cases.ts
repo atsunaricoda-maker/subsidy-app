@@ -85,6 +85,97 @@ routes.get('/cases/:id', async (c) => {
   return c.json(result)
 })
 
+// 案件クイックビュー（モーダル用）
+routes.get('/cases/:id/quick-view', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const tab = c.req.query('tab') || 'overview'
+  
+  // 案件基本情報
+  const caseData = await DB.prepare(`
+    SELECT 
+      cases.*,
+      clients.name as client_name,
+      clients.company_name,
+      clients.email,
+      clients.phone,
+      subsidy_types.name as subsidy_type_name,
+      admin_users.name as assigned_to_name
+    FROM cases
+    LEFT JOIN clients ON cases.client_id = clients.id
+    LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+    LEFT JOIN admin_users ON cases.assigned_to = admin_users.username
+    WHERE cases.id = ?
+  `).bind(id).first()
+  
+  if (!caseData) {
+    return c.json({ error: 'Case not found' }, 404)
+  }
+  
+  const result: any = { ...caseData }
+  
+  // タブごとに追加データを取得
+  if (tab === 'documents') {
+    const docs = await DB.prepare(`
+      SELECT * FROM documents WHERE case_id = ? ORDER BY created_at DESC
+    `).bind(id).all()
+    result.documents = docs.results || []
+  }
+  
+  if (tab === 'timeline') {
+    // コミュニケーション履歴を取得
+    const communications = await DB.prepare(`
+      SELECT 
+        'communication' as type,
+        message as action,
+        sender as user,
+        created_at,
+        'fa-comment' as icon
+      FROM communications 
+      WHERE case_id = ? 
+      ORDER BY created_at DESC 
+      LIMIT 20
+    `).bind(id).all()
+    
+    // 書類アップロード履歴
+    const uploads = await DB.prepare(`
+      SELECT 
+        'upload' as type,
+        '書類アップロード: ' || file_name as action,
+        uploaded_by as user,
+        created_at,
+        'fa-upload' as icon
+      FROM documents 
+      WHERE case_id = ? 
+      ORDER BY created_at DESC 
+      LIMIT 20
+    `).bind(id).all()
+    
+    // マージしてソート
+    const timeline = [
+      ...(communications.results || []),
+      ...(uploads.results || [])
+    ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    
+    result.timeline = timeline.slice(0, 20)
+  }
+  
+  return c.json(result)
+})
+
+// ステータス更新
+routes.put('/cases/:id/status', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const { status } = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE cases SET status = ?, updated_at = datetime('now') WHERE id = ?
+  `).bind(status, id).run()
+  
+  return c.json({ success: true })
+})
+
 // アクセストークンで案件取得（顧客ポータル用）
 routes.get('/cases/token/:token', async (c) => {
   const { DB } = c.env

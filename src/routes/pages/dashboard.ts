@@ -1,6 +1,7 @@
 // 管理者画面
 import { Hono } from 'hono'
 import { generateSidebar, sidebarStyles, sidebarScripts } from '../../templates/sidebar'
+import { modalStyles, modalScripts } from '../../templates/modal'
 import type { AppEnv } from '../../types'
 import { getCurrentUser } from '../../utils/auth'
 
@@ -19,6 +20,7 @@ routes.get('/', (c) => {
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
             ${sidebarStyles}
+            ${modalStyles}
             
             /* ボタンの押下効果 */
             button, a.bg-blue-600, a.bg-green-600, a.bg-purple-600, a.bg-red-600 {
@@ -601,6 +603,8 @@ routes.get('/', (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+            ${modalScripts}
+            
             // サイドバートグル
             function toggleSidebar() {
                 const sidebar = document.getElementById('sidebar');
@@ -910,8 +914,17 @@ routes.get('/', (c) => {
                 return true;
             }
             
-            function logout() {
-                if (confirm('ログアウトしますか？')) {
+            async function logout() {
+                const confirmed = await confirmDialog({
+                    title: 'ログアウト',
+                    message: 'ログアウトしてもよろしいですか？',
+                    confirmText: 'ログアウト',
+                    cancelText: 'キャンセル',
+                    confirmClass: 'bg-blue-600 text-white hover:bg-blue-700',
+                    icon: 'fas fa-sign-out-alt text-blue-600'
+                });
+                
+                if (confirmed) {
                     localStorage.removeItem('admin_token');
                     localStorage.removeItem('admin_name');
                     window.location.href = '/login';
@@ -2258,16 +2271,23 @@ routes.get('/', (c) => {
             
             // 案件削除
             async function deleteCase(caseId, clientName, caseNumber) {
-                if (!confirm(\`\${clientName}様の案件「\${caseNumber}」を削除してもよろしいですか？\\n\\nこの操作は取り消せません。\`)) {
-                    return;
-                }
+                const confirmed = await confirmDialog({
+                    title: '案件の削除',
+                    message: \`\${clientName}様の案件「\${caseNumber}」を削除してもよろしいですか？この操作は取り消せません。\`,
+                    confirmText: '削除する',
+                    cancelText: 'キャンセル',
+                    confirmClass: 'bg-red-600 text-white hover:bg-red-700',
+                    icon: 'fas fa-trash-alt text-red-600'
+                });
+                
+                if (!confirmed) return;
                 
                 try {
                     await axios.delete(\`/api/cases/\${caseId}\`);
                     showToast(\`案件「\${caseNumber}」を削除しました\`);
                     loadData();
                 } catch (error) {
-                    alert('削除に失敗しました: ' + (error.response?.data?.error || error.message));
+                    showToast('削除に失敗しました: ' + (error.response?.data?.error || error.message), 'error');
                     console.error('Delete error:', error);
                 }
             }
@@ -2288,67 +2308,85 @@ routes.get('/', (c) => {
                     }
                     loadData();
                 } catch (error) {
-                    alert('削除に失敗しました: ' + (error.response?.data?.error || error.message));
+                    showToast('削除に失敗しました: ' + (error.response?.data?.error || error.message), 'error');
                     console.error('Delete error:', error);
                 }
             }
             
-            // 削除選択ダイアログ
+            // 削除選択ダイアログ（モーダルコンポーネント使用）
             function showDeleteChoiceDialog(clientName) {
                 return new Promise((resolve) => {
-                    const modal = document.createElement('div');
-                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-                    modal.innerHTML = \`
-                        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
-                            <div class="p-4 border-b bg-red-600 text-white rounded-t-lg">
-                                <h3 class="font-bold"><i class="fas fa-exclamation-triangle mr-2"></i>削除オプション</h3>
-                            </div>
-                            <div class="p-4">
-                                <p class="mb-4 text-gray-700"><strong>\${clientName}</strong>様の情報をどのように処理しますか？</p>
-                                <div class="space-y-3">
-                                    <button id="dashResetBtn" class="w-full p-3 border-2 border-blue-500 rounded-lg text-left hover:bg-blue-50">
-                                        <div class="flex items-start gap-3">
-                                            <i class="fas fa-redo text-blue-600 mt-1"></i>
-                                            <div>
-                                                <div class="font-bold text-blue-700">案件情報のみリセット</div>
-                                                <div class="text-xs text-gray-600">顧客情報は保持、案件データを削除</div>
-                                            </div>
-                                        </div>
-                                    </button>
-                                    <button id="dashDeleteBtn" class="w-full p-3 border-2 border-red-500 rounded-lg text-left hover:bg-red-50">
-                                        <div class="flex items-start gap-3">
-                                            <i class="fas fa-trash text-red-600 mt-1"></i>
-                                            <div>
-                                                <div class="font-bold text-red-700">完全に削除</div>
-                                                <div class="text-xs text-gray-600">すべてのデータを削除（取り消し不可）</div>
-                                            </div>
-                                        </div>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="p-4 border-t bg-gray-50 rounded-b-lg">
-                                <button id="dashCancelBtn" class="w-full py-2 border rounded-lg hover:bg-gray-100">キャンセル</button>
-                            </div>
-                        </div>
-                    \`;
-                    document.body.appendChild(modal);
+                    const modalId = 'deleteChoiceModal-' + Date.now();
                     
-                    document.getElementById('dashResetBtn').onclick = () => { modal.remove(); resolve('reset'); };
-                    document.getElementById('dashDeleteBtn').onclick = () => {
-                        if (confirm('本当に完全削除しますか？')) { modal.remove(); resolve('delete'); }
+                    modalManager.create({
+                        id: modalId,
+                        title: '削除オプション',
+                        icon: 'fas fa-exclamation-triangle text-red-600',
+                        size: 'sm',
+                        content: \`
+                            <p class="mb-4 text-gray-700"><strong>\${clientName}</strong>様の情報をどのように処理しますか？</p>
+                            <div class="space-y-3">
+                                <button onclick="window._deleteChoiceResolve && window._deleteChoiceResolve('reset')" 
+                                        class="w-full p-3 border-2 border-blue-500 rounded-lg text-left hover:bg-blue-50 transition">
+                                    <div class="flex items-start gap-3">
+                                        <i class="fas fa-redo text-blue-600 mt-1"></i>
+                                        <div>
+                                            <div class="font-bold text-blue-700">案件情報のみリセット</div>
+                                            <div class="text-xs text-gray-600">顧客情報は保持、案件データを削除</div>
+                                        </div>
+                                    </div>
+                                </button>
+                                <button onclick="window._deleteChoiceResolve && window._deleteChoiceResolve('delete')" 
+                                        class="w-full p-3 border-2 border-red-500 rounded-lg text-left hover:bg-red-50 transition">
+                                    <div class="flex items-start gap-3">
+                                        <i class="fas fa-trash text-red-600 mt-1"></i>
+                                        <div>
+                                            <div class="font-bold text-red-700">完全に削除</div>
+                                            <div class="text-xs text-gray-600">すべてのデータを削除（取り消し不可）</div>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                        \`,
+                        footer: \`
+                            <button onclick="window._deleteChoiceResolve && window._deleteChoiceResolve(null)" 
+                                    class="w-full py-2 border rounded-lg hover:bg-gray-100">
+                                キャンセル
+                            </button>
+                        \`
+                    });
+                    
+                    window._deleteChoiceResolve = async (choice) => {
+                        if (choice === 'delete') {
+                            // 完全削除の場合は追加確認
+                            const confirmed = await confirmDialog({
+                                title: '最終確認',
+                                message: '本当に完全削除しますか？この操作は取り消せません。',
+                                confirmText: '完全削除',
+                                cancelText: '戻る',
+                                confirmClass: 'bg-red-600 text-white hover:bg-red-700',
+                                icon: 'fas fa-exclamation-triangle text-red-600'
+                            });
+                            if (!confirmed) return;
+                        }
+                        modalManager.close(modalId);
+                        document.getElementById(modalId)?.remove();
+                        resolve(choice);
                     };
-                    document.getElementById('dashCancelBtn').onclick = () => { modal.remove(); resolve(null); };
-                    modal.onclick = (e) => { if (e.target === modal) { modal.remove(); resolve(null); } };
+                    
+                    modalManager.open(modalId);
                 });
             }
             
             // トースト通知表示
-            function showToast(message) {
+            function showToast(message, type = 'success') {
                 const toast = document.createElement('div');
-                toast.className = 'fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-auto bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in';
+                const bgColor = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+                const icon = type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle';
+                toast.className = \`fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-auto \${bgColor} text-white px-4 md:px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in\`;
                 toast.innerHTML = \`
                     <div class="flex items-center gap-2">
-                        <i class="fas fa-check-circle"></i>
+                        <i class="fas \${icon}"></i>
                         <span class="text-sm md:text-base">\${message}</span>
                     </div>
                 \`;
@@ -2358,7 +2396,7 @@ routes.get('/', (c) => {
                     toast.style.opacity = '0';
                     toast.style.transition = 'opacity 0.3s';
                     setTimeout(() => toast.remove(), 300);
-                }, 3000);
+                }, type === 'error' ? 5000 : 3000);
             }
 
             // 検索（案件ベース）

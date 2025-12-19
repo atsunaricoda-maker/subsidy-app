@@ -231,6 +231,87 @@ routes.get('/stats', async (c) => {
   })
 })
 
+// 顧客クイックビュー取得（モーダル用）
+routes.get('/clients/:id/quick-view', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const tab = c.req.query('tab') || 'info'
+  const user = await getCurrentUser(c)
+  
+  try {
+    // 顧客基本情報を取得
+    const client = await DB.prepare(`
+      SELECT * FROM clients WHERE id = ?
+    `).bind(id).first() as any
+    
+    if (!client) {
+      return c.json({ error: 'Client not found' }, 404)
+    }
+    
+    // 案件数を取得
+    const caseCountResult = await DB.prepare(`
+      SELECT COUNT(*) as count FROM cases WHERE client_id = ?
+    `).bind(id).first() as any
+    
+    const baseData = {
+      id: client.id,
+      name: client.name,
+      company_name: client.company_name,
+      email: client.email,
+      phone: client.phone,
+      address: client.address,
+      notes: client.notes,
+      created_at: client.created_at,
+      case_count: caseCountResult?.count || 0
+    }
+    
+    // タブに応じて追加データを取得
+    if (tab === 'cases') {
+      // 案件一覧
+      const casesResult = await DB.prepare(`
+        SELECT 
+          c.id, c.case_number, c.status, c.result, c.approved_amount,
+          c.created_at, c.access_token,
+          st.name as subsidy_type_name
+        FROM cases c
+        LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+        WHERE c.client_id = ?
+        ORDER BY c.created_at DESC
+      `).bind(id).all()
+      
+      return c.json({
+        ...baseData,
+        cases: casesResult.results || []
+      })
+    }
+    
+    if (tab === 'documents') {
+      // 書類一覧（casesテーブル経由で取得）
+      const docsResult = await DB.prepare(`
+        SELECT 
+          d.id, d.document_type, d.file_name, d.status, d.created_at
+        FROM documents d
+        JOIN cases c ON d.case_id = c.id
+        WHERE c.client_id = ?
+        ORDER BY d.created_at DESC
+        LIMIT 20
+      `).bind(id).all()
+      
+      return c.json({
+        ...baseData,
+        documents: docsResult.results || []
+      })
+    }
+    
+    // デフォルト: 基本情報のみ
+    return c.json(baseData)
+    
+  } catch (error: any) {
+    console.error('Client quick-view error:', error)
+    return c.json({ error: error.message || 'Unknown error' }, 500)
+  }
+})
+
 // 顧客詳細取得（案件一覧も含む）
 routes.get('/clients/:id', async (c) => {
   const { DB } = c.env
