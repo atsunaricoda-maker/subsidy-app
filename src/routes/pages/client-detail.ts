@@ -2451,12 +2451,46 @@ routes.get('/client/:id', async (c) => {
                 currentViewingDocId = docId;
                 try {
                     const response = await axios.get(\`/api/generated-documents/\${docId}\`);
-                    const doc = response.data;
+                    // APIは { document: {...} } 形式で返す
+                    const doc = response.data.document || response.data;
                     
                     document.getElementById('documentDetailTitle').textContent = doc.document_title || '無題の文書';
                     
-                    const sections = JSON.parse(doc.template_sections || '[]');
-                    const content = JSON.parse(doc.sections_content || '{}');
+                    // template_sectionsがない場合はsections_contentからキーを取得してセクションを生成
+                    let sections = [];
+                    let content = {};
+                    
+                    if (doc.template_sections) {
+                        sections = JSON.parse(doc.template_sections);
+                    }
+                    
+                    if (doc.sections_content) {
+                        content = typeof doc.sections_content === 'string' 
+                            ? JSON.parse(doc.sections_content) 
+                            : doc.sections_content;
+                        
+                        // template_sectionsがない場合、sections_contentのキーからセクションを生成
+                        if (sections.length === 0) {
+                            const sectionLabels = {
+                                'company_overview': '会社概要・事業概要',
+                                'innovation_plan': '革新的な取組内容',
+                                'equipment_plan': '設備投資計画',
+                                'expected_results': '期待される成果',
+                                'implementation_schedule': '実施スケジュール',
+                                'innovation': '革新的な取組内容',
+                                'future_outlook': '将来の展望',
+                                'schedule': 'スケジュール',
+                                'content': '本文'
+                            };
+                            
+                            sections = Object.keys(content).map((key, index) => ({
+                                id: key,
+                                title: sectionLabels[key] || key,
+                                max_chars: 10000,
+                                order: index
+                            }));
+                        }
+                    }
                     
                     const statusOptions = ['draft', 'review', 'final'];
                     const statusLabels = { draft: '下書き', review: 'レビュー中', final: '確定' };
