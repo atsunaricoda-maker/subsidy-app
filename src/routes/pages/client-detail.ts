@@ -457,6 +457,52 @@ routes.get('/client/:id', async (c) => {
             </div>
         </div>
 
+        <!-- AI添削モーダル -->
+        <div id="aiRefineModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-lg max-w-4xl w-full my-8 max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-magic text-2xl"></i>
+                        <div>
+                            <h3 class="font-bold text-lg">AI添削</h3>
+                            <p id="aiRefineDocTitle" class="text-sm text-white/80"></p>
+                        </div>
+                    </div>
+                    <button onclick="closeAiRefineModal()" class="text-white hover:text-white/80">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                    <div id="aiRefineLoading" class="text-center py-12">
+                        <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mb-4"></i>
+                        <p class="text-gray-600">書類を読み込んでいます...</p>
+                    </div>
+                    
+                    <div id="aiRefineSections" class="hidden space-y-4">
+                        <!-- セクションが動的に生成される -->
+                    </div>
+                </div>
+                
+                <div class="p-4 border-t bg-white rounded-b-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2 text-sm text-gray-500">
+                            <i class="fas fa-lightbulb text-yellow-500"></i>
+                            <span>各セクションの「AI添削」ボタンで改善提案を受けられます</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="closeAiRefineModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+                                キャンセル
+                            </button>
+                            <button onclick="saveRefinedDocument()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                <i class="fas fa-save mr-1"></i>保存
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 顧客編集モーダル -->
         <div id="editClientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeEditModal()">
             <div class="bg-white rounded-lg p-4 md:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
@@ -2235,6 +2281,11 @@ routes.get('/client/:id', async (c) => {
                                 <button onclick="viewDocument(\${doc.id})" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm">
                                     <i class="fas fa-eye mr-1"></i>詳細・編集
                                 </button>
+                                <button onclick="openAiRefineModal(\${doc.id}, '\${(doc.document_title || '無題の文書').replace(/'/g, "\\\\'")}' )" 
+                                        class="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                                        title="AI添削">
+                                    <i class="fas fa-magic"></i>
+                                </button>
                                 <button onclick="deleteGeneratedDocument(\${doc.id})" 
                                         class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-sm"
                                         title="削除"
@@ -2860,6 +2911,179 @@ routes.get('/client/:id', async (c) => {
             }
             
             window.updateCharCount = updateCharCount;
+
+            // ======================================
+            // AI添削モーダル機能
+            // ======================================
+            let currentRefineDocId = null;
+            let currentRefineSections = {};
+            
+            async function openAiRefineModal(docId, docTitle) {
+                currentRefineDocId = docId;
+                document.getElementById('aiRefineDocTitle').textContent = docTitle;
+                document.getElementById('aiRefineModal').classList.remove('hidden');
+                document.getElementById('aiRefineLoading').classList.remove('hidden');
+                document.getElementById('aiRefineSections').classList.add('hidden');
+                
+                try {
+                    const response = await axios.get(\`/api/generated-documents/\${docId}\`);
+                    const doc = response.data.document || response.data;
+                    
+                    // セクションを解析
+                    let sections = {};
+                    if (doc.sections_content) {
+                        sections = typeof doc.sections_content === 'string' 
+                            ? JSON.parse(doc.sections_content) 
+                            : doc.sections_content;
+                    } else if (doc.content) {
+                        sections = { content: doc.content };
+                    }
+                    
+                    currentRefineSections = sections;
+                    
+                    const sectionLabels = {
+                        'company_overview': '会社概要・事業概要',
+                        'innovation_plan': '革新的な取組内容',
+                        'equipment_plan': '設備投資計画',
+                        'expected_results': '期待される成果',
+                        'implementation_schedule': '実施スケジュール',
+                        'innovation': '革新的な取組内容',
+                        'future_outlook': '将来の展望',
+                        'schedule': 'スケジュール',
+                        'content': '本文'
+                    };
+                    
+                    let html = '';
+                    let idx = 0;
+                    for (const [key, value] of Object.entries(sections)) {
+                        idx++;
+                        const label = sectionLabels[key] || key;
+                        html += \`
+                            <div class="bg-white rounded-lg border shadow-sm" data-section-key="\${key}">
+                                <div class="flex items-center justify-between p-3 border-b bg-gray-50">
+                                    <h4 class="font-bold text-gray-800">
+                                        <span class="text-purple-600 mr-2">\${idx}.</span>\${label}
+                                    </h4>
+                                    <button onclick="refineSection('\${key}')" 
+                                            class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 flex items-center gap-1">
+                                        <i class="fas fa-magic"></i>AI添削
+                                    </button>
+                                </div>
+                                <div class="p-3">
+                                    <textarea id="refine_\${key}" 
+                                              class="w-full min-h-[120px] p-3 border rounded-lg text-sm leading-relaxed resize-y focus:ring-2 focus:ring-purple-500"
+                                              placeholder="内容を入力...">\${value || ''}</textarea>
+                                    <div id="refineSuggestion_\${key}" class="hidden mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <i class="fas fa-robot text-purple-600"></i>
+                                            <span class="font-medium text-purple-800">AI添削提案</span>
+                                        </div>
+                                        <div id="refineSuggestionContent_\${key}" class="text-sm text-gray-700 whitespace-pre-wrap"></div>
+                                        <div class="flex gap-2 mt-3">
+                                            <button onclick="applyRefineSuggestion('\${key}')" 
+                                                    class="px-3 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+                                                <i class="fas fa-check mr-1"></i>適用
+                                            </button>
+                                            <button onclick="hideRefineSuggestion('\${key}')" 
+                                                    class="px-3 py-1.5 border rounded text-sm hover:bg-gray-100">
+                                                閉じる
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                    }
+                    
+                    if (Object.keys(sections).length === 0) {
+                        html = '<div class="text-center py-8 text-gray-500"><i class="fas fa-file-alt text-4xl mb-3 text-gray-300"></i><p>編集可能なセクションがありません</p></div>';
+                    }
+                    
+                    document.getElementById('aiRefineSections').innerHTML = html;
+                    document.getElementById('aiRefineLoading').classList.add('hidden');
+                    document.getElementById('aiRefineSections').classList.remove('hidden');
+                    
+                } catch (error) {
+                    console.error('Failed to load document:', error);
+                    document.getElementById('aiRefineLoading').innerHTML = '<div class="text-center text-red-500"><i class="fas fa-exclamation-circle text-3xl mb-3"></i><p>読み込みに失敗しました</p></div>';
+                }
+            }
+            
+            function closeAiRefineModal() {
+                document.getElementById('aiRefineModal').classList.add('hidden');
+                currentRefineDocId = null;
+                currentRefineSections = {};
+            }
+            
+            async function refineSection(sectionKey) {
+                const textarea = document.getElementById('refine_' + sectionKey);
+                const suggestionDiv = document.getElementById('refineSuggestion_' + sectionKey);
+                const suggestionContent = document.getElementById('refineSuggestionContent_' + sectionKey);
+                
+                const currentText = textarea.value;
+                if (!currentText.trim()) {
+                    alert('添削する内容がありません');
+                    return;
+                }
+                
+                suggestionDiv.classList.remove('hidden');
+                suggestionContent.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>AIが添削しています...';
+                
+                try {
+                    const res = await axios.post('/api/ai/refine-document', {
+                        section_key: sectionKey,
+                        content: currentText
+                    });
+                    
+                    suggestionContent.textContent = res.data.refined || res.data.suggestion || '添削結果を取得できませんでした';
+                } catch (error) {
+                    console.error('AI refine error:', error);
+                    suggestionContent.innerHTML = '<span class="text-red-500">添削に失敗しました</span>';
+                }
+            }
+            
+            function applyRefineSuggestion(sectionKey) {
+                const textarea = document.getElementById('refine_' + sectionKey);
+                const suggestionContent = document.getElementById('refineSuggestionContent_' + sectionKey);
+                textarea.value = suggestionContent.textContent;
+                hideRefineSuggestion(sectionKey);
+            }
+            
+            function hideRefineSuggestion(sectionKey) {
+                document.getElementById('refineSuggestion_' + sectionKey).classList.add('hidden');
+            }
+            
+            async function saveRefinedDocument() {
+                if (!currentRefineDocId) return;
+                
+                const updatedSections = {};
+                for (const key of Object.keys(currentRefineSections)) {
+                    const textarea = document.getElementById('refine_' + key);
+                    if (textarea) {
+                        updatedSections[key] = textarea.value;
+                    }
+                }
+                
+                try {
+                    await axios.put(\`/api/generated-documents/\${currentRefineDocId}\`, {
+                        sections_content: JSON.stringify(updatedSections)
+                    });
+                    
+                    showToast('保存しました');
+                    closeAiRefineModal();
+                    loadGeneratedDocuments();
+                } catch (error) {
+                    console.error('Save error:', error);
+                    alert('保存に失敗しました');
+                }
+            }
+            
+            window.openAiRefineModal = openAiRefineModal;
+            window.closeAiRefineModal = closeAiRefineModal;
+            window.refineSection = refineSection;
+            window.applyRefineSuggestion = applyRefineSuggestion;
+            window.hideRefineSuggestion = hideRefineSuggestion;
+            window.saveRefinedDocument = saveRefinedDocument;
 
             // グローバルスコープに関数を公開（onclick対応）
             window.logout = logout;
