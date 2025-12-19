@@ -1,3 +1,4 @@
+import { generateMasterSidebar, masterSidebarScripts } from '../../templates/master-sidebar'
 // 法的表記・会社情報設定ページ
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'

@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser } from '../../utils/auth'
+import { generateMasterSidebar, masterSidebarScripts } from '../../templates/master-sidebar'
 
 const routes = new Hono<AppEnv>()
 

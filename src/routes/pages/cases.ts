@@ -209,16 +209,16 @@ routes.get('/cases', async (c) => {
       ` : ''
       
       return `
-        <div class="kanban-column flex flex-col rounded-lg ${colors.bg} border ${colors.border} overflow-hidden">
-          <div class="${colors.header} px-2 py-2 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-1.5">
-              <i class="fas ${status.icon} text-sm"></i>
-              <span class="font-semibold text-sm">${status.label}</span>
+        <div class="kanban-column rounded-lg ${colors.bg} border ${colors.border} overflow-hidden">
+          <div class="${colors.header} px-2 py-1.5 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-1">
+              <i class="fas ${status.icon} text-xs"></i>
+              <span class="font-semibold text-xs">${status.label}</span>
             </div>
             <span class="${colors.badge} text-white text-xs px-1.5 py-0.5 rounded-full">${status.key === 'archived' ? archivedCount : statusCases.length}</span>
           </div>
           ${archivedSubHeader}
-          <div class="p-2 flex-1 overflow-y-auto">
+          <div class="kanban-column-cards p-1.5">
             ${cardsHtml}
           </div>
         </div>
@@ -238,27 +238,30 @@ routes.get('/cases', async (c) => {
         <style>
             ${sidebarStyles}
             ${modalStyles}
+            /* 1ページに収まるようにカンバンレイアウトを最適化 */
             .kanban-container {
                 display: grid;
-                grid-template-columns: repeat(6, minmax(180px, 1fr));
-                gap: 0.75rem;
-                padding-bottom: 0.5rem;
-                min-height: 0;
+                grid-template-columns: repeat(6, 1fr);
+                gap: 0.5rem;
+                height: calc(100vh - 140px);
+                min-height: 400px;
             }
-            @media (max-width: 1600px) {
+            @media (max-width: 1400px) {
                 .kanban-container {
-                    grid-template-columns: repeat(6, minmax(160px, 1fr));
-                    gap: 0.5rem;
+                    grid-template-columns: repeat(6, 1fr);
+                    gap: 0.375rem;
                 }
             }
-            @media (max-width: 1200px) {
+            @media (max-width: 1000px) {
                 .kanban-container {
-                    grid-template-columns: repeat(3, minmax(200px, 1fr));
+                    grid-template-columns: repeat(3, 1fr);
+                    height: auto;
+                    max-height: calc(100vh - 140px);
                 }
             }
-            @media (max-width: 768px) {
+            @media (max-width: 640px) {
                 .kanban-container {
-                    grid-template-columns: repeat(2, minmax(160px, 1fr));
+                    grid-template-columns: repeat(2, 1fr);
                 }
             }
             @media (max-width: 480px) {
@@ -267,22 +270,30 @@ routes.get('/cases', async (c) => {
                 }
             }
             .kanban-column {
-                max-height: calc(100vh - 180px);
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+                max-height: 100%;
+            }
+            .kanban-column-cards {
+                flex: 1;
                 overflow-y: auto;
+                min-height: 0;
             }
-            .kanban-column::-webkit-scrollbar {
-                width: 4px;
+            .kanban-column-cards::-webkit-scrollbar {
+                width: 3px;
             }
-            .kanban-column::-webkit-scrollbar-thumb {
+            .kanban-column-cards::-webkit-scrollbar-thumb {
                 background: #cbd5e1;
                 border-radius: 2px;
             }
+            /* カードをコンパクトに */
             .case-card {
-                font-size: 0.8rem;
-                padding: 0.625rem;
+                font-size: 0.75rem;
+                padding: 0.5rem;
             }
             .case-card-title {
-                font-size: 0.75rem;
+                font-size: 0.7rem;
             }
         </style>
     </head>
@@ -290,9 +301,9 @@ routes.get('/cases', async (c) => {
         <div class="min-h-screen flex">
             ${generateSidebar('cases')}
             
-            <main class="flex-1 min-h-screen overflow-hidden flex flex-col">
+            <main class="flex-1 h-screen overflow-hidden flex flex-col">
                 <header class="bg-white shadow-sm sticky top-0 z-30">
-                    <div class="flex items-center justify-between px-4 py-3">
+                    <div class="flex items-center justify-between px-3 py-2">
                         <div class="flex items-center gap-4">
                             <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
                                 <i class="fas fa-bars text-xl"></i>
@@ -339,7 +350,7 @@ routes.get('/cases', async (c) => {
                     ` : ''}
                 </header>
 
-                <div class="p-4 lg:p-6 flex-1 overflow-auto">
+                <div class="p-2 lg:p-3 flex-1 overflow-hidden">
                     <!-- カンバンボード -->
                     <div class="kanban-container">
                         ${kanbanHtml}

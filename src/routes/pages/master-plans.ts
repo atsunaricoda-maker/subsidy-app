@@ -1,3 +1,4 @@
+import { generateMasterSidebar, masterSidebarScripts } from '../../templates/master-sidebar'
 // プラン管理ページ
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'

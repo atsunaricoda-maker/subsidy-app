@@ -1,3 +1,4 @@
+import { generateMasterSidebar, masterSidebarScripts } from '../../templates/master-sidebar'
 // マスターデータ管理
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
