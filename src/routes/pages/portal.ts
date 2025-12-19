@@ -2705,6 +2705,18 @@ routes.get('/portal/:token', async (c) => {
                 \`}).join('');
             }
 
+            // DB時刻文字列(YYYY-MM-DD HH:MM:SS形式、既にJST)から時刻部分を抽出
+            function formatJSTTime(dateStr) {
+                if (!dateStr) return '';
+                // "2025-12-19 14:40:23" → "14:40"
+                const parts = dateStr.split(' ');
+                if (parts.length >= 2) {
+                    const timeParts = parts[1].split(':');
+                    return timeParts[0] + ':' + timeParts[1];
+                }
+                return dateStr;
+            }
+            
             async function loadCommunications() {
                 // 案件IDがある場合は案件別、なければ顧客全体のやり取りを取得
                 const url = CASE_ID 
@@ -2725,7 +2737,7 @@ routes.get('/portal/:token', async (c) => {
                         <div class="flex \${isClient ? 'justify-end' : 'justify-start'}">
                             <div class="max-w-[85%] \${isClient ? 'bg-green-100' : 'bg-gray-100'} rounded-lg px-2.5 py-1.5">
                                 <div class="text-xs">\${comm.message}</div>
-                                <div class="text-xs text-gray-400 mt-0.5">\${comm.sender_name} · \${new Date(comm.created_at).toLocaleTimeString('ja-JP', {timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit'})}</div>
+                                <div class="text-xs text-gray-400 mt-0.5">\${comm.sender_name} · \${formatJSTTime(comm.created_at)}</div>
                             </div>
                         </div>
                     \`;

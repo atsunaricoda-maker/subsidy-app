@@ -1208,6 +1208,13 @@ routes.get('/client/:id', async (c) => {
             
             window.deleteCommonDocumentAdmin = deleteCommonDocumentAdmin;
 
+            // DB時刻文字列(YYYY-MM-DD HH:MM:SS形式、既にJST)を日本語フォーマットに変換
+            function formatJSTDateTime(dateStr) {
+                if (!dateStr) return '';
+                // "2025-12-19 14:40:23" → "2025/12/19 14:40:23"
+                return dateStr.replace(/-/g, '/');
+            }
+            
             async function loadCommunications() {
                 const response = await axios.get(\`/api/clients/\${CLIENT_ID}/communications\`);
                 const comms = response.data;
@@ -1225,7 +1232,7 @@ routes.get('/client/:id', async (c) => {
                             <div class="max-w-xs \${isStaff ? 'bg-blue-100' : 'bg-gray-100'} rounded-lg p-3">
                                 <div class="font-medium text-sm mb-1">\${comm.sender_name}</div>
                                 <div class="text-sm">\${comm.message}</div>
-                                <div class="text-xs text-gray-500 mt-1">\${new Date(comm.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
+                                <div class="text-xs text-gray-500 mt-1">\${formatJSTDateTime(comm.created_at)}</div>
                             </div>
                         </div>
                     \`;
