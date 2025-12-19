@@ -599,6 +599,39 @@ routes.delete('/cases/:id', async (c) => {
     return c.json({ error: '案件の削除は管理者のみ実行できます' }, 403)
   }
   
+  // 案件の状態を確認
+  const caseData: any = await DB.prepare(`
+    SELECT status, deposit_paid, deposit_amount
+    FROM cases WHERE id = ?
+  `).bind(id).first()
+  
+  if (!caseData) {
+    return c.json({ error: '案件が見つかりません' }, 404)
+  }
+  
+  // 削除不可の条件をチェック
+  const nonDeletableStatuses = ['submitted', 'under_review', 'approved', 'completed', 'rejected']
+  
+  if (nonDeletableStatuses.includes(caseData.status)) {
+    const statusLabels: Record<string, string> = {
+      'submitted': '申請済み',
+      'under_review': '審査中',
+      'approved': '採択',
+      'completed': '完了',
+      'rejected': '不採択'
+    }
+    return c.json({ 
+      error: `ステータスが「${statusLabels[caseData.status] || caseData.status}」の案件は削除できません` 
+    }, 400)
+  }
+  
+  // 着手金が支払い済みの場合は削除不可
+  if (caseData.deposit_paid && caseData.deposit_amount > 0) {
+    return c.json({ 
+      error: '着手金が支払い済みの案件は削除できません。案件をアーカイブすることをお勧めします。' 
+    }, 400)
+  }
+  
   try {
     // 案件に紐づく関連データを明示的に削除（順序が重要：子テーブルから先に）
     

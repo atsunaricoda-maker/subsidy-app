@@ -2232,11 +2232,19 @@ routes.get('/', (c) => {
                                             <a href="/portal/\${caseItem.access_token}" target="_blank" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-green-100 hover:text-green-600" title="ポータル">
                                                 <i class="fas fa-external-link-alt text-sm"></i>
                                             </a>
-                                            \${localStorage.getItem('admin_role') === 'admin' ? \`
-                                            <button onclick="deleteCase(\${caseItem.id}, '\${clientData.clientName}', '\${caseNo}')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-red-100 hover:text-red-600" title="削除">
-                                                <i class="fas fa-trash text-sm"></i>
-                                            </button>
-                                            \` : ''}
+                                            \${localStorage.getItem('admin_role') === 'admin' ? (() => {
+                                                const nonDeletableStatuses = ['submitted', 'under_review', 'approved', 'completed', 'rejected'];
+                                                const canDelete = !nonDeletableStatuses.includes(caseItem.status) && !(caseItem.deposit_paid && caseItem.deposit_amount > 0);
+                                                if (canDelete) {
+                                                    return \`<button onclick="deleteCase(\${caseItem.id}, '\${clientData.clientName}', '\${caseNo}')" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded hover:bg-red-100 hover:text-red-600" title="削除">
+                                                        <i class="fas fa-trash text-sm"></i>
+                                                    </button>\`;
+                                                } else {
+                                                    return \`<button disabled class="w-8 h-8 flex items-center justify-center bg-gray-50 text-gray-300 rounded cursor-not-allowed" title="この案件は削除できません（進行中または着手金支払い済み）">
+                                                        <i class="fas fa-trash text-sm"></i>
+                                                    </button>\`;
+                                                }
+                                            })() : ''}
                                         </div>
                                     </div>
                                 </div>
