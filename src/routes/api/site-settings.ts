@@ -174,6 +174,233 @@ routes.post('/test-claude-env', async (c) => {
   }
 })
 
+// ========================================
+// マスター管理API（プラン、管理者、ログなど）
+// ========================================
+
+// プラン一覧取得（マスター管理用）
+routes.get('/master/plans', async (c) => {
+  const { DB } = c.env
+  try {
+    const plans = await DB.prepare(`
+      SELECT * FROM subscription_plans ORDER BY monthly_price ASC
+    `).all()
+    return c.json(plans.results || [])
+  } catch (error) {
+    console.error('Load plans error:', error)
+    return c.json([])
+  }
+})
+
+// プラン作成
+routes.post('/master/plans', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      INSERT INTO subscription_plans (plan_code, plan_name, monthly_price, monthly_slots, max_staff, description, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.plan_code,
+      data.plan_name,
+      data.monthly_price || 0,
+      data.monthly_slots || 5,
+      data.max_staff || 3,
+      data.description || '',
+      data.is_active ? 1 : 0
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Create plan error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// プラン更新
+routes.put('/master/plans/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE subscription_plans 
+      SET plan_code = ?, plan_name = ?, monthly_price = ?, monthly_slots = ?, 
+          max_staff = ?, description = ?, is_active = ?
+      WHERE id = ?
+    `).bind(
+      data.plan_code,
+      data.plan_name,
+      data.monthly_price || 0,
+      data.monthly_slots || 5,
+      data.max_staff || 3,
+      data.description || '',
+      data.is_active ? 1 : 0,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Update plan error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// プラン削除
+routes.delete('/master/plans/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    await DB.prepare(`DELETE FROM subscription_plans WHERE id = ?`).bind(id).run()
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete plan error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// マスター管理者一覧取得
+routes.get('/master/admins', async (c) => {
+  const { DB } = c.env
+  try {
+    const admins = await DB.prepare(`
+      SELECT id, username, role, email, is_active, created_at 
+      FROM admin_users 
+      WHERE is_master_admin = 1
+      ORDER BY created_at DESC
+    `).all()
+    return c.json(admins.results || [])
+  } catch (error) {
+    console.error('Load admins error:', error)
+    return c.json([])
+  }
+})
+
+// マスター管理者作成
+routes.post('/master/admins', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    // パスワードハッシュ（実際はbcryptなどを使う）
+    const passwordHash = data.password // TODO: ハッシュ化
+    
+    await DB.prepare(`
+      INSERT INTO admin_users (username, password_hash, role, email, is_master_admin, is_active)
+      VALUES (?, ?, 'master_admin', ?, 1, 1)
+    `).bind(data.username, passwordHash, data.email || '').run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Create admin error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 操作ログ取得
+routes.get('/master/logs', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.query('organization_id')
+  const type = c.req.query('type')
+  
+  try {
+    let query = `
+      SELECT al.*, o.company_name as organization_name
+      FROM audit_logs al
+      LEFT JOIN organizations o ON al.organization_id = o.id
+      WHERE 1=1
+    `
+    const params: any[] = []
+    
+    if (orgId) {
+      query += ` AND al.organization_id = ?`
+      params.push(orgId)
+    }
+    if (type) {
+      query += ` AND al.action_type = ?`
+      params.push(type)
+    }
+    
+    query += ` ORDER BY al.created_at DESC LIMIT 100`
+    
+    const logs = await DB.prepare(query).bind(...params).all()
+    return c.json(logs.results || [])
+  } catch (error) {
+    console.error('Load logs error:', error)
+    return c.json([])
+  }
+})
+
+// ヒアリング質問一覧取得（マスター管理用）
+routes.get('/master/hearing-questions', async (c) => {
+  const { DB } = c.env
+  const subsidyTypeId = c.req.query('subsidy_type_id')
+  const category = c.req.query('category')
+  
+  try {
+    let query = `
+      SELECT hq.*, st.name as subsidy_name 
+      FROM hearing_questions hq
+      LEFT JOIN subsidy_types st ON hq.subsidy_type_id = st.id
+      WHERE 1=1
+    `
+    const params: any[] = []
+    
+    if (subsidyTypeId && subsidyTypeId !== 'all') {
+      query += ` AND hq.subsidy_type_id = ?`
+      params.push(subsidyTypeId)
+    }
+    if (category && category !== 'all') {
+      query += ` AND hq.category = ?`
+      params.push(category)
+    }
+    
+    query += ` ORDER BY hq.subsidy_type_id, hq.sort_order ASC`
+    
+    const questions = await DB.prepare(query).bind(...params).all()
+    return c.json(questions.results || [])
+  } catch (error) {
+    console.error('Load hearing questions error:', error)
+    return c.json([])
+  }
+})
+
+// AIプロンプト一覧取得
+routes.get('/master/ai-prompts', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const prompts = await DB.prepare(`
+      SELECT * FROM ai_prompts ORDER BY section_id ASC
+    `).all()
+    return c.json(prompts.results || [])
+  } catch (error) {
+    console.error('Load AI prompts error:', error)
+    return c.json([])
+  }
+})
+
+// AIプロンプト更新
+routes.put('/master/ai-prompts/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE ai_prompts SET prompt_text = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(data.prompt_text, id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Update AI prompt error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // AIモデル設定取得API
 routes.get('/master/ai-models', async (c) => {
   const { DB } = c.env

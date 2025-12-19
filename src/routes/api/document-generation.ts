@@ -84,10 +84,11 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
     return c.json({ error: '顧客が見つかりません' }, 404)
   }
   
-  // テンプレート取得
+  // テンプレート取得（templateId または template_id に対応）
+  const templateId = data.templateId || data.template_id
   const template = await DB.prepare(`
     SELECT * FROM document_templates WHERE id = ?
-  `).bind(data.template_id).first()
+  `).bind(templateId).first()
   
   if (!template) {
     return c.json({ error: 'テンプレートが見つかりません' }, 404)
@@ -101,7 +102,7 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
   `).bind(client.subsidy_type_id).first()
   
   // ヒアリング回答取得（案件IDが指定されている場合はその案件のみ）
-  const caseId = data.case_id
+  const caseId = data.caseId || data.case_id
   let answers
   if (caseId) {
     // 案件に紐づくヒアリング回答のみ取得
