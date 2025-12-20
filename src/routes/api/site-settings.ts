@@ -368,38 +368,8 @@ routes.get('/master/hearing-questions', async (c) => {
   }
 })
 
-// AIプロンプト一覧取得
-routes.get('/master/ai-prompts', async (c) => {
-  const { DB } = c.env
-  
-  try {
-    const prompts = await DB.prepare(`
-      SELECT * FROM ai_prompts ORDER BY section_id ASC
-    `).all()
-    return c.json(prompts.results || [])
-  } catch (error) {
-    console.error('Load AI prompts error:', error)
-    return c.json([])
-  }
-})
-
-// AIプロンプト更新
-routes.put('/master/ai-prompts/:id', async (c) => {
-  const { DB } = c.env
-  const id = c.req.param('id')
-  const data = await c.req.json()
-  
-  try {
-    await DB.prepare(`
-      UPDATE ai_prompts SET prompt_text = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-    `).bind(data.prompt_text, id).run()
-    
-    return c.json({ success: true })
-  } catch (error: any) {
-    console.error('Update AI prompt error:', error)
-    return c.json({ error: error.message }, 500)
-  }
-})
+// AIプロンプト関連は master-data.ts で管理（site_settingsテーブル使用）
+// 旧ai_promptsテーブルは使用しない
 
 // AIモデル設定取得API
 routes.get('/master/ai-models', async (c) => {

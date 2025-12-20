@@ -822,7 +822,7 @@ routes.get('/master/ai-prompts', async (c) => {
             
             async function loadPrompts() {
                 try {
-                    const res = await axios.get('/api/master/ai-prompts');
+                    const res = await axios.get('/master/ai-prompts');
                     const prompts = res.data;
                     
                     // セクション別プロンプト
@@ -858,7 +858,7 @@ routes.get('/master/ai-prompts', async (c) => {
             
             async function editSection(sectionId) {
                 try {
-                    const res = await axios.get('/api/master/ai-prompts');
+                    const res = await axios.get('/master/ai-prompts');
                     const p = res.data.sections?.[sectionId] || {};
                     currentSectionData = p;
                     
@@ -884,7 +884,7 @@ routes.get('/master/ai-prompts', async (c) => {
                 const sectionId = document.getElementById('sectionId').value;
                 
                 try {
-                    await axios.put('/api/master/ai-prompts/section/' + sectionId, {
+                    await axios.put('/master/ai-prompts/section/' + sectionId, {
                         purpose: document.getElementById('sectionPurpose').value,
                         required: document.getElementById('sectionRequired').value,
                         prohibited: document.getElementById('sectionProhibited').value,
@@ -900,7 +900,7 @@ routes.get('/master/ai-prompts', async (c) => {
             
             async function saveBasePrompt() {
                 try {
-                    await axios.put('/api/master/ai-prompts/base', {
+                    await axios.put('/master/ai-prompts/base', {
                         content: document.getElementById('basePrompt').value
                     });
                     alert('保存しました');
@@ -911,7 +911,7 @@ routes.get('/master/ai-prompts', async (c) => {
             
             async function saveOutputRules() {
                 try {
-                    await axios.put('/api/master/ai-prompts/rules', {
+                    await axios.put('/master/ai-prompts/rules', {
                         content: document.getElementById('outputRules').value
                     });
                     alert('保存しました');
