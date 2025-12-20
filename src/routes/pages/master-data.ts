@@ -822,7 +822,7 @@ routes.get('/master/ai-prompts', async (c) => {
             
             async function loadPrompts() {
                 try {
-                    const res = await axios.get('/master/ai-prompts');
+                    const res = await axios.get('/master/ai-prompts/data');
                     const prompts = res.data;
                     
                     // セクション別プロンプト
@@ -858,7 +858,7 @@ routes.get('/master/ai-prompts', async (c) => {
             
             async function editSection(sectionId) {
                 try {
-                    const res = await axios.get('/master/ai-prompts');
+                    const res = await axios.get('/master/ai-prompts/data');
                     const p = res.data.sections?.[sectionId] || {};
                     currentSectionData = p;
                     
@@ -932,8 +932,8 @@ routes.get('/master/ai-prompts', async (c) => {
   `)
 })
 
-// AIプロンプトAPI
-routes.get('/master/ai-prompts', async (c) => {
+// AIプロンプトAPI (データ取得)
+routes.get('/master/ai-prompts/data', async (c) => {
   const { DB } = c.env
   
   // site_settingsからプロンプト設定を取得
