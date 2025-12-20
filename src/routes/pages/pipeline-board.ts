@@ -129,7 +129,7 @@ routes.get('/pipeline', (c) => {
                     
                     // 公募要領を取得（申請期限用）
                     try {
-                        const glRes = await axios.get('/api/guidelines');
+                        const glRes = await axios.get('/api/subsidy-guidelines');
                         const glList = glRes.data || [];
                         glList.forEach(gl => {
                             // 補助金種別ごとに最新の公募要領を保持
