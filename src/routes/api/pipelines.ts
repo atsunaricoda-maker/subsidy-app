@@ -341,6 +341,53 @@ routes.get('/clients/:clientId/cases', async (c) => {
   return c.json(cases.results || [])
 })
 
+// 全アクティブパイプライン取得（案件進捗ボード用）
+routes.get('/pipelines/all-active', async (c) => {
+  const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 組織IDで絞り込み
+  const orgId = user?.organization_id || (c as any).get?.('tenantOrgId')
+  
+  // アクティブな案件のパイプラインをタスク付きで取得
+  const pipelines = await DB.prepare(`
+    SELECT cp.*, 
+           pt.name as template_name,
+           c.title as case_title,
+           cl.name as client_name,
+           cl.company_name as client_company,
+           st.name as subsidy_name
+    FROM client_pipelines cp
+    LEFT JOIN pipeline_templates pt ON cp.template_id = pt.id
+    LEFT JOIN cases c ON cp.case_id = c.id
+    LEFT JOIN clients cl ON cp.client_id = cl.id
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    WHERE (c.is_archived = 0 OR c.is_archived IS NULL)
+      AND cp.status = 'active'
+      ${orgId ? 'AND cl.organization_id = ?' : ''}
+    ORDER BY cp.created_at DESC
+    LIMIT 50
+  `).bind(...(orgId ? [orgId] : [])).all()
+  
+  // 各パイプラインのタスクを取得
+  const result = []
+  for (const pipeline of (pipelines.results || [])) {
+    const tasks = await DB.prepare(`
+      SELECT id, task_name, task_type, status, due_date, description, sort_order
+      FROM client_pipeline_tasks
+      WHERE pipeline_id = ?
+      ORDER BY sort_order ASC
+    `).bind(pipeline.id).all()
+    
+    result.push({
+      ...pipeline,
+      tasks: tasks.results || []
+    })
+  }
+  
+  return c.json(result)
+})
+
 // 顧客のパイプライン一覧取得（顧客ポータル用）
 // 完了してアーカイブされた案件のパイプラインは除外（サービス進捗から消える）
 routes.get('/clients/:clientId/pipelines', async (c) => {
