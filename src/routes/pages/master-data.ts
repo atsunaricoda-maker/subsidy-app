@@ -1245,7 +1245,7 @@ routes.get('/master/document-templates', async (c) => {
                                         <p class="text-sm text-gray-500 mt-1">\${sections.length}セクション</p>
                                         <div class="flex flex-wrap gap-2 mt-3">
                                             \${sections.map(s => \`
-                                                <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">\${s.title}</span>
+                                                <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">\${s.title || s.name}</span>
                                             \`).join('')}
                                         </div>
                                     </div>
@@ -1381,50 +1381,6 @@ routes.get('/master/document-templates', async (c) => {
     </body>
     </html>
   `)
-})
-
-// 文書テンプレートAPI
-routes.get('/document-templates/:id', async (c) => {
-  const { DB } = c.env
-  const id = c.req.param('id')
-  const template = await DB.prepare('SELECT * FROM document_templates WHERE id = ?').bind(id).first()
-  return c.json(template)
-})
-
-routes.post('/document-templates', async (c) => {
-  const { DB } = c.env
-  const data = await c.req.json()
-  
-  await DB.prepare(`
-    INSERT INTO document_templates (template_name, subsidy_type_id, sections)
-    VALUES (?, ?, ?)
-  `).bind(data.template_name, data.subsidy_type_id, data.sections).run()
-  
-  return c.json({ success: true })
-})
-
-routes.put('/document-templates/:id', async (c) => {
-  const { DB } = c.env
-  const id = c.req.param('id')
-  const data = await c.req.json()
-  
-  await DB.prepare(`
-    UPDATE document_templates SET
-      template_name = ?,
-      subsidy_type_id = ?,
-      sections = ?,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).bind(data.template_name, data.subsidy_type_id, data.sections, id).run()
-  
-  return c.json({ success: true })
-})
-
-routes.delete('/document-templates/:id', async (c) => {
-  const { DB } = c.env
-  const id = c.req.param('id')
-  await DB.prepare('DELETE FROM document_templates WHERE id = ?').bind(id).run()
-  return c.json({ success: true })
 })
 
 export default routes

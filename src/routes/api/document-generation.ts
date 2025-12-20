@@ -21,6 +21,78 @@ routes.get('/document-templates', async (c) => {
   return c.json(result.results)
 })
 
+// テンプレート単体取得
+routes.get('/document-templates/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  const result = await DB.prepare(`
+    SELECT dt.*, st.name as subsidy_name
+    FROM document_templates dt
+    LEFT JOIN subsidy_types st ON dt.subsidy_type_id = st.id
+    WHERE dt.id = ?
+  `).bind(id).first()
+  
+  if (!result) {
+    return c.json({ error: 'テンプレートが見つかりません' }, 404)
+  }
+  
+  return c.json(result)
+})
+
+// テンプレート作成
+routes.post('/document-templates', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  
+  const result = await DB.prepare(`
+    INSERT INTO document_templates (subsidy_type_id, template_name, template_version, sections, ai_prompt_base, is_active)
+    VALUES (?, ?, ?, ?, ?, 1)
+  `).bind(
+    body.subsidy_type_id,
+    body.template_name,
+    body.template_version || '1.0',
+    JSON.stringify(body.sections || []),
+    body.ai_prompt_base || null
+  ).run()
+  
+  return c.json({ id: result.meta.last_row_id, success: true })
+})
+
+// テンプレート更新
+routes.put('/document-templates/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  
+  await DB.prepare(`
+    UPDATE document_templates 
+    SET template_name = ?, template_version = ?, sections = ?, ai_prompt_base = ?, subsidy_type_id = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(
+    body.template_name,
+    body.template_version || '1.0',
+    JSON.stringify(body.sections || []),
+    body.ai_prompt_base || null,
+    body.subsidy_type_id,
+    id
+  ).run()
+  
+  return c.json({ success: true })
+})
+
+// テンプレート削除
+routes.delete('/document-templates/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  await DB.prepare(`
+    UPDATE document_templates SET is_active = 0 WHERE id = ?
+  `).bind(id).run()
+  
+  return c.json({ success: true })
+})
+
 // 補助金種別のテンプレート取得
 routes.get('/document-templates/by-subsidy/:subsidyTypeId', async (c) => {
   const { DB } = c.env
