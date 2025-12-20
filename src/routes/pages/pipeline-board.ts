@@ -146,26 +146,19 @@ routes.get('/pipeline', (c) => {
                     const casesRes = await axios.get('/api/cases?limit=1000&include_archived=false');
                     allCases = casesRes.data.cases || casesRes.data || [];
                     
-                    // 各案件のパイプラインを取得
+                    // 各案件のパイプラインタスクを取得
+                    // APIは /api/cases/:id/pipelines でタスク一覧を直接返す
                     allPipelines = {};
                     for (const c of allCases) {
                         try {
                             const res = await axios.get('/api/cases/' + c.id + '/pipelines');
-                            const pipelines = res.data || [];
-                            if (pipelines.length > 0) {
-                                // タスクを取得
-                                try {
-                                    const tasksRes = await axios.get('/api/pipelines/' + pipelines[0].id + '/tasks');
-                                    allPipelines[c.id] = {
-                                        pipeline: pipelines[0],
-                                        tasks: tasksRes.data || []
-                                    };
-                                } catch (e) {
-                                    allPipelines[c.id] = {
-                                        pipeline: pipelines[0],
-                                        tasks: []
-                                    };
-                                }
+                            const tasks = res.data || [];
+                            if (tasks.length > 0) {
+                                // タスクをsort_order順にソート
+                                tasks.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+                                allPipelines[c.id] = {
+                                    tasks: tasks
+                                };
                             }
                         } catch (e) {
                             // パイプラインがない場合は無視
@@ -200,16 +193,21 @@ routes.get('/pipeline', (c) => {
                     return { percent: 0, completed: 0, total: 0, currentTask: null, tasks: [] };
                 }
                 
+                // タスクはsort_order順にソート済み
                 const tasks = pipelineData.tasks;
-                const completed = tasks.filter(t => t.status === 'completed').length;
-                const inProgress = tasks.find(t => t.status === 'in_progress');
-                const percent = Math.round((completed / tasks.length) * 100);
+                const completedCount = tasks.filter(t => t.status === 'completed').length;
+                const percent = Math.round((completedCount / tasks.length) * 100);
+                
+                // 現在のタスク: 進行中があればそれ、なければ未完了の最初（sort_order順）
+                const inProgressTask = tasks.find(t => t.status === 'in_progress');
+                const firstPendingTask = tasks.find(t => t.status === 'pending' || t.status === 'not_started');
+                const currentTask = inProgressTask || firstPendingTask;
                 
                 return {
                     percent,
-                    completed,
+                    completed: completedCount,
                     total: tasks.length,
-                    currentTask: inProgress || tasks.find(t => t.status === 'pending'),
+                    currentTask,
                     tasks
                 };
             }
@@ -407,7 +405,7 @@ routes.get('/pipeline', (c) => {
                             \${progress.currentTask ? \`
                                 <div class="flex items-center gap-2">
                                     <span class="task-dot \${progress.currentTask.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'}"></span>
-                                    <span class="text-sm text-gray-700">\${progress.currentTask.name}</span>
+                                    <span class="text-sm text-gray-700">\${progress.currentTask.task_name}</span>
                                 </div>
                             \` : \`
                                 <span class="text-sm text-gray-400">-</span>
@@ -486,7 +484,7 @@ routes.get('/pipeline', (c) => {
                                     \${t.status === 'completed' ? '<i class="fas fa-check"></i>' : i + 1}
                                 </div>
                                 <div class="flex-1">
-                                    <div class="font-medium \${t.status === 'completed' ? 'text-green-800 line-through' : 'text-gray-800'}">\${t.name}</div>
+                                    <div class="font-medium \${t.status === 'completed' ? 'text-green-800 line-through' : 'text-gray-800'}">\${t.task_name}</div>
                                     \${t.description ? '<div class="text-xs text-gray-500">' + t.description + '</div>' : ''}
                                 </div>
                                 <div class="text-xs \${t.status === 'completed' ? 'text-green-600' : t.status === 'in_progress' ? 'text-blue-600' : 'text-gray-400'}">
