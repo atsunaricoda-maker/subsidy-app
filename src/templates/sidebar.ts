@@ -20,11 +20,12 @@ export function generateSidebar(activePage: string = '') {
                 <span>ダッシュボード</span>
             </a>
             
-            <!-- 案件進捗 - トップレベルで目立つ位置に -->
-            <a href="/pipeline" class="sidebar-link ${isActive('pipeline')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-to-r from-blue-600/30 to-purple-600/30 border border-blue-400/30 mt-2">
-                <i class="fas fa-tasks w-4 text-center text-yellow-300"></i>
-                <span class="font-medium">案件進捗</span>
-                <span class="ml-auto text-xs bg-yellow-500 text-yellow-900 px-1.5 py-0.5 rounded font-bold">NEW</span>
+            <!-- 案件進捗ボード - 最重要機能として目立つ位置に -->
+            <a href="/pipeline" class="sidebar-link ${isActive('pipeline')} flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm bg-gradient-to-r from-indigo-600/40 to-purple-600/40 border border-indigo-400/50 mt-2 hover:from-indigo-600/60 hover:to-purple-600/60">
+                <div class="w-6 h-6 rounded bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow">
+                    <i class="fas fa-columns text-white text-xs"></i>
+                </div>
+                <span class="font-bold">案件進捗ボード</span>
             </a>
             
             <!-- 案件管理セクション - 折りたたみ可能、デフォルト展開 -->
