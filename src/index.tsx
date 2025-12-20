@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import type { AppEnv } from './types'
 import { generateSidebar, sidebarStyles, sidebarScripts } from './templates/sidebar'
+import { extractSlugFromHost, getOrganizationBySlug, isOrganizationActive } from './utils/tenant'
 
 // API Routes
 import admin_usersRoutes from './routes/api/admin-users'
@@ -65,6 +66,92 @@ const app = new Hono<AppEnv>()
 
 // CORS設定
 app.use('/api/*', cors())
+
+// マルチテナントミドルウェア：サブドメインから組織を判別
+app.use('*', async (c, next) => {
+  const host = c.req.header('host') || ''
+  const slug = extractSlugFromHost(host)
+  
+  // サブドメインがある場合、組織を解決
+  if (slug) {
+    const { DB } = c.env
+    const org = await getOrganizationBySlug(DB, slug)
+    
+    if (!org) {
+      // 組織が見つからない場合
+      const path = c.req.path
+      // APIはエラーを返す
+      if (path.startsWith('/api/')) {
+        return c.json({ error: '組織が見つかりません', slug }, 404)
+      }
+      // ページはエラーページを表示
+      return c.html(`
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>組織が見つかりません - 申請らくらく君</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+          <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+            <div class="text-6xl mb-4">💼</div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">組織が見つかりません</h1>
+            <p class="text-gray-600 mb-6">
+              <code class="bg-gray-100 px-2 py-1 rounded">${slug}.shinsei-raku.com</code> は登録されていません。
+            </p>
+            <div class="space-y-3">
+              <a href="https://shinsei-raku.com/signup" class="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition">
+                <i class="fas fa-user-plus mr-2"></i>新規登録はこちら
+              </a>
+              <a href="https://shinsei-raku.com" class="block w-full bg-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-300 transition">
+                トップページへ
+              </a>
+            </div>
+          </div>
+        </body>
+        </html>
+      `, 404)
+    }
+    
+    // 組織のステータス確認
+    if (!isOrganizationActive(org)) {
+      const path = c.req.path
+      if (path.startsWith('/api/')) {
+        return c.json({ error: '組織の利用が停止されています', status: org.status }, 403)
+      }
+      return c.html(`
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>利用停止中 - 申請らくらく君</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+          <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+            <div class="text-6xl mb-4">⚠️</div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">利用停止中</h1>
+            <p class="text-gray-600 mb-6">
+              この組織の利用は現在停止されています。<br>
+              お心当たりのある場合は管理者にお問い合わせください。
+            </p>
+          </div>
+        </body>
+        </html>
+      `, 403)
+    }
+    
+    // 組織情報をコンテキストに保存
+    c.set('tenantOrg', org)
+    c.set('tenantOrgId', org.id)
+    c.set('tenantSlug', slug)
+  }
+  
+  await next()
+})
 
 // Mount routes
 app.route('/api', admin_usersRoutes)

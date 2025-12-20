@@ -151,15 +151,34 @@ routes.post('/auth/login', async (c) => {
   const { DB } = c.env
   const { username, password } = await c.req.json()
   
-  const user = await DB.prepare(`
-    SELECT au.*, o.name as organization_name, o.status as org_status
+  // サブドメインからテナント組織IDを取得
+  const tenantOrgId = c.get('tenantOrgId')
+  
+  // ユーザー取得クエリ
+  let query = `
+    SELECT au.*, o.name as organization_name, o.status as org_status, o.slug as organization_slug
     FROM admin_users au
     LEFT JOIN organizations o ON au.organization_id = o.id
     WHERE au.username = ? AND au.password_hash = ?
-  `).bind(username, password).first()
+  `
+  
+  // サブドメインがある場合、その組織のユーザーのみ許可
+  if (tenantOrgId) {
+    query += ` AND au.organization_id = ?`
+  }
+  
+  const bindValues = tenantOrgId 
+    ? [username, password, tenantOrgId]
+    : [username, password]
+  
+  const user = await DB.prepare(query).bind(...bindValues).first()
   
   if (!user) {
-    return c.json({ error: 'Invalid credentials' }, 401)
+    // サブドメインがある場合はより具体的なエラーメッセージ
+    if (tenantOrgId) {
+      return c.json({ error: 'このサブドメインで有効なアカウントではありません' }, 401)
+    }
+    return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401)
   }
   
   // 組織が停止中の場合はログインを拒否
@@ -180,7 +199,8 @@ routes.post('/auth/login', async (c) => {
     username: user.username,
     role: user.role || 'staff',
     organization_id: user.organization_id,
-    organization_name: user.organization_name
+    organization_name: user.organization_name,
+    organization_slug: user.organization_slug
   })
 })
 

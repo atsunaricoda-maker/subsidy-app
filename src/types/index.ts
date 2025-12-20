@@ -17,6 +17,18 @@ export type Variables = {
     role: string;
     organization_id: number;
   };
+  // マルチテナント用
+  tenantOrg?: {
+    id: number;
+    name: string;
+    slug: string;
+    email: string;
+    status: string;
+    trial_ends_at: string;
+    business_scope: string;
+  };
+  tenantOrgId?: number;
+  tenantSlug?: string;
 }
 
 export type AppEnv = {
