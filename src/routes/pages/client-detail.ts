@@ -1427,12 +1427,14 @@ routes.get('/client/:id', async (c) => {
                         return;
                     }
                     
-                    // ステータス定義
+                    // ステータス定義（フロー順）
                     const STATUSES = [
                         { key: 'inquiry', label: '見込み', color: 'yellow', icon: 'fa-lightbulb' },
                         { key: 'preparing', label: '書類準備中', color: 'orange', icon: 'fa-file-alt' },
                         { key: 'applying', label: '申請中', color: 'purple', icon: 'fa-paper-plane' },
-                        { key: 'completed', label: '完了済み', color: 'green', icon: 'fa-check-circle' }
+                        { key: 'adopted', label: '採択', color: 'blue', icon: 'fa-award' },
+                        { key: 'rejected', label: '不採択', color: 'red', icon: 'fa-times-circle' },
+                        { key: 'completed', label: '完了', color: 'green', icon: 'fa-check-circle' }
                     ];
                     
                     // ステータスごとに案件をグループ化
@@ -1455,6 +1457,7 @@ routes.get('/client/:id', async (c) => {
                             blue: { bg: 'bg-blue-50', border: 'border-blue-300', header: 'bg-blue-100 text-blue-800', badge: 'bg-blue-500' },
                             orange: { bg: 'bg-orange-50', border: 'border-orange-300', header: 'bg-orange-100 text-orange-800', badge: 'bg-orange-500' },
                             purple: { bg: 'bg-purple-50', border: 'border-purple-300', header: 'bg-purple-100 text-purple-800', badge: 'bg-purple-500' },
+                            red: { bg: 'bg-red-50', border: 'border-red-300', header: 'bg-red-100 text-red-800', badge: 'bg-red-500' },
                             green: { bg: 'bg-green-50', border: 'border-green-300', header: 'bg-green-100 text-green-800', badge: 'bg-green-500' }
                         }[status.color];
                         
