@@ -116,12 +116,31 @@ routes.get('/pipeline', (c) => {
             let subsidyTypes = [];
             let allCases = [];
             let allPipelines = {};
+            let guidelines = {};
             
             async function loadData() {
                 try {
+                    document.getElementById('subsidyGroups').innerHTML = 
+                        '<div class="text-center py-12 text-gray-500"><i class="fas fa-spinner fa-spin text-3xl mb-3"></i><div>読み込み中...</div></div>';
+                    
                     // 補助金種別を取得
                     const stRes = await axios.get('/api/subsidy-types');
                     subsidyTypes = stRes.data || [];
+                    
+                    // 公募要領を取得（申請期限用）
+                    try {
+                        const glRes = await axios.get('/api/guidelines');
+                        const glList = glRes.data || [];
+                        glList.forEach(gl => {
+                            // 補助金種別ごとに最新の公募要領を保持
+                            if (!guidelines[gl.subsidy_type_id] || 
+                                new Date(gl.application_end_date) > new Date(guidelines[gl.subsidy_type_id].application_end_date)) {
+                                guidelines[gl.subsidy_type_id] = gl;
+                            }
+                        });
+                    } catch (e) {
+                        console.log('Guidelines not available');
+                    }
                     
                     // 全案件を取得（アーカイブ以外）
                     const casesRes = await axios.get('/api/cases?limit=1000&include_archived=false');
@@ -129,24 +148,29 @@ routes.get('/pipeline', (c) => {
                     
                     // 各案件のパイプラインを取得
                     allPipelines = {};
-                    const pipelinePromises = allCases.map(async (c) => {
+                    for (const c of allCases) {
                         try {
                             const res = await axios.get('/api/cases/' + c.id + '/pipelines');
                             const pipelines = res.data || [];
                             if (pipelines.length > 0) {
                                 // タスクを取得
-                                const tasksRes = await axios.get('/api/pipelines/' + pipelines[0].id + '/tasks');
-                                allPipelines[c.id] = {
-                                    pipeline: pipelines[0],
-                                    tasks: tasksRes.data || []
-                                };
+                                try {
+                                    const tasksRes = await axios.get('/api/pipelines/' + pipelines[0].id + '/tasks');
+                                    allPipelines[c.id] = {
+                                        pipeline: pipelines[0],
+                                        tasks: tasksRes.data || []
+                                    };
+                                } catch (e) {
+                                    allPipelines[c.id] = {
+                                        pipeline: pipelines[0],
+                                        tasks: []
+                                    };
+                                }
                             }
                         } catch (e) {
                             // パイプラインがない場合は無視
                         }
-                    });
-                    
-                    await Promise.all(pipelinePromises);
+                    }
                     
                     renderSummary();
                     renderSubsidyGroups();
@@ -155,6 +179,19 @@ routes.get('/pipeline', (c) => {
                     document.getElementById('subsidyGroups').innerHTML = 
                         '<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-circle text-3xl mb-3"></i><div>読み込みに失敗しました</div></div>';
                 }
+            }
+            
+            function getDeadline(caseItem) {
+                // 案件に個別の期限があればそれを使用
+                if (caseItem.deadline) {
+                    return { date: caseItem.deadline, source: 'case' };
+                }
+                // なければ公募要領の申請期限を使用
+                const gl = guidelines[caseItem.subsidy_type_id];
+                if (gl && gl.application_end_date) {
+                    return { date: gl.application_end_date, source: 'guideline' };
+                }
+                return null;
             }
             
             function calculateProgress(caseId) {
@@ -188,7 +225,8 @@ routes.get('/pipeline', (c) => {
                         completed++;
                     } else if (c.status !== 'rejected') {
                         inProgress++;
-                        if (c.deadline && new Date(c.deadline) < now) {
+                        const deadline = getDeadline(c);
+                        if (deadline && new Date(deadline.date) < now) {
                             overdue++;
                         }
                     }
@@ -206,6 +244,7 @@ routes.get('/pipeline', (c) => {
                 subsidyTypes.forEach(st => {
                     grouped[st.id] = {
                         subsidyType: st,
+                        guideline: guidelines[st.id],
                         cases: []
                     };
                 });
@@ -213,6 +252,7 @@ routes.get('/pipeline', (c) => {
                 // 未分類用
                 grouped['other'] = {
                     subsidyType: { id: 'other', name: '種別未設定' },
+                    guideline: null,
                     cases: []
                 };
                 
@@ -238,19 +278,32 @@ routes.get('/pipeline', (c) => {
                 
                 document.getElementById('subsidyGroups').innerHTML = sortedGroups.map(group => {
                     const st = group.subsidyType;
+                    const gl = group.guideline;
                     const cases = group.cases;
                     
-                    // 進捗率でソート（低い順＝要対応順）
+                    // 進捗率でソート（低い順＝要対応順）、その後期限順
                     cases.sort((a, b) => {
                         const progressA = calculateProgress(a.id).percent;
                         const progressB = calculateProgress(b.id).percent;
-                        return progressA - progressB;
+                        if (progressA !== progressB) return progressA - progressB;
+                        
+                        const deadlineA = getDeadline(a);
+                        const deadlineB = getDeadline(b);
+                        if (deadlineA && deadlineB) {
+                            return new Date(deadlineA.date) - new Date(deadlineB.date);
+                        }
+                        return 0;
                     });
                     
                     // グループの平均進捗
                     const avgProgress = cases.length > 0 
                         ? Math.round(cases.reduce((sum, c) => sum + calculateProgress(c.id).percent, 0) / cases.length)
                         : 0;
+                    
+                    // 申請期限表示
+                    const deadlineHtml = gl && gl.application_end_date 
+                        ? '<div class="text-xs text-gray-500"><i class="fas fa-calendar-alt mr-1"></i>申請期限: ' + formatDateFull(gl.application_end_date) + '</div>'
+                        : '';
                     
                     return \`
                         <div class="subsidy-group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -260,7 +313,10 @@ routes.get('/pipeline', (c) => {
                                     <i class="fas fa-chevron-down collapse-icon text-gray-400 transition-transform"></i>
                                     <div>
                                         <h2 class="font-bold text-gray-800">\${st.name}</h2>
-                                        <div class="text-sm text-gray-500">\${cases.length}社が申請中</div>
+                                        <div class="flex items-center gap-3">
+                                            <span class="text-sm text-gray-500">\${cases.length}社が申請中</span>
+                                            \${deadlineHtml}
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-4">
@@ -278,7 +334,7 @@ routes.get('/pipeline', (c) => {
                                     <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
                                         <tr>
                                             <th class="px-5 py-3 text-left font-medium">会社名</th>
-                                            <th class="px-5 py-3 text-left font-medium w-64">進捗</th>
+                                            <th class="px-5 py-3 text-left font-medium w-56">進捗</th>
                                             <th class="px-5 py-3 text-left font-medium">現在のタスク</th>
                                             <th class="px-5 py-3 text-left font-medium">期限</th>
                                             <th class="px-5 py-3 text-left font-medium">ステータス</th>
@@ -297,7 +353,8 @@ routes.get('/pipeline', (c) => {
             
             function renderCaseRow(c) {
                 const progress = calculateProgress(c.id);
-                const isOverdue = c.deadline && new Date(c.deadline) < new Date();
+                const deadline = getDeadline(c);
+                const isOverdue = deadline && new Date(deadline.date) < new Date();
                 
                 const statusColors = {
                     inquiry: 'bg-yellow-100 text-yellow-800',
@@ -322,9 +379,9 @@ routes.get('/pipeline', (c) => {
                 return \`
                     <tr class="case-row hover:bg-gray-50 transition-colors">
                         <td class="px-5 py-4">
-                            <a href="/cases/\${c.id}" class="hover:text-blue-600">
+                            <a href="/case/\${c.id}" class="hover:text-blue-600">
                                 <div class="font-medium text-gray-800">\${c.company_name || c.client_name || '未設定'}</div>
-                                <div class="text-xs text-gray-500">\${c.client_name || ''}</div>
+                                \${c.company_name && c.client_name ? '<div class="text-xs text-gray-500">' + c.client_name + '</div>' : ''}
                             </a>
                         </td>
                         <td class="px-5 py-4">
@@ -332,14 +389,14 @@ routes.get('/pipeline', (c) => {
                                 <div class="flex-1">
                                     <div class="flex items-center justify-between mb-1">
                                         <span class="text-sm font-medium text-gray-700">\${progress.percent}%</span>
-                                        <span class="text-xs text-gray-500">\${progress.completed}/\${progress.total}タスク</span>
+                                        <span class="text-xs text-gray-500">\${progress.total > 0 ? progress.completed + '/' + progress.total + 'タスク' : 'タスク未設定'}</span>
                                     </div>
                                     <div class="h-2 progress-bar-bg rounded-full overflow-hidden">
                                         <div class="h-full progress-bar-fill \${progressColor}" style="width: \${progress.percent}%"></div>
                                     </div>
                                 </div>
                                 \${progress.tasks.length > 0 ? \`
-                                <button onclick="event.stopPropagation(); showTasks(\${c.id}, '\${c.company_name || c.client_name || ''}')" 
+                                <button onclick="event.stopPropagation(); showTasks(\${c.id}, '\${(c.company_name || c.client_name || '').replace(/'/g, "\\\\'")}')" 
                                         class="text-gray-400 hover:text-blue-600" title="タスク詳細">
                                     <i class="fas fa-list-check"></i>
                                 </button>
@@ -353,15 +410,15 @@ routes.get('/pipeline', (c) => {
                                     <span class="text-sm text-gray-700">\${progress.currentTask.name}</span>
                                 </div>
                             \` : \`
-                                <span class="text-sm text-gray-400">タスク未設定</span>
+                                <span class="text-sm text-gray-400">-</span>
                             \`}
                         </td>
                         <td class="px-5 py-4">
-                            \${c.deadline ? \`
+                            \${deadline ? \`
                                 <div class="\${isOverdue ? 'text-red-600 font-medium overdue' : 'text-gray-600'}">
-                                    <i class="fas fa-calendar mr-1"></i>
-                                    \${formatDate(c.deadline)}
+                                    \${formatDate(deadline.date)}
                                     \${isOverdue ? '<i class="fas fa-exclamation-triangle ml-1"></i>' : ''}
+                                    \${deadline.source === 'guideline' ? '<span class="text-xs text-gray-400 ml-1">(公募)</span>' : ''}
                                 </div>
                             \` : '<span class="text-gray-400">-</span>'}
                         </td>
@@ -371,7 +428,7 @@ routes.get('/pipeline', (c) => {
                             </span>
                         </td>
                         <td class="px-5 py-4 text-center">
-                            <a href="/cases/\${c.id}" class="text-blue-600 hover:text-blue-800">
+                            <a href="/case/\${c.id}" class="text-blue-600 hover:text-blue-800" title="案件詳細">
                                 <i class="fas fa-external-link-alt"></i>
                             </a>
                         </td>
@@ -388,13 +445,19 @@ routes.get('/pipeline', (c) => {
                 const formatted = (d.getMonth() + 1) + '/' + d.getDate();
                 
                 if (diffDays < 0) {
-                    return formatted + ' (' + Math.abs(diffDays) + '日超過)';
+                    return formatted + ' <span class="text-red-500">(' + Math.abs(diffDays) + '日超過)</span>';
                 } else if (diffDays === 0) {
-                    return formatted + ' (今日)';
+                    return formatted + ' <span class="text-orange-500">(今日)</span>';
                 } else if (diffDays <= 7) {
-                    return formatted + ' (あと' + diffDays + '日)';
+                    return formatted + ' <span class="text-orange-500">(あと' + diffDays + '日)</span>';
                 }
                 return formatted;
+            }
+            
+            function formatDateFull(dateStr) {
+                if (!dateStr) return '';
+                const d = new Date(dateStr);
+                return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
             }
             
             function toggleGroup(el) {
@@ -433,7 +496,7 @@ routes.get('/pipeline', (c) => {
                         \`).join('')}
                     </div>
                     <div class="mt-4 pt-4 border-t">
-                        <a href="/cases/\${caseId}" class="block w-full text-center bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                        <a href="/case/\${caseId}" class="block w-full text-center bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                             案件詳細を開く
                         </a>
                     </div>
