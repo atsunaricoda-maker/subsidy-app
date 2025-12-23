@@ -337,12 +337,15 @@ routes.post('/cases', async (c) => {
   // アクセストークンを生成
   const accessToken = crypto.randomUUID().replace(/-/g, '').substring(0, 20)
   
-  // 案件番号を生成（CASE-YYYY-NNNN形式）
-  const year = new Date().getFullYear()
+  // 案件番号を生成（CASE-YYYYMMDD-NNNN形式）
+  const now = new Date()
+  const dateStr = now.getFullYear().toString() + 
+                  String(now.getMonth() + 1).padStart(2, '0') + 
+                  String(now.getDate()).padStart(2, '0')
   const countResult = await DB.prepare(`
     SELECT COUNT(*) as count FROM cases WHERE case_number LIKE ? AND organization_id = ?
-  `).bind(`CASE-${year}-%`, orgId).first()
-  const caseNumber = `CASE-${year}-${String((countResult?.count || 0) + 1).padStart(4, '0')}`
+  `).bind(`CASE-${dateStr}-%`, orgId).first()
+  const caseNumber = `CASE-${dateStr}-${String((countResult?.count || 0) + 1).padStart(4, '0')}`
   
   const result = await DB.prepare(`
     INSERT INTO cases (
