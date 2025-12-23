@@ -123,7 +123,16 @@ routes.get('/support/faq', async (c) => {
     
     const faqs = await DB.prepare(query).bind(...params).all()
     
-    return c.json({ faqs: faqs.results || [] })
+    // DBにデータがない場合はデフォルトFAQを返す
+    if (!faqs.results || faqs.results.length === 0) {
+      let defaultFaqs = getDefaultFAQs()
+      if (category) {
+        defaultFaqs = defaultFaqs.filter((faq: any) => faq.category === category)
+      }
+      return c.json({ faqs: defaultFaqs })
+    }
+    
+    return c.json({ faqs: faqs.results })
   } catch (error) {
     console.error('FAQ fetch error:', error)
     // テーブルがない場合はデフォルトFAQを返す
