@@ -1402,7 +1402,7 @@ routes.get('/master/organizations', async (c) => {
             }
             
             async function loginAsOrg(orgId) {
-                if (!confirm('この法人の管理画面に切り替えますか？')) return;
+                if (!confirm('この法人の管理画面に切り替えますか？\\n\\n※サブドメインの管理画面に移動します')) return;
                 try {
                     const token = localStorage.getItem('master_token');
                     const response = await axios.post('/api/master/impersonate/' + orgId, {}, {
@@ -1415,8 +1415,16 @@ routes.get('/master/organizations', async (c) => {
                     localStorage.setItem('admin_username', response.data.username);
                     localStorage.setItem('admin_role', response.data.role);
                     localStorage.setItem('organization_id', orgId);
+                    localStorage.setItem('organization_slug', response.data.organization_slug);
+                    localStorage.setItem('organization_name', response.data.organization_name);
                     
-                    window.location.href = '/';
+                    // サブドメインにリダイレクト
+                    const slug = response.data.organization_slug;
+                    if (slug) {
+                        window.location.href = 'https://' + slug + '.shinsei-raku.com/';
+                    } else {
+                        window.location.href = '/';
+                    }
                 } catch (error) {
                     alert('ログインに失敗しました');
                 }
@@ -2753,10 +2761,19 @@ routes.post('/master/impersonate/:id', async (c) => {
   const { DB } = c.env
   const orgId = c.req.param('id')
   
+  // 組織情報を取得
+  const org = await DB.prepare(`
+    SELECT id, slug, name FROM organizations WHERE id = ?
+  `).bind(orgId).first() as any
+  
+  if (!org) {
+    return c.json({ error: 'Organization not found' }, 404)
+  }
+  
   // 組織の管理者アカウントを取得
   const admin = await DB.prepare(`
     SELECT * FROM admin_users WHERE organization_id = ? AND role = 'admin' LIMIT 1
-  `).bind(orgId).first()
+  `).bind(orgId).first() as any
   
   if (!admin) {
     return c.json({ error: 'Admin not found for this organization' }, 404)
@@ -2769,7 +2786,9 @@ routes.post('/master/impersonate/:id', async (c) => {
     name: admin.name,
     username: admin.username,
     role: admin.role || 'admin',
-    organization_id: orgId
+    organization_id: orgId,
+    organization_slug: org.slug,
+    organization_name: org.name
   })
 })
 
