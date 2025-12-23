@@ -1,7 +1,7 @@
 // API: 顧客管理
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -10,8 +10,11 @@ routes.get('/recent-activity', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   
-  // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   try {
     // 最近のコミュニケーション
@@ -88,8 +91,11 @@ routes.get('/clients', async (c) => {
   const user = await getCurrentUser(c)
   const includeCases = c.req.query('include_cases') === 'true'
   
-  // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // 補助金の公募要領情報もJOINして取得
   let query = `
@@ -140,6 +146,12 @@ routes.get('/clients-with-cases', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
   // 案件ベースで一覧取得
   let query = `
     SELECT 
@@ -174,20 +186,19 @@ routes.get('/clients-with-cases', async (c) => {
     LEFT JOIN clients ON cases.client_id = clients.id
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
     LEFT JOIN subsidy_guidelines sg ON cases.subsidy_type_id = sg.subsidy_type_id AND sg.status = 'active'
+    WHERE cases.organization_id = ?
   `
-  let params: string[] = []
+  let params: any[] = [orgId]
   
   // adminロール以外は自分が担当の案件のみ表示
   if (user && user.role !== 'admin') {
-    query += ` WHERE cases.assigned_to = ?`
+    query += ` AND cases.assigned_to = ?`
     params.push(user.username)
   }
   
   query += ` ORDER BY cases.created_at DESC`
   
-  const result = params.length > 0 
-    ? await DB.prepare(query).bind(...params).all()
-    : await DB.prepare(query).all()
+  const result = await DB.prepare(query).bind(...params).all()
   
   return c.json(result.results)
 })
@@ -197,8 +208,11 @@ routes.get('/stats', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   
-  // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // 総顧客数
   const totalResult = await DB.prepare(`
@@ -375,8 +389,11 @@ routes.post('/clients', async (c) => {
   const data = await c.req.json()
   const user = await getCurrentUser(c)
   
-  // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // 顧客用のアクセストークンを生成（レガシー互換用、実際の案件アクセスはcasesテーブルのトークンを使用）
   const accessToken = crypto.randomUUID().replace(/-/g, '').substring(0, 20)

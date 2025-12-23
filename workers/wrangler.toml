@@ -1,0 +1,8 @@
+name = "wildcard-router"
+main = "wildcard-router.js"
+compatibility_date = "2024-01-01"
+
+# *.shinsei-raku.com へのルーティング
+routes = [
+  { pattern = "*.shinsei-raku.com/*", zone_name = "shinsei-raku.com" }
+]

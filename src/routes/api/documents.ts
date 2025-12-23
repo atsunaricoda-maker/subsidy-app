@@ -1,7 +1,7 @@
 // API: 書類管理
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -9,14 +9,25 @@ const routes = new Hono<AppEnv>()
 routes.get('/clients/:id/documents', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // organization_idでテナント分離 - クライアントが自組織のものか確認
+  const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(id, orgId).first()
+  if (!clientCheck) {
+    return c.json([])
+  }
   
   // まず案件テーブルから取得を試みる
   const caseResult = await DB.prepare(`
     SELECT d.* FROM documents d
     INNER JOIN cases c ON d.case_id = c.id
-    WHERE c.client_id = ?
+    WHERE c.client_id = ? AND c.organization_id = ?
     ORDER BY d.uploaded_at DESC
-  `).bind(id).all()
+  `).bind(id, orgId).all()
   
   if (caseResult.results && caseResult.results.length > 0) {
     return c.json(caseResult.results)
@@ -34,6 +45,17 @@ routes.get('/clients/:id/documents', async (c) => {
 routes.post('/clients/:id/documents/upload', async (c) => {
   const { DB, R2 } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // organization_idでテナント分離 - クライアントが自組織のものか確認
+  const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(id, orgId).first()
+  if (!clientCheck) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   try {
     const formData = await c.req.formData()
@@ -176,11 +198,18 @@ routes.get('/documents/download-file/:path{.+}', async (c) => {
 routes.get('/documents/:id/download', async (c) => {
   const { DB, R2 } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
-  // ドキュメント情報取得
+  // ドキュメント情報取得 - organization_idでテナント分離
   const doc = await DB.prepare(`
-    SELECT * FROM documents WHERE id = ?
-  `).bind(id).first()
+    SELECT d.* FROM documents d
+    LEFT JOIN clients c ON d.client_id = c.id
+    WHERE d.id = ? AND (c.organization_id = ? OR c.organization_id IS NULL)
+  `).bind(id, orgId).first()
   
   if (!doc) {
     return c.json({ error: 'Document not found' }, 404)
@@ -205,15 +234,20 @@ routes.get('/documents/:id/download', async (c) => {
 routes.get('/cases/:id/documents/download-all', async (c) => {
   const { DB, R2 } = c.env
   const caseId = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
-  // 案件情報取得
+  // 案件情報取得 - organization_idでテナント分離
   const caseInfo = await DB.prepare(`
     SELECT c.*, cl.name as client_name, cl.company_name, st.name as subsidy_name
     FROM cases c
     LEFT JOIN clients cl ON c.client_id = cl.id
     LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-    WHERE c.id = ?
-  `).bind(caseId).first()
+    WHERE c.id = ? AND c.organization_id = ?
+  `).bind(caseId, orgId).first()
   
   if (!caseInfo) {
     return c.json({ error: 'Case not found' }, 404)
@@ -321,6 +355,22 @@ routes.put('/documents/:id/status', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const { status } = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // organization_idでテナント分離 - ドキュメントの所有者確認
+  const docCheck = await DB.prepare(`
+    SELECT d.id FROM documents d
+    LEFT JOIN clients c ON d.client_id = c.id
+    WHERE d.id = ? AND (c.organization_id = ? OR c.organization_id IS NULL)
+  `).bind(id, orgId).first()
+  
+  if (!docCheck) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   console.log(`Updating document ${id} status to ${status}`)
   

@@ -1,7 +1,7 @@
 // 請求書API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -47,6 +47,13 @@ async function generateInvoiceNumber(DB: D1Database, organizationId: number): Pr
 // 振込待ちリスト取得（管理画面用）
 routes.get('/invoices/pending-payments', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   try {
     // テーブルが存在するか確認
@@ -68,11 +75,12 @@ routes.get('/invoices/pending-payments', async (c) => {
       LEFT JOIN clients c ON i.client_id = c.id
       LEFT JOIN cases cs ON i.case_id = cs.id
       WHERE i.status IN ('issued', 'sent')
+        AND i.organization_id = ?
       ORDER BY 
         CASE WHEN i.due_date IS NULL THEN 1 ELSE 0 END,
         i.due_date ASC,
         i.created_at DESC
-    `).all()
+    `).bind(orgId).all()
     
     return c.json(invoices.results || [])
   } catch (error: any) {
@@ -88,6 +96,11 @@ routes.get('/invoices/pending-payments', async (c) => {
 routes.get('/cases/:caseId/invoices', async (c) => {
   const { DB } = c.env
   const caseId = c.req.param('caseId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   try {
     // まずテーブルが存在するか確認
@@ -100,13 +113,14 @@ routes.get('/cases/:caseId/invoices', async (c) => {
       return c.json([])
     }
     
+    // organization_idでテナント分離
     const invoices = await DB.prepare(`
       SELECT i.*, c.name as client_name, c.company_name as client_company
       FROM invoices i
       LEFT JOIN clients c ON i.client_id = c.id
-      WHERE i.case_id = ?
+      WHERE i.case_id = ? AND i.organization_id = ?
       ORDER BY i.created_at DESC
-    `).bind(caseId).all()
+    `).bind(caseId, orgId).all()
     
     return c.json(invoices.results || [])
   } catch (error: any) {
@@ -152,7 +166,13 @@ routes.get('/portal/invoices', async (c) => {
 routes.get('/invoices/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
+  // organization_idでテナント分離
   const invoice = await DB.prepare(`
     SELECT i.*, 
            c.name as client_name, c.company_name as client_company, c.email as client_email,
@@ -165,8 +185,8 @@ routes.get('/invoices/:id', async (c) => {
     LEFT JOIN cases cs ON i.case_id = cs.id
     LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
     LEFT JOIN organizations o ON i.organization_id = o.id
-    WHERE i.id = ?
-  `).bind(id).first() as any
+    WHERE i.id = ? AND i.organization_id = ?
+  `).bind(id, orgId).first() as any
   
   if (!invoice) {
     return c.json({ error: '請求書が見つかりません' }, 404)
@@ -212,7 +232,10 @@ routes.post('/cases/:caseId/invoices', async (c) => {
   
   try {
     const user = await getCurrentUser(c)
-    const orgId = user?.organization_id || 1
+    const orgId = getEffectiveOrgId(c, user)
+    if (!orgId) {
+      return c.json({ error: '組織が特定できません' }, 401)
+    }
     
     // テーブルが存在しない場合は作成
     await DB.prepare(`
@@ -332,6 +355,17 @@ routes.put('/invoices/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // organization_idでテナント分離 - 存在確認
+  const existing = await DB.prepare(`SELECT id FROM invoices WHERE id = ? AND organization_id = ?`).bind(id, orgId).first()
+  if (!existing) {
+    return c.json({ error: '請求書が見つかりません' }, 404)
+  }
   
   // 金額再計算
   const subtotal = data.subtotal || 0
@@ -354,7 +388,7 @@ routes.put('/invoices/:id', async (c) => {
       notes = ?,
       status = COALESCE(?, status),
       updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
+    WHERE id = ? AND organization_id = ?
   `).bind(
     subtotal,
     taxRate,
@@ -367,7 +401,8 @@ routes.put('/invoices/:id', async (c) => {
     data.item_description || null,
     data.notes || null,
     data.status || null,
-    id
+    id,
+    orgId
   ).run()
   
   return c.json({ success: true, message: '請求書を更新しました' })
@@ -378,6 +413,11 @@ routes.put('/invoices/:id/status', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const { status } = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   if (!['draft', 'issued', 'sent', 'payment_reported', 'paid', 'cancelled'].includes(status)) {
     return c.json({ error: '無効なステータスです' }, 400)
@@ -385,13 +425,14 @@ routes.put('/invoices/:id/status', async (c) => {
   
   const paidAt = status === 'paid' ? new Date().toISOString() : null
   
+  // organization_idでテナント分離
   await DB.prepare(`
     UPDATE invoices SET 
       status = ?, 
       paid_at = COALESCE(?, paid_at),
       updated_at = CURRENT_TIMESTAMP 
-    WHERE id = ?
-  `).bind(status, paidAt, id).run()
+    WHERE id = ? AND organization_id = ?
+  `).bind(status, paidAt, id, orgId).run()
   
   // 入金確認時は関連する案件のdeposit_paidも更新
   if (status === 'paid') {
@@ -414,10 +455,16 @@ routes.put('/invoices/:id/status', async (c) => {
 routes.post('/invoices/:id/issue', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
+  // organization_idでテナント分離
   await DB.prepare(`
-    UPDATE invoices SET status = 'issued', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).bind(id).run()
+    UPDATE invoices SET status = 'issued', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND organization_id = ?
+  `).bind(id, orgId).run()
   
   return c.json({ success: true, message: '請求書を発行しました' })
 })
@@ -493,14 +540,22 @@ routes.post('/invoices/:id/confirm-payment', async (c) => {
 routes.delete('/invoices/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
-  // 発行済みの請求書は削除不可（キャンセルのみ）
-  const invoice = await DB.prepare(`SELECT status FROM invoices WHERE id = ?`).bind(id).first()
-  if (invoice && (invoice as any).status !== 'draft') {
+  // 発行済みの請求書は削除不可（キャンセルのみ）+ organization_idチェック
+  const invoice = await DB.prepare(`SELECT status FROM invoices WHERE id = ? AND organization_id = ?`).bind(id, orgId).first()
+  if (!invoice) {
+    return c.json({ error: '請求書が見つかりません' }, 404)
+  }
+  if ((invoice as any).status !== 'draft') {
     return c.json({ error: '発行済みの請求書は削除できません。キャンセルしてください。' }, 400)
   }
   
-  await DB.prepare(`DELETE FROM invoices WHERE id = ?`).bind(id).run()
+  await DB.prepare(`DELETE FROM invoices WHERE id = ? AND organization_id = ?`).bind(id, orgId).run()
   return c.json({ success: true, message: '請求書を削除しました' })
 })
 
@@ -508,10 +563,16 @@ routes.delete('/invoices/:id', async (c) => {
 routes.post('/invoices/:id/cancel', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
+  // organization_idでテナント分離
   await DB.prepare(`
-    UPDATE invoices SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).bind(id).run()
+    UPDATE invoices SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND organization_id = ?
+  `).bind(id, orgId).run()
   
   return c.json({ success: true, message: '請求書をキャンセルしました' })
 })

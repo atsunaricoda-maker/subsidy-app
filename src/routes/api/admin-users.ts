@@ -1,7 +1,7 @@
 // 従業員管理API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -10,8 +10,11 @@ routes.get('/admin/users', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   
-  // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   const users = await DB.prepare(`
     SELECT id, username, name, role, created_at 
@@ -29,8 +32,11 @@ routes.get('/admin/users/:id', async (c) => {
   const id = c.req.param('id')
   const user = await getCurrentUser(c)
   
-  // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   const result = await DB.prepare(`
     SELECT id, username, name, role, created_at 
@@ -51,8 +57,11 @@ routes.post('/admin/users', async (c) => {
   const { username, password, name, role } = await c.req.json()
   const user = await getCurrentUser(c)
   
-  // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // ユーザー名の重複チェック（同じ組織内）
   const existing = await DB.prepare(`

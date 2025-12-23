@@ -1,7 +1,7 @@
 // サブスクリプション・枠管理API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -28,8 +28,11 @@ routes.get('/subscription/status', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
   
-  // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  // organization_idでテナント分離（|| 1 フォールバック廃止）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // 組織のサブスクリプションを取得
   let subscription = await DB.prepare(`
@@ -242,7 +245,10 @@ routes.post('/subscription/consume-slot', async (c) => {
   const user = await getCurrentUser(c)
   
   // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   if (!case_id) {
     return c.json({ error: 'case_id is required' }, 400)
@@ -342,7 +348,10 @@ routes.get('/subscription/check-slot', async (c) => {
   
   // organization_idでテナント分離
   const user = await getCurrentUser(c)
-  const orgId = user?.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // サブスクリプション取得（プラン情報も含める）
   const subscription = await DB.prepare(`
@@ -393,7 +402,10 @@ routes.post('/subscription/purchase-slots', async (c) => {
   }
   
   // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   const { package_id } = await c.req.json()
   
   if (!package_id) {
@@ -463,7 +475,10 @@ routes.post('/subscription/change-plan', async (c) => {
   }
   
   // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   if (!plan_id) {
     return c.json({ error: 'plan_id is required' }, 400)
@@ -523,7 +538,10 @@ routes.post('/subscription/cancel-scheduled-plan', async (c) => {
   }
   
   // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   await DB.prepare(`
     UPDATE user_subscriptions 
@@ -585,7 +603,10 @@ routes.get('/subscription/history', async (c) => {
   const user = await getCurrentUser(c)
   
   // organization_idでテナント分離
-  const orgId = user?.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   const subscription = await DB.prepare(`
     SELECT id FROM user_subscriptions WHERE organization_id = ? AND status = 'active' LIMIT 1

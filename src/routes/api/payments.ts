@@ -1,7 +1,7 @@
 // API: 支払い管理
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -9,6 +9,17 @@ const routes = new Hono<AppEnv>()
 routes.get('/clients/:clientId/payments', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // organization_idでテナント分離（clientが自組織のものか確認）
+  const client = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(clientId, orgId).first()
+  if (!client) {
+    return c.json([])
+  }
   
   const payments = await DB.prepare(`
     SELECT ph.*, au.name as confirmed_by_name
@@ -192,18 +203,23 @@ routes.put('/payments/:paymentId/confirm', async (c) => {
 // 支払い待ち一覧（管理者用）
 routes.get('/payments/pending', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   try {
-    // 旧payment_historyからの未確認報告
+    // 旧payment_historyからの未確認報告 - organization_idでテナント分離
     const oldPayments = await DB.prepare(`
       SELECT ph.*, c.name as client_name, c.company_name, 'payment_history' as source
       FROM payment_history ph
       JOIN clients c ON ph.client_id = c.id
-      WHERE ph.status = 'reported'
+      WHERE ph.status = 'reported' AND c.organization_id = ?
       ORDER BY ph.bank_transfer_reported_at ASC
-    `).all()
+    `).bind(orgId).all()
     
-    // 新invoicesからの振込報告（payment_reported状態）
+    // 新invoicesからの振込報告（payment_reported状態）- organization_idでテナント分離
     let invoicePayments: any[] = []
     try {
       const invoices = await DB.prepare(`
@@ -222,9 +238,9 @@ routes.get('/payments/pending', async (c) => {
         FROM invoices i
         JOIN clients c ON i.client_id = c.id
         LEFT JOIN cases cs ON i.case_id = cs.id
-        WHERE i.status = 'payment_reported'
+        WHERE i.status = 'payment_reported' AND i.organization_id = ?
         ORDER BY i.payment_reported_at ASC
-      `).all()
+      `).bind(orgId).all()
       invoicePayments = invoices.results || []
     } catch (e) {
       // invoicesテーブルがない場合は空配列
@@ -251,9 +267,14 @@ routes.get('/payments/pending', async (c) => {
 routes.get('/payments/history', async (c) => {
   const { DB } = c.env
   const type = c.req.query('type') || 'all'
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   try {
-    // 旧payment_historyからの確認済み支払い
+    // 旧payment_historyからの確認済み支払い - organization_idでテナント分離
     let oldQuery = `
       SELECT 
         ph.id,
@@ -271,7 +292,7 @@ routes.get('/payments/history', async (c) => {
       JOIN clients c ON ph.client_id = c.id
       LEFT JOIN cases cs ON cs.client_id = ph.client_id
       LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
-      WHERE ph.status = 'confirmed'
+      WHERE ph.status = 'confirmed' AND c.organization_id = ${orgId}
     `
     
     if (type === 'deposit') {
@@ -284,7 +305,7 @@ routes.get('/payments/history', async (c) => {
     
     const oldPayments = await DB.prepare(oldQuery).all()
     
-    // invoicesテーブルからの確認済み支払い（status = 'paid'）
+    // invoicesテーブルからの確認済み支払い（status = 'paid'） - organization_idでテナント分離
     let invoicePayments: any[] = []
     try {
       let invoiceQuery = `
@@ -304,7 +325,7 @@ routes.get('/payments/history', async (c) => {
         JOIN clients c ON i.client_id = c.id
         LEFT JOIN cases cs ON i.case_id = cs.id
         LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
-        WHERE i.status = 'paid'
+        WHERE i.status = 'paid' AND i.organization_id = ${orgId}
       `
       
       if (type === 'deposit') {

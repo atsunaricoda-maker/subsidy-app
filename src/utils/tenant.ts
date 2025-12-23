@@ -56,7 +56,9 @@ export async function getOrganizationBySlug(DB: any, slug: string): Promise<any 
 
 // リクエストコンテキストから組織IDを取得（ミドルウェア用）
 export async function resolveOrganization(c: any): Promise<{ orgId: number | null; org: any | null; slug: string | null }> {
-  const host = c.req.header('host') || ''
+  // Workerからプロキシされた場合はX-Original-Hostを優先
+  const originalHost = c.req.header('x-original-host') || ''
+  const host = originalHost || c.req.header('host') || ''
   const slug = extractSlugFromHost(host)
   
   if (!slug) {

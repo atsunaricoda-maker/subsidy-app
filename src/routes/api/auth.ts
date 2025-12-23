@@ -133,6 +133,7 @@ routes.post('/signup', async (c) => {
       success: true,
       organization_id: orgId,
       organization_name: data.organization_name,
+      organization_slug: slug,
       username: data.username,
       admin_name: data.admin_name,
       token,

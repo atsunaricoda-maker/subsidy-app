@@ -1,7 +1,7 @@
 // API: やり取り記録
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -9,6 +9,17 @@ const routes = new Hono<AppEnv>()
 routes.get('/clients/:id/communications', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // organization_idでテナント分離 - クライアントが自組織のものか確認
+  const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(id, orgId).first()
+  if (!clientCheck) {
+    return c.json([])
+  }
   
   const result = await DB.prepare(`
     SELECT * FROM communications WHERE client_id = ? ORDER BY created_at ASC
@@ -22,6 +33,17 @@ routes.post('/clients/:id/communications', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // organization_idでテナント分離 - クライアントが自組織のものか確認
+  const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(id, orgId).first()
+  if (!clientCheck) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   const result = await DB.prepare(`
     INSERT INTO communications (client_id, case_id, message, sender_type, sender_name)

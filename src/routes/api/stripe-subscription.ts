@@ -1,7 +1,7 @@
 // Stripe サブスクリプション・追加枠購入API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -42,7 +42,10 @@ routes.post('/stripe/create-subscription-checkout', async (c) => {
   
   const { plan_code, plan_id } = await c.req.json()
   
-  const orgId = user.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // plan_idが指定された場合はDBからplan_codeを取得
   let resolvedPlanCode = plan_code
@@ -171,7 +174,10 @@ routes.post('/stripe/create-slot-checkout', async (c) => {
     return c.json({ error: '無効な枠パッケージです' }, 400)
   }
   
-  const orgId = user.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   const slotInfo = STRIPE_PRICES.slots[slot_package as keyof typeof STRIPE_PRICES.slots]
   
   // 組織情報を取得
@@ -456,7 +462,10 @@ routes.post('/stripe/create-portal-session', async (c) => {
     return c.json({ error: 'Stripe決済は現在設定されていません' }, 400)
   }
   
-  const orgId = user.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // 組織情報を取得
   const org = await DB.prepare(`SELECT stripe_customer_id FROM organizations WHERE id = ?`).bind(orgId).first() as any

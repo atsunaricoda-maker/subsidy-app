@@ -70,7 +70,9 @@ app.use('/api/*', cors())
 
 // マルチテナントミドルウェア：サブドメインから組織を判別
 app.use('*', async (c, next) => {
-  const host = c.req.header('host') || ''
+  // Workerからプロキシされた場合はX-Original-Hostを優先
+  const originalHost = c.req.header('x-original-host') || ''
+  const host = originalHost || c.req.header('host') || ''
   const slug = extractSlugFromHost(host)
   
   // サブドメインがある場合、組織を解決

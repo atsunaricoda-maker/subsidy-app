@@ -162,7 +162,7 @@ routes.get('/signup', (c) => {
                                         <input type="text" name="slug" id="slug" required pattern="[a-z0-9-]+"
                                                class="flex-1 px-4 py-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                placeholder="例: tanaka-office">
-                                        <span class="bg-gray-100 px-3 py-2 border border-l-0 rounded-r-lg text-gray-500 text-sm">.subsidy-app.jp</span>
+                                        <span class="bg-gray-100 px-3 py-2 border border-l-0 rounded-r-lg text-gray-500 text-sm">.shinsei-raku.com</span>
                                     </div>
                                     <p class="text-xs text-gray-500 mt-1">半角英数字とハイフンのみ（将来的にこのURLでアクセスできます）</p>
                                     <div id="slugPreview" class="text-xs text-blue-600 mt-1 hidden">
@@ -442,8 +442,12 @@ routes.get('/signup', (c) => {
                     localStorage.setItem('admin_username', response.data.username);
                     localStorage.setItem('admin_role', 'admin');
                     localStorage.setItem('organization_id', response.data.organization_id);
+                    localStorage.setItem('organization_slug', response.data.organization_slug);
                     
-                    window.location.href = '/?welcome=true';
+                    // サブドメインにリダイレクト
+                    const slug = response.data.organization_slug;
+                    const redirectUrl = 'https://' + slug + '.shinsei-raku.com/?welcome=true';
+                    window.location.href = redirectUrl;
                     
                 } catch (error) {
                     showError(error.response?.data?.error || '登録に失敗しました。もう一度お試しください。');
@@ -498,7 +502,7 @@ routes.get('/signup', (c) => {
                     return;
                 }
                 
-                slugUrl.textContent = slug + '.subsidy-app.jp';
+                slugUrl.textContent = slug + '.shinsei-raku.com';
                 slugPreview.classList.remove('hidden');
                 
                 clearTimeout(slugCheckTimeout);

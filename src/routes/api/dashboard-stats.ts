@@ -1,7 +1,7 @@
 // フェーズ4: ダッシュボード統計API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -9,7 +9,10 @@ const routes = new Hono<AppEnv>()
 routes.get('/dashboard/stats', async (c) => {
   const { DB } = c.env
   const user = await getCurrentUser(c)
-  const orgId = user?.organization_id || 1
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
   // 顧客統計（organization_idでフィルタ）
   const clientStats = await DB.prepare(`
@@ -72,10 +75,10 @@ routes.get('/dashboard/stats', async (c) => {
     SELECT COUNT(*) as count FROM subsidy_update_logs WHERE status = 'pending'
   `).first()
   
-  // 未読通知数
+  // 未読通知数（organization_idでテナント分離）
   const unreadNotifications = await DB.prepare(`
-    SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0
-  `).first()
+    SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0 AND (organization_id = ? OR organization_id IS NULL)
+  `).bind(orgId).first()
   
   // 今月の採択率を計算
   const monthlyCompleted = monthlyCaseStats?.monthly_completed || 0
