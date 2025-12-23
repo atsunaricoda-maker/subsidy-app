@@ -4399,6 +4399,8 @@ routes.get('/portal/:token', async (c) => {
                 const formData = new FormData(form);
                 
                 const subsidyTypeId = formData.get('subsidy_type_id');
+                const subsidySelect = document.getElementById('applicationSubsidyType');
+                const subsidyTypeName = subsidySelect.options[subsidySelect.selectedIndex]?.text || '不明';
                 const notes = formData.get('notes');
                 const privacyAgreed = form.querySelector('[name="privacy_agreed"]').checked;
                 
@@ -4415,7 +4417,7 @@ routes.get('/portal/:token', async (c) => {
                 try {
                     // 新規申込として通信を送信
                     await axios.post(\`/api/clients/\${CLIENT_ID}/communications\`, {
-                        message: \`【新規申込希望】補助金ID: \${subsidyTypeId}\\n相談内容: \${notes || 'なし'}\\nプライバシーポリシー同意: 済\`,
+                        message: \`【新規申込希望】\\n申請種別: \${subsidyTypeName}\\n相談内容: \${notes || 'なし'}\\nプライバシーポリシー同意: 済\`,
                         sender_type: 'client',
                         sender_name: '${client.name}'
                     });
