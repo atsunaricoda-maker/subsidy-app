@@ -324,6 +324,21 @@ routes.get('/master/inquiries', (c) => {
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
+                                
+                                <!-- お知らせ作成ボタン -->
+                                <div class="border-t border-gray-700 mt-4 pt-4">
+                                    <p class="text-sm font-medium text-gray-300 mb-3">お知らせとして配信</p>
+                                    <div class="flex gap-3">
+                                        \${currentInquiry.organization_id ? \`
+                                            <button onclick="createAnnouncement('specific')" class="flex-1 bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 py-2 rounded-lg text-sm">
+                                                <i class="fas fa-user mr-1"></i>この法人に回答
+                                            </button>
+                                        \` : ''}
+                                        <button onclick="createAnnouncement('all')" class="flex-1 bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 py-2 rounded-lg text-sm">
+                                            <i class="fas fa-globe mr-1"></i>全法人にお知らせ
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     \`;
@@ -398,6 +413,59 @@ routes.get('/master/inquiries', (c) => {
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
+            }
+            
+            async function createAnnouncement(type) {
+                if (!currentInquiry) return;
+                
+                const token = localStorage.getItem('master_token');
+                const responseText = document.getElementById('responseText').value;
+                
+                // タイトルと内容を問い合わせから生成
+                let title = '';
+                let content = responseText || '';
+                let targetType = 'all';
+                let targetIds = null;
+                let annType = 'info';
+                
+                if (type === 'specific') {
+                    title = '【回答】' + currentInquiry.subject;
+                    targetType = 'specific_org';
+                    targetIds = String(currentInquiry.organization_id);
+                    
+                    if (!content) {
+                        content = 'お問い合わせいただきありがとうございます。\\n\\n' + 
+                                  '【お問い合わせ内容】\\n' + currentInquiry.message + '\\n\\n' +
+                                  '【回答】\\n（回答内容を入力してください）';
+                    }
+                } else {
+                    // 全法人向け - カテゴリに応じてタイプを設定
+                    if (currentInquiry.category === 'bug') {
+                        title = '【不具合情報】' + currentInquiry.subject;
+                        annType = 'error';
+                    } else if (currentInquiry.category === 'feature') {
+                        title = '【機能追加のお知らせ】';
+                        annType = 'success';
+                    } else {
+                        title = '【お知らせ】' + currentInquiry.subject;
+                    }
+                    
+                    if (!content) {
+                        content = '（お知らせ内容を入力してください）';
+                    }
+                }
+                
+                // お知らせ管理ページに遷移してフォームを開く
+                const params = new URLSearchParams({
+                    title: title,
+                    content: content,
+                    type: annType,
+                    target_type: targetType,
+                    target_ids: targetIds || '',
+                    from_inquiry: currentInquiry.id
+                });
+                
+                window.location.href = '/master/announcements?' + params.toString();
             }
             
             function toggleSidebar() {

@@ -8,7 +8,10 @@ import { getCurrentUser } from '../../utils/auth'
 const routes = new Hono<AppEnv>()
 
 // 管理者トップページ
-routes.get('/', (c) => {
+routes.get('/', async (c) => {
+  // テナント組織IDを取得
+  const tenantOrgId = c.get('tenantOrgId') || 1;
+  
   return c.html(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -103,6 +106,13 @@ routes.get('/', (c) => {
                 </header>
                 
                 <div class="p-4 lg:p-6">
+                    <!-- システムお知らせセクション -->
+                    <div id="announcementsSection" class="hidden mb-6">
+                        <div id="announcementsList" class="space-y-3">
+                            <!-- お知らせはJSで生成 -->
+                        </div>
+                    </div>
+                    
                     <!-- 未対応通知セクション -->
                     <div id="notificationSummary" class="hidden mb-6">
                         <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm p-4 border border-blue-100">
@@ -1227,6 +1237,9 @@ routes.get('/', (c) => {
             let subsidyTypes = [];
             let allUsers = [];
 
+            // 組織ID（サーバーサイドから渡される）
+            window.currentOrgId = ${tenantOrgId};
+            
             // Axios設定：認証ヘッダーを自動付与
             axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
 
@@ -1256,6 +1269,7 @@ routes.get('/', (c) => {
                     loadRecentActivity();
                     loadSlotBalance();
                     loadNotificationSummary();
+                    loadAnnouncements();
                 } catch (error) {
                     console.error('Error loading data:', error);
                     document.getElementById('clientsList').innerHTML = 
@@ -1284,6 +1298,92 @@ routes.get('/', (c) => {
                 } catch (error) {
                     console.error('Error loading notification summary:', error);
                 }
+            }
+            
+            // システムお知らせを読み込む
+            async function loadAnnouncements() {
+                try {
+                    // 組織IDを取得（サーバーサイドから渡すか、APIから取得）
+                    const orgId = window.currentOrgId || 1; // デフォルトは1
+                    const response = await axios.get('/api/organizations/' + orgId + '/announcements');
+                    const announcements = response.data || [];
+                    
+                    const section = document.getElementById('announcementsSection');
+                    const container = document.getElementById('announcementsList');
+                    
+                    if (announcements.length === 0) {
+                        section.classList.add('hidden');
+                        return;
+                    }
+                    
+                    section.classList.remove('hidden');
+                    container.innerHTML = announcements.map(ann => {
+                        const typeStyles = {
+                            'info': 'bg-blue-50 border-blue-200 text-blue-800',
+                            'warning': 'bg-yellow-50 border-yellow-200 text-yellow-800',
+                            'error': 'bg-red-50 border-red-200 text-red-800',
+                            'success': 'bg-green-50 border-green-200 text-green-800'
+                        };
+                        const typeIcons = {
+                            'info': 'fa-info-circle text-blue-500',
+                            'warning': 'fa-exclamation-triangle text-yellow-500',
+                            'error': 'fa-times-circle text-red-500',
+                            'success': 'fa-check-circle text-green-500'
+                        };
+                        const style = typeStyles[ann.type] || typeStyles['info'];
+                        const icon = typeIcons[ann.type] || typeIcons['info'];
+                        
+                        return \`
+                            <div class="rounded-xl border p-4 \${style} \${ann.is_read ? 'opacity-70' : ''}">
+                                <div class="flex items-start gap-3">
+                                    <i class="fas \${icon} text-lg mt-0.5"></i>
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-bold">\${escapeHtml(ann.title)}</h4>
+                                            <span class="text-xs opacity-70">\${formatDate(ann.created_at)}</span>
+                                        </div>
+                                        <p class="text-sm mt-1 whitespace-pre-wrap">\${escapeHtml(ann.content)}</p>
+                                        \${!ann.is_read ? \`
+                                            <button onclick="markAnnouncementRead(\${ann.id})" class="text-xs mt-2 underline hover:no-underline">
+                                                既読にする
+                                            </button>
+                                        \` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                } catch (error) {
+                    console.error('Error loading announcements:', error);
+                }
+            }
+            
+            // お知らせを既読にする
+            async function markAnnouncementRead(announcementId) {
+                try {
+                    const orgId = window.currentOrgId || 1;
+                    await axios.post('/api/announcements/' + announcementId + '/read', {
+                        organization_id: orgId
+                    });
+                    loadAnnouncements();
+                } catch (error) {
+                    console.error('Error marking announcement read:', error);
+                }
+            }
+            
+            // 日付フォーマット
+            function formatDate(dateStr) {
+                if (!dateStr) return '';
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+            }
+            
+            // HTMLエスケープ
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
             }
             
             // 通知タイプでフィルター表示（グローバル関数として公開）

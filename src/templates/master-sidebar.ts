@@ -67,6 +67,10 @@ export function generateMasterSidebar(activePage: string = '') {
                 <span>問い合わせ一覧</span>
                 <span id="inquiryBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
             </a>
+            <a href="/master/announcements" class="sidebar-link ${isActive('announcements')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-bullhorn w-5"></i>
+                <span>お知らせ管理</span>
+            </a>
             
             <div class="pt-4 pb-2">
                 <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">システム設定</p>
