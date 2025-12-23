@@ -25,7 +25,7 @@ routes.get('/check-slug', async (c) => {
   return c.json({ available: !existing })
 })
 
-// サインアップAPI
+// サインアップAPI（シンプル版：14日間トライアル + 1件枠付与）
 routes.post('/signup', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
@@ -57,9 +57,6 @@ routes.post('/signup', async (c) => {
     return c.json({ error: 'このサブドメインは既に使用されています' }, 400)
   }
   
-  // ユーザー名の重複チェックは組織作成後に行う（テナントごとに独立）
-  // サインアップ時は新規組織なので、同じ組織内での重複はあり得ない
-  
   const existingEmail = await DB.prepare(`SELECT id FROM organizations WHERE email = ?`).bind(data.email).first()
   if (existingEmail) {
     return c.json({ error: 'このメールアドレスは既に登録されています' }, 400)
@@ -75,7 +72,7 @@ routes.post('/signup', async (c) => {
       return c.json({ error: '業務範囲の選択が不正です' }, 400)
     }
     
-    // 1. 組織を作成
+    // 1. 組織を作成（トライアルモード）
     const orgResult = await DB.prepare(`
       INSERT INTO organizations (name, slug, email, phone, status, trial_ends_at, business_scope)
       VALUES (?, ?, ?, ?, 'trial', ?, ?)
@@ -96,33 +93,22 @@ routes.post('/signup', async (c) => {
       VALUES (?, ?, ?, 'admin', ?)
     `).bind(data.username, data.password, data.admin_name, orgId).run()
     
-    // 3. サブスクリプションを作成（トライアル）
-    const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(data.plan_id).first()
-    if (plan) {
-      const periodEnd = new Date()
-      periodEnd.setDate(periodEnd.getDate() + 14) // トライアル期間
-      
-      const subResult = await DB.prepare(`
-        INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
-        VALUES (?, ?, 'active', date('now'), ?)
-      `).bind(orgId, data.plan_id, periodEnd.toISOString().split('T')[0]).run()
-      
-      const subscriptionId = subResult.meta?.last_row_id
-      
-      // 4. 初期枠を付与（トライアル中はプランの枠数を付与）
-      await DB.prepare(`
-        INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining)
-        VALUES (?, ?, ?, 0)
-      `).bind(subscriptionId, orgId, plan.monthly_slots).run()
-    }
+    // 3. トライアル用サブスクリプションを作成（プランなし）
+    const periodEnd = new Date()
+    periodEnd.setDate(periodEnd.getDate() + 14) // 14日間
     
-    // 5. 両方利用の場合はアドオンを追加（+2000円）
-    if (businessScope === 'both') {
-      await DB.prepare(`
-        INSERT INTO organization_addons (organization_id, addon_type, price)
-        VALUES (?, 'dual_scope', 2000)
-      `).bind(orgId).run()
-    }
+    const subResult = await DB.prepare(`
+      INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
+      VALUES (?, NULL, 'trial', date('now'), ?)
+    `).bind(orgId, periodEnd.toISOString().split('T')[0]).run()
+    
+    const subscriptionId = subResult.meta?.last_row_id
+    
+    // 4. トライアル枠を1件付与
+    await DB.prepare(`
+      INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+      VALUES (?, ?, 1, 0, date('now'))
+    `).bind(subscriptionId, orgId).run()
     
     // トークン生成
     const token = btoa(`${orgId}:${data.username}:${Date.now()}`)
@@ -136,7 +122,8 @@ routes.post('/signup', async (c) => {
       admin_name: data.admin_name,
       token,
       trial_ends_at: trialEndsAt,
-      message: '登録が完了しました！14日間の無料トライアルをお楽しみください。'
+      trial_slots: 1,
+      message: '登録が完了しました！14日間の無料トライアル（1件分）をご利用いただけます。'
     })
     
   } catch (error: any) {

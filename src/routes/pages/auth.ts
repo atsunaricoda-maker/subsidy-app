@@ -96,7 +96,7 @@ routes.get('/login', (c) => {
   `)
 })
 
-// サインアップページ（法人セルフ登録）
+// サインアップページ（シンプル版：14日間トライアル + 1件枠付与）
 routes.get('/signup', (c) => {
   return c.html(`
     <!DOCTYPE html>
@@ -110,36 +110,36 @@ routes.get('/signup', (c) => {
     </head>
     <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
         <div class="min-h-screen py-12 px-4">
-            <div class="max-w-2xl mx-auto">
+            <div class="max-w-xl mx-auto">
                 <!-- ヘッダー -->
                 <div class="text-center mb-8">
                     <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
                     <h1 class="text-3xl font-bold text-gray-800">申請らくらく君</h1>
-                    <p class="text-gray-600 mt-2">14日間の無料トライアルで今すぐ始めましょう</p>
+                    <p class="text-gray-600 mt-2">14日間の無料トライアル（1件分）で今すぐ始めましょう</p>
                 </div>
                 
                 <!-- 特徴 -->
                 <div class="grid grid-cols-3 gap-4 mb-8">
                     <div class="bg-white rounded-lg p-4 text-center shadow-sm">
                         <i class="fas fa-clock text-2xl text-blue-500 mb-2"></i>
-                        <p class="text-sm font-medium">セットアップ不要</p>
-                        <p class="text-xs text-gray-500">すぐに使い始められます</p>
+                        <p class="text-sm font-medium">即日利用可能</p>
+                        <p class="text-xs text-gray-500">登録後すぐに使えます</p>
                     </div>
                     <div class="bg-white rounded-lg p-4 text-center shadow-sm">
                         <i class="fas fa-credit-card text-2xl text-green-500 mb-2"></i>
-                        <p class="text-sm font-medium">14日間無料</p>
+                        <p class="text-sm font-medium">カード不要</p>
                         <p class="text-xs text-gray-500">クレジットカード不要</p>
                     </div>
                     <div class="bg-white rounded-lg p-4 text-center shadow-sm">
-                        <i class="fas fa-headset text-2xl text-purple-500 mb-2"></i>
-                        <p class="text-sm font-medium">サポート付き</p>
-                        <p class="text-xs text-gray-500">導入をお手伝いします</p>
+                        <i class="fas fa-gift text-2xl text-purple-500 mb-2"></i>
+                        <p class="text-sm font-medium">1件無料</p>
+                        <p class="text-xs text-gray-500">トライアル期間中</p>
                     </div>
                 </div>
                 
                 <!-- 登録フォーム -->
                 <div class="bg-white rounded-xl shadow-lg p-8">
-                    <h2 class="text-xl font-bold text-gray-800 mb-6">アカウント作成</h2>
+                    <h2 class="text-xl font-bold text-gray-800 mb-6">無料トライアル登録</h2>
                     
                     <form id="signupForm" class="space-y-6">
                         <!-- 事務所情報 -->
@@ -147,16 +147,16 @@ routes.get('/signup', (c) => {
                             <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
                                 <i class="fas fa-building mr-2 text-blue-500"></i>事務所情報
                             </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="md:col-span-2">
+                            <div class="grid grid-cols-1 gap-4">
+                                <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">事務所名 / 法人名 <span class="text-red-500">*</span></label>
                                     <input type="text" name="organization_name" id="organization_name" required 
                                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                            placeholder="例: 田中社労士事務所">
                                 </div>
-                                <div class="md:col-span-2">
+                                <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">
-                                        サブドメイン（URL識別子） <span class="text-red-500">*</span>
+                                        サブドメイン <span class="text-red-500">*</span>
                                     </label>
                                     <div class="flex items-center">
                                         <input type="text" name="slug" id="slug" required pattern="[a-z0-9-]+"
@@ -164,7 +164,7 @@ routes.get('/signup', (c) => {
                                                placeholder="例: tanaka-office">
                                         <span class="bg-gray-100 px-3 py-2 border border-l-0 rounded-r-lg text-gray-500 text-sm">.shinsei-raku.com</span>
                                     </div>
-                                    <p class="text-xs text-gray-500 mt-1">半角英数字とハイフンのみ（将来的にこのURLでアクセスできます）</p>
+                                    <p class="text-xs text-gray-500 mt-1">半角英数字とハイフンのみ</p>
                                     <div id="slugPreview" class="text-xs text-blue-600 mt-1 hidden">
                                         <i class="fas fa-globe mr-1"></i>URL: <span id="slugUrl"></span>
                                     </div>
@@ -188,7 +188,7 @@ routes.get('/signup', (c) => {
                         <!-- 管理者情報 -->
                         <div class="border-b pb-6">
                             <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-user-shield mr-2 text-green-500"></i>管理者情報
+                                <i class="fas fa-user-shield mr-2 text-green-500"></i>ログイン情報
                             </h3>
                             <div class="grid grid-cols-1 gap-4">
                                 <div>
@@ -197,11 +197,20 @@ routes.get('/signup', (c) => {
                                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                            placeholder="例: 田中太郎">
                                 </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ユーザー名 <span class="text-red-500">*</span></label>
+                                    <input type="text" name="username" required 
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="例: tanaka">
+                                    <p class="text-xs text-gray-500 mt-1">ログイン時に使用します</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">パスワード <span class="text-red-500">*</span></label>
+                                    <input type="password" name="password" required minlength="6"
+                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           placeholder="6文字以上">
+                                </div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-3">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                ログイン情報（ユーザー名・パスワード）は登録完了後にメールでお送りします。
-                            </p>
                         </div>
                         
                         <!-- 業務範囲選択 -->
@@ -217,7 +226,7 @@ routes.get('/signup', (c) => {
                                             <span class="font-medium">社労士業務</span>
                                             <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">厚労省管轄</span>
                                         </div>
-                                        <p class="text-sm text-gray-500 mt-1">助成金申請（キャリアアップ、両立支援、人材開発等）</p>
+                                        <p class="text-sm text-gray-500 mt-1">助成金申請（キャリアアップ、両立支援等）</p>
                                     </div>
                                 </label>
                                 <label class="scope-option flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-indigo-300 transition-all border-gray-200" onclick="selectScope('administrative', this)">
@@ -227,44 +236,31 @@ routes.get('/signup', (c) => {
                                             <span class="font-medium">行政書士業務</span>
                                             <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">経産省・自治体管轄</span>
                                         </div>
-                                        <p class="text-sm text-gray-500 mt-1">補助金申請（持続化、IT導入、ものづくり等）+ 許認可申請</p>
+                                        <p class="text-sm text-gray-500 mt-1">補助金申請（持続化、IT導入等）+ 許認可</p>
                                     </div>
                                 </label>
                                 <label class="scope-option flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:border-indigo-300 transition-all border-gray-200" onclick="selectScope('both', this)">
                                     <input type="radio" name="business_scope" value="both" class="mt-1">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-2">
-                                            <span class="font-medium">両方（社労士 + 行政書士）</span>
-                                            <span class="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">+¥2,000/月</span>
+                                            <span class="font-medium">両方</span>
                                         </div>
                                         <p class="text-sm text-gray-500 mt-1">助成金 + 補助金 + 許認可のすべてに対応</p>
                                     </div>
                                 </label>
                             </div>
-                            <div id="scopeAddonNote" class="hidden mt-3 p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                両方選択時は基本プランに月額¥2,000が追加されます。
-                            </div>
                         </div>
                         
-                        <!-- プラン選択 -->
-                        <div>
-                            <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-tags mr-2 text-purple-500"></i>プラン選択
-                            </h3>
-                            <div id="planOptions" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <!-- プランはJSで動的に読み込み -->
-                                <div class="animate-pulse h-32 bg-gray-200 rounded-lg"></div>
-                                <div class="animate-pulse h-32 bg-gray-200 rounded-lg"></div>
-                                <div class="animate-pulse h-32 bg-gray-200 rounded-lg"></div>
-                            </div>
-                            <p class="text-sm text-gray-500 mt-3">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                14日間の無料トライアル後、選択したプランに自動移行します。
-                            </p>
-                            <p id="totalPriceDisplay" class="mt-2 text-right font-medium text-lg">
-                                合計: <span id="totalPrice">¥0</span>/月
-                            </p>
+                        <!-- トライアル説明 -->
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-medium text-blue-800 flex items-center">
+                                <i class="fas fa-gift mr-2"></i>14日間無料トライアル
+                            </h4>
+                            <ul class="text-sm text-blue-700 mt-2 space-y-1">
+                                <li><i class="fas fa-check mr-2"></i>1件分の申請作成が無料</li>
+                                <li><i class="fas fa-check mr-2"></i>すべての機能をお試し可能</li>
+                                <li><i class="fas fa-check mr-2"></i>期間中にプランを選択して継続利用</li>
+                            </ul>
                         </div>
                         
                         <!-- 利用規約 -->
@@ -278,12 +274,8 @@ routes.get('/signup', (c) => {
                         
                         <button type="submit" id="submitBtn"
                                 class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium transition-colors">
-                            <i class="fas fa-credit-card mr-2"></i>決済画面へ進む（14日間無料）
+                            <i class="fas fa-rocket mr-2"></i>無料で始める
                         </button>
-                        <p class="text-xs text-gray-500 text-center mt-2">
-                            <i class="fas fa-lock mr-1"></i>
-                            クレジットカード情報はStripeで安全に管理されます。14日間は課金されません。
-                        </p>
                     </form>
                     
                     <div id="errorMessage" class="hidden mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm"></div>
@@ -296,8 +288,6 @@ routes.get('/signup', (c) => {
                 
                 <!-- フッターリンク -->
                 <div class="mt-8 text-center text-xs text-gray-500">
-                    <a href="/legal" class="hover:text-blue-600">特定商取引法に基づく表記</a>
-                    <span class="mx-2">|</span>
                     <a href="/terms" class="hover:text-blue-600">利用規約</a>
                     <span class="mx-2">|</span>
                     <a href="/privacy-policy" class="hover:text-blue-600">プライバシーポリシー</a>
@@ -307,14 +297,8 @@ routes.get('/signup', (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
-            let selectedPlanId = null;
-            let selectedPlanPrice = 0;
-            let selectedBusinessScope = 'labor';
-            const DUAL_SCOPE_ADDON_PRICE = 2000;
-            
-            // 業務範囲選択時の処理
+            // 業務範囲選択
             function selectScope(scope, element) {
-                selectedBusinessScope = scope;
                 document.querySelectorAll('.scope-option').forEach(el => {
                     el.classList.remove('border-indigo-500', 'bg-indigo-50');
                     el.classList.add('border-gray-200');
@@ -322,123 +306,54 @@ routes.get('/signup', (c) => {
                 element.classList.remove('border-gray-200');
                 element.classList.add('border-indigo-500', 'bg-indigo-50');
                 element.querySelector('input[type="radio"]').checked = true;
-                
-                // アドオン表示
-                const addonNote = document.getElementById('scopeAddonNote');
-                if (scope === 'both') {
-                    addonNote.classList.remove('hidden');
-                } else {
-                    addonNote.classList.add('hidden');
-                }
-                updatePriceDisplay();
             }
             
-            function updatePriceDisplay() {
-                const priceDisplay = document.getElementById('totalPriceDisplay');
-                if (!priceDisplay || !selectedPlanPrice) return;
-                
-                let totalPrice = selectedPlanPrice;
-                let addon = '';
-                
-                if (selectedBusinessScope === 'both') {
-                    totalPrice += DUAL_SCOPE_ADDON_PRICE;
-                    addon = ' <span class="text-sm text-orange-600">(+¥2,000 両方利用)</span>';
-                }
-                
-                priceDisplay.innerHTML = '月額料金: <span class="font-bold text-blue-600">¥' + totalPrice.toLocaleString() + '</span>' + addon;
-            }
-            
-            async function loadPlans() {
-                try {
-                    const response = await axios.get('/api/subscription/plans');
-                    const plans = response.data.filter(p => p.monthly_slots > 0);
-                    
-                    const container = document.getElementById('planOptions');
-                    container.innerHTML = plans.slice(0, 5).map((plan, index) => {
-                        const isPopular = plan.plan_code === 'standard';
-                        return \`
-                            <div class="plan-option relative border-2 rounded-lg p-4 cursor-pointer transition-all hover:border-blue-300 \${index === 1 ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}"
-                                 data-plan-id="\${plan.id}" onclick="selectPlan(\${plan.id}, this)">
-                                \${isPopular ? '<span class="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">人気</span>' : ''}
-                                <h4 class="font-bold text-gray-800">\${plan.plan_name}</h4>
-                                <p class="text-2xl font-bold text-blue-600 my-2">¥\${plan.monthly_price.toLocaleString()}<span class="text-sm font-normal text-gray-500">/月</span></p>
-                                <p class="text-sm text-gray-600">\${plan.monthly_slots}枠/月</p>
-                                <p class="text-xs text-gray-500 mt-1">\${plan.description || ''}</p>
-                                <input type="radio" name="plan_id" value="\${plan.id}" data-price="\${plan.monthly_price}" class="hidden" \${index === 1 ? 'checked' : ''}>
-                            </div>
-                        \`;
-                    }).join('');
-                    
-                    const standardPlan = plans.find(p => p.plan_code === 'standard');
-                    if (standardPlan) {
-                        selectedPlanId = standardPlan.id;
-                        selectedPlanPrice = standardPlan.monthly_price;
-                    } else if (plans.length > 0) {
-                        selectedPlanId = plans[0].id;
-                        selectedPlanPrice = plans[0].monthly_price;
-                    }
-                    updatePriceDisplay();
-                    
-                } catch (error) {
-                    console.error('Failed to load plans:', error);
-                }
-            }
-            
-            function selectPlan(planId, element) {
-                selectedPlanId = planId;
-                const radioInput = element.querySelector('input[type="radio"]');
-                selectedPlanPrice = parseInt(radioInput.dataset.price) || 0;
-                
-                document.querySelectorAll('.plan-option').forEach(el => {
-                    el.classList.remove('border-blue-500', 'bg-blue-50');
-                    el.classList.add('border-gray-200');
-                });
-                element.classList.remove('border-gray-200');
-                element.classList.add('border-blue-500', 'bg-blue-50');
-                radioInput.checked = true;
-                updatePriceDisplay();
-            }
-            
+            // フォーム送信
             document.getElementById('signupForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData);
                 
-                if (!selectedPlanId) {
-                    showError('プランを選択してください');
-                    return;
-                }
-                
-                // Stripe Checkout用のデータを準備
-                const checkoutData = {
-                    organization_name: data.organization_name,
-                    slug: data.slug,
-                    email: data.email,
-                    phone: data.phone || '',
-                    admin_name: data.admin_name,
-                    plan_id: selectedPlanId,
-                    business_scope: selectedBusinessScope
-                };
-                
                 const btn = document.getElementById('submitBtn');
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>決済画面へ移動中...';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>登録中...';
                 
                 try {
-                    // Stripe Checkout Sessionを作成してリダイレクト
-                    const response = await axios.post('/api/stripe/create-signup-checkout', checkoutData);
+                    const response = await axios.post('/api/signup', {
+                        organization_name: data.organization_name,
+                        slug: data.slug,
+                        email: data.email,
+                        phone: data.phone || '',
+                        admin_name: data.admin_name,
+                        username: data.username,
+                        password: data.password,
+                        business_scope: data.business_scope
+                    });
                     
-                    if (response.data.checkout_url) {
-                        window.location.href = response.data.checkout_url;
-                    } else {
-                        throw new Error('決済URLの取得に失敗しました');
+                    if (response.data.success) {
+                        // 登録成功 - ログイン情報を保存してリダイレクト
+                        localStorage.setItem('admin_token', response.data.token);
+                        localStorage.setItem('admin_name', response.data.admin_name);
+                        localStorage.setItem('admin_username', response.data.username);
+                        localStorage.setItem('organization_id', response.data.organization_id);
+                        localStorage.setItem('organization_name', response.data.organization_name);
+                        localStorage.setItem('organization_slug', response.data.organization_slug);
+                        
+                        // 成功メッセージを表示してリダイレクト
+                        btn.innerHTML = '<i class="fas fa-check mr-2"></i>登録完了！';
+                        btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                        btn.classList.add('bg-green-600');
+                        
+                        setTimeout(() => {
+                            const slug = response.data.organization_slug;
+                            window.location.href = 'https://' + slug + '.shinsei-raku.com/?welcome=true';
+                        }, 1000);
                     }
-                    
                 } catch (error) {
-                    showError(error.response?.data?.error || '決済セッションの作成に失敗しました。もう一度お試しください。');
+                    showError(error.response?.data?.error || '登録に失敗しました。もう一度お試しください。');
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-credit-card mr-2"></i>決済画面へ進む';
+                    btn.innerHTML = '<i class="fas fa-rocket mr-2"></i>無料で始める';
                 }
             });
             
@@ -448,8 +363,6 @@ routes.get('/signup', (c) => {
                 errorDiv.classList.remove('hidden');
                 errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
-            
-            loadPlans();
             
             // slug自動生成・バリデーション
             const orgNameInput = document.getElementById('organization_name');
@@ -500,7 +413,7 @@ routes.get('/signup', (c) => {
                             slugInput.classList.remove('border-red-500');
                             slugInput.classList.add('border-green-500');
                         } else {
-                            slugError.textContent = 'このURLは既に使用されています';
+                            slugError.textContent = response.data.reason === 'reserved' ? 'このURLは予約されています' : 'このURLは既に使用されています';
                             slugError.classList.remove('hidden');
                             slugInput.classList.remove('border-green-500');
                             slugInput.classList.add('border-red-500');
