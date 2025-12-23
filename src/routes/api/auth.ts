@@ -62,6 +62,12 @@ routes.post('/signup', async (c) => {
     return c.json({ error: 'このメールアドレスは既に登録されています' }, 400)
   }
   
+  // ユーザー名の重複チェック（グローバルでユニーク制約があるため）
+  const existingUsername = await DB.prepare(`SELECT id FROM admin_users WHERE username = ?`).bind(data.username).first()
+  if (existingUsername) {
+    return c.json({ error: 'このユーザー名は既に使用されています。別のユーザー名をお試しください。' }, 400)
+  }
+  
   try {
     // トライアル期間（14日間）
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
