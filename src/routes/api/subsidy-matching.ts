@@ -1,14 +1,26 @@
 // 補助金マッチングAPI
+// テナント分離: 自組織のクライアントのみアクセス可能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-// 企業プロファイル取得/作成
+// 企業プロファイル取得/作成 - テナント分離
 routes.get('/clients/:clientId/profile', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントか確認
+  const clientCheck = await DB.prepare(`
+    SELECT id FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!clientCheck && orgId) {
+    return c.json({}) // 他テナントのクライアントにはアクセス不可
+  }
   
   const profile = await DB.prepare(`
     SELECT * FROM client_profiles WHERE client_id = ?
@@ -17,10 +29,22 @@ routes.get('/clients/:clientId/profile', async (c) => {
   return c.json(profile || {})
 })
 
+// テナント分離対応
 routes.put('/clients/:clientId/profile', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントか確認
+  const clientCheck = await DB.prepare(`
+    SELECT id FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!clientCheck && orgId) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   // 既存プロファイル確認
   const existing = await DB.prepare(`
@@ -65,11 +89,22 @@ routes.put('/clients/:clientId/profile', async (c) => {
   return c.json({ success: true })
 })
 
-// 補助金マッチング実行
+// 補助金マッチング実行 - テナント分離
 routes.post('/clients/:clientId/match-subsidies', async (c) => {
   const { DB } = c.env
   const env = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントか確認
+  const clientCheck = await DB.prepare(`
+    SELECT id FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!clientCheck && orgId) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   // 顧客プロファイル取得
   const profile = await DB.prepare(`
@@ -177,10 +212,21 @@ ${(answers.results || []).map((a: any) => `${a.question_text}: ${a.answer_text |
   return c.json(matchResults)
 })
 
-// マッチングスコア取得
+// マッチングスコア取得 - テナント分離
 routes.get('/clients/:clientId/match-scores', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントか確認
+  const clientCheck = await DB.prepare(`
+    SELECT id FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!clientCheck && orgId) {
+    return c.json([]) // 他テナントのクライアントにはアクセス不可
+  }
   
   const result = await DB.prepare(`
     SELECT sms.*, st.name as subsidy_name, st.category

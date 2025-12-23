@@ -1,7 +1,8 @@
 // 書類解析・財務データ抽出API
+// テナント分離: 自組織のクライアントのデータのみアクセス可能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -20,19 +21,21 @@ function getDocumentAnalysisType(documentType: string): string | null {
   return null;
 }
 
-// 書類解析をトリガー
+// 書類解析をトリガー - テナント分離
 routes.post('/documents/:id/analyze', async (c) => {
   const { DB } = c.env;
   const documentId = c.req.param('id');
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
-    // 書類情報を取得
+    // 書類情報を取得（テナント分離）
     const document = await DB.prepare(`
       SELECT d.*, c.name as client_name 
       FROM documents d
       JOIN clients c ON d.client_id = c.id
-      WHERE d.id = ?
-    `).bind(documentId).first();
+      WHERE d.id = ? AND c.organization_id = ?
+    `).bind(documentId, orgId).first();
     
     if (!document) {
       return c.json({ error: '書類が見つかりません' }, 404);
@@ -132,13 +135,24 @@ routes.post('/documents/:id/analyze', async (c) => {
   }
 });
 
-// 登記簿データの保存・更新
+// 登記簿データの保存・更新 - テナント分離
 routes.post('/clients/:id/registry-data', async (c) => {
   const { DB } = c.env;
   const clientId = c.req.param('id');
   const data = await c.req.json();
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
+    // テナント分離: 自組織のクライアントか確認
+    const clientCheck = await DB.prepare(`
+      SELECT id FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(clientId, orgId).first();
+    
+    if (!clientCheck && orgId) {
+      return c.json({ error: 'アクセス権限がありません' }, 403);
+    }
+    
     // 既存データをチェック
     const existing = await DB.prepare(`
       SELECT id FROM company_registry_data WHERE client_id = ?
@@ -228,12 +242,23 @@ routes.post('/clients/:id/registry-data', async (c) => {
   }
 });
 
-// 登記簿データの取得
+// 登記簿データの取得 - テナント分離
 routes.get('/clients/:id/registry-data', async (c) => {
   const { DB } = c.env;
   const clientId = c.req.param('id');
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
+    // テナント分離: 自組織のクライアントか確認
+    const clientCheck = await DB.prepare(`
+      SELECT id FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(clientId, orgId).first();
+    
+    if (!clientCheck && orgId) {
+      return c.json(null);
+    }
+    
     const data = await DB.prepare(`
       SELECT * FROM company_registry_data WHERE client_id = ?
     `).bind(clientId).first();
@@ -254,13 +279,24 @@ routes.get('/clients/:id/registry-data', async (c) => {
   }
 });
 
-// 財務諸表データの保存・更新
+// 財務諸表データの保存・更新 - テナント分離
 routes.post('/clients/:id/financial-statements', async (c) => {
   const { DB } = c.env;
   const clientId = c.req.param('id');
   const data = await c.req.json();
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
+    // テナント分離: 自組織のクライアントか確認
+    const clientCheck = await DB.prepare(`
+      SELECT id FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(clientId, orgId).first();
+    
+    if (!clientCheck && orgId) {
+      return c.json({ error: 'アクセス権限がありません' }, 403);
+    }
+    
     // 既存データをチェック（同じ決算期）
     const existing = await DB.prepare(`
       SELECT id FROM financial_statements WHERE client_id = ? AND fiscal_year = ?
@@ -358,12 +394,23 @@ routes.post('/clients/:id/financial-statements', async (c) => {
   }
 });
 
-// 財務諸表データの取得
+// 財務諸表データの取得 - テナント分離
 routes.get('/clients/:id/financial-statements', async (c) => {
   const { DB } = c.env;
   const clientId = c.req.param('id');
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
+    // テナント分離: 自組織のクライアントか確認
+    const clientCheck = await DB.prepare(`
+      SELECT id FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(clientId, orgId).first();
+    
+    if (!clientCheck && orgId) {
+      return c.json([]);
+    }
+    
     const data = await DB.prepare(`
       SELECT * FROM financial_statements 
       WHERE client_id = ? 
@@ -465,12 +512,23 @@ async function calculateFinancialIndicators(
   }
 }
 
-// 財務指標の取得
+// 財務指標の取得 - テナント分離
 routes.get('/clients/:id/financial-indicators', async (c) => {
   const { DB } = c.env;
   const clientId = c.req.param('id');
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
+    // テナント分離: 自組織のクライアントか確認
+    const clientCheck = await DB.prepare(`
+      SELECT id FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(clientId, orgId).first();
+    
+    if (!clientCheck && orgId) {
+      return c.json([]);
+    }
+    
     const indicators = await DB.prepare(`
       SELECT * FROM financial_indicators 
       WHERE client_id = ? 
@@ -483,13 +541,24 @@ routes.get('/clients/:id/financial-indicators', async (c) => {
   }
 });
 
-// 確定申告書データの保存・更新
+// 確定申告書データの保存・更新 - テナント分離
 routes.post('/clients/:id/tax-return', async (c) => {
   const { DB } = c.env;
   const clientId = c.req.param('id');
   const data = await c.req.json();
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
+    // テナント分離: 自組織のクライアントか確認
+    const clientCheck = await DB.prepare(`
+      SELECT id FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(clientId, orgId).first();
+    
+    if (!clientCheck && orgId) {
+      return c.json({ error: 'アクセス権限がありません' }, 403);
+    }
+    
     const existing = await DB.prepare(`
       SELECT id FROM tax_return_data WHERE client_id = ? AND tax_year = ?
     `).bind(clientId, data.tax_year).first();
@@ -569,12 +638,23 @@ routes.post('/clients/:id/tax-return', async (c) => {
   }
 });
 
-// 確定申告書データの取得
+// 確定申告書データの取得 - テナント分離
 routes.get('/clients/:id/tax-return', async (c) => {
   const { DB } = c.env;
   const clientId = c.req.param('id');
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
+    // テナント分離: 自組織のクライアントか確認
+    const clientCheck = await DB.prepare(`
+      SELECT id FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(clientId, orgId).first();
+    
+    if (!clientCheck && orgId) {
+      return c.json([]);
+    }
+    
     const data = await DB.prepare(`
       SELECT * FROM tax_return_data 
       WHERE client_id = ? 
@@ -614,12 +694,23 @@ routes.get('/business-plan-templates/:subsidyTypeId', async (c) => {
   }
 });
 
-// 顧客の抽出データサマリー取得（基本情報フィールド埋め用）
+// 顧客の抽出データサマリー取得（基本情報フィールド埋め用）- テナント分離
 routes.get('/clients/:id/extracted-data-summary', async (c) => {
   const { DB } = c.env;
   const clientId = c.req.param('id');
+  const user = await getCurrentUser(c);
+  const orgId = getEffectiveOrgId(c, user);
   
   try {
+    // テナント分離: 自組織のクライアントか確認
+    const clientCheck = await DB.prepare(`
+      SELECT id FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(clientId, orgId).first();
+    
+    if (!clientCheck && orgId) {
+      return c.json({ registry: null, financial_statement: null, tax_return: null, financial_indicators: null, summary: {} });
+    }
+    
     // 登記簿データ
     const registry = await DB.prepare(`
       SELECT * FROM company_registry_data WHERE client_id = ?

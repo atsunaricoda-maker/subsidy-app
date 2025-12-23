@@ -1,7 +1,8 @@
 // フェーズ4: エクスポート機能（PDF/Word）
+// テナント分離: 自組織のデータのみエクスポート可能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -10,19 +11,21 @@ routes.get('/generated-documents/:id/export', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const format = c.req.query('format') || 'html'
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
-  // 文書取得（テンプレートの補助金タイプから補助金名を取得）
+  // テナント分離: 自組織のクライアントに紐づく文書のみ取得可能
   const doc = await DB.prepare(`
     SELECT gd.*, dt.template_name, dt.sections as template_sections,
-           c.name as client_name, c.company_name,
+           c.name as client_name, c.company_name, c.organization_id,
            COALESCE(st_template.name, st_client.name) as subsidy_name
     FROM generated_documents gd
     JOIN document_templates dt ON gd.template_id = dt.id
     JOIN clients c ON gd.client_id = c.id
     LEFT JOIN subsidy_types st_template ON dt.subsidy_type_id = st_template.id
     LEFT JOIN subsidy_types st_client ON c.subsidy_type_id = st_client.id
-    WHERE gd.id = ?
-  `).bind(id).first()
+    WHERE gd.id = ? AND c.organization_id = ?
+  `).bind(id, orgId).first()
   
   if (!doc) {
     return c.json({ error: '文書が見つかりません' }, 404)
@@ -228,6 +231,20 @@ routes.get('/generated-documents/:id/export', async (c) => {
 routes.post('/clients/:clientId/export-all-documents', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントのみアクセス可能
+  const client = await DB.prepare(`
+    SELECT c.*, st.name as subsidy_name
+    FROM clients c
+    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    WHERE c.id = ? AND c.organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!client) {
+    return c.json({ error: '顧客が見つかりません' }, 404)
+  }
   
   // 顧客の全文書取得
   const docs = await DB.prepare(`
@@ -237,17 +254,6 @@ routes.post('/clients/:clientId/export-all-documents', async (c) => {
     WHERE gd.client_id = ?
     ORDER BY gd.created_at DESC
   `).bind(clientId).all()
-  
-  const client = await DB.prepare(`
-    SELECT c.*, st.name as subsidy_name
-    FROM clients c
-    LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-    WHERE c.id = ?
-  `).bind(clientId).first()
-  
-  if (!client) {
-    return c.json({ error: '顧客が見つかりません' }, 404)
-  }
   
   return c.json({
     client: {

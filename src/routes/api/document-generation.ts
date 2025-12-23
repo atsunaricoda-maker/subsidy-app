@@ -1,7 +1,8 @@
 // 文書生成API
+// テナント分離: 自組織のクライアントの文書のみアクセス可能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 import { callAI, extractTextFromDocument, getAIModelName } from './ai'
 
 const routes = new Hono<AppEnv>()
@@ -107,10 +108,21 @@ routes.get('/document-templates/by-subsidy/:subsidyTypeId', async (c) => {
   return c.json(result)
 })
 
-// 生成済み文書一覧
+// 生成済み文書一覧 - テナント分離
 routes.get('/clients/:clientId/generated-documents', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントか確認
+  const clientCheck = await DB.prepare(`
+    SELECT id FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!clientCheck && orgId) {
+    return c.json([]) // 他テナントのクライアントにはアクセス不可
+  }
   
   const result = await DB.prepare(`
     SELECT gd.*, dt.template_name
@@ -123,39 +135,50 @@ routes.get('/clients/:clientId/generated-documents', async (c) => {
   return c.json(result.results)
 })
 
-// 文書詳細取得
+// 文書詳細取得 - テナント分離
 routes.get('/generated-documents/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
+  // テナント分離: 自組織のクライアントの文書のみ取得可能
   const doc = await DB.prepare(`
     SELECT gd.*, dt.template_name, dt.sections as template_sections
     FROM generated_documents gd
     LEFT JOIN document_templates dt ON gd.template_id = dt.id
-    WHERE gd.id = ?
-  `).bind(id).first()
+    JOIN clients c ON gd.client_id = c.id
+    WHERE gd.id = ? AND c.organization_id = ?
+  `).bind(id, orgId).first()
+  
+  if (!doc) {
+    return c.json({ error: '文書が見つかりません' }, 404)
+  }
   
   return c.json(doc)
 })
 
 // AI文書生成（レガシー - 一括生成、タイムアウトの可能性あり）
 // 新しいフロントエンドは prepare-document + generate-section を使用
+// テナント分離対応
 routes.post('/clients/:clientId/generate-document', async (c) => {
   const { DB, CLAUDE_API_KEY } = c.env
   const env = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
   // 新しい段階的生成APIにリダイレクト
   // フロントエンドが対応するまでの間、セクション単位で順次生成を試みる
   
-  // 顧客情報取得
+  // 顧客情報取得（テナント分離）
   const client = await DB.prepare(`
     SELECT c.*, st.name as subsidy_name
     FROM clients c
     LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-    WHERE c.id = ?
-  `).bind(clientId).first()
+    WHERE c.id = ? AND c.organization_id = ?
+  `).bind(clientId, orgId).first()
   
   if (!client) {
     return c.json({ error: '顧客が見つかりません' }, 404)
@@ -218,19 +241,21 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
   })
 })
 
-// 文書生成の準備（文書レコード作成のみ、AI生成なし）
+// 文書生成の準備（文書レコード作成のみ、AI生成なし）- テナント分離
 routes.post('/clients/:clientId/prepare-document', async (c) => {
   const { DB, R2, CLAUDE_API_KEY } = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
-  // 顧客情報取得
+  // 顧客情報取得（テナント分離）
   const client = await DB.prepare(`
     SELECT c.*, st.name as subsidy_name
     FROM clients c
     LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-    WHERE c.id = ?
-  `).bind(clientId).first()
+    WHERE c.id = ? AND c.organization_id = ?
+  `).bind(clientId, orgId).first()
   
   if (!client) {
     return c.json({ error: '顧客が見つかりません' }, 404)
@@ -350,25 +375,28 @@ routes.post('/clients/:clientId/prepare-document', async (c) => {
   })
 })
 
-// 単一セクションのAI生成
+// 単一セクションのAI生成 - テナント分離
 routes.post('/generated-documents/:id/generate-section', async (c) => {
   const { DB, CLAUDE_API_KEY } = c.env
   const env = c.env
   const docId = c.req.param('id')
   const data = await c.req.json()
   const sectionId = data.section_id
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
   if (!sectionId) {
     return c.json({ error: 'section_id is required' }, 400)
   }
   
-  // 文書とテンプレート取得
+  // 文書とテンプレート取得（テナント分離）
   const doc = await DB.prepare(`
     SELECT gd.*, dt.sections as template_sections, dt.ai_prompt_base
     FROM generated_documents gd
     JOIN document_templates dt ON gd.template_id = dt.id
-    WHERE gd.id = ?
-  `).bind(docId).first()
+    JOIN clients c ON gd.client_id = c.id
+    WHERE gd.id = ? AND c.organization_id = ?
+  `).bind(docId, orgId).first()
   
   if (!doc) {
     return c.json({ error: '文書が見つかりません' }, 404)
@@ -650,10 +678,23 @@ ${sectionSpecific}
   }
 })
 
-// 文書生成完了（ステータス更新）
+// 文書生成完了（ステータス更新）- テナント分離
 routes.post('/generated-documents/:id/complete-generation', async (c) => {
   const { DB } = c.env
   const docId = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントの文書のみ更新可能
+  const doc = await DB.prepare(`
+    SELECT gd.id FROM generated_documents gd
+    JOIN clients c ON gd.client_id = c.id
+    WHERE gd.id = ? AND c.organization_id = ?
+  `).bind(docId, orgId).first()
+  
+  if (!doc) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   await DB.prepare(`
     UPDATE generated_documents 
@@ -664,19 +705,23 @@ routes.post('/generated-documents/:id/complete-generation', async (c) => {
   return c.json({ success: true })
 })
 
-// 文書セクション更新
+// 文書セクション更新 - テナント分離
 routes.put('/generated-documents/:id/sections/:sectionId', async (c) => {
   const { DB } = c.env
   const docId = c.req.param('id')
   const sectionId = c.req.param('sectionId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
   try {
     const data = await c.req.json()
     
-    // 現在の文書取得
+    // 現在の文書取得（テナント分離）
     const doc = await DB.prepare(`
-      SELECT * FROM generated_documents WHERE id = ?
-    `).bind(docId).first()
+      SELECT gd.* FROM generated_documents gd
+      JOIN clients c ON gd.client_id = c.id
+      WHERE gd.id = ? AND c.organization_id = ?
+    `).bind(docId, orgId).first()
     
     if (!doc) {
       return c.json({ error: '文書が見つかりません' }, 404)
@@ -716,10 +761,23 @@ routes.put('/generated-documents/:id/sections/:sectionId', async (c) => {
   }
 })
 
-// 文書削除
+// 文書削除 - テナント分離
 routes.delete('/generated-documents/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントの文書のみ削除可能
+  const doc = await DB.prepare(`
+    SELECT gd.id FROM generated_documents gd
+    JOIN clients c ON gd.client_id = c.id
+    WHERE gd.id = ? AND c.organization_id = ?
+  `).bind(id, orgId).first()
+  
+  if (!doc) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   // 編集履歴も削除
   await DB.prepare(`
@@ -734,11 +792,24 @@ routes.delete('/generated-documents/:id', async (c) => {
   return c.json({ success: true })
 })
 
-// 文書ステータス更新
+// 文書ステータス更新 - テナント分離
 routes.put('/generated-documents/:id/status', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントの文書のみ更新可能
+  const doc = await DB.prepare(`
+    SELECT gd.id FROM generated_documents gd
+    JOIN clients c ON gd.client_id = c.id
+    WHERE gd.id = ? AND c.organization_id = ?
+  `).bind(id, orgId).first()
+  
+  if (!doc) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   await DB.prepare(`
     UPDATE generated_documents 
@@ -749,20 +820,23 @@ routes.put('/generated-documents/:id/status', async (c) => {
   return c.json({ success: true })
 })
 
-// セクション再生成
+// セクション再生成 - テナント分離
 routes.post('/generated-documents/:id/regenerate-section', async (c) => {
   const { DB, CLAUDE_API_KEY } = c.env
   const env = c.env
   const docId = c.req.param('id')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
-  // 文書とテンプレート取得
+  // 文書とテンプレート取得（テナント分離）
   const doc = await DB.prepare(`
     SELECT gd.*, dt.sections as template_sections, dt.ai_prompt_base
     FROM generated_documents gd
     JOIN document_templates dt ON gd.template_id = dt.id
-    WHERE gd.id = ?
-  `).bind(docId).first()
+    JOIN clients c ON gd.client_id = c.id
+    WHERE gd.id = ? AND c.organization_id = ?
+  `).bind(docId, orgId).first()
   
   if (!doc) {
     return c.json({ error: '文書が見つかりません' }, 404)
