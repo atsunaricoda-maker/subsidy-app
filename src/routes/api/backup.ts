@@ -184,11 +184,15 @@ routes.get('/backup/info', async (c) => {
   
   try {
     const [
+      adminUsersCount,
+      subsidyTypesCount,
       clientsCount,
       documentsCount,
       generatedDocsCount,
-      casesCount
+      successCasesCount
     ] = await Promise.all([
+      DB.prepare('SELECT COUNT(*) as count FROM admin_users WHERE organization_id = ?').bind(orgId).first(),
+      DB.prepare('SELECT COUNT(*) as count FROM subsidy_types').first(),
       DB.prepare('SELECT COUNT(*) as count FROM clients WHERE organization_id = ?').bind(orgId).first(),
       DB.prepare(`SELECT COUNT(*) as count FROM documents d 
                   JOIN clients c ON d.client_id = c.id 
@@ -196,16 +200,18 @@ routes.get('/backup/info', async (c) => {
       DB.prepare(`SELECT COUNT(*) as count FROM generated_documents gd 
                   JOIN clients c ON gd.client_id = c.id 
                   WHERE c.organization_id = ?`).bind(orgId).first(),
-      DB.prepare('SELECT COUNT(*) as count FROM cases WHERE organization_id = ?').bind(orgId).first()
+      DB.prepare('SELECT COUNT(*) as count FROM success_cases').first()
     ])
 
     return c.json({
       organization_id: orgId,
       summary: {
+        admin_users: adminUsersCount?.count || 0,
+        subsidy_types: subsidyTypesCount?.count || 0,
         clients: clientsCount?.count || 0,
         documents: documentsCount?.count || 0,
         generated_documents: generatedDocsCount?.count || 0,
-        cases: casesCount?.count || 0
+        success_cases: successCasesCount?.count || 0
       },
       last_checked: new Date().toISOString()
     })
