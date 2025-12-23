@@ -348,10 +348,11 @@ routes.post('/stripe/subscription-webhook', async (c) => {
         }
         
         // 3. 管理者アカウントを作成
+        // 注意: admin_usersテーブルにemailカラムがないため除外
         await DB.prepare(`
-          INSERT INTO admin_users (username, password_hash, name, email, role, organization_id)
-          VALUES (?, ?, ?, ?, 'admin', ?)
-        `).bind(username, initialPassword, adminName, email, orgId).run()
+          INSERT INTO admin_users (username, password_hash, name, role, organization_id)
+          VALUES (?, ?, ?, 'admin', ?)
+        `).bind(username, initialPassword, adminName, orgId).run()
         
         console.log('Created admin user:', username)
         
