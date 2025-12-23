@@ -500,7 +500,7 @@ routes.get('/cases', async (c) => {
                                 \${data.result === 'rejected' ? '<span class="px-3 py-1 rounded-full text-sm font-medium bg-red-500 text-white"><i class="fas fa-times mr-1"></i>不採択</span>' : ''}
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="changeStatus('\${data.id}')" class="text-sm px-3 py-1.5 border rounded-lg hover:bg-gray-50">
+                                <button onclick="changeStatus('\${data.id}', '\${data.status}')" class="text-sm px-3 py-1.5 border rounded-lg hover:bg-gray-50">
                                     <i class="fas fa-exchange-alt mr-1"></i>ステータス変更
                                 </button>
                             </div>
@@ -658,7 +658,7 @@ routes.get('/cases', async (c) => {
             }
             
             // ステータス変更ダイアログ
-            async function changeStatus(caseId) {
+            async function changeStatus(caseId, currentStatus) {
                 const statuses = [
                     { key: 'inquiry', label: '見込み' },
                     { key: 'preparing', label: '書類準備中' },
@@ -667,17 +667,32 @@ routes.get('/cases', async (c) => {
                     { key: 'rejected', label: '不採択' }
                 ];
                 
+                // 「見込み」から変更する場合は枠消費の警告を表示
+                const isFromInquiry = currentStatus === 'inquiry';
+                const warningHtml = isFromInquiry ? \`
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4">
+                        <div class="flex items-start">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 mr-2 mt-0.5"></i>
+                            <div class="text-sm text-yellow-700">
+                                <strong>注意:</strong> 「見込み」以外のステータスに変更すると、<span class="font-bold text-red-600">枠が1つ消費</span>されます。
+                            </div>
+                        </div>
+                    </div>
+                \` : '';
+                
                 modalManager.create({
                     id: 'statusChangeModal',
                     title: 'ステータス変更',
                     icon: 'fas fa-exchange-alt',
                     size: 'sm',
                     content: \`
+                        \${warningHtml}
                         <div class="space-y-2">
                             \${statuses.map(s => \`
-                                <button onclick="applyStatusChange('\${caseId}', '\${s.key}')" 
-                                        class="w-full text-left px-4 py-3 rounded-lg border hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                                <button onclick="applyStatusChange('\${caseId}', '\${s.key}', '\${currentStatus}')" 
+                                        class="w-full text-left px-4 py-3 rounded-lg border hover:bg-blue-50 hover:border-blue-300 transition-colors \${s.key === currentStatus ? 'bg-blue-100 border-blue-400' : ''}">
                                     \${s.label}
+                                    \${s.key === currentStatus ? '<span class="text-blue-600 text-sm ml-2">(現在)</span>' : ''}
                                 </button>
                             \`).join('')}
                         </div>
@@ -687,17 +702,28 @@ routes.get('/cases', async (c) => {
             }
             
             // ステータス変更を適用
-            async function applyStatusChange(caseId, newStatus) {
+            async function applyStatusChange(caseId, newStatus, currentStatus) {
+                // 「見込み」から他のステータスに変更する場合は確認
+                if (currentStatus === 'inquiry' && newStatus !== 'inquiry') {
+                    if (!confirm('ステータスを変更すると枠が1つ消費されます。よろしいですか？')) {
+                        return;
+                    }
+                }
+                
                 try {
                     const token = localStorage.getItem('admin_token');
-                    await axios.put('/api/cases/' + caseId + '/status', { status: newStatus }, {
+                    const response = await axios.put('/api/cases/' + caseId + '/status', { status: newStatus }, {
                         headers: { 'Authorization': 'Bearer ' + token }
                     });
                     modalManager.close('statusChangeModal');
                     location.reload();
                 } catch (error) {
                     console.error('Status change error:', error);
-                    alert('ステータス変更に失敗しました');
+                    if (error.response && error.response.data && error.response.data.slot_error) {
+                        alert(error.response.data.error);
+                    } else {
+                        alert('ステータス変更に失敗しました');
+                    }
                 }
             }
             
