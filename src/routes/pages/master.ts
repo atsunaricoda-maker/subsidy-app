@@ -56,7 +56,7 @@ routes.get('/master/login', (c) => {
                 const data = Object.fromEntries(formData);
                 
                 try {
-                    const response = await axios.post('/api/master/login', data);
+                    const response = await axios.post('/master/login', data);
                     localStorage.setItem('master_token', response.data.token);
                     localStorage.setItem('master_name', response.data.name);
                     window.location.href = '/master';
