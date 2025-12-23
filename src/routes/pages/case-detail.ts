@@ -71,7 +71,7 @@ routes.get('/case/:id', async (c) => {
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
-                            <a href="/portal/${caseData.access_token}#documents" target="_blank" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm" title="書類生成画面へ">
+                            <a id="docGenerateBtn" href="/client/${caseData.client_id}#ai" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm" title="書類生成画面へ">
                                 <i class="fas fa-magic mr-2"></i>書類生成
                             </a>
                             <a href="/portal/${caseData.access_token}" target="_blank" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
@@ -253,7 +253,7 @@ routes.get('/case/:id', async (c) => {
                     <!-- 書類管理タブ -->
                     <div id="content-documents" class="tab-content hidden">
                         <!-- AI書類生成へのリンク -->
-                        <div class="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl shadow-lg p-5 mb-6 text-white">
+                        <div id="docGenerateBanner" class="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl shadow-lg p-5 mb-6 text-white">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-4">
                                     <div class="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
@@ -263,13 +263,16 @@ routes.get('/case/:id', async (c) => {
                                         <h3 class="font-bold text-lg">
                                             <i class="fas fa-robot mr-2"></i>AI書類生成
                                         </h3>
-                                        <p class="text-sm text-purple-100 mt-1">ヒアリング回答をもとにAIが事業計画書などの書類を自動生成します</p>
+                                        <p id="docGenerateBannerDesc" class="text-sm text-purple-100 mt-1">ヒアリング回答をもとにAIが事業計画書などの書類を自動生成します</p>
                                     </div>
                                 </div>
-                                <a href="/portal/${caseData.access_token}#documents" target="_blank" class="bg-white text-purple-700 px-6 py-3 rounded-lg hover:bg-purple-50 flex items-center gap-2 font-bold shadow-md">
-                                    <i class="fas fa-external-link-alt"></i>
+                                <a id="docGenerateBannerBtn" href="/client/${caseData.client_id}#ai" class="bg-white text-purple-700 px-6 py-3 rounded-lg hover:bg-purple-50 flex items-center gap-2 font-bold shadow-md">
+                                    <i class="fas fa-file-alt"></i>
                                     <span>書類生成画面へ</span>
                                 </a>
+                            </div>
+                            <div id="docCreationModeInfo" class="mt-3 pt-3 border-t border-white/20 hidden">
+                                <span id="docCreationModeLabel" class="text-xs bg-white/20 px-2 py-1 rounded"></span>
                             </div>
                         </div>
                         
@@ -732,6 +735,7 @@ routes.get('/case/:id', async (c) => {
             const CASE_ID = ${id};
             const CLIENT_ID = ${caseData.client_id};
             const SUBSIDY_TYPE_ID = ${caseData.subsidy_type_id || 'null'};
+            const PORTAL_TOKEN = '${caseData.access_token}';
             const PORTAL_URL = '${new URL(c.req.url).origin}/portal/${caseData.access_token}';
             const SUCCESS_FEE_ENABLED = ${caseData.success_fee_enabled ? 'true' : 'false'};
             const SUCCESS_FEE_RATE = ${caseData.success_fee_rate || 0};
@@ -2426,8 +2430,71 @@ routes.get('/case/:id', async (c) => {
                 }
             }
             
+            // 書類作成モードを取得してリンクを設定
+            async function loadDocumentCreationMode() {
+                try {
+                    const response = await axios.get(\`/api/cases/\${CASE_ID}/license-status\`);
+                    const data = response.data;
+                    
+                    const headerBtn = document.getElementById('docGenerateBtn');
+                    const bannerBtn = document.getElementById('docGenerateBannerBtn');
+                    const bannerDesc = document.getElementById('docGenerateBannerDesc');
+                    const modeInfo = document.getElementById('docCreationModeInfo');
+                    const modeLabel = document.getElementById('docCreationModeLabel');
+                    
+                    // 資格者代行モード（expert_proxy）かつ代行可能な場合は管理者の顧客詳細画面へ
+                    if (data.canCreateDocumentsForClient || data.effectiveMode === 'expert_proxy') {
+                        // 顧客詳細ページの書類生成へ
+                        const clientDetailUrl = \`/client/\${CLIENT_ID}#ai\`;
+                        
+                        if (headerBtn) {
+                            headerBtn.href = clientDetailUrl;
+                            headerBtn.removeAttribute('target');
+                            headerBtn.title = '顧客詳細 - AI書類生成';
+                        }
+                        if (bannerBtn) {
+                            bannerBtn.href = clientDetailUrl;
+                            bannerBtn.removeAttribute('target');
+                            bannerBtn.innerHTML = '<i class="fas fa-file-alt"></i><span>書類生成画面へ</span>';
+                        }
+                        if (bannerDesc) {
+                            bannerDesc.textContent = '資格者として顧客に代わって書類を作成します（管理画面で作業）';
+                        }
+                        if (modeInfo && modeLabel) {
+                            modeInfo.classList.remove('hidden');
+                            modeLabel.innerHTML = '<i class="fas fa-user-tie mr-1"></i>資格者代行モード';
+                        }
+                    } else {
+                        // 顧客自己作成モードの場合はポータルへ
+                        const portalUrl = \`/portal/\${PORTAL_TOKEN}#documents\`;
+                        
+                        if (headerBtn) {
+                            headerBtn.href = portalUrl;
+                            headerBtn.setAttribute('target', '_blank');
+                            headerBtn.title = '顧客ポータル - 書類生成';
+                        }
+                        if (bannerBtn) {
+                            bannerBtn.href = portalUrl;
+                            bannerBtn.setAttribute('target', '_blank');
+                            bannerBtn.innerHTML = '<i class="fas fa-external-link-alt"></i><span>書類生成画面へ</span>';
+                        }
+                        if (bannerDesc) {
+                            bannerDesc.textContent = 'ヒアリング回答をもとにAIが事業計画書などの書類を自動生成します（顧客ポータル）';
+                        }
+                        if (modeInfo && modeLabel) {
+                            modeInfo.classList.remove('hidden');
+                            modeLabel.innerHTML = '<i class="fas fa-user mr-1"></i>顧客自己作成モード';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading document creation mode:', error);
+                    // エラー時はデフォルトで顧客詳細へ（安全側）
+                }
+            }
+            
             // 初期読み込み
             loadCaseData();
+            loadDocumentCreationMode();
             loadPipeline();
             loadDocuments();
             loadHearing();

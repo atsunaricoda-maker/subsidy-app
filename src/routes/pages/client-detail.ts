@@ -3246,9 +3246,23 @@ routes.get('/client/:id', async (c) => {
                 loadDocuments();
                 loadCommonDocumentsAdmin();
                 loadCommunications();
+                
+                // URLハッシュによるタブ切り替え対応
+                const hash = window.location.hash.replace('#', '');
+                if (hash && ['overview', 'cases', 'ai', 'documents', 'pipeline'].includes(hash)) {
+                    setTimeout(() => switchClientTab(hash), 100);
+                }
             }).catch(error => {
                 console.error('Error during initial load:', error);
                 document.getElementById('clientInfo').innerHTML = '<div class="text-red-600">初期データの読み込みに失敗しました</div>';
+            });
+            
+            // ハッシュ変更時のタブ切り替え
+            window.addEventListener('hashchange', () => {
+                const hash = window.location.hash.replace('#', '');
+                if (hash && ['overview', 'cases', 'ai', 'documents', 'pipeline'].includes(hash)) {
+                    switchClientTab(hash);
+                }
             });
             
             ${sidebarScripts}
