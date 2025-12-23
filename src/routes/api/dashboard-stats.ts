@@ -14,6 +14,7 @@ routes.get('/dashboard/stats', async (c) => {
     return c.json({ error: '組織が特定できません' }, 401)
   }
   
+  try {
   // 顧客統計（organization_idでフィルタ）
   const clientStats = await DB.prepare(`
     SELECT 
@@ -48,37 +49,57 @@ routes.get('/dashboard/stats', async (c) => {
   `).bind(thisMonth, thisMonth, thisMonth, thisMonth, orgId).first() as any
   
   // 生成文書統計（organization_idでフィルタ - casesテーブル経由）
-  const docStats = await DB.prepare(`
-    SELECT 
-      COUNT(*) as total,
-      SUM(CASE WHEN gd.status = 'draft' THEN 1 ELSE 0 END) as draft,
-      SUM(CASE WHEN gd.status = 'review' THEN 1 ELSE 0 END) as review,
-      SUM(CASE WHEN gd.status = 'final' THEN 1 ELSE 0 END) as final
-    FROM generated_documents gd
-    JOIN cases c ON gd.case_id = c.id
-    WHERE c.organization_id = ?
-  `).bind(orgId).first()
+  let docStats: any = { total: 0, draft: 0, review: 0, final: 0 }
+  try {
+    docStats = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN gd.status = 'draft' THEN 1 ELSE 0 END) as draft,
+        SUM(CASE WHEN gd.status = 'review' THEN 1 ELSE 0 END) as review,
+        SUM(CASE WHEN gd.status = 'final' THEN 1 ELSE 0 END) as final
+      FROM generated_documents gd
+      JOIN cases c ON gd.case_id = c.id
+      WHERE c.organization_id = ?
+    `).bind(orgId).first() || docStats
+  } catch (e) {
+    // テーブルが存在しない場合はスキップ
+  }
   
   // マッチングスコア統計（organization_idでフィルタ - clientsテーブル経由）
-  const matchStats = await DB.prepare(`
-    SELECT 
-      AVG(sms.match_score) as avg_score,
-      AVG(sms.adoption_probability) as avg_probability,
-      COUNT(*) as total_analyses
-    FROM subsidy_match_scores sms
-    JOIN clients cl ON sms.client_id = cl.id
-    WHERE cl.organization_id = ?
-  `).bind(orgId).first()
+  let matchStats: any = { avg_score: 0, avg_probability: 0, total_analyses: 0 }
+  try {
+    matchStats = await DB.prepare(`
+      SELECT 
+        AVG(sms.match_score) as avg_score,
+        AVG(sms.adoption_probability) as avg_probability,
+        COUNT(*) as total_analyses
+      FROM subsidy_match_scores sms
+      JOIN clients cl ON sms.client_id = cl.id
+      WHERE cl.organization_id = ?
+    `).bind(orgId).first() || matchStats
+  } catch (e) {
+    // テーブルが存在しない場合はスキップ
+  }
   
   // 公募要領更新通知
-  const pendingUpdates = await DB.prepare(`
-    SELECT COUNT(*) as count FROM subsidy_update_logs WHERE status = 'pending'
-  `).first()
+  let pendingUpdates: any = { count: 0 }
+  try {
+    pendingUpdates = await DB.prepare(`
+      SELECT COUNT(*) as count FROM subsidy_update_logs WHERE status = 'pending'
+    `).first() || pendingUpdates
+  } catch (e) {
+    // テーブルが存在しない場合はスキップ
+  }
   
   // 未読通知数（organization_idでテナント分離）
-  const unreadNotifications = await DB.prepare(`
-    SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0 AND (organization_id = ? OR organization_id IS NULL)
-  `).bind(orgId).first()
+  let unreadNotifications: any = { count: 0 }
+  try {
+    unreadNotifications = await DB.prepare(`
+      SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0 AND (organization_id = ? OR organization_id IS NULL)
+    `).bind(orgId).first() || unreadNotifications
+  } catch (e) {
+    // テーブルが存在しない場合はスキップ
+  }
   
   // 今月の採択率を計算
   const monthlyCompleted = monthlyCaseStats?.monthly_completed || 0
@@ -111,6 +132,13 @@ routes.get('/dashboard/stats', async (c) => {
     current_month: thisMonth,
     generated_at: new Date().toISOString()
   })
+  } catch (error: any) {
+    console.error('Dashboard stats error:', error)
+    return c.json({ 
+      error: 'ダッシュボード統計の取得に失敗しました',
+      details: error.message 
+    }, 500)
+  }
 })
 
 export default routes
