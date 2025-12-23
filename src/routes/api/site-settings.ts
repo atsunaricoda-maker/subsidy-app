@@ -2386,7 +2386,7 @@ routes.get('/master/organizations/:id', async (c) => {
             });
             
             async function loginAsOrg(orgId) {
-                if (!confirm('この法人の管理画面に切り替えますか？')) return;
+                if (!confirm('この法人の管理画面に切り替えますか？\\n\\n※サブドメインの管理画面に移動します')) return;
                 try {
                     const token = localStorage.getItem('master_token');
                     const response = await axios.post('/api/master/impersonate/' + orgId, {}, {
@@ -2398,8 +2398,16 @@ routes.get('/master/organizations/:id', async (c) => {
                     localStorage.setItem('admin_username', response.data.username);
                     localStorage.setItem('admin_role', response.data.role);
                     localStorage.setItem('organization_id', orgId);
+                    localStorage.setItem('organization_slug', response.data.organization_slug);
+                    localStorage.setItem('organization_name', response.data.organization_name);
                     
-                    window.location.href = '/';
+                    // サブドメインにリダイレクト
+                    const slug = response.data.organization_slug;
+                    if (slug) {
+                        window.location.href = 'https://' + slug + '.shinsei-raku.com/';
+                    } else {
+                        window.location.href = '/';
+                    }
                 } catch (error) {
                     alert('ログインに失敗しました');
                 }
