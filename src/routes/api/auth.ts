@@ -99,12 +99,13 @@ routes.post('/signup', async (c) => {
       VALUES (?, ?, ?, 'admin', ?)
     `).bind(data.username, data.password, data.admin_name, orgId).run()
     
-    // 3. トライアル用サブスクリプションを作成（basicプラン=ID:1を使用）
+    // 3. トライアル用サブスクリプションを作成
     const periodEnd = new Date()
     periodEnd.setDate(periodEnd.getDate() + 14) // 14日間
     
-    // basicプラン（ID: 1）をトライアル用に設定
-    const TRIAL_PLAN_ID = 1
+    // トライアルプラン（plan_code='trial'）を取得
+    const trialPlan = await DB.prepare(`SELECT id FROM subscription_plans WHERE plan_code = 'trial'`).first() as any
+    const TRIAL_PLAN_ID = trialPlan?.id || 7 // フォールバック: ID 7
     
     const subResult = await DB.prepare(`
       INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
