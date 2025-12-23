@@ -463,7 +463,14 @@ routes.get('/admin/subscription', async (c) => {
             async function loadPlans() {
                 try {
                     const response = await axios.get('/api/subscription/plans');
-                    const plans = response.data;
+                    let plans = response.data;
+                    
+                    // トライアルプランは、現在トライアル中のユーザーにのみ表示
+                    // 一度でも有料プランに変更した場合は非表示
+                    const isCurrentlyTrial = currentSubscription?.plan_code === 'trial';
+                    if (!isCurrentlyTrial) {
+                        plans = plans.filter(p => p.plan_code !== 'trial');
+                    }
                     
                     const container = document.getElementById('plansList');
                     container.innerHTML = plans.map(plan => {
