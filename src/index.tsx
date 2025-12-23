@@ -63,6 +63,8 @@ import portalPages from './routes/pages/portal'
 import statisticsPages from './routes/pages/statistics'
 import subsidy_typesPages from './routes/pages/subsidy-types'
 import authPages from './routes/pages/auth'
+import supportPages from './routes/pages/support'
+import supportRoutes from './routes/api/support'
 
 const app = new Hono<AppEnv>()
 
@@ -193,6 +195,7 @@ app.route('/api', subsidy_typesRoutes)
 app.route('/api', success_casesRoutes)
 app.route('/api', organizationsRoutes)
 app.route('/api', debugTenantRoutes)
+app.route('/api', supportRoutes)
 app.route('', admin_settingsPages)
 app.route('', admin_usersPages)
 app.route('', backupPages)
@@ -218,6 +221,7 @@ app.route('', portalPages)
 app.route('', statisticsPages)
 app.route('', subsidy_typesPages)
 app.route('', authPages)
+app.route('', supportPages)
 
 // Re-export templates for use in routes
 export { generateSidebar, sidebarStyles, sidebarScripts }

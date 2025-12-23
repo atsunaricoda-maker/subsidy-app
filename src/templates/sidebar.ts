@@ -107,6 +107,24 @@ export function generateSidebar(activePage: string = '') {
                     </a>
                 </div>
             </div>
+            
+            <!-- サポートセクション -->
+            <div class="sidebar-section" data-section="support">
+                <button onclick="toggleSidebarSection('support')" class="w-full flex items-center justify-between px-3 py-1.5 text-blue-300 hover:text-white text-xs mt-2">
+                    <span class="font-semibold uppercase tracking-wide">サポート</span>
+                    <i class="fas fa-chevron-down section-icon transition-transform text-xs"></i>
+                </button>
+                <div class="section-content space-y-0.5">
+                    <a href="/help" class="sidebar-link ${isActive('help')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-question-circle w-4 text-center"></i>
+                        <span>ヘルプ・FAQ</span>
+                    </a>
+                    <a href="/contact" class="sidebar-link ${isActive('contact')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
+                        <i class="fas fa-envelope w-4 text-center"></i>
+                        <span>お問い合わせ</span>
+                    </a>
+                </div>
+            </div>
         </nav>
         
         <!-- 法的リンク -->
