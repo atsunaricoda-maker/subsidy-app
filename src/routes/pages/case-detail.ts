@@ -2,13 +2,21 @@
 import { Hono } from 'hono'
 import { generateSidebar, sidebarStyles, sidebarScripts } from '../../templates/sidebar'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
 routes.get('/case/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  
+  // organization_idでテナント分離
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  if (!orgId) {
+    return c.text('Unauthorized - Organization not found', 401)
+  }
   
   const caseData = await DB.prepare(`
     SELECT 
@@ -25,8 +33,8 @@ routes.get('/case/:id', async (c) => {
     LEFT JOIN clients ON cases.client_id = clients.id
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
     LEFT JOIN admin_users ON cases.assigned_to = admin_users.username
-    WHERE cases.id = ?
-  `).bind(id).first()
+    WHERE cases.id = ? AND cases.organization_id = ?
+  `).bind(id, orgId).first()
   
   if (!caseData) {
     return c.text('Case not found', 404)

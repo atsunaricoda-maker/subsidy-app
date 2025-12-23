@@ -2,7 +2,7 @@
 import { Hono } from 'hono'
 import { generateSidebar, sidebarStyles, sidebarScripts } from '../../templates/sidebar'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -10,9 +10,17 @@ routes.get('/client/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   
+  // organization_idでテナント分離
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  if (!orgId) {
+    return c.text('Unauthorized - Organization not found', 401)
+  }
+  
   const client = await DB.prepare(`
-    SELECT * FROM clients WHERE id = ?
-  `).bind(id).first()
+    SELECT * FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(id, orgId).first()
   
   if (!client) {
     return c.text('Client not found', 404)

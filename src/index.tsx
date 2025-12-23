@@ -39,6 +39,7 @@ import subsidy_matchingRoutes from './routes/api/subsidy-matching'
 import subsidy_typesRoutes from './routes/api/subsidy-types'
 import success_casesRoutes from './routes/api/success-cases'
 import organizationsRoutes from './routes/api/organizations'
+import debugTenantRoutes from './routes/api/debug-tenant'
 import admin_settingsPages from './routes/pages/admin-settings'
 import admin_usersPages from './routes/pages/admin-users'
 import backupPages from './routes/pages/backup'
@@ -191,6 +192,7 @@ app.route('/api', subsidy_matchingRoutes)
 app.route('/api', subsidy_typesRoutes)
 app.route('/api', success_casesRoutes)
 app.route('/api', organizationsRoutes)
+app.route('/api', debugTenantRoutes)
 app.route('', admin_settingsPages)
 app.route('', admin_usersPages)
 app.route('', backupPages)

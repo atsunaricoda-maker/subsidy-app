@@ -89,10 +89,7 @@ export async function getCurrentUser(c: any) {
         return { ...user, role: user.role || 'admin', organization_id: effectiveOrgId }
       }
       
-      // テナントIDがない場合のみデフォルト（メインドメインのみ）
-      if (!tenantOrgId) {
-        return { username, role: 'staff', organization_id: 1 }
-      }
+      // ユーザーが見つからない場合はnull（デフォルトorganization_idへのフォールバック廃止）
     }
     return null
   } catch {

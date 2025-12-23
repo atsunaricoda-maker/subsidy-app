@@ -3,16 +3,23 @@ import { Hono } from 'hono'
 import { generateSidebar, sidebarStyles, sidebarScripts } from '../../templates/sidebar'
 import { modalStyles, modalScripts } from '../../templates/modal'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
 routes.get('/cases', async (c) => {
   try {
     const { DB } = c.env
+    const user = await getCurrentUser(c)
     const showArchived = c.req.query('archived') === 'true'
     const assignedTo = c.req.query('assigned_to') || ''
     const filterStatus = c.req.query('status') || ''
+    
+    // organization_idでテナント分離
+    const orgId = getEffectiveOrgId(c, user)
+    if (!orgId) {
+      return c.redirect('/login')
+    }
     
     // 担当者フィルター用：担当者名を取得
     let assignedToName = ''
@@ -25,7 +32,7 @@ routes.get('/cases', async (c) => {
       }
     }
     
-    // casesテーブルから案件を取得
+    // casesテーブルから案件を取得（organization_idでフィルター）
     let query = `
       SELECT 
         cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
@@ -42,7 +49,7 @@ routes.get('/cases', async (c) => {
       LEFT JOIN clients cl ON cs.client_id = cl.id
       LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
       LEFT JOIN admin_users au ON cs.assigned_to = au.username
-      WHERE (cs.is_archived = 0 OR cs.is_archived IS NULL)
+      WHERE cs.organization_id = ? AND (cs.is_archived = 0 OR cs.is_archived IS NULL)
       ORDER BY cs.created_at DESC
     `
     
@@ -64,12 +71,12 @@ routes.get('/cases', async (c) => {
         LEFT JOIN clients cl ON cs.client_id = cl.id
         LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
         LEFT JOIN admin_users au ON cs.assigned_to = au.username
-        WHERE cs.is_archived = 1
+        WHERE cs.organization_id = ? AND cs.is_archived = 1
         ORDER BY cs.created_at DESC
       `
     }
     
-    let casesResult = await DB.prepare(query).all()
+    let casesResult = await DB.prepare(query).bind(orgId).all()
     let allCases = casesResult.results || []
     
     // 担当者フィルター適用
@@ -88,10 +95,10 @@ routes.get('/cases', async (c) => {
     
     const filteredCount = allCases.length
     
-    // アーカイブ数を取得
+    // アーカイブ数を取得（organization_idでフィルター）
     const archivedCountResult = await DB.prepare(`
-      SELECT COUNT(*) as count FROM cases WHERE is_archived = 1
-    `).first() as any
+      SELECT COUNT(*) as count FROM cases WHERE is_archived = 1 AND organization_id = ?
+    `).bind(orgId).first() as any
     const archivedCount = archivedCountResult?.count || 0
     
     // 担当者リスト取得（フィルター用）
@@ -108,7 +115,7 @@ routes.get('/cases', async (c) => {
       { key: 'archived', label: '完了済み', color: 'green', icon: 'fa-check-circle', isArchived: true }
     ]
     
-    // 完了済み（アーカイブ）案件を別途取得（最新10件）
+    // 完了済み（アーカイブ）案件を別途取得（最新10件）（organization_idでフィルター）
     let archivedCasesQuery = `
       SELECT 
         cs.id, cs.case_number, cs.status, cs.access_token, cs.created_at,
@@ -122,11 +129,11 @@ routes.get('/cases', async (c) => {
       LEFT JOIN clients cl ON cs.client_id = cl.id
       LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
       LEFT JOIN admin_users au ON cs.assigned_to = au.username
-      WHERE cs.is_archived = 1
+      WHERE cs.organization_id = ? AND cs.is_archived = 1
       ORDER BY cs.updated_at DESC
       LIMIT 10
     `
-    const archivedCasesResult = await DB.prepare(archivedCasesQuery).all()
+    const archivedCasesResult = await DB.prepare(archivedCasesQuery).bind(orgId).all()
     let archivedCases = archivedCasesResult.results || []
     
     // 担当者フィルターをアーカイブにも適用

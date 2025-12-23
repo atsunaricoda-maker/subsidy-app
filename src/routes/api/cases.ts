@@ -14,8 +14,15 @@ routes.get('/cases', async (c) => {
   const statusFilter = c.req.query('status') // 'inquiry', 'preparing', 'applying', 'adopted', 'rejected'
   const resultFilter = c.req.query('result') // 'approved', 'rejected', 'pending'
   
+  // デバッグ: テナント情報をログ出力
+  const tenantOrgId = c.get('tenantOrgId')
+  const tenantSlug = c.get('tenantSlug')
+  console.log('[DEBUG /api/cases] tenantOrgId:', tenantOrgId, 'tenantSlug:', tenantSlug, 'user:', user?.id, 'user.org_id:', user?.organization_id)
+  
   // organization_idでテナント分離（|| 1 フォールバック廃止）
   const orgId = getEffectiveOrgId(c, user)
+  console.log('[DEBUG /api/cases] effectiveOrgId:', orgId)
+  
   if (!orgId) {
     return c.json({ error: '組織が特定できません' }, 401)
   }
@@ -1528,3 +1535,39 @@ ${content}`
 })
 
 export default routes
+
+// デバッグ用: 案件のorganization_id分布を確認
+routes.get('/cases/debug/org-distribution', async (c) => {
+  const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 管理者のみアクセス可能
+  if (!user || user.role !== 'admin') {
+    return c.json({ error: '管理者権限が必要です' }, 403)
+  }
+  
+  const tenantOrgId = c.get('tenantOrgId')
+  
+  // 組織別の案件数を取得
+  const distribution = await DB.prepare(`
+    SELECT 
+      organization_id,
+      COUNT(*) as case_count,
+      (SELECT name FROM organizations WHERE id = cases.organization_id) as org_name
+    FROM cases
+    GROUP BY organization_id
+    ORDER BY organization_id
+  `).all()
+  
+  // NULL organization_idの案件数
+  const nullOrgCases = await DB.prepare(`
+    SELECT COUNT(*) as count FROM cases WHERE organization_id IS NULL
+  `).first()
+  
+  return c.json({
+    current_tenant_org_id: tenantOrgId,
+    user_org_id: user?.organization_id,
+    distribution: distribution.results,
+    null_org_count: nullOrgCases?.count || 0
+  })
+})

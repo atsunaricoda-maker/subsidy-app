@@ -2,36 +2,45 @@
 import { Hono } from 'hono'
 import { generateSidebar, sidebarStyles, sidebarScripts } from '../../templates/sidebar'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
 routes.get('/admin/statistics', async (c) => {
   const { DB } = c.env
   
-  // 統計データを取得
-  const totalClients = await DB.prepare('SELECT COUNT(*) as count FROM clients').first() as any
+  // organization_idでテナント分離
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  if (!orgId) {
+    return c.text('Unauthorized - Organization not found', 401)
+  }
+  
+  // 統計データを取得（organization_idでフィルタリング）
+  const totalClients = await DB.prepare('SELECT COUNT(*) as count FROM clients WHERE organization_id = ?').bind(orgId).first() as any
   const newThisMonth = await DB.prepare(`
     SELECT COUNT(*) as count FROM clients 
-    WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
-  `).first() as any
+    WHERE organization_id = ? AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+  `).bind(orgId).first() as any
   const completedThisMonth = await DB.prepare(`
     SELECT COUNT(*) as count FROM clients 
-    WHERE status = 'completed' AND strftime('%Y-%m', updated_at) = strftime('%Y-%m', 'now')
-  `).first() as any
+    WHERE organization_id = ? AND status = 'completed' AND strftime('%Y-%m', updated_at) = strftime('%Y-%m', 'now')
+  `).bind(orgId).first() as any
   
   const byStatus = await DB.prepare(`
-    SELECT status, COUNT(*) as count FROM clients GROUP BY status
-  `).all()
+    SELECT status, COUNT(*) as count FROM clients WHERE organization_id = ? GROUP BY status
+  `).bind(orgId).all()
   
   const bySubsidyType = await DB.prepare(`
     SELECT st.name, st.category, COUNT(c.id) as count
     FROM clients c
     LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+    WHERE c.organization_id = ?
     GROUP BY c.subsidy_type_id
     ORDER BY count DESC
     LIMIT 10
-  `).all()
+  `).bind(orgId).all()
   
   const monthlyStats = await DB.prepare(`
     SELECT 
@@ -39,10 +48,10 @@ routes.get('/admin/statistics', async (c) => {
       COUNT(*) as new_count,
       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count
     FROM clients
-    WHERE created_at >= date('now', '-6 months')
+    WHERE organization_id = ? AND created_at >= date('now', '-6 months')
     GROUP BY strftime('%Y-%m', created_at)
     ORDER BY month DESC
-  `).all()
+  `).bind(orgId).all()
   
   // 支払い統計（月別）- invoicesテーブルから
   let monthlyPayments: any[] = []
@@ -59,10 +68,10 @@ routes.get('/admin/statistics', async (c) => {
         SUM(total_amount) as total,
         COUNT(*) as count
       FROM invoices
-      WHERE status = 'paid' AND paid_at >= date('now', '-12 months')
+      WHERE organization_id = ? AND status = 'paid' AND paid_at >= date('now', '-12 months')
       GROUP BY strftime('%Y-%m', paid_at), invoice_type
       ORDER BY month DESC
-    `).all()
+    `).bind(orgId).all()
     monthlyPayments = monthlyPaymentsResult.results || []
     
     // 年別支払い（過去5年）
@@ -73,10 +82,10 @@ routes.get('/admin/statistics', async (c) => {
         SUM(total_amount) as total,
         COUNT(*) as count
       FROM invoices
-      WHERE status = 'paid' AND paid_at >= date('now', '-5 years')
+      WHERE organization_id = ? AND status = 'paid' AND paid_at >= date('now', '-5 years')
       GROUP BY strftime('%Y', paid_at), invoice_type
       ORDER BY year DESC
-    `).all()
+    `).bind(orgId).all()
     yearlyPayments = yearlyPaymentsResult.results || []
     
     // 今月の支払い合計
@@ -85,9 +94,9 @@ routes.get('/admin/statistics', async (c) => {
         invoice_type,
         SUM(total_amount) as total
       FROM invoices
-      WHERE status = 'paid' AND strftime('%Y-%m', paid_at) = strftime('%Y-%m', 'now')
+      WHERE organization_id = ? AND status = 'paid' AND strftime('%Y-%m', paid_at) = strftime('%Y-%m', 'now')
       GROUP BY invoice_type
-    `).all()
+    `).bind(orgId).all()
     
     for (const p of (thisMonthPayments.results || []) as any[]) {
       if (p.invoice_type === 'deposit') totalPaymentThisMonth.deposit = p.total || 0
@@ -101,9 +110,9 @@ routes.get('/admin/statistics', async (c) => {
         invoice_type,
         SUM(total_amount) as total
       FROM invoices
-      WHERE status = 'paid' AND strftime('%Y', paid_at) = strftime('%Y', 'now')
+      WHERE organization_id = ? AND status = 'paid' AND strftime('%Y', paid_at) = strftime('%Y', 'now')
       GROUP BY invoice_type
-    `).all()
+    `).bind(orgId).all()
     
     for (const p of (thisYearPayments.results || []) as any[]) {
       if (p.invoice_type === 'deposit') totalPaymentThisYear.deposit = p.total || 0

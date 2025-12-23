@@ -1,16 +1,62 @@
 // サイト設定API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 import { generateMasterSidebar, masterSidebarScripts } from '../../templates/master-sidebar'
 
 const routes = new Hono<AppEnv>()
 
-// 設定一覧取得
+// 設定一覧取得（テナント分離対応）
 routes.get('/settings', async (c) => {
   const { DB, CLAUDE_API_KEY } = c.env
+  const user = await getCurrentUser(c)
+  
+  // テナントIDを取得
+  const orgId = getEffectiveOrgId(c, user)
   
   try {
+    // テナントIDがある場合は組織テーブルから設定を取得
+    if (orgId) {
+      const org = await DB.prepare(`
+        SELECT 
+          name as company_name,
+          address as company_address,
+          phone as company_phone,
+          email as company_email,
+          representative_name as company_representative,
+          bank_name,
+          bank_branch,
+          bank_account_type,
+          bank_account_number,
+          bank_account_holder,
+          invoice_registration_number
+        FROM organizations
+        WHERE id = ?
+      `).bind(orgId).first() as any
+      
+      if (org) {
+        const settingsObj: Record<string, any> = {
+          company_name: { value: org.company_name || '', type: 'text' },
+          company_address: { value: org.company_address || '', type: 'text' },
+          company_phone: { value: org.company_phone || '', type: 'text' },
+          company_email: { value: org.company_email || '', type: 'text' },
+          company_representative: { value: org.company_representative || '', type: 'text' },
+          bank_name: { value: org.bank_name || '', type: 'text' },
+          bank_branch: { value: org.bank_branch || '', type: 'text' },
+          bank_account_type: { value: org.bank_account_type || '普通', type: 'text' },
+          bank_account_number: { value: org.bank_account_number || '', type: 'text' },
+          bank_account_holder: { value: org.bank_account_holder || '', type: 'text' },
+          invoice_registration_number: { value: org.invoice_registration_number || '', type: 'text' },
+          '_env_status': {
+            claude_api_key_set: !!CLAUDE_API_KEY,
+            claude_api_key_preview: CLAUDE_API_KEY ? `${CLAUDE_API_KEY.substring(0, 12)}...（環境変数で設定済み）` : null
+          }
+        }
+        return c.json(settingsObj)
+      }
+    }
+    
+    // フォールバック: site_settingsテーブル（マスター管理用）
     const settings = await DB.prepare(`
       SELECT setting_key, setting_value, setting_type, description
       FROM site_settings
@@ -37,22 +83,65 @@ routes.get('/settings', async (c) => {
   } catch (error) {
     // テーブルが存在しない場合はデフォルト値を返す
     return c.json({
-      company_name: { value: '株式会社サンプル事務所', type: 'text' },
-      company_address: { value: '〒000-0000 東京都○○区○○1-2-3', type: 'text' },
-      company_phone: { value: '03-0000-0000', type: 'text' },
-      company_email: { value: 'info@example.com', type: 'text' },
-      privacy_policy: { value: 'プライバシーポリシーを設定してください', type: 'textarea' },
-      legal_notice: { value: '特定商取引法に基づく表記を設定してください', type: 'textarea' }
+      company_name: { value: '', type: 'text' },
+      company_address: { value: '', type: 'text' },
+      company_phone: { value: '', type: 'text' },
+      company_email: { value: '', type: 'text' },
+      privacy_policy: { value: '', type: 'textarea' },
+      legal_notice: { value: '', type: 'textarea' }
     })
   }
 })
 
-// 設定を更新
+// 設定を更新（テナント分離対応）
 routes.put('/settings', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  
+  // テナントIDを取得
+  const orgId = getEffectiveOrgId(c, user)
   
   try {
+    // テナントIDがある場合はorganizationsテーブルを更新
+    if (orgId) {
+      // 組織テーブルのカラムマッピング
+      const orgColumnMap: Record<string, string> = {
+        'company_name': 'name',
+        'company_address': 'address',
+        'company_phone': 'phone',
+        'company_email': 'email',
+        'company_representative': 'representative_name',
+        'bank_name': 'bank_name',
+        'bank_branch': 'bank_branch',
+        'bank_account_type': 'bank_account_type',
+        'bank_account_number': 'bank_account_number',
+        'bank_account_holder': 'bank_account_holder',
+        'invoice_registration_number': 'invoice_registration_number'
+      }
+      
+      const updates: string[] = []
+      const values: any[] = []
+      
+      for (const [key, value] of Object.entries(data)) {
+        const column = orgColumnMap[key]
+        if (column) {
+          updates.push(`${column} = ?`)
+          values.push(value)
+        }
+      }
+      
+      if (updates.length > 0) {
+        values.push(orgId)
+        await DB.prepare(`
+          UPDATE organizations SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        `).bind(...values).run()
+      }
+      
+      return c.json({ success: true, message: '設定を保存しました' })
+    }
+    
+    // フォールバック: site_settingsテーブル（マスター管理用）
     for (const [key, value] of Object.entries(data)) {
       await DB.prepare(`
         INSERT INTO site_settings (setting_key, setting_value, updated_at)
