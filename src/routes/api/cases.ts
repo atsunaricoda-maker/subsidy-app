@@ -210,6 +210,81 @@ routes.put('/cases/:id/status', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const { status } = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // 現在のステータスを取得
+  const currentCase = await DB.prepare(`SELECT status, organization_id FROM cases WHERE id = ?`).bind(id).first() as any
+  
+  if (!currentCase) {
+    return c.json({ error: '案件が見つかりません' }, 404)
+  }
+  
+  // テナント分離チェック
+  if (currentCase.organization_id !== orgId) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
+  
+  // 「見込み(inquiry)」から他のステータスに変更する場合、枠を消費
+  if (currentCase.status === 'inquiry' && status !== 'inquiry') {
+    // 既に枠を消費済みかチェック
+    const alreadyConsumed = await DB.prepare(`
+      SELECT id FROM slot_usage_history WHERE case_id = ? AND action = 'consumed'
+    `).bind(id).first()
+    
+    if (!alreadyConsumed) {
+      // サブスクリプション取得（テナント分離: organization_id で検索）
+      const subscription = await DB.prepare(`
+        SELECT us.id, sb.monthly_slots_remaining, sb.purchased_slots_remaining
+        FROM user_subscriptions us
+        JOIN slot_balances sb ON us.id = sb.subscription_id
+        WHERE us.organization_id = ? AND us.status = 'active'
+        LIMIT 1
+      `).bind(orgId).first() as any
+      
+      if (subscription) {
+        const totalAvailable = (subscription.monthly_slots_remaining || 0) + (subscription.purchased_slots_remaining || 0)
+        
+        if (totalAvailable <= 0) {
+          return c.json({ 
+            error: '利用可能な枠がありません。追加枠を購入してください。', 
+            need_purchase: true,
+            slot_error: true 
+          }, 400)
+        }
+        
+        // 月次枠から優先消費、なければ購入枠から消費
+        let slotType = 'monthly'
+        let newMonthly = subscription.monthly_slots_remaining
+        let newPurchased = subscription.purchased_slots_remaining
+        
+        if (subscription.monthly_slots_remaining > 0) {
+          newMonthly = subscription.monthly_slots_remaining - 1
+        } else {
+          slotType = 'purchased'
+          newPurchased = subscription.purchased_slots_remaining - 1
+        }
+        
+        // 枠を消費
+        await DB.prepare(`
+          UPDATE slot_balances 
+          SET monthly_slots_remaining = ?, purchased_slots_remaining = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE subscription_id = ?
+        `).bind(newMonthly, newPurchased, subscription.id).run()
+        
+        // 使用履歴を記録
+        await DB.prepare(`
+          INSERT INTO slot_usage_history (subscription_id, case_id, slot_type, action, slots_changed, balance_after, note, organization_id)
+          VALUES (?, ?, ?, 'consumed', -1, ?, '案件開始による枠消費（見込み→進行中）', ?)
+        `).bind(subscription.id, id, slotType, newMonthly + newPurchased, orgId).run()
+      }
+      // サブスクリプションがない場合は枠消費をスキップ（初期状態対応）
+    }
+  }
   
   await DB.prepare(`
     UPDATE cases SET status = ?, updated_at = datetime('now') WHERE id = ?
