@@ -60,6 +60,15 @@ export function generateMasterSidebar(activePage: string = '') {
             </a>
             
             <div class="pt-4 pb-2">
+                <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">サポート</p>
+            </div>
+            <a href="/master/inquiries" class="sidebar-link ${isActive('inquiries')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-envelope w-5"></i>
+                <span>問い合わせ一覧</span>
+                <span id="inquiryBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
+            </a>
+            
+            <div class="pt-4 pb-2">
                 <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">システム設定</p>
             </div>
             <a href="/master/ai-models" class="sidebar-link ${isActive('ai-models')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
