@@ -71,6 +71,9 @@ routes.get('/case/:id', async (c) => {
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
+                            <a href="/portal/${caseData.access_token}#documents" target="_blank" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm" title="書類生成画面へ">
+                                <i class="fas fa-magic mr-2"></i>書類生成
+                            </a>
                             <a href="/portal/${caseData.access_token}" target="_blank" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
                                 <i class="fas fa-external-link-alt mr-2"></i>ポータル
                             </a>
@@ -249,6 +252,27 @@ routes.get('/case/:id', async (c) => {
                     
                     <!-- 書類管理タブ -->
                     <div id="content-documents" class="tab-content hidden">
+                        <!-- AI書類生成へのリンク -->
+                        <div class="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl shadow-lg p-5 mb-6 text-white">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
+                                        <i class="fas fa-magic text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-lg">
+                                            <i class="fas fa-robot mr-2"></i>AI書類生成
+                                        </h3>
+                                        <p class="text-sm text-purple-100 mt-1">ヒアリング回答をもとにAIが事業計画書などの書類を自動生成します</p>
+                                    </div>
+                                </div>
+                                <a href="/portal/${caseData.access_token}#documents" target="_blank" class="bg-white text-purple-700 px-6 py-3 rounded-lg hover:bg-purple-50 flex items-center gap-2 font-bold shadow-md">
+                                    <i class="fas fa-external-link-alt"></i>
+                                    <span>書類生成画面へ</span>
+                                </a>
+                            </div>
+                        </div>
+                        
                         <!-- 一括ダウンロードボタン -->
                         <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm p-4 mb-6 border border-blue-100">
                             <div class="flex items-center justify-between">

@@ -1,21 +1,25 @@
 // パイプライン管理API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
 // パイプラインテンプレート一覧取得
 routes.get('/pipeline-templates', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   const category = c.req.query('category')
   const subsidyTypeId = c.req.query('subsidy_type_id')
   
+  // organization_idでフィルター（自テナント + 共通テンプレート）
   let query = `
     SELECT pt.*, 
            (SELECT COUNT(*) FROM pipeline_template_tasks WHERE template_id = pt.id) as task_count
     FROM pipeline_templates pt
     WHERE pt.is_active = 1
+      AND (pt.organization_id = ? OR pt.organization_id IS NULL)
   `
   
   // カテゴリでフィルタリング
@@ -23,7 +27,7 @@ routes.get('/pipeline-templates', async (c) => {
     query += ` AND pt.category = '${category}'`
   }
   
-  const templates = await DB.prepare(query).all()
+  const templates = await DB.prepare(query).bind(orgId || 0).all()
   let results = templates.results || []
   
   // 申請種別IDが指定されている場合、紐付けられたパイプラインのみを返す
@@ -51,11 +55,14 @@ routes.get('/pipeline-templates', async (c) => {
 // パイプラインテンプレート詳細取得
 routes.get('/pipeline-templates/:id', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   const templateId = c.req.param('id')
   
+  // 自テナントまたは共通テンプレートのみ取得可能
   const template = await DB.prepare(`
-    SELECT * FROM pipeline_templates WHERE id = ?
-  `).bind(templateId).first()
+    SELECT * FROM pipeline_templates WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)
+  `).bind(templateId, orgId || 0).first()
   
   if (!template) {
     return c.json({ error: 'テンプレートが見つかりません' }, 404)
@@ -77,6 +84,13 @@ routes.get('/pipeline-templates/:id', async (c) => {
 routes.post('/pipeline-templates', async (c) => {
   try {
     const { DB } = c.env
+    const user = await getCurrentUser(c)
+    const orgId = getEffectiveOrgId(c, user)
+    
+    if (!orgId) {
+      return c.json({ error: '組織が特定できません' }, 401)
+    }
+    
     const data = await c.req.json()
     
     // subsidy_type_idsをJSON文字列に変換
@@ -87,8 +101,8 @@ routes.post('/pipeline-templates', async (c) => {
     const result = await DB.prepare(`
       INSERT INTO pipeline_templates 
       (name, description, category, service_start_offset, service_end_offset, 
-       requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids, organization_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       data.name,
       data.description || '',
@@ -99,7 +113,8 @@ routes.post('/pipeline-templates', async (c) => {
       data.allow_external_tasks ? 1 : 0,
       data.progress_reflection !== false ? 1 : 0,
       data.created_by || null,
-      subsidyTypeIds
+      subsidyTypeIds,
+      orgId
     ).run()
     
     const templateId = result.meta.last_row_id
@@ -150,7 +165,23 @@ routes.post('/pipeline-templates', async (c) => {
 routes.put('/pipeline-templates/:id', async (c) => {
   try {
     const { DB } = c.env
+    const user = await getCurrentUser(c)
+    const orgId = getEffectiveOrgId(c, user)
     const templateId = c.req.param('id')
+    
+    if (!orgId) {
+      return c.json({ error: '組織が特定できません' }, 401)
+    }
+    
+    // 自テナントのテンプレートのみ更新可能
+    const existing = await DB.prepare(`
+      SELECT id FROM pipeline_templates WHERE id = ? AND organization_id = ?
+    `).bind(templateId, orgId).first()
+    
+    if (!existing) {
+      return c.json({ error: 'テンプレートが見つからないか、編集権限がありません' }, 404)
+    }
+    
     const data = await c.req.json()
     
     // subsidy_type_idsをJSON文字列に変換
@@ -165,7 +196,7 @@ routes.put('/pipeline-templates/:id', async (c) => {
       requires_approval = ?, allow_external_tasks = ?, progress_reflection = ?,
       subsidy_type_ids = ?,
       updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE id = ? AND organization_id = ?
     `).bind(
       data.name,
       data.description || '',
@@ -176,7 +207,8 @@ routes.put('/pipeline-templates/:id', async (c) => {
       data.allow_external_tasks ? 1 : 0,
       data.progress_reflection !== false ? 1 : 0,
       subsidyTypeIds,
-      templateId
+      templateId,
+      orgId
     ).run()
     
     // タスクを更新（一旦削除して再作成）
@@ -225,11 +257,19 @@ routes.put('/pipeline-templates/:id', async (c) => {
 // パイプラインテンプレート削除
 routes.delete('/pipeline-templates/:id', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   const templateId = c.req.param('id')
   
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // 自テナントのテンプレートのみ削除可能
   await DB.prepare(`
-    UPDATE pipeline_templates SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).bind(templateId).run()
+    UPDATE pipeline_templates SET is_active = 0, updated_at = CURRENT_TIMESTAMP 
+    WHERE id = ? AND organization_id = ?
+  `).bind(templateId, orgId).run()
   
   return c.json({ 
     success: true,
