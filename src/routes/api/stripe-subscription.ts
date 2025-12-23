@@ -304,95 +304,141 @@ routes.post('/stripe/subscription-webhook', async (c) => {
       
       console.log('Processing new signup:', { slug, email, organizationName, planCode })
       
-      // 既に組織が作成されていないか確認
-      const existingOrg = await DB.prepare(`SELECT id FROM organizations WHERE slug = ?`).bind(slug).first()
-      if (existingOrg) {
-        console.log('Organization already exists, skipping creation')
-        return c.json({ received: true })
-      }
-      
       try {
-        // トライアル期間（14日間）
-        const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+        // 既にsignup_sessionsが存在するか確認（重複処理防止）
+        const existingSession = await DB.prepare(`
+          SELECT id FROM signup_sessions WHERE session_id = ?
+        `).bind(session.id).first()
         
-        // 1. 組織を作成
-        const orgResult = await DB.prepare(`
-          INSERT INTO organizations (name, slug, email, phone, status, trial_ends_at, business_scope, stripe_customer_id)
-          VALUES (?, ?, ?, ?, 'trial', ?, ?, ?)
-        `).bind(
-          organizationName,
-          slug,
-          email,
-          phone || null,
-          trialEndsAt,
-          businessScope,
-          stripeCustomerId
-        ).run()
-        
-        const orgId = orgResult.meta?.last_row_id
-        console.log('Created organization:', orgId)
-        
-        // 2. 初期パスワードを生成
-        const initialPassword = generatePassword(12)
-        
-        // ユーザー名をメールアドレスの@前部分から生成
-        let username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '')
-        if (username.length < 3) username = 'admin'
-        
-        // ユーザー名重複チェック（同一組織内）
-        const existingUser = await DB.prepare(`
-          SELECT id FROM admin_users WHERE username = ? AND organization_id = ?
-        `).bind(username, orgId).first()
-        if (existingUser) {
-          username = username + '_' + Date.now().toString().slice(-4)
+        if (existingSession) {
+          console.log('Signup session already processed, skipping')
+          return c.json({ received: true })
         }
         
-        // 3. 管理者アカウントを作成
-        // 注意: admin_usersテーブルにemailカラムがないため除外
-        await DB.prepare(`
-          INSERT INTO admin_users (username, password_hash, name, role, organization_id)
-          VALUES (?, ?, ?, 'admin', ?)
-        `).bind(username, initialPassword, adminName, orgId).run()
+        // 既に組織が作成されているか確認
+        const existingOrg = await DB.prepare(`SELECT id FROM organizations WHERE slug = ?`).bind(slug).first() as any
         
-        console.log('Created admin user:', username)
+        let orgId: number
+        let username: string
+        let initialPassword: string
         
-        // 4. プラン情報を取得してサブスクリプション作成
-        const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(planId).first() as any
-        if (plan) {
-          const periodEnd = new Date()
-          periodEnd.setDate(periodEnd.getDate() + 14) // トライアル期間
+        if (existingOrg) {
+          // 既存組織がある場合（以前のWebhookで部分的に作成された可能性）
+          console.log('Organization already exists, checking for missing data:', existingOrg.id)
+          orgId = existingOrg.id
           
-          const subResult = await DB.prepare(`
-            INSERT INTO user_subscriptions (organization_id, plan_id, status, stripe_subscription_id, stripe_customer_id, current_period_start, current_period_end)
-            VALUES (?, ?, 'active', ?, ?, date('now'), ?)
-          `).bind(orgId, planId, stripeSubscriptionId, stripeCustomerId, periodEnd.toISOString().split('T')[0]).run()
+          // admin_userが存在するか確認
+          const existingAdmin = await DB.prepare(`
+            SELECT username, password_hash FROM admin_users WHERE organization_id = ? AND role = 'admin' LIMIT 1
+          `).bind(orgId).first() as any
           
-          const subscriptionId = subResult.meta?.last_row_id
-          
-          // 5. 初期枠を付与
-          if (subscriptionId) {
+          if (existingAdmin) {
+            // 既存の管理者情報を使用
+            username = existingAdmin.username
+            initialPassword = existingAdmin.password_hash
+            console.log('Using existing admin user:', username)
+          } else {
+            // 管理者が存在しない場合は作成
+            initialPassword = generatePassword(12)
+            username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '')
+            if (username.length < 3) username = 'admin'
+            
+            // ユーザー名重複チェック
+            const duplicateUser = await DB.prepare(`
+              SELECT id FROM admin_users WHERE username = ? AND organization_id = ?
+            `).bind(username, orgId).first()
+            if (duplicateUser) {
+              username = username + '_' + Date.now().toString().slice(-4)
+            }
+            
             await DB.prepare(`
-              INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
-              VALUES (?, ?, ?, 0, date('now'))
-            `).bind(subscriptionId, orgId, plan.monthly_slots === -1 ? 0 : plan.monthly_slots).run()
+              INSERT INTO admin_users (username, password_hash, name, role, organization_id)
+              VALUES (?, ?, ?, 'admin', ?)
+            `).bind(username, initialPassword, adminName, orgId).run()
+            console.log('Created missing admin user:', username)
           }
           
-          console.log('Created subscription and slot balance')
-        }
-        
-        // 6. 両方業務の場合はアドオンを記録
-        if (businessScope === 'both') {
-          try {
-            await DB.prepare(`
-              INSERT INTO organization_addons (organization_id, addon_type, price)
-              VALUES (?, 'dual_scope', 2000)
-            `).bind(orgId).run()
-          } catch (e) {
-            console.log('Addon table might not exist, skipping')
+        } else {
+          // 新規組織を作成
+          const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+          
+          const orgResult = await DB.prepare(`
+            INSERT INTO organizations (name, slug, email, phone, status, trial_ends_at, business_scope, stripe_customer_id)
+            VALUES (?, ?, ?, ?, 'trial', ?, ?, ?)
+          `).bind(
+            organizationName,
+            slug,
+            email,
+            phone || null,
+            trialEndsAt,
+            businessScope,
+            stripeCustomerId
+          ).run()
+          
+          orgId = orgResult.meta?.last_row_id as number
+          console.log('Created organization:', orgId)
+          
+          // 初期パスワードを生成
+          initialPassword = generatePassword(12)
+          
+          // ユーザー名をメールアドレスの@前部分から生成
+          username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '')
+          if (username.length < 3) username = 'admin'
+          
+          // ユーザー名重複チェック（同一組織内）
+          const existingUser = await DB.prepare(`
+            SELECT id FROM admin_users WHERE username = ? AND organization_id = ?
+          `).bind(username, orgId).first()
+          if (existingUser) {
+            username = username + '_' + Date.now().toString().slice(-4)
+          }
+          
+          // 管理者アカウントを作成
+          await DB.prepare(`
+            INSERT INTO admin_users (username, password_hash, name, role, organization_id)
+            VALUES (?, ?, ?, 'admin', ?)
+          `).bind(username, initialPassword, adminName, orgId).run()
+          
+          console.log('Created admin user:', username)
+          
+          // プラン情報を取得してサブスクリプション作成
+          const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(planId).first() as any
+          if (plan) {
+            const periodEnd = new Date()
+            periodEnd.setDate(periodEnd.getDate() + 14)
+            
+            const subResult = await DB.prepare(`
+              INSERT INTO user_subscriptions (organization_id, plan_id, status, stripe_subscription_id, stripe_customer_id, current_period_start, current_period_end)
+              VALUES (?, ?, 'active', ?, ?, date('now'), ?)
+            `).bind(orgId, planId, stripeSubscriptionId, stripeCustomerId, periodEnd.toISOString().split('T')[0]).run()
+            
+            const subscriptionId = subResult.meta?.last_row_id
+            
+            // 初期枠を付与
+            if (subscriptionId) {
+              await DB.prepare(`
+                INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+                VALUES (?, ?, ?, 0, date('now'))
+              `).bind(subscriptionId, orgId, plan.monthly_slots === -1 ? 0 : plan.monthly_slots).run()
+            }
+            
+            console.log('Created subscription and slot balance')
+          }
+          
+          // 両方業務の場合はアドオンを記録
+          if (businessScope === 'both') {
+            try {
+              await DB.prepare(`
+                INSERT INTO organization_addons (organization_id, addon_type, price)
+                VALUES (?, 'dual_scope', 2000)
+              `).bind(orgId).run()
+            } catch (e) {
+              console.log('Addon table might not exist, skipping')
+            }
           }
         }
         
-        // 7. 登録完了情報を一時保存（signup-completeページで使用）
+        // signup_sessionsに登録完了情報を保存（最重要）
         await DB.prepare(`
           INSERT INTO signup_sessions (session_id, organization_id, slug, email, username, initial_password, created_at)
           VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -402,6 +448,8 @@ routes.post('/stripe/subscription-webhook', async (c) => {
         
       } catch (error: any) {
         console.error('Error creating organization from signup:', error)
+        // エラーの詳細をログに記録
+        console.error('Error details:', JSON.stringify(error, null, 2))
       }
       
       return c.json({ received: true })
