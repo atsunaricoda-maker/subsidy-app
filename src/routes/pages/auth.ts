@@ -185,38 +185,23 @@ routes.get('/signup', (c) => {
                             </div>
                         </div>
                         
-                        <!-- 管理者アカウント -->
+                        <!-- 管理者情報 -->
                         <div class="border-b pb-6">
                             <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center">
-                                <i class="fas fa-user-shield mr-2 text-green-500"></i>管理者アカウント
+                                <i class="fas fa-user-shield mr-2 text-green-500"></i>管理者情報
                             </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">お名前 <span class="text-red-500">*</span></label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ご担当者名 <span class="text-red-500">*</span></label>
                                     <input type="text" name="admin_name" required 
                                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                            placeholder="例: 田中太郎">
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">ユーザー名 <span class="text-red-500">*</span></label>
-                                    <input type="text" name="username" required pattern="[a-zA-Z0-9_]+"
-                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                           placeholder="例: tanaka">
-                                    <p class="text-xs text-gray-500 mt-1">半角英数字とアンダースコアのみ</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">パスワード <span class="text-red-500">*</span></label>
-                                    <input type="password" name="password" required minlength="6"
-                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                           placeholder="6文字以上">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">パスワード（確認） <span class="text-red-500">*</span></label>
-                                    <input type="password" name="password_confirm" required minlength="6"
-                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                           placeholder="パスワードを再入力">
-                                </div>
                             </div>
+                            <p class="text-xs text-gray-500 mt-3">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                ログイン情報（ユーザー名・パスワード）は登録完了後にメールでお送りします。
+                            </p>
                         </div>
                         
                         <!-- 業務範囲選択 -->
@@ -293,8 +278,12 @@ routes.get('/signup', (c) => {
                         
                         <button type="submit" id="submitBtn"
                                 class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium transition-colors">
-                            <i class="fas fa-rocket mr-2"></i>無料トライアルを開始
+                            <i class="fas fa-credit-card mr-2"></i>決済画面へ進む（14日間無料）
                         </button>
+                        <p class="text-xs text-gray-500 text-center mt-2">
+                            <i class="fas fa-lock mr-1"></i>
+                            クレジットカード情報はStripeで安全に管理されます。14日間は課金されません。
+                        </p>
                     </form>
                     
                     <div id="errorMessage" class="hidden mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm"></div>
@@ -416,43 +405,40 @@ routes.get('/signup', (c) => {
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData);
                 
-                if (data.password !== data.password_confirm) {
-                    showError('パスワードが一致しません');
-                    return;
-                }
-                
                 if (!selectedPlanId) {
                     showError('プランを選択してください');
                     return;
                 }
                 
-                data.plan_id = selectedPlanId;
-                data.business_scope = selectedBusinessScope;
-                data.dual_scope_addon = selectedBusinessScope === 'both';
+                // Stripe Checkout用のデータを準備
+                const checkoutData = {
+                    organization_name: data.organization_name,
+                    slug: data.slug,
+                    email: data.email,
+                    phone: data.phone || '',
+                    admin_name: data.admin_name,
+                    plan_id: selectedPlanId,
+                    business_scope: selectedBusinessScope
+                };
                 
                 const btn = document.getElementById('submitBtn');
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>登録中...';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>決済画面へ移動中...';
                 
                 try {
-                    const response = await axios.post('/api/signup', data);
+                    // Stripe Checkout Sessionを作成してリダイレクト
+                    const response = await axios.post('/api/stripe/create-signup-checkout', checkoutData);
                     
-                    localStorage.setItem('admin_token', response.data.token);
-                    localStorage.setItem('admin_name', response.data.admin_name);
-                    localStorage.setItem('admin_username', response.data.username);
-                    localStorage.setItem('admin_role', 'admin');
-                    localStorage.setItem('organization_id', response.data.organization_id);
-                    localStorage.setItem('organization_slug', response.data.organization_slug);
-                    
-                    // サブドメインにリダイレクト
-                    const slug = response.data.organization_slug;
-                    const redirectUrl = 'https://' + slug + '.shinsei-raku.com/?welcome=true';
-                    window.location.href = redirectUrl;
+                    if (response.data.checkout_url) {
+                        window.location.href = response.data.checkout_url;
+                    } else {
+                        throw new Error('決済URLの取得に失敗しました');
+                    }
                     
                 } catch (error) {
-                    showError(error.response?.data?.error || '登録に失敗しました。もう一度お試しください。');
+                    showError(error.response?.data?.error || '決済セッションの作成に失敗しました。もう一度お試しください。');
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-rocket mr-2"></i>無料トライアルを開始';
+                    btn.innerHTML = '<i class="fas fa-credit-card mr-2"></i>決済画面へ進む';
                 }
             });
             
@@ -528,6 +514,206 @@ routes.get('/signup', (c) => {
     </body>
     </html>
   `)
+})
+
+// 登録完了ページ（Stripe決済完了後のリダイレクト先）
+routes.get('/signup-complete', async (c) => {
+  const { DB } = c.env
+  const sessionId = c.req.query('session_id')
+  
+  if (!sessionId) {
+    return c.redirect('/signup')
+  }
+  
+  // セッション情報を取得
+  let signupData: any = null
+  try {
+    signupData = await DB.prepare(`
+      SELECT * FROM signup_sessions WHERE session_id = ? AND is_used = 0
+    `).bind(sessionId).first()
+  } catch (e) {
+    console.log('signup_sessions table might not exist yet')
+  }
+  
+  // データがまだない場合は少し待ってリトライ案内
+  if (!signupData) {
+    return c.html(`
+      <!DOCTYPE html>
+      <html lang="ja">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>登録処理中... - 申請らくらく君</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+          <meta http-equiv="refresh" content="3">
+      </head>
+      <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
+          <div class="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto text-center">
+              <i class="fas fa-spinner fa-spin text-5xl text-blue-500 mb-4"></i>
+              <h1 class="text-2xl font-bold text-gray-800 mb-2">登録処理中...</h1>
+              <p class="text-gray-600">アカウントを準備しています。しばらくお待ちください。</p>
+              <p class="text-sm text-gray-400 mt-4">自動的に更新されます</p>
+          </div>
+      </body>
+      </html>
+    `)
+  }
+  
+  // セッションを使用済みにする
+  try {
+    await DB.prepare(`
+      UPDATE signup_sessions SET is_used = 1, used_at = datetime('now') WHERE session_id = ?
+    `).bind(sessionId).run()
+  } catch (e) {
+    console.log('Could not update signup_sessions')
+  }
+  
+  const loginUrl = `https://${signupData.slug}.shinsei-raku.com`
+  const username = signupData.username
+  const password = signupData.initial_password
+  const email = signupData.email
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>登録完了 - 申請らくらく君</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gradient-to-br from-green-50 to-blue-100 min-h-screen py-12 px-4">
+        <div class="max-w-2xl mx-auto">
+            <!-- 成功メッセージ -->
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center mb-8">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-check text-4xl text-green-600"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">登録完了！</h1>
+                <p class="text-gray-600 mb-6">申請らくらく君へようこそ！14日間の無料トライアルが開始されました。</p>
+                
+                <!-- ログイン情報 -->
+                <div class="bg-blue-50 rounded-lg p-6 text-left mb-6">
+                    <h2 class="font-bold text-blue-800 mb-4 flex items-center">
+                        <i class="fas fa-key mr-2"></i>ログイン情報
+                    </h2>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between bg-white rounded-lg p-3">
+                            <span class="text-gray-600">アクセスURL</span>
+                            <div class="flex items-center gap-2">
+                                <code id="loginUrl" class="bg-gray-100 px-3 py-1 rounded text-blue-600 font-mono text-sm">
+                                    ${loginUrl}
+                                </code>
+                                <button onclick="copyToClipboard('loginUrl')" class="text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between bg-white rounded-lg p-3">
+                            <span class="text-gray-600">ユーザー名</span>
+                            <div class="flex items-center gap-2">
+                                <code id="username" class="bg-gray-100 px-3 py-1 rounded font-mono">${username}</code>
+                                <button onclick="copyToClipboard('username')" class="text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between bg-white rounded-lg p-3">
+                            <span class="text-gray-600">パスワード</span>
+                            <div class="flex items-center gap-2">
+                                <code id="password" class="bg-gray-100 px-3 py-1 rounded font-mono">${password}</code>
+                                <button onclick="copyToClipboard('password')" class="text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-blue-700 mt-4">
+                        <i class="fas fa-envelope mr-1"></i>
+                        この情報は <strong>${email}</strong> にもメールでお送りしています。
+                    </p>
+                </div>
+                
+                <!-- 注意事項 -->
+                <div class="bg-yellow-50 rounded-lg p-4 text-left mb-6">
+                    <p class="text-yellow-800 text-sm">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <strong>重要:</strong> 初回ログイン後、必ずパスワードを変更してください。
+                    </p>
+                </div>
+                
+                <!-- ログインボタン -->
+                <a href="${loginUrl}/login" 
+                   class="inline-block bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-medium transition-colors">
+                    <i class="fas fa-sign-in-alt mr-2"></i>ログインする
+                </a>
+            </div>
+            
+            <!-- 次のステップ -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="font-bold text-gray-800 mb-4">次のステップ</h2>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span class="text-blue-600 font-bold">1</span>
+                        </div>
+                        <div>
+                            <p class="font-medium">ログインしてダッシュボードを確認</p>
+                            <p class="text-sm text-gray-500">まずはシステムの全体像を把握しましょう</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span class="text-blue-600 font-bold">2</span>
+                        </div>
+                        <div>
+                            <p class="font-medium">顧客情報を登録</p>
+                            <p class="text-sm text-gray-500">最初の顧客を登録してみましょう</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span class="text-blue-600 font-bold">3</span>
+                        </div>
+                        <div>
+                            <p class="font-medium">AIアシスタントで書類を生成</p>
+                            <p class="text-sm text-gray-500">補助金申請書類の自動生成を体験しましょう</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- フッター -->
+            <div class="text-center mt-8 text-sm text-gray-500">
+                <p>ご不明な点がございましたら、お気軽にお問い合わせください。</p>
+                <p class="mt-2">© 2024 申請らくらく君</p>
+            </div>
+        </div>
+        
+        <script>
+            function copyToClipboard(elementId) {
+                const text = document.getElementById(elementId).textContent.trim();
+                navigator.clipboard.writeText(text).then(() => {
+                    // コピー成功のフィードバック
+                    const btn = event.target.closest('button');
+                    const originalIcon = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check text-green-500"></i>';
+                    setTimeout(() => {
+                        btn.innerHTML = originalIcon;
+                    }, 1500);
+                });
+            }
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// キャンセル時のリダイレクト用
+routes.get('/signup-cancelled', (c) => {
+  return c.redirect('/signup?cancelled=true')
 })
 
 export default routes

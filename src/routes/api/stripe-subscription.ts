@@ -5,6 +5,16 @@ import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
+// ランダムパスワード生成
+function generatePassword(length: number = 12): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'
+  let password = ''
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return password
+}
+
 // Stripe Price ID設定（テスト環境）
 const STRIPE_PRICES = {
   // プラン別Price ID
@@ -275,8 +285,131 @@ routes.post('/stripe/subscription-webhook', async (c) => {
   // checkout.session.completed イベント処理
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
-    const orgId = session.metadata?.organization_id
     const type = session.metadata?.type
+    
+    // ========================================
+    // 新規サインアップ処理
+    // ========================================
+    if (type === 'new_signup') {
+      const slug = session.metadata?.slug
+      const email = session.metadata?.email
+      const organizationName = session.metadata?.organization_name
+      const adminName = session.metadata?.admin_name
+      const phone = session.metadata?.phone
+      const planId = session.metadata?.plan_id
+      const planCode = session.metadata?.plan_code
+      const businessScope = session.metadata?.business_scope || 'labor'
+      const stripeCustomerId = session.customer
+      const stripeSubscriptionId = session.subscription
+      
+      console.log('Processing new signup:', { slug, email, organizationName, planCode })
+      
+      // 既に組織が作成されていないか確認
+      const existingOrg = await DB.prepare(`SELECT id FROM organizations WHERE slug = ?`).bind(slug).first()
+      if (existingOrg) {
+        console.log('Organization already exists, skipping creation')
+        return c.json({ received: true })
+      }
+      
+      try {
+        // トライアル期間（14日間）
+        const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+        
+        // 1. 組織を作成
+        const orgResult = await DB.prepare(`
+          INSERT INTO organizations (name, slug, email, phone, status, trial_ends_at, business_scope, stripe_customer_id)
+          VALUES (?, ?, ?, ?, 'trial', ?, ?, ?)
+        `).bind(
+          organizationName,
+          slug,
+          email,
+          phone || null,
+          trialEndsAt,
+          businessScope,
+          stripeCustomerId
+        ).run()
+        
+        const orgId = orgResult.meta?.last_row_id
+        console.log('Created organization:', orgId)
+        
+        // 2. 初期パスワードを生成
+        const initialPassword = generatePassword(12)
+        
+        // ユーザー名をメールアドレスの@前部分から生成
+        let username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '')
+        if (username.length < 3) username = 'admin'
+        
+        // ユーザー名重複チェック（同一組織内）
+        const existingUser = await DB.prepare(`
+          SELECT id FROM admin_users WHERE username = ? AND organization_id = ?
+        `).bind(username, orgId).first()
+        if (existingUser) {
+          username = username + '_' + Date.now().toString().slice(-4)
+        }
+        
+        // 3. 管理者アカウントを作成
+        await DB.prepare(`
+          INSERT INTO admin_users (username, password_hash, name, email, role, organization_id)
+          VALUES (?, ?, ?, ?, 'admin', ?)
+        `).bind(username, initialPassword, adminName, email, orgId).run()
+        
+        console.log('Created admin user:', username)
+        
+        // 4. プラン情報を取得してサブスクリプション作成
+        const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(planId).first() as any
+        if (plan) {
+          const periodEnd = new Date()
+          periodEnd.setDate(periodEnd.getDate() + 14) // トライアル期間
+          
+          const subResult = await DB.prepare(`
+            INSERT INTO user_subscriptions (organization_id, plan_id, status, stripe_subscription_id, stripe_customer_id, current_period_start, current_period_end)
+            VALUES (?, ?, 'active', ?, ?, date('now'), ?)
+          `).bind(orgId, planId, stripeSubscriptionId, stripeCustomerId, periodEnd.toISOString().split('T')[0]).run()
+          
+          const subscriptionId = subResult.meta?.last_row_id
+          
+          // 5. 初期枠を付与
+          if (subscriptionId) {
+            await DB.prepare(`
+              INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+              VALUES (?, ?, ?, 0, date('now'))
+            `).bind(subscriptionId, orgId, plan.monthly_slots === -1 ? 0 : plan.monthly_slots).run()
+          }
+          
+          console.log('Created subscription and slot balance')
+        }
+        
+        // 6. 両方業務の場合はアドオンを記録
+        if (businessScope === 'both') {
+          try {
+            await DB.prepare(`
+              INSERT INTO organization_addons (organization_id, addon_type, price)
+              VALUES (?, 'dual_scope', 2000)
+            `).bind(orgId).run()
+          } catch (e) {
+            console.log('Addon table might not exist, skipping')
+          }
+        }
+        
+        // 7. 登録完了情報を一時保存（signup-completeページで使用）
+        await DB.prepare(`
+          INSERT INTO signup_sessions (session_id, organization_id, slug, email, username, initial_password, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        `).bind(session.id, orgId, slug, email, username, initialPassword).run()
+        
+        console.log('Signup completed successfully for:', slug)
+        
+      } catch (error: any) {
+        console.error('Error creating organization from signup:', error)
+      }
+      
+      return c.json({ received: true })
+    }
+    
+    // ========================================
+    // 既存組織のサブスクリプション・追加枠処理
+    // ========================================
+    const orgId = session.metadata?.organization_id
     
     if (!orgId) {
       console.error('No organization_id in metadata')
@@ -447,6 +580,150 @@ routes.post('/stripe/subscription-webhook', async (c) => {
   }
   
   return c.json({ received: true })
+})
+
+// ========================================
+// 新規登録用Stripe Checkout（認証不要）
+// ========================================
+routes.post('/stripe/create-signup-checkout', async (c) => {
+  const { DB, STRIPE_SECRET_KEY } = c.env as any
+  
+  if (!STRIPE_SECRET_KEY) {
+    return c.json({ error: 'Stripe決済は現在設定されていません' }, 400)
+  }
+  
+  const data = await c.req.json()
+  
+  // バリデーション
+  if (!data.organization_name || !data.email || !data.admin_name || !data.slug || !data.plan_id) {
+    return c.json({ error: '必須項目を入力してください' }, 400)
+  }
+  
+  // slugのバリデーション
+  const slug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, '')
+  if (!slug || slug.length < 3) {
+    return c.json({ error: 'サブドメインは3文字以上で入力してください' }, 400)
+  }
+  
+  // 予約語チェック
+  const reservedSlugs = ['admin', 'master', 'api', 'www', 'app', 'login', 'signup', 'default']
+  if (reservedSlugs.includes(slug)) {
+    return c.json({ error: 'このサブドメインは予約されています' }, 400)
+  }
+  
+  // slug重複チェック
+  const existingSlug = await DB.prepare(`SELECT id FROM organizations WHERE slug = ?`).bind(slug).first()
+  if (existingSlug) {
+    return c.json({ error: 'このサブドメインは既に使用されています' }, 400)
+  }
+  
+  // メール重複チェック
+  const existingEmail = await DB.prepare(`SELECT id FROM organizations WHERE email = ?`).bind(data.email).first()
+  if (existingEmail) {
+    return c.json({ error: 'このメールアドレスは既に登録されています' }, 400)
+  }
+  
+  // プラン情報を取得
+  const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(data.plan_id).first() as any
+  if (!plan) {
+    return c.json({ error: '無効なプランです' }, 400)
+  }
+  
+  const planCode = plan.plan_code
+  if (!STRIPE_PRICES.plans[planCode as keyof typeof STRIPE_PRICES.plans]) {
+    return c.json({ error: 'このプランはStripe決済に対応していません' }, 400)
+  }
+  
+  const priceId = STRIPE_PRICES.plans[planCode as keyof typeof STRIPE_PRICES.plans]
+  const businessScope = data.business_scope || 'labor'
+  
+  try {
+    // Stripe Customer作成
+    const customerResponse = await fetch('https://api.stripe.com/v1/customers', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        'name': data.organization_name,
+        'email': data.email,
+        'metadata[signup_slug]': slug,
+        'metadata[admin_name]': data.admin_name,
+        'metadata[phone]': data.phone || '',
+        'metadata[business_scope]': businessScope
+      }).toString()
+    })
+    const customer = await customerResponse.json() as any
+    
+    if (customer.error) {
+      console.error('Stripe customer creation error:', customer.error)
+      return c.json({ error: customer.error.message }, 400)
+    }
+    
+    const stripeCustomerId = customer.id
+    const baseUrl = new URL(c.req.url).origin
+    
+    // Checkout Session作成（14日無料トライアル付きサブスク）
+    const checkoutParams: Record<string, string> = {
+      'customer': stripeCustomerId,
+      'line_items[0][price]': priceId,
+      'line_items[0][quantity]': '1',
+      'mode': 'subscription',
+      'success_url': `${baseUrl}/signup-complete?session_id={CHECKOUT_SESSION_ID}`,
+      'cancel_url': `${baseUrl}/signup?cancelled=true`,
+      'subscription_data[trial_period_days]': '14',
+      'subscription_data[metadata][type]': 'new_signup',
+      'subscription_data[metadata][organization_name]': data.organization_name,
+      'subscription_data[metadata][slug]': slug,
+      'subscription_data[metadata][email]': data.email,
+      'subscription_data[metadata][admin_name]': data.admin_name,
+      'subscription_data[metadata][phone]': data.phone || '',
+      'subscription_data[metadata][plan_id]': String(data.plan_id),
+      'subscription_data[metadata][plan_code]': planCode,
+      'subscription_data[metadata][business_scope]': businessScope,
+      'metadata[type]': 'new_signup',
+      'metadata[organization_name]': data.organization_name,
+      'metadata[slug]': slug,
+      'metadata[email]': data.email,
+      'metadata[admin_name]': data.admin_name,
+      'metadata[phone]': data.phone || '',
+      'metadata[plan_id]': String(data.plan_id),
+      'metadata[plan_code]': planCode,
+      'metadata[business_scope]': businessScope
+    }
+    
+    // 両方業務の場合、アドオンも追加
+    if (businessScope === 'both' && STRIPE_PRICES.addons.dual_scope) {
+      checkoutParams['line_items[1][price]'] = STRIPE_PRICES.addons.dual_scope
+      checkoutParams['line_items[1][quantity]'] = '1'
+    }
+    
+    const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(checkoutParams).toString()
+    })
+    
+    const session = await response.json() as any
+    
+    if (session.error) {
+      console.error('Stripe checkout session error:', session.error)
+      return c.json({ error: session.error.message }, 400)
+    }
+    
+    return c.json({
+      success: true,
+      checkout_url: session.url,
+      session_id: session.id
+    })
+  } catch (error: any) {
+    console.error('Stripe signup checkout error:', error)
+    return c.json({ error: '決済セッションの作成に失敗しました' }, 500)
+  }
 })
 
 // Stripe Customer Portal セッション作成（顧客が支払い方法を管理）
