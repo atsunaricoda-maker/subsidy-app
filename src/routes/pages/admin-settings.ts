@@ -485,8 +485,9 @@ routes.get('/admin/subscription', async (c) => {
                             buttonHtml = '';
                         }
                         
-                        // 無制限プランかどうか
+                        // プランタイプ判定
                         const isPlanUnlimited = plan.monthly_slots === -1;
+                        const isTrialPlan = plan.plan_code === 'trial';
                         const slotsDisplay = isPlanUnlimited ? '<i class="fas fa-infinity"></i> 無制限' : plan.monthly_slots + '枠';
                         
                         // 無制限プランの場合は特別なスタイル
@@ -494,18 +495,31 @@ routes.get('/admin/subscription', async (c) => {
                             borderClass = 'border-purple-300 hover:border-purple-500 bg-gradient-to-br from-purple-50 to-indigo-50';
                         }
                         
+                        // トライアルプラン用の表示
+                        let slotsFeature = '';
+                        let additionalFeatures = '';
+                        if (isTrialPlan) {
+                            slotsFeature = '<li><i class="fas fa-gift text-blue-500 mr-2"></i><span class="font-bold">初回1件のみ</span>無料</li>';
+                            additionalFeatures = '<li class="text-blue-600"><i class="fas fa-clock mr-2"></i>14日間限定</li>';
+                        } else if (isPlanUnlimited) {
+                            slotsFeature = '<li><i class="fas fa-check text-green-500 mr-2"></i>毎月<span class="font-bold">' + slotsDisplay + '</span>付与</li>';
+                            additionalFeatures = '<li class="text-purple-600 font-bold"><i class="fas fa-star mr-2"></i>案件数の制限なし</li>';
+                        } else {
+                            slotsFeature = '<li><i class="fas fa-check text-green-500 mr-2"></i>毎月<span class="font-bold">' + slotsDisplay + '</span>付与</li>';
+                            additionalFeatures = '<li><i class="fas fa-check text-green-500 mr-2"></i>追加枠の購入可能</li><li class="text-orange-600"><i class="fas fa-sync-alt mr-2"></i>プラン枠は毎月リセット</li>';
+                        }
+                        
                         return \`
                             <div class="border-2 rounded-xl p-6 \${borderClass} transition-colors \${isPlanUnlimited ? 'relative' : ''}">
                                 \${isPlanUnlimited && !isCurrent ? '<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full"><i class="fas fa-crown mr-1"></i>おすすめ</div>' : ''}
                                 \${statusBadge}
                                 <h3 class="text-lg font-bold text-gray-900">\${plan.plan_name}</h3>
-                                <p class="text-3xl font-bold text-gray-900 my-3">¥\${plan.monthly_price.toLocaleString()}<span class="text-sm font-normal text-gray-500">/月</span></p>
+                                <p class="text-3xl font-bold text-gray-900 my-3">¥\${plan.monthly_price.toLocaleString()}<span class="text-sm font-normal text-gray-500">\${isTrialPlan ? '' : '/月'}</span></p>
                                 <p class="text-sm text-gray-600 mb-4">\${plan.description}</p>
                                 <ul class="text-sm text-gray-600 space-y-2 mb-4">
-                                    <li><i class="fas fa-check text-green-500 mr-2"></i>毎月<span class="font-bold">\${slotsDisplay}</span>付与</li>
+                                    \${slotsFeature}
                                     <li><i class="fas fa-check text-green-500 mr-2"></i>見込み案件は無制限</li>
-                                    \${isPlanUnlimited ? '<li class="text-purple-600 font-bold"><i class="fas fa-star mr-2"></i>案件数の制限なし</li>' : '<li><i class="fas fa-check text-green-500 mr-2"></i>追加枠の購入可能</li>'}
-                                    \${isPlanUnlimited ? '' : '<li class="text-orange-600"><i class="fas fa-sync-alt mr-2"></i>プラン枠は毎月リセット</li>'}
+                                    \${additionalFeatures}
                                 </ul>
                                 \${buttonHtml}
                             </div>
