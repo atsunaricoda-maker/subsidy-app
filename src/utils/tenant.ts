@@ -31,8 +31,8 @@ export function extractSlugFromHost(host: string): string | null {
       const subdomain = hostWithoutPort.slice(0, -(baseDomain.length + 1))
       // wwwは無視
       if (subdomain === 'www') return null
-      // 予約語チェック
-      const reserved = ['admin', 'master', 'api', 'app', 'login', 'signup', 'default', 'portal']
+      // 予約語チェック（defaultは組織として使用可能なので除外）
+      const reserved = ['admin', 'master', 'api', 'app', 'login', 'signup', 'portal']
       if (reserved.includes(subdomain.toLowerCase())) return null
       return subdomain
     }
