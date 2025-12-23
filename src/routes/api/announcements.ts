@@ -91,21 +91,26 @@ routes.get('/organizations/:orgId/announcements', async (c) => {
   
   const now = new Date().toISOString()
   
-  const announcements = await DB.prepare(`
-    SELECT a.*, 
-           CASE WHEN ar.id IS NOT NULL THEN 1 ELSE 0 END as is_read
-    FROM announcements a
-    LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.organization_id = ?
-    WHERE a.is_active = 1
-    AND (a.target_type = 'all' OR a.target_type = 'organization' 
-         OR (a.target_type = 'specific_org' AND (',' || a.target_ids || ',') LIKE '%,' || ? || ',%'))
-    AND (a.start_date IS NULL OR a.start_date <= ?)
-    AND (a.end_date IS NULL OR a.end_date >= ?)
-    ORDER BY a.created_at DESC
-    LIMIT 10
-  `).bind(orgId, orgId, now, now).all()
-  
-  return c.json(announcements.results || [])
+  try {
+    const announcements = await DB.prepare(`
+      SELECT a.*, 
+             CASE WHEN ar.id IS NOT NULL THEN 1 ELSE 0 END as is_read
+      FROM announcements a
+      LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.organization_id = ?
+      WHERE a.is_active = 1
+      AND (a.target_type = 'all' OR a.target_type = 'organization' 
+           OR (a.target_type = 'specific_org' AND (',' || a.target_ids || ',') LIKE '%,' || ? || ',%'))
+      AND (a.start_date IS NULL OR datetime(a.start_date) <= datetime(?))
+      AND (a.end_date IS NULL OR datetime(a.end_date) >= datetime(?))
+      ORDER BY a.created_at DESC
+      LIMIT 10
+    `).bind(orgId, orgId, now, now).all()
+    
+    return c.json(announcements.results || [])
+  } catch (error) {
+    console.error('Announcements fetch error:', error)
+    return c.json([])
+  }
 })
 
 // お知らせ更新
