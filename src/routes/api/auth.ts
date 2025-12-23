@@ -57,10 +57,8 @@ routes.post('/signup', async (c) => {
     return c.json({ error: 'このサブドメインは既に使用されています' }, 400)
   }
   
-  const existingUsername = await DB.prepare(`SELECT id FROM admin_users WHERE username = ?`).bind(data.username).first()
-  if (existingUsername) {
-    return c.json({ error: 'このユーザー名は既に使用されています' }, 400)
-  }
+  // ユーザー名の重複チェックは組織作成後に行う（テナントごとに独立）
+  // サインアップ時は新規組織なので、同じ組織内での重複はあり得ない
   
   const existingEmail = await DB.prepare(`SELECT id FROM organizations WHERE email = ?`).bind(data.email).first()
   if (existingEmail) {

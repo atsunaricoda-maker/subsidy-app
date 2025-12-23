@@ -93,11 +93,27 @@ routes.put('/admin/users/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const { username, password, name, role } = await c.req.json()
+  const user = await getCurrentUser(c)
   
-  // ユーザー名の重複チェック（自分以外）
+  // organization_idでテナント分離
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // 編集対象が同じ組織のユーザーかチェック
+  const targetUser = await DB.prepare(`
+    SELECT id FROM admin_users WHERE id = ? AND organization_id = ?
+  `).bind(id, orgId).first()
+  
+  if (!targetUser) {
+    return c.json({ error: 'ユーザーが見つかりません' }, 404)
+  }
+  
+  // ユーザー名の重複チェック（同じ組織内、自分以外）
   const existing = await DB.prepare(`
-    SELECT id FROM admin_users WHERE username = ? AND id != ?
-  `).bind(username, id).first()
+    SELECT id FROM admin_users WHERE username = ? AND id != ? AND organization_id = ?
+  `).bind(username, id, orgId).first()
   
   if (existing) {
     return c.json({ error: 'このユーザー名は既に使用されています' }, 400)
@@ -134,15 +150,40 @@ routes.put('/admin/users/:id', async (c) => {
 routes.delete('/admin/users/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
   
-  // admin（ID=1）は削除不可
-  if (id === '1') {
-    return c.json({ error: 'メイン管理者は削除できません' }, 400)
+  // organization_idでテナント分離
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  // 削除対象が同じ組織のユーザーかチェック
+  const targetUser = await DB.prepare(`
+    SELECT id, role FROM admin_users WHERE id = ? AND organization_id = ?
+  `).bind(id, orgId).first() as any
+  
+  if (!targetUser) {
+    return c.json({ error: 'ユーザーが見つかりません' }, 404)
+  }
+  
+  // 自分自身は削除不可
+  if (user && user.id === parseInt(id)) {
+    return c.json({ error: '自分自身は削除できません' }, 400)
+  }
+  
+  // 組織内の最後の管理者は削除不可
+  const adminCount = await DB.prepare(`
+    SELECT COUNT(*) as count FROM admin_users WHERE organization_id = ? AND role = 'admin'
+  `).bind(orgId).first() as any
+  
+  if (targetUser.role === 'admin' && adminCount?.count <= 1) {
+    return c.json({ error: '組織には最低1人の管理者が必要です' }, 400)
   }
   
   await DB.prepare(`
-    DELETE FROM admin_users WHERE id = ?
-  `).bind(id).run()
+    DELETE FROM admin_users WHERE id = ? AND organization_id = ?
+  `).bind(id, orgId).run()
   
   return c.json({ 
     success: true,
