@@ -751,8 +751,8 @@ routes.delete('/cases/:id', async (c) => {
       }
     }
     
-    // 2. 通知を削除
-    await DB.prepare(`DELETE FROM admin_notifications WHERE case_id = ?`).bind(id).run()
+    // 2. 通知を削除（related_tableとrelated_idで関連付け）
+    await DB.prepare(`DELETE FROM admin_notifications WHERE related_table = 'cases' AND related_id = ?`).bind(id).run()
     
     // 3. その他の関連データを削除
     await DB.prepare(`DELETE FROM documents WHERE case_id = ?`).bind(id).run()
