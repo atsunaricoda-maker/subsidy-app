@@ -1,7 +1,7 @@
 // AIチャットAPI
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 import { callAIForChat } from './ai'
 
 const routes = new Hono<AppEnv>()
@@ -10,6 +10,14 @@ const routes = new Hono<AppEnv>()
 routes.get('/clients/:clientId/ai-chat', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // organization_idでテナント分離 - クライアントが自組織のものか確認
+  const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(clientId, orgId).first()
+  if (!clientCheck && orgId) {
+    return c.json([]) // 他テナントのクライアントにはアクセス不可
+  }
   
   const result = await DB.prepare(`
     SELECT * FROM ai_chat_history 
@@ -26,6 +34,14 @@ routes.post('/clients/:clientId/ai-chat', async (c) => {
   const env = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // organization_idでテナント分離 - クライアントが自組織のものか確認
+  const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(clientId, orgId).first()
+  if (!clientCheck && orgId) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   // ユーザーメッセージを保存
   await DB.prepare(`

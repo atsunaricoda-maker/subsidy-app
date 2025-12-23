@@ -1,23 +1,26 @@
 // フェーズ4: 採択率予測システム強化
+// テナント分離: 自組織のクライアントのみアクセス可能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-// 詳細な採択率予測API
+// 詳細な採択率予測API - テナント分離
 routes.post('/clients/:clientId/predict-adoption', async (c) => {
   const { DB } = c.env
   const env = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
-  // 顧客情報取得
+  // 顧客情報取得（テナント分離）
   const client = await DB.prepare(`
     SELECT c.*, st.name as subsidy_name, st.category, st.description as subsidy_description
     FROM clients c
     LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
-    WHERE c.id = ?
-  `).bind(clientId).first()
+    WHERE c.id = ? AND c.organization_id = ?
+  `).bind(clientId, orgId).first()
   
   if (!client) {
     return c.json({ error: '顧客が見つかりません' }, 404)

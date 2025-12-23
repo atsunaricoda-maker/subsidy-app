@@ -1,19 +1,22 @@
 // フェーズ4: 複数補助金マッチング強化
+// テナント分離: 自組織のクライアントのみアクセス可能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-// 全補助金との詳細マッチング分析
+// 全補助金との詳細マッチング分析 - テナント分離
 routes.post('/clients/:clientId/comprehensive-matching', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
-  // 顧客情報取得
+  // 顧客情報取得（テナント分離）
   const client = await DB.prepare(`
-    SELECT * FROM clients WHERE id = ?
-  `).bind(clientId).first()
+    SELECT * FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
   
   if (!client) {
     return c.json({ error: '顧客が見つかりません' }, 404)

@@ -1,11 +1,12 @@
 // API: 共通書類（顧客単位、全案件で共有）
+// テナント分離: 自組織のクライアントの書類のみアクセス可能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-// 共通書類タイプ一覧取得
+// 共通書類タイプ一覧取得（マスターデータなのでテナント分離不要）
 routes.get('/common-document-types', async (c) => {
   const { DB } = c.env
   
@@ -67,10 +68,21 @@ routes.post('/common-document-types/initialize', async (c) => {
   })
 })
 
-// 顧客の共通書類一覧取得
+// 顧客の共通書類一覧取得 - テナント分離
 routes.get('/clients/:clientId/common-documents', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントか確認
+  const clientCheck = await DB.prepare(`
+    SELECT id FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!clientCheck && orgId) {
+    return c.json([]) // 他テナントのクライアントにはアクセス不可
+  }
   
   const result = await DB.prepare(`
     SELECT cd.*, cdt.validity_months, cdt.max_versions, cdt.description as type_description
@@ -83,10 +95,21 @@ routes.get('/clients/:clientId/common-documents', async (c) => {
   return c.json(result.results || [])
 })
 
-// 共通書類アップロード
+// 共通書類アップロード - テナント分離
 routes.post('/clients/:clientId/common-documents', async (c) => {
   const { DB, R2 } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントか確認
+  const clientCheck = await DB.prepare(`
+    SELECT id FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!clientCheck && orgId) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   try {
     const formData = await c.req.formData()
@@ -168,14 +191,20 @@ routes.post('/clients/:clientId/common-documents', async (c) => {
   }
 })
 
-// 共通書類ダウンロード
+// 共通書類ダウンロード - テナント分離
 routes.get('/common-documents/:id/download', async (c) => {
   const { DB, R2 } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
+  // テナント分離: 自組織のクライアントの書類か確認
   const doc = await DB.prepare(`
-    SELECT * FROM client_common_documents WHERE id = ?
-  `).bind(id).first() as any
+    SELECT cd.*, c.organization_id
+    FROM client_common_documents cd
+    JOIN clients c ON cd.client_id = c.id
+    WHERE cd.id = ? AND c.organization_id = ?
+  `).bind(id, orgId).first() as any
   
   if (!doc) {
     return c.json({ error: 'Document not found' }, 404)
@@ -195,10 +224,24 @@ routes.get('/common-documents/:id/download', async (c) => {
   })
 })
 
-// 共通書類削除（ステータスをinactiveに）
+// 共通書類削除（ステータスをinactiveに）- テナント分離
 routes.delete('/common-documents/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントの書類か確認
+  const doc = await DB.prepare(`
+    SELECT cd.id
+    FROM client_common_documents cd
+    JOIN clients c ON cd.client_id = c.id
+    WHERE cd.id = ? AND c.organization_id = ?
+  `).bind(id, orgId).first()
+  
+  if (!doc) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   await DB.prepare(`
     UPDATE client_common_documents SET status = 'replaced' WHERE id = ?
@@ -207,10 +250,21 @@ routes.delete('/common-documents/:id', async (c) => {
   return c.json({ success: true })
 })
 
-// 共通書類の有効期限チェック・更新
+// 共通書類の有効期限チェック・更新 - テナント分離
 routes.post('/clients/:clientId/common-documents/check-validity', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 自組織のクライアントか確認
+  const clientCheck = await DB.prepare(`
+    SELECT id FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(clientId, orgId).first()
+  
+  if (!clientCheck && orgId) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
   
   // 期限切れの書類を expired に更新
   await DB.prepare(`
