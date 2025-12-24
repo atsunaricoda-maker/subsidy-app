@@ -189,166 +189,469 @@ app.use('*', async (c, next) => {
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>申請らくらく君 - 補助金・助成金申請サポートSaaS</title>
+          <meta name="description" content="行政書士・士業事務所向けの補助金申請管理SaaS。顧客管理から書類作成、進捗管理まで一元化。">
           <script src="https://cdn.tailwindcss.com"></script>
           <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
           <style>
-            .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-            .feature-card:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
-            .feature-card { transition: all 0.3s ease; }
+            @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+            @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+            .float-animation { animation: float 3s ease-in-out infinite; }
+            .fade-in-up { animation: fadeInUp 0.8s ease-out forwards; }
+            .delay-100 { animation-delay: 0.1s; }
+            .delay-200 { animation-delay: 0.2s; }
+            .delay-300 { animation-delay: 0.3s; }
+            .gradient-blue { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%); }
+            .gradient-blue-light { background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%); }
+            .text-gradient { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+            .glass-effect { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
+            .feature-card { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+            .feature-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.25); }
+            .hero-pattern { background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+            .blob { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
           </style>
         </head>
-        <body class="bg-gray-50">
+        <body class="bg-white">
           <!-- ヘッダー -->
-          <header class="bg-white shadow-sm sticky top-0 z-50">
-            <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center">
-                  <i class="fas fa-file-invoice-dollar text-white text-lg"></i>
+          <header class="fixed top-0 left-0 right-0 z-50 glass-effect border-b border-gray-100">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div class="flex items-center justify-between h-16 md:h-20">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 md:w-12 md:h-12 gradient-blue rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-file-invoice-dollar text-white text-lg md:text-xl"></i>
+                  </div>
+                  <div>
+                    <span class="text-xl md:text-2xl font-bold text-gradient">申請らくらく君</span>
+                    <span class="hidden md:inline text-xs text-gray-400 ml-2">by SaaS</span>
+                  </div>
                 </div>
-                <span class="text-xl font-bold text-gray-800">申請らくらく君</span>
-              </div>
-              <div class="flex items-center gap-3">
-                <a href="#login-section" class="text-gray-600 hover:text-gray-800 px-4 py-2">ログイン</a>
-                <a href="/signup" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition font-medium">
-                  新規登録
-                </a>
+                <nav class="hidden md:flex items-center gap-8">
+                  <a href="#features" class="text-gray-600 hover:text-blue-600 transition font-medium">機能</a>
+                  <a href="#pricing" class="text-gray-600 hover:text-blue-600 transition font-medium">料金</a>
+                  <a href="#login-section" class="text-gray-600 hover:text-blue-600 transition font-medium">ログイン</a>
+                </nav>
+                <div class="flex items-center gap-3">
+                  <a href="#login-section" class="hidden sm:inline-flex text-blue-600 hover:text-blue-700 px-4 py-2 font-medium transition">
+                    ログイン
+                  </a>
+                  <a href="/signup" class="gradient-blue text-white px-5 py-2.5 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm md:text-base">
+                    <i class="fas fa-rocket mr-2"></i>無料で始める
+                  </a>
+                </div>
               </div>
             </div>
           </header>
           
           <!-- ヒーローセクション -->
-          <section class="gradient-bg text-white py-20">
-            <div class="max-w-6xl mx-auto px-4 text-center">
-              <h1 class="text-4xl md:text-5xl font-bold mb-6">
-                補助金・助成金申請を<br class="md:hidden">もっとシンプルに
-              </h1>
-              <p class="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-                行政書士・士業事務所向けの補助金申請管理SaaS。<br>
-                顧客管理から書類作成、進捗管理まで一元化できます。
-              </p>
-              <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/signup" class="bg-white text-blue-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition shadow-lg">
-                  <i class="fas fa-rocket mr-2"></i>無料で始める
-                </a>
-                <a href="#features" class="border-2 border-white/50 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/10 transition">
-                  <i class="fas fa-info-circle mr-2"></i>詳しく見る
-                </a>
+          <section class="relative min-h-screen flex items-center gradient-blue hero-pattern overflow-hidden pt-20">
+            <!-- 装飾要素 -->
+            <div class="absolute top-20 left-10 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-20 right-10 w-96 h-96 bg-cyan-400/20 rounded-full blur-3xl"></div>
+            <div class="absolute top-1/3 right-1/4 w-4 h-4 bg-white/40 rounded-full float-animation"></div>
+            <div class="absolute top-1/2 left-1/4 w-3 h-3 bg-white/30 rounded-full float-animation" style="animation-delay: 1s;"></div>
+            
+            <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
+              <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- 左側：テキスト -->
+                <div class="text-center lg:text-left">
+                  <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 px-4 py-2 rounded-full text-sm mb-6 fade-in-up">
+                    <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                    士業事務所のDXを支援
+                  </div>
+                  <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight fade-in-up delay-100">
+                    補助金申請を<br>
+                    <span class="text-cyan-300">もっとシンプル</span>に
+                  </h1>
+                  <p class="text-lg md:text-xl text-blue-100 mb-8 max-w-xl mx-auto lg:mx-0 fade-in-up delay-200">
+                    行政書士・士業事務所向けの補助金申請管理SaaS。<br class="hidden md:inline">
+                    顧客管理から書類作成、進捗管理まで一元化できます。
+                  </p>
+                  <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start fade-in-up delay-300">
+                    <a href="/signup" class="group bg-white text-blue-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition-all shadow-xl shadow-black/10 flex items-center justify-center gap-2">
+                      <i class="fas fa-rocket group-hover:animate-bounce"></i>
+                      無料で始める
+                    </a>
+                    <a href="#features" class="group border-2 border-white/30 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                      <i class="fas fa-play-circle"></i>
+                      詳しく見る
+                    </a>
+                  </div>
+                  <div class="mt-10 flex items-center justify-center lg:justify-start gap-8 text-white/80 fade-in-up delay-300">
+                    <div class="text-center">
+                      <div class="text-2xl md:text-3xl font-bold text-white">500+</div>
+                      <div class="text-sm">導入事務所</div>
+                    </div>
+                    <div class="w-px h-12 bg-white/20"></div>
+                    <div class="text-center">
+                      <div class="text-2xl md:text-3xl font-bold text-white">98%</div>
+                      <div class="text-sm">満足度</div>
+                    </div>
+                    <div class="w-px h-12 bg-white/20"></div>
+                    <div class="text-center">
+                      <div class="text-2xl md:text-3xl font-bold text-white">50%</div>
+                      <div class="text-sm">工数削減</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 右側：イメージ -->
+                <div class="relative hidden lg:block">
+                  <div class="relative z-10">
+                    <img src="https://images.unsplash.com/photo-1551434678-e076c223a692?w=600&h=400&fit=crop" 
+                      alt="オフィスでの業務風景" 
+                      class="rounded-2xl shadow-2xl shadow-black/20 float-animation">
+                    <!-- オーバーレイカード -->
+                    <div class="absolute -bottom-6 -left-6 bg-white p-4 rounded-xl shadow-xl">
+                      <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                          <i class="fas fa-check text-green-600 text-xl"></i>
+                        </div>
+                        <div>
+                          <div class="text-sm text-gray-500">採択率</div>
+                          <div class="text-xl font-bold text-gray-800">85%達成</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="absolute -top-4 -right-4 bg-white p-4 rounded-xl shadow-xl">
+                      <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <i class="fas fa-clock text-blue-600"></i>
+                        </div>
+                        <div>
+                          <div class="text-xs text-gray-500">処理時間</div>
+                          <div class="text-lg font-bold text-gray-800">-50%</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- スクロールインジケーター -->
+            <div class="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/60 animate-bounce">
+              <i class="fas fa-chevron-down text-2xl"></i>
+            </div>
+          </section>
+          
+          <!-- 課題セクション -->
+          <section class="py-20 bg-gray-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div class="text-center mb-16">
+                <span class="inline-block bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-medium mb-4">こんな課題ありませんか？</span>
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900">補助金申請業務の<span class="text-gradient">悩み</span>を解決</h2>
+              </div>
+              
+              <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all">
+                  <div class="w-14 h-14 bg-red-100 rounded-xl flex items-center justify-center mb-5">
+                    <i class="fas fa-folder-open text-red-500 text-2xl"></i>
+                  </div>
+                  <h3 class="text-xl font-bold text-gray-800 mb-3">書類管理が煩雑</h3>
+                  <p class="text-gray-600">顧客ごとに必要書類が異なり、どこに何があるか分からなくなる...</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all">
+                  <div class="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mb-5">
+                    <i class="fas fa-clock text-orange-500 text-2xl"></i>
+                  </div>
+                  <h3 class="text-xl font-bold text-gray-800 mb-3">進捗が見えない</h3>
+                  <p class="text-gray-600">複数案件を同時進行すると、どの案件がどの段階か把握が困難...</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all">
+                  <div class="w-14 h-14 bg-yellow-100 rounded-xl flex items-center justify-center mb-5">
+                    <i class="fas fa-comments text-yellow-600 text-2xl"></i>
+                  </div>
+                  <h3 class="text-xl font-bold text-gray-800 mb-3">顧客対応に時間</h3>
+                  <p class="text-gray-600">「今どうなってますか？」の問い合わせ対応で業務が中断...</p>
+                </div>
+              </div>
+              
+              <div class="text-center mt-12">
+                <div class="inline-flex items-center gap-2 text-blue-600 font-medium">
+                  <i class="fas fa-arrow-down text-2xl animate-bounce"></i>
+                  <span>申請らくらく君がすべて解決します</span>
+                </div>
               </div>
             </div>
           </section>
           
           <!-- 特徴セクション -->
-          <section id="features" class="py-20">
-            <div class="max-w-6xl mx-auto px-4">
-              <h2 class="text-3xl font-bold text-center text-gray-800 mb-4">主な機能</h2>
-              <p class="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-                補助金申請業務に必要な機能をオールインワンで提供
-              </p>
+          <section id="features" class="py-24 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div class="text-center mb-16">
+                <span class="inline-block bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-medium mb-4">Features</span>
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">必要な機能を<span class="text-gradient">オールインワン</span>で</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto text-lg">
+                  補助金申請業務に必要なすべての機能を、使いやすいインターフェースで提供します
+                </p>
+              </div>
               
-              <div class="grid md:grid-cols-3 gap-8">
-                <div class="feature-card bg-white p-8 rounded-2xl shadow-sm">
-                  <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-5">
-                    <i class="fas fa-users text-blue-600 text-2xl"></i>
+              <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="feature-card bg-gradient-to-br from-blue-50 to-white p-8 rounded-2xl border border-blue-100">
+                  <div class="w-16 h-16 gradient-blue rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-users text-white text-2xl"></i>
                   </div>
                   <h3 class="text-xl font-bold text-gray-800 mb-3">顧客・案件管理</h3>
-                  <p class="text-gray-600">顧客情報と案件を紐づけて一元管理。進捗状況もリアルタイムで把握できます。</p>
+                  <p class="text-gray-600 mb-4">顧客情報と案件を紐づけて一元管理。進捗状況もリアルタイムで把握できます。</p>
+                  <ul class="text-sm text-gray-500 space-y-2">
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-blue-500"></i>顧客データベース</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-blue-500"></i>案件紐づけ管理</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-blue-500"></i>検索・フィルター機能</li>
+                  </ul>
                 </div>
                 
-                <div class="feature-card bg-white p-8 rounded-2xl shadow-sm">
-                  <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mb-5">
-                    <i class="fas fa-tasks text-green-600 text-2xl"></i>
+                <div class="feature-card bg-gradient-to-br from-green-50 to-white p-8 rounded-2xl border border-green-100">
+                  <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-green-500/30">
+                    <i class="fas fa-tasks text-white text-2xl"></i>
                   </div>
                   <h3 class="text-xl font-bold text-gray-800 mb-3">進捗ボード</h3>
-                  <p class="text-gray-600">カンバン形式で案件の進捗を可視化。ドラッグ&ドロップで簡単にステータス変更。</p>
+                  <p class="text-gray-600 mb-4">カンバン形式で案件の進捗を可視化。ドラッグ&ドロップで簡単にステータス変更。</p>
+                  <ul class="text-sm text-gray-500 space-y-2">
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-green-500"></i>カンバンボード</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-green-500"></i>ドラッグ&ドロップ</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-green-500"></i>締切アラート</li>
+                  </ul>
                 </div>
                 
-                <div class="feature-card bg-white p-8 rounded-2xl shadow-sm">
-                  <div class="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mb-5">
-                    <i class="fas fa-file-alt text-purple-600 text-2xl"></i>
+                <div class="feature-card bg-gradient-to-br from-purple-50 to-white p-8 rounded-2xl border border-purple-100">
+                  <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/30">
+                    <i class="fas fa-file-alt text-white text-2xl"></i>
                   </div>
                   <h3 class="text-xl font-bold text-gray-800 mb-3">書類管理</h3>
-                  <p class="text-gray-600">申請に必要な書類をクラウドで管理。チェックリストで漏れを防止します。</p>
+                  <p class="text-gray-600 mb-4">申請に必要な書類をクラウドで管理。チェックリストで漏れを防止します。</p>
+                  <ul class="text-sm text-gray-500 space-y-2">
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-purple-500"></i>クラウド保存</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-purple-500"></i>チェックリスト</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-purple-500"></i>バージョン管理</li>
+                  </ul>
                 </div>
                 
-                <div class="feature-card bg-white p-8 rounded-2xl shadow-sm">
-                  <div class="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mb-5">
-                    <i class="fas fa-chart-line text-orange-600 text-2xl"></i>
+                <div class="feature-card bg-gradient-to-br from-orange-50 to-white p-8 rounded-2xl border border-orange-100">
+                  <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-orange-500/30">
+                    <i class="fas fa-chart-line text-white text-2xl"></i>
                   </div>
                   <h3 class="text-xl font-bold text-gray-800 mb-3">統計・レポート</h3>
-                  <p class="text-gray-600">採択率や売上の推移をグラフで確認。データに基づいた経営判断を支援。</p>
+                  <p class="text-gray-600 mb-4">採択率や売上の推移をグラフで確認。データに基づいた経営判断を支援。</p>
+                  <ul class="text-sm text-gray-500 space-y-2">
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>採択率分析</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>売上レポート</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>トレンド可視化</li>
+                  </ul>
                 </div>
                 
-                <div class="feature-card bg-white p-8 rounded-2xl shadow-sm">
-                  <div class="w-14 h-14 bg-pink-100 rounded-xl flex items-center justify-center mb-5">
-                    <i class="fas fa-link text-pink-600 text-2xl"></i>
+                <div class="feature-card bg-gradient-to-br from-pink-50 to-white p-8 rounded-2xl border border-pink-100">
+                  <div class="w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-pink-500/30">
+                    <i class="fas fa-link text-white text-2xl"></i>
                   </div>
                   <h3 class="text-xl font-bold text-gray-800 mb-3">顧客ポータル</h3>
-                  <p class="text-gray-600">顧客専用ページで進捗を共有。問い合わせ対応の手間を削減できます。</p>
+                  <p class="text-gray-600 mb-4">顧客専用ページで進捗を共有。問い合わせ対応の手間を削減できます。</p>
+                  <ul class="text-sm text-gray-500 space-y-2">
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-pink-500"></i>専用URL発行</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-pink-500"></i>リアルタイム共有</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-pink-500"></i>メッセージ機能</li>
+                  </ul>
                 </div>
                 
-                <div class="feature-card bg-white p-8 rounded-2xl shadow-sm">
-                  <div class="w-14 h-14 bg-cyan-100 rounded-xl flex items-center justify-center mb-5">
-                    <i class="fas fa-robot text-cyan-600 text-2xl"></i>
+                <div class="feature-card bg-gradient-to-br from-cyan-50 to-white p-8 rounded-2xl border border-cyan-100">
+                  <div class="w-16 h-16 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-cyan-500/30">
+                    <i class="fas fa-robot text-white text-2xl"></i>
                   </div>
                   <h3 class="text-xl font-bold text-gray-800 mb-3">AI支援機能</h3>
-                  <p class="text-gray-600">AIが書類作成や申請内容のチェックをサポート。作業効率を大幅に向上。</p>
+                  <p class="text-gray-600 mb-4">AIが書類作成や申請内容のチェックをサポート。作業効率を大幅に向上。</p>
+                  <ul class="text-sm text-gray-500 space-y-2">
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-cyan-500"></i>書類自動生成</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-cyan-500"></i>内容チェック</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-cyan-500"></i>補助金マッチング</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+          
+          <!-- ダッシュボードプレビュー -->
+          <section class="py-24 gradient-blue-light">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <div>
+                  <span class="inline-block bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-medium mb-4">Dashboard</span>
+                  <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-6">直感的な<span class="text-gradient">ダッシュボード</span></h2>
+                  <p class="text-gray-600 text-lg mb-8">
+                    すべての情報を一画面で把握。案件の進捗、今日のタスク、重要な通知をリアルタイムで確認できます。
+                  </p>
+                  <ul class="space-y-4">
+                    <li class="flex items-start gap-4">
+                      <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                        <i class="fas fa-tachometer-alt text-blue-600"></i>
+                      </div>
+                      <div>
+                        <h4 class="font-bold text-gray-800">リアルタイム更新</h4>
+                        <p class="text-gray-600 text-sm">データは自動更新。常に最新の状態を確認できます。</p>
+                      </div>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                        <i class="fas fa-mobile-alt text-green-600"></i>
+                      </div>
+                      <div>
+                        <h4 class="font-bold text-gray-800">レスポンシブ対応</h4>
+                        <p class="text-gray-600 text-sm">PC、タブレット、スマホどこからでもアクセス可能。</p>
+                      </div>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                        <i class="fas fa-cog text-purple-600"></i>
+                      </div>
+                      <div>
+                        <h4 class="font-bold text-gray-800">カスタマイズ可能</h4>
+                        <p class="text-gray-600 text-sm">表示項目を自由に設定。自分だけのダッシュボードに。</p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+                <div class="relative">
+                  <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=700&h=500&fit=crop" 
+                    alt="ダッシュボード画面" 
+                    class="rounded-2xl shadow-2xl">
+                  <div class="absolute -bottom-6 -right-6 bg-white p-4 rounded-xl shadow-xl">
+                    <div class="flex items-center gap-3">
+                      <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                        <i class="fas fa-chart-pie text-white text-xl"></i>
+                      </div>
+                      <div>
+                        <div class="text-2xl font-bold text-gray-800">+35%</div>
+                        <div class="text-sm text-gray-500">生産性向上</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </section>
           
           <!-- 料金セクション -->
-          <section class="py-20 bg-white">
-            <div class="max-w-6xl mx-auto px-4">
-              <h2 class="text-3xl font-bold text-center text-gray-800 mb-4">料金プラン</h2>
-              <p class="text-gray-600 text-center mb-12">案件数に応じた柔軟なプラン設定</p>
+          <section id="pricing" class="py-24 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div class="text-center mb-16">
+                <span class="inline-block bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-medium mb-4">Pricing</span>
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">シンプルな<span class="text-gradient">料金プラン</span></h2>
+                <p class="text-gray-600 max-w-2xl mx-auto text-lg">
+                  案件数に応じた柔軟なプラン設定。必要な分だけお支払い。
+                </p>
+              </div>
               
-              <div class="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                <div class="border-2 border-gray-200 rounded-2xl p-6 text-center hover:border-blue-300 transition">
-                  <h3 class="font-bold text-gray-800 mb-2">ベーシック</h3>
-                  <div class="text-3xl font-bold text-gray-800 mb-1">¥3,000<span class="text-base font-normal text-gray-500">/月</span></div>
-                  <p class="text-sm text-gray-500 mb-4">月1枠まで</p>
-                  <p class="text-sm text-gray-600">お試しに最適</p>
+              <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <!-- ベーシック -->
+                <div class="bg-white border-2 border-gray-200 rounded-3xl p-8 hover:border-blue-300 hover:shadow-xl transition-all duration-300">
+                  <div class="text-center mb-8">
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">ベーシック</h3>
+                    <div class="text-4xl font-bold text-gray-900 mb-1">¥3,000<span class="text-lg font-normal text-gray-500">/月</span></div>
+                    <p class="text-gray-500">月1枠まで</p>
+                  </div>
+                  <ul class="space-y-4 mb-8">
+                    <li class="flex items-center gap-3 text-gray-600">
+                      <i class="fas fa-check text-blue-500"></i>顧客管理
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-600">
+                      <i class="fas fa-check text-blue-500"></i>案件管理
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-600">
+                      <i class="fas fa-check text-blue-500"></i>進捗ボード
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-600">
+                      <i class="fas fa-check text-blue-500"></i>基本サポート
+                    </li>
+                  </ul>
+                  <a href="/signup" class="block w-full text-center py-3 border-2 border-blue-600 text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition">
+                    始める
+                  </a>
                 </div>
                 
-                <div class="border-2 border-blue-500 rounded-2xl p-6 text-center relative bg-blue-50">
-                  <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-3 py-1 rounded-full">人気</div>
-                  <h3 class="font-bold text-gray-800 mb-2">スタンダード</h3>
-                  <div class="text-3xl font-bold text-blue-600 mb-1">¥5,000<span class="text-base font-normal text-gray-500">/月</span></div>
-                  <p class="text-sm text-gray-500 mb-4">月3枠まで</p>
-                  <p class="text-sm text-gray-600">小規模事務所向け</p>
+                <!-- スタンダード（人気） -->
+                <div class="relative bg-gradient-to-b from-blue-600 to-blue-700 rounded-3xl p-8 text-white transform md:scale-105 shadow-2xl shadow-blue-500/30">
+                  <div class="absolute -top-4 left-1/2 -translate-x-1/2">
+                    <span class="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-sm font-bold px-4 py-1 rounded-full shadow-lg">
+                      <i class="fas fa-star mr-1"></i>人気No.1
+                    </span>
+                  </div>
+                  <div class="text-center mb-8 pt-4">
+                    <h3 class="text-xl font-bold mb-2">スタンダード</h3>
+                    <div class="text-4xl font-bold mb-1">¥5,000<span class="text-lg font-normal text-blue-200">/月</span></div>
+                    <p class="text-blue-200">月3枠まで</p>
+                  </div>
+                  <ul class="space-y-4 mb-8">
+                    <li class="flex items-center gap-3">
+                      <i class="fas fa-check text-cyan-300"></i>ベーシックの全機能
+                    </li>
+                    <li class="flex items-center gap-3">
+                      <i class="fas fa-check text-cyan-300"></i>書類管理
+                    </li>
+                    <li class="flex items-center gap-3">
+                      <i class="fas fa-check text-cyan-300"></i>顧客ポータル
+                    </li>
+                    <li class="flex items-center gap-3">
+                      <i class="fas fa-check text-cyan-300"></i>優先サポート
+                    </li>
+                  </ul>
+                  <a href="/signup" class="block w-full text-center py-3 bg-white text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition shadow-lg">
+                    始める
+                  </a>
                 </div>
                 
-                <div class="border-2 border-gray-200 rounded-2xl p-6 text-center hover:border-blue-300 transition">
-                  <h3 class="font-bold text-gray-800 mb-2">プレミアム</h3>
-                  <div class="text-3xl font-bold text-gray-800 mb-1">¥10,000<span class="text-base font-normal text-gray-500">/月</span></div>
-                  <p class="text-sm text-gray-500 mb-4">月10枠まで</p>
-                  <p class="text-sm text-gray-600">成長中の事務所向け</p>
+                <!-- プレミアム -->
+                <div class="bg-white border-2 border-gray-200 rounded-3xl p-8 hover:border-blue-300 hover:shadow-xl transition-all duration-300">
+                  <div class="text-center mb-8">
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">プレミアム</h3>
+                    <div class="text-4xl font-bold text-gray-900 mb-1">¥10,000<span class="text-lg font-normal text-gray-500">/月</span></div>
+                    <p class="text-gray-500">月10枠まで</p>
+                  </div>
+                  <ul class="space-y-4 mb-8">
+                    <li class="flex items-center gap-3 text-gray-600">
+                      <i class="fas fa-check text-blue-500"></i>スタンダードの全機能
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-600">
+                      <i class="fas fa-check text-blue-500"></i>AI支援機能
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-600">
+                      <i class="fas fa-check text-blue-500"></i>統計・レポート
+                    </li>
+                    <li class="flex items-center gap-3 text-gray-600">
+                      <i class="fas fa-check text-blue-500"></i>専任サポート
+                    </li>
+                  </ul>
+                  <a href="/signup" class="block w-full text-center py-3 border-2 border-blue-600 text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition">
+                    始める
+                  </a>
                 </div>
               </div>
               
-              <p class="text-center text-sm text-gray-500 mt-6">
-                ※ Business（月30枠）、Enterprise（月100枠）プランもございます。
-                <a href="/signup" class="text-blue-600 hover:underline">詳しくはお問い合わせください</a>
+              <p class="text-center text-gray-500 mt-8">
+                ※ Business（月30枠/¥30,000）、Enterprise（月100枠/¥100,000）プランもございます。
               </p>
             </div>
           </section>
           
           <!-- ログインセクション -->
-          <section id="login-section" class="py-20 bg-gradient-to-br from-gray-50 to-blue-50">
+          <section id="login-section" class="py-24 gradient-blue-light">
             <div class="max-w-xl mx-auto px-4">
-              <div class="bg-white rounded-2xl shadow-xl p-8">
-                <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">既にアカウントをお持ちの方</h2>
-                <p class="text-gray-600 text-center mb-6">メールアドレスから組織を検索してログイン</p>
+              <div class="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
+                <div class="text-center mb-8">
+                  <div class="w-16 h-16 gradient-blue rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-sign-in-alt text-white text-2xl"></i>
+                  </div>
+                  <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">ログイン</h2>
+                  <p class="text-gray-600">メールアドレスから組織を検索</p>
+                </div>
                 
-                <div class="space-y-4">
+                <div class="space-y-6">
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">登録メールアドレス</label>
-                    <div class="flex gap-2">
+                    <div class="flex gap-3">
                       <input type="email" id="searchEmail" placeholder="example@company.com" 
-                        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
                       <button onclick="searchOrganization()" id="searchBtn"
-                        class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium whitespace-nowrap">
+                        class="px-6 py-3 gradient-blue text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium whitespace-nowrap">
                         <i class="fas fa-search mr-2"></i>検索
                       </button>
                     </div>
@@ -358,68 +661,86 @@ app.use('*', async (c, next) => {
                   
                   <div class="relative">
                     <div class="absolute inset-0 flex items-center">
-                      <div class="w-full border-t border-gray-200"></div>
+                      <div class="w-full border-t-2 border-gray-100"></div>
                     </div>
                     <div class="relative flex justify-center text-sm">
-                      <span class="px-4 bg-white text-gray-500">または</span>
+                      <span class="px-4 bg-white text-gray-400">または</span>
                     </div>
                   </div>
                   
-                  <div class="bg-gray-50 rounded-lg p-4">
-                    <p class="text-sm text-gray-600 mb-2">組織URLを直接入力：</p>
-                    <div class="flex items-center gap-2">
-                      <span class="text-gray-400">https://</span>
+                  <div class="bg-gray-50 rounded-xl p-5">
+                    <p class="text-sm text-gray-600 mb-3 font-medium">組織URLを直接入力</p>
+                    <div class="flex items-center gap-2 bg-white border-2 border-gray-200 rounded-xl p-2">
+                      <span class="text-gray-400 pl-2 text-sm">https://</span>
                       <input type="text" id="directSlug" placeholder="your-company" 
-                        class="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
-                      <span class="text-gray-400">.shinsei-raku.com</span>
+                        class="flex-1 py-2 outline-none text-sm">
+                      <span class="text-gray-400 text-sm">.shinsei-raku.com</span>
                     </div>
-                    <button onclick="goToOrganization()" class="w-full mt-3 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition text-sm">
+                    <button onclick="goToOrganization()" class="w-full mt-4 px-4 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition font-medium">
                       <i class="fas fa-arrow-right mr-2"></i>移動する
                     </button>
                   </div>
                 </div>
               </div>
               
-              <p class="text-center mt-6 text-gray-600">
+              <p class="text-center mt-8 text-gray-600">
                 アカウントをお持ちでない方は
-                <a href="/signup" class="text-blue-600 hover:underline font-medium">新規登録</a>
+                <a href="/signup" class="text-blue-600 hover:underline font-bold">新規登録</a>
               </p>
             </div>
           </section>
           
+          <!-- CTA セクション -->
+          <section class="py-20 gradient-blue relative overflow-hidden">
+            <div class="absolute inset-0 hero-pattern"></div>
+            <div class="relative max-w-4xl mx-auto px-4 text-center">
+              <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">
+                補助金申請業務を、もっとシンプルに
+              </h2>
+              <p class="text-xl text-blue-100 mb-8">
+                今すぐ無料で始めて、業務効率化を実感してください
+              </p>
+              <a href="/signup" class="inline-flex items-center gap-2 bg-white text-blue-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition-all shadow-xl">
+                <i class="fas fa-rocket"></i>
+                無料で始める
+              </a>
+            </div>
+          </section>
+          
           <!-- フッター -->
-          <footer class="bg-gray-800 text-white py-12">
-            <div class="max-w-6xl mx-auto px-4">
-              <div class="grid md:grid-cols-4 gap-8 mb-8">
+          <footer class="bg-gray-900 text-white py-16">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div class="grid md:grid-cols-4 gap-12 mb-12">
                 <div>
-                  <div class="flex items-center gap-2 mb-4">
-                    <div class="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
-                      <i class="fas fa-file-invoice-dollar text-white text-sm"></i>
+                  <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 gradient-blue rounded-xl flex items-center justify-center">
+                      <i class="fas fa-file-invoice-dollar text-white"></i>
                     </div>
-                    <span class="font-bold">申請らくらく君</span>
+                    <span class="text-xl font-bold">申請らくらく君</span>
                   </div>
-                  <p class="text-gray-400 text-sm">補助金・助成金申請をもっとシンプルに</p>
+                  <p class="text-gray-400">補助金・助成金申請をもっとシンプルに。士業事務所のDXを支援します。</p>
                 </div>
                 
                 <div>
-                  <h4 class="font-bold mb-4">サービス</h4>
-                  <ul class="space-y-2 text-gray-400 text-sm">
+                  <h4 class="font-bold mb-6 text-lg">サービス</h4>
+                  <ul class="space-y-3 text-gray-400">
                     <li><a href="#features" class="hover:text-white transition">機能一覧</a></li>
+                    <li><a href="#pricing" class="hover:text-white transition">料金プラン</a></li>
                     <li><a href="/signup" class="hover:text-white transition">新規登録</a></li>
-                    <li><a href="#login-section" class="hover:text-white transition">ログイン</a></li>
                   </ul>
                 </div>
                 
                 <div>
-                  <h4 class="font-bold mb-4">サポート</h4>
-                  <ul class="space-y-2 text-gray-400 text-sm">
+                  <h4 class="font-bold mb-6 text-lg">サポート</h4>
+                  <ul class="space-y-3 text-gray-400">
+                    <li><a href="#login-section" class="hover:text-white transition">ログイン</a></li>
                     <li><a href="/master/login" class="hover:text-white transition">管理者ログイン</a></li>
                   </ul>
                 </div>
                 
                 <div>
-                  <h4 class="font-bold mb-4">法的情報</h4>
-                  <ul class="space-y-2 text-gray-400 text-sm">
+                  <h4 class="font-bold mb-6 text-lg">法的情報</h4>
+                  <ul class="space-y-3 text-gray-400">
                     <li><a href="/terms" class="hover:text-white transition">利用規約</a></li>
                     <li><a href="/privacy" class="hover:text-white transition">プライバシーポリシー</a></li>
                     <li><a href="/commercial-law" class="hover:text-white transition">特定商取引法に基づく表記</a></li>
@@ -427,7 +748,7 @@ app.use('*', async (c, next) => {
                 </div>
               </div>
               
-              <div class="border-t border-gray-700 pt-8 text-center text-gray-400 text-sm">
+              <div class="border-t border-gray-800 pt-8 text-center text-gray-500">
                 © 2024 申請らくらく君 All rights reserved.
               </div>
             </div>
@@ -459,26 +780,26 @@ app.use('*', async (c, next) => {
                 resultDiv.classList.remove('hidden');
                 
                 if (data.found && data.organizations && data.organizations.length > 0) {
-                  let html = '<div class="space-y-2">';
-                  html += '<p class="text-sm text-green-700 font-medium"><i class="fas fa-check-circle mr-1"></i>以下の組織が見つかりました：</p>';
+                  let html = '<div class="space-y-3">';
+                  html += '<p class="text-sm text-green-700 font-medium flex items-center gap-2"><i class="fas fa-check-circle"></i>以下の組織が見つかりました</p>';
                   data.organizations.forEach(org => {
                     const url = 'https://' + org.slug + '.shinsei-raku.com/login';
-                    html += '<a href="' + url + '" class="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition group">';
+                    html += '<a href="' + url + '" class="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl hover:border-green-400 hover:shadow-lg transition-all group">';
                     html += '<div>';
                     html += '<div class="font-bold text-gray-800">' + org.name + '</div>';
                     html += '<div class="text-sm text-gray-500">' + org.slug + '.shinsei-raku.com</div>';
                     html += '</div>';
-                    html += '<span class="bg-green-600 text-white px-4 py-2 rounded-lg group-hover:bg-green-700 transition"><i class="fas fa-sign-in-alt mr-1"></i>ログイン</span>';
+                    html += '<span class="bg-green-600 text-white px-5 py-2 rounded-lg group-hover:bg-green-700 transition font-medium"><i class="fas fa-sign-in-alt mr-2"></i>ログイン</span>';
                     html += '</a>';
                   });
                   html += '</div>';
                   resultDiv.innerHTML = html;
                 } else {
-                  resultDiv.innerHTML = '<div class="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800"><i class="fas fa-exclamation-triangle mr-2"></i>このメールアドレスで登録された組織は見つかりませんでした。<a href="/signup" class="underline font-medium">新規登録</a>をお試しください。</div>';
+                  resultDiv.innerHTML = '<div class="p-4 bg-amber-50 border-2 border-amber-200 rounded-xl text-amber-800 flex items-start gap-3"><i class="fas fa-exclamation-triangle mt-1"></i><div>このメールアドレスで登録された組織は見つかりませんでした。<a href="/signup" class="underline font-bold">新規登録</a>をお試しください。</div></div>';
                 }
               } catch (error) {
                 resultDiv.classList.remove('hidden');
-                resultDiv.innerHTML = '<div class="p-4 bg-red-50 border border-red-200 rounded-xl text-red-800"><i class="fas fa-times-circle mr-2"></i>検索中にエラーが発生しました。</div>';
+                resultDiv.innerHTML = '<div class="p-4 bg-red-50 border-2 border-red-200 rounded-xl text-red-800 flex items-center gap-3"><i class="fas fa-times-circle"></i>検索中にエラーが発生しました。</div>';
               } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-search mr-2"></i>検索';
@@ -494,12 +815,22 @@ app.use('*', async (c, next) => {
               window.location.href = 'https://' + slug + '.shinsei-raku.com/login';
             }
             
-            // Enterキーで検索
             document.getElementById('searchEmail').addEventListener('keypress', function(e) {
               if (e.key === 'Enter') searchOrganization();
             });
             document.getElementById('directSlug').addEventListener('keypress', function(e) {
               if (e.key === 'Enter') goToOrganization();
+            });
+            
+            // スムーススクロール
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+              anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              });
             });
           </script>
         </body>
