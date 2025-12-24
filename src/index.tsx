@@ -156,6 +156,75 @@ app.use('*', async (c, next) => {
     c.set('tenantOrg', org)
     c.set('tenantOrgId', org.id)
     c.set('tenantSlug', slug)
+  } else {
+    // サブドメインなし（shinsei-raku.com）の場合
+    // マスター管理者専用なので、マスター関連ページ以外はブロック
+    const path = c.req.path
+    const allowedPaths = [
+      '/master',
+      '/signup',
+      '/portal',
+      '/api/master',
+      '/api/site-settings',
+      '/api/signup',
+      '/api/portal',
+      '/terms',
+      '/privacy',
+      '/legal',
+      '/commercial-law',
+      '/favicon.ico',
+      '/robots.txt'
+    ]
+    
+    // 許可されたパスかチェック
+    const isAllowed = allowedPaths.some(allowed => path === allowed || path.startsWith(allowed + '/'))
+    
+    if (!isAllowed && path !== '/') {
+      // マスター関連以外のページにアクセスしようとした場合
+      if (path.startsWith('/api/')) {
+        return c.json({ 
+          error: 'サブドメインが指定されていません。組織のサブドメイン（例: your-company.shinsei-raku.com）からアクセスしてください。',
+          redirect: null
+        }, 400)
+      }
+      
+      // 一般ページへのアクセスはエラーページを表示
+      return c.html(`
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>サブドメインが必要です - 申請らくらく君</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        </head>
+        <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+          <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+            <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i class="fas fa-building text-blue-600 text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-3">組織のサブドメインからアクセスしてください</h1>
+            <p class="text-gray-600 mb-6">
+              このページを利用するには、組織専用のURLからアクセスする必要があります。
+            </p>
+            <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+              <p class="text-sm text-gray-500 mb-2">アクセスURL例：</p>
+              <code class="text-blue-600 font-mono">https://your-company.shinsei-raku.com</code>
+            </div>
+            <div class="space-y-3">
+              <a href="/signup" class="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium">
+                <i class="fas fa-user-plus mr-2"></i>新規登録はこちら
+              </a>
+              <a href="/" class="block w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition">
+                トップページへ戻る
+              </a>
+            </div>
+          </div>
+        </body>
+        </html>
+      `, 400)
+    }
   }
   
   await next()
