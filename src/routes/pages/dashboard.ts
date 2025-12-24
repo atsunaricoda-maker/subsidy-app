@@ -1241,7 +1241,7 @@ routes.get('/', async (c) => {
             window.currentOrgId = ${tenantOrgId};
             
             // Axios設定：認証ヘッダーを自動付与
-            axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
+            axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_token');
 
             // データ読み込み（案件ベース）
             let allCases = [];

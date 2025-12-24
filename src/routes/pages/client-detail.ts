@@ -621,7 +621,7 @@ routes.get('/client/:id', async (c) => {
             }
             
             // Axios設定：認証ヘッダーを自動付与
-            axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
+            axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_token');
         
             const CLIENT_ID = ${id};
             const STATUS_LABELS = {

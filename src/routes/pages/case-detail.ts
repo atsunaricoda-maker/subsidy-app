@@ -770,7 +770,7 @@ routes.get('/case/:id', async (c) => {
             }
             if (!checkAuth()) { /* redirect */ }
             
-            axios.defaults.headers.common['Authorization'] = \`Bearer \${localStorage.getItem('admin_username')}:\${localStorage.getItem('admin_role')}\`;
+            axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_token');
             
             // サイドバートグル
             function toggleSidebar() {
