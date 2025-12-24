@@ -293,21 +293,67 @@ app.use('*', async (c, next) => {
                   </div>
                 </div>
                 
-                <!-- 右側：イメージ -->
+                <!-- 右側：イメージ（イラスト風UI） -->
                 <div class="relative hidden lg:block">
                   <div class="relative z-10">
-                    <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=600&h=450&fit=crop" 
-                      alt="書類管理をする日本人ビジネスウーマン" 
-                      class="rounded-2xl shadow-2xl float-animation">
+                    <!-- メインビジュアル：書類管理ダッシュボード風 -->
+                    <div class="bg-white rounded-2xl shadow-2xl p-6 float-animation" style="min-width: 480px;">
+                      <!-- ヘッダー -->
+                      <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                          <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-folder-open text-white"></i>
+                          </div>
+                          <div>
+                            <div class="font-bold text-gray-800">書類管理</div>
+                            <div class="text-xs text-gray-500">IT導入補助金 2025</div>
+                          </div>
+                        </div>
+                        <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-medium">進行中</span>
+                      </div>
+                      <!-- 書類リスト -->
+                      <div class="space-y-3">
+                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <div class="w-8 h-8 bg-blue-100 rounded flex items-center justify-center"><i class="fas fa-file-pdf text-blue-600 text-sm"></i></div>
+                          <div class="flex-1"><div class="text-sm font-medium text-gray-700">事業計画書.pdf</div><div class="text-xs text-gray-400">2.4 MB • 更新: 12/24</div></div>
+                          <i class="fas fa-check-circle text-green-500"></i>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <div class="w-8 h-8 bg-purple-100 rounded flex items-center justify-center"><i class="fas fa-file-excel text-purple-600 text-sm"></i></div>
+                          <div class="flex-1"><div class="text-sm font-medium text-gray-700">見積書一覧.xlsx</div><div class="text-xs text-gray-400">1.1 MB • 更新: 12/23</div></div>
+                          <i class="fas fa-check-circle text-green-500"></i>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <div class="w-8 h-8 bg-orange-100 rounded flex items-center justify-center"><i class="fas fa-file-image text-orange-600 text-sm"></i></div>
+                          <div class="flex-1"><div class="text-sm font-medium text-gray-700">会社概要資料.pptx</div><div class="text-xs text-gray-400">5.8 MB • 更新: 12/22</div></div>
+                          <i class="fas fa-check-circle text-green-500"></i>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                          <div class="w-8 h-8 bg-yellow-100 rounded flex items-center justify-center"><i class="fas fa-file-alt text-yellow-600 text-sm"></i></div>
+                          <div class="flex-1"><div class="text-sm font-medium text-gray-700">納税証明書.pdf</div><div class="text-xs text-yellow-600">未アップロード</div></div>
+                          <i class="fas fa-exclamation-circle text-yellow-500"></i>
+                        </div>
+                      </div>
+                      <!-- 進捗バー -->
+                      <div class="mt-6">
+                        <div class="flex justify-between text-xs text-gray-500 mb-2">
+                          <span>書類準備状況</span>
+                          <span class="font-medium text-blue-600">75%</span>
+                        </div>
+                        <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full" style="width: 75%"></div>
+                        </div>
+                      </div>
+                    </div>
                     <!-- オーバーレイカード：書類管理 -->
                     <div class="absolute -bottom-6 -left-6 bg-white p-4 rounded-xl shadow-xl">
                       <div class="flex items-center gap-3">
                         <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <i class="fas fa-folder-open text-blue-600 text-xl"></i>
+                          <i class="fas fa-cloud-upload-alt text-blue-600 text-xl"></i>
                         </div>
                         <div>
-                          <div class="text-sm text-gray-500">書類管理</div>
-                          <div class="text-xl font-bold text-gray-800">クラウドで一元化</div>
+                          <div class="text-sm text-gray-500">クラウド管理</div>
+                          <div class="text-xl font-bold text-gray-800">いつでもアクセス</div>
                         </div>
                       </div>
                     </div>
@@ -407,10 +453,10 @@ app.use('*', async (c, next) => {
                     <i class="fas fa-tasks text-white text-2xl"></i>
                   </div>
                   <h3 class="text-xl font-bold text-gray-800 mb-3">進捗ボード</h3>
-                  <p class="text-gray-600 mb-4">カンバン形式で案件の進捗を可視化。ドラッグ&ドロップで簡単にステータス変更。</p>
+                  <p class="text-gray-600 mb-4">カンバン形式で案件の進捗を一目で把握。複数案件の状況を同時に管理できます。</p>
                   <ul class="text-sm text-gray-500 space-y-2">
                     <li class="flex items-center gap-2"><i class="fas fa-check text-green-500"></i>カンバンボード</li>
-                    <li class="flex items-center gap-2"><i class="fas fa-check text-green-500"></i>ドラッグ&ドロップ</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-green-500"></i>ステータス管理</li>
                     <li class="flex items-center gap-2"><i class="fas fa-check text-green-500"></i>締切アラート</li>
                   </ul>
                 </div>
@@ -511,9 +557,66 @@ app.use('*', async (c, next) => {
                   </ul>
                 </div>
                 <div class="relative">
-                  <img src="https://images.unsplash.com/photo-1553877522-43269d4ea984?w=700&h=500&fit=crop" 
-                    alt="ダッシュボード画面を操作するビジネスパーソン" 
-                    class="rounded-2xl shadow-2xl">
+                  <!-- ダッシュボード風UI -->
+                  <div class="bg-white rounded-2xl shadow-2xl overflow-hidden" style="min-width: 520px;">
+                    <!-- ダッシュボードヘッダー -->
+                    <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-4">
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                          <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-chart-pie text-white"></i>
+                          </div>
+                          <span class="text-white font-bold">ダッシュボード</span>
+                        </div>
+                        <div class="flex gap-2">
+                          <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full">12月</span>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- 統計カード -->
+                    <div class="p-6">
+                      <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="bg-blue-50 p-4 rounded-xl text-center">
+                          <div class="text-2xl font-bold text-blue-600">24</div>
+                          <div class="text-xs text-gray-500">進行中案件</div>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-xl text-center">
+                          <div class="text-2xl font-bold text-green-600">18</div>
+                          <div class="text-xs text-gray-500">今月完了</div>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-xl text-center">
+                          <div class="text-2xl font-bold text-purple-600">156</div>
+                          <div class="text-xs text-gray-500">管理書類</div>
+                        </div>
+                      </div>
+                      <!-- 案件リスト -->
+                      <div class="text-sm font-medium text-gray-700 mb-3">直近の案件</div>
+                      <div class="space-y-2">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div class="flex items-center gap-3">
+                            <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span class="text-sm text-gray-700">株式会社ABC - IT導入補助金</span>
+                          </div>
+                          <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">申請中</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div class="flex items-center gap-3">
+                            <div class="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span class="text-sm text-gray-700">有限会社XYZ - 事業再構築</span>
+                          </div>
+                          <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">書類準備</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div class="flex items-center gap-3">
+                            <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span class="text-sm text-gray-700">DEF株式会社 - 小規模持続化</span>
+                          </div>
+                          <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">採択待ち</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- オーバーレイカード -->
                   <div class="absolute -bottom-6 -right-6 bg-white p-4 rounded-xl shadow-xl">
                     <div class="flex items-center gap-3">
                       <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
