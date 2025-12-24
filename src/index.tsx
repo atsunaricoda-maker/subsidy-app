@@ -243,53 +243,52 @@ app.use('*', async (c, next) => {
           </header>
           
           <!-- ヒーローセクション -->
-          <section class="relative min-h-screen flex items-center gradient-blue hero-pattern overflow-hidden pt-20">
+          <section class="relative min-h-screen flex items-center overflow-hidden pt-20" style="background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 40%, #0284c7 100%);">
             <!-- 装飾要素 -->
-            <div class="absolute top-20 left-10 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl"></div>
-            <div class="absolute bottom-20 right-10 w-96 h-96 bg-cyan-400/20 rounded-full blur-3xl"></div>
-            <div class="absolute top-1/3 right-1/4 w-4 h-4 bg-white/40 rounded-full float-animation"></div>
-            <div class="absolute top-1/2 left-1/4 w-3 h-3 bg-white/30 rounded-full float-animation" style="animation-delay: 1s;"></div>
+            <div class="absolute top-20 left-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-20 right-10 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl"></div>
             
             <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
               <div class="grid lg:grid-cols-2 gap-12 items-center">
                 <!-- 左側：テキスト -->
                 <div class="text-center lg:text-left">
-                  <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 px-4 py-2 rounded-full text-sm mb-6 fade-in-up">
+                  <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-medium mb-6 fade-in-up">
                     <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                    士業事務所のDXを支援
+                    業務効率化に特化したSaaS
                   </div>
-                  <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight fade-in-up delay-100">
-                    補助金申請を<br>
-                    <span class="text-cyan-300">もっとシンプル</span>に
+                  <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight fade-in-up delay-100" style="text-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+                    補助金申請の<br>
+                    <span style="color: #7dd3fc;">書類管理をもっと楽に</span>
                   </h1>
-                  <p class="text-lg md:text-xl text-blue-100 mb-8 max-w-xl mx-auto lg:mx-0 fade-in-up delay-200">
+                  <p class="text-lg md:text-xl text-white mb-8 max-w-xl mx-auto lg:mx-0 fade-in-up delay-200" style="text-shadow: 0 1px 3px rgba(0,0,0,0.2);">
                     行政書士・士業事務所向けの補助金申請管理SaaS。<br class="hidden md:inline">
-                    顧客管理から書類作成、進捗管理まで一元化できます。
+                    顧客管理から書類整理、進捗管理まで一元化。<br class="hidden md:inline">
+                    <strong>面倒な事務作業を大幅に削減</strong>できます。
                   </p>
                   <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start fade-in-up delay-300">
-                    <a href="/signup" class="group bg-white text-blue-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition-all shadow-xl shadow-black/10 flex items-center justify-center gap-2">
+                    <a href="/signup" class="group bg-white text-blue-700 px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition-all shadow-xl flex items-center justify-center gap-2">
                       <i class="fas fa-rocket group-hover:animate-bounce"></i>
                       無料で始める
                     </a>
-                    <a href="#features" class="group border-2 border-white/30 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                    <a href="#features" class="group border-2 border-white text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2">
                       <i class="fas fa-play-circle"></i>
                       詳しく見る
                     </a>
                   </div>
-                  <div class="mt-10 flex items-center justify-center lg:justify-start gap-8 text-white/80 fade-in-up delay-300">
-                    <div class="text-center">
-                      <div class="text-2xl md:text-3xl font-bold text-white">500+</div>
-                      <div class="text-sm">導入事務所</div>
-                    </div>
-                    <div class="w-px h-12 bg-white/20"></div>
-                    <div class="text-center">
-                      <div class="text-2xl md:text-3xl font-bold text-white">98%</div>
-                      <div class="text-sm">満足度</div>
-                    </div>
-                    <div class="w-px h-12 bg-white/20"></div>
-                    <div class="text-center">
+                  
+                  <!-- 効率化に特化した数値 -->
+                  <div class="mt-10 grid grid-cols-3 gap-4 fade-in-up delay-300">
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
                       <div class="text-2xl md:text-3xl font-bold text-white">50%</div>
-                      <div class="text-sm">工数削減</div>
+                      <div class="text-sm text-blue-100">書類整理時間削減</div>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
+                      <div class="text-2xl md:text-3xl font-bold text-white">80%</div>
+                      <div class="text-sm text-blue-100">検索時間削減</div>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
+                      <div class="text-2xl md:text-3xl font-bold text-white">0件</div>
+                      <div class="text-sm text-blue-100">書類の紛失</div>
                     </div>
                   </div>
                 </div>
@@ -297,29 +296,30 @@ app.use('*', async (c, next) => {
                 <!-- 右側：イメージ -->
                 <div class="relative hidden lg:block">
                   <div class="relative z-10">
-                    <img src="https://images.unsplash.com/photo-1551434678-e076c223a692?w=600&h=400&fit=crop" 
-                      alt="オフィスでの業務風景" 
-                      class="rounded-2xl shadow-2xl shadow-black/20 float-animation">
-                    <!-- オーバーレイカード -->
+                    <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=600&h=450&fit=crop" 
+                      alt="書類管理をする日本人ビジネスウーマン" 
+                      class="rounded-2xl shadow-2xl float-animation">
+                    <!-- オーバーレイカード：書類管理 -->
                     <div class="absolute -bottom-6 -left-6 bg-white p-4 rounded-xl shadow-xl">
                       <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                          <i class="fas fa-check text-green-600 text-xl"></i>
+                        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                          <i class="fas fa-folder-open text-blue-600 text-xl"></i>
                         </div>
                         <div>
-                          <div class="text-sm text-gray-500">採択率</div>
-                          <div class="text-xl font-bold text-gray-800">85%達成</div>
+                          <div class="text-sm text-gray-500">書類管理</div>
+                          <div class="text-xl font-bold text-gray-800">クラウドで一元化</div>
                         </div>
                       </div>
                     </div>
+                    <!-- オーバーレイカード：時間削減 -->
                     <div class="absolute -top-4 -right-4 bg-white p-4 rounded-xl shadow-xl">
                       <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <i class="fas fa-clock text-blue-600"></i>
+                        <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <i class="fas fa-clock text-green-600"></i>
                         </div>
                         <div>
-                          <div class="text-xs text-gray-500">処理時間</div>
-                          <div class="text-lg font-bold text-gray-800">-50%</div>
+                          <div class="text-xs text-gray-500">作業時間</div>
+                          <div class="text-lg font-bold text-green-600">50%削減</div>
                         </div>
                       </div>
                     </div>
@@ -329,7 +329,7 @@ app.use('*', async (c, next) => {
             </div>
             
             <!-- スクロールインジケーター -->
-            <div class="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/60 animate-bounce">
+            <div class="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/80 animate-bounce">
               <i class="fas fa-chevron-down text-2xl"></i>
             </div>
           </section>
@@ -433,11 +433,11 @@ app.use('*', async (c, next) => {
                     <i class="fas fa-chart-line text-white text-2xl"></i>
                   </div>
                   <h3 class="text-xl font-bold text-gray-800 mb-3">統計・レポート</h3>
-                  <p class="text-gray-600 mb-4">採択率や売上の推移をグラフで確認。データに基づいた経営判断を支援。</p>
+                  <p class="text-gray-600 mb-4">案件数や処理状況をグラフで確認。業務の見える化で効率アップ。</p>
                   <ul class="text-sm text-gray-500 space-y-2">
-                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>採択率分析</li>
-                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>売上レポート</li>
-                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>トレンド可視化</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>案件状況分析</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>月次レポート</li>
+                    <li class="flex items-center gap-2"><i class="fas fa-check text-orange-500"></i>業務量可視化</li>
                   </ul>
                 </div>
                 
@@ -511,17 +511,17 @@ app.use('*', async (c, next) => {
                   </ul>
                 </div>
                 <div class="relative">
-                  <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=700&h=500&fit=crop" 
-                    alt="ダッシュボード画面" 
+                  <img src="https://images.unsplash.com/photo-1553877522-43269d4ea984?w=700&h=500&fit=crop" 
+                    alt="ダッシュボード画面を操作するビジネスパーソン" 
                     class="rounded-2xl shadow-2xl">
                   <div class="absolute -bottom-6 -right-6 bg-white p-4 rounded-xl shadow-xl">
                     <div class="flex items-center gap-3">
-                      <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                        <i class="fas fa-chart-pie text-white text-xl"></i>
+                      <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                        <i class="fas fa-check-double text-white text-xl"></i>
                       </div>
                       <div>
-                        <div class="text-2xl font-bold text-gray-800">+35%</div>
-                        <div class="text-sm text-gray-500">生産性向上</div>
+                        <div class="text-2xl font-bold text-gray-800">書類漏れ0</div>
+                        <div class="text-sm text-gray-500">チェック機能で安心</div>
                       </div>
                     </div>
                   </div>
