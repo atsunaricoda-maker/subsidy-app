@@ -168,6 +168,7 @@ app.use('*', async (c, next) => {
       '/api/site-settings',
       '/api/signup',
       '/api/portal',
+      '/api/find-organization',
       '/terms',
       '/privacy',
       '/legal',
@@ -200,27 +201,109 @@ app.use('*', async (c, next) => {
           <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         </head>
         <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
-          <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-            <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <i class="fas fa-building text-blue-600 text-3xl"></i>
+          <div class="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full">
+            <div class="text-center mb-8">
+              <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-building text-blue-600 text-3xl"></i>
+              </div>
+              <h1 class="text-2xl font-bold text-gray-800 mb-3">組織のサブドメインからアクセスしてください</h1>
+              <p class="text-gray-600">
+                このページを利用するには、組織専用のURLからアクセスする必要があります。
+              </p>
             </div>
-            <h1 class="text-2xl font-bold text-gray-800 mb-3">組織のサブドメインからアクセスしてください</h1>
-            <p class="text-gray-600 mb-6">
-              このページを利用するには、組織専用のURLからアクセスする必要があります。
-            </p>
-            <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+            
+            <!-- 既存ユーザー向け：サブドメイン検索 -->
+            <div class="bg-blue-50 rounded-xl p-5 mb-6">
+              <h2 class="font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-search text-blue-600 mr-2"></i>
+                既にアカウントをお持ちの方
+              </h2>
+              <p class="text-sm text-gray-600 mb-4">登録メールアドレスから組織URLを検索できます</p>
+              <div class="flex gap-2">
+                <input type="email" id="searchEmail" placeholder="メールアドレスを入力" 
+                  class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                <button onclick="searchOrganization()" id="searchBtn"
+                  class="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm whitespace-nowrap">
+                  <i class="fas fa-search mr-1"></i>検索
+                </button>
+              </div>
+              <div id="searchResult" class="mt-4 hidden"></div>
+            </div>
+            
+            <!-- アクセスURL例 -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
               <p class="text-sm text-gray-500 mb-2">アクセスURL例：</p>
-              <code class="text-blue-600 font-mono">https://your-company.shinsei-raku.com</code>
+              <code class="text-blue-600 font-mono text-sm">https://your-company.shinsei-raku.com</code>
             </div>
+            
+            <!-- アクションボタン -->
             <div class="space-y-3">
-              <a href="/signup" class="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium">
+              <a href="/signup" class="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-medium text-center">
                 <i class="fas fa-user-plus mr-2"></i>新規登録はこちら
               </a>
-              <a href="/" class="block w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition">
+              <a href="/" class="block w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition text-center">
                 トップページへ戻る
               </a>
             </div>
           </div>
+          
+          <script>
+            async function searchOrganization() {
+              const email = document.getElementById('searchEmail').value.trim();
+              const resultDiv = document.getElementById('searchResult');
+              const btn = document.getElementById('searchBtn');
+              
+              if (!email) {
+                alert('メールアドレスを入力してください');
+                return;
+              }
+              
+              btn.disabled = true;
+              btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>検索中...';
+              resultDiv.classList.add('hidden');
+              
+              try {
+                const response = await fetch('/api/find-organization', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                resultDiv.classList.remove('hidden');
+                
+                if (data.found && data.organizations && data.organizations.length > 0) {
+                  let html = '<div class="space-y-2">';
+                  html += '<p class="text-sm text-green-700 font-medium"><i class="fas fa-check-circle mr-1"></i>以下の組織が見つかりました：</p>';
+                  data.organizations.forEach(org => {
+                    const url = 'https://' + org.slug + '.shinsei-raku.com/login';
+                    html += '<a href="' + url + '" class="flex items-center justify-between p-3 bg-white border border-green-200 rounded-lg hover:bg-green-50 transition group">';
+                    html += '<div>';
+                    html += '<div class="font-medium text-gray-800">' + org.name + '</div>';
+                    html += '<div class="text-xs text-gray-500">' + org.slug + '.shinsei-raku.com</div>';
+                    html += '</div>';
+                    html += '<i class="fas fa-arrow-right text-green-600 group-hover:translate-x-1 transition-transform"></i>';
+                    html += '</a>';
+                  });
+                  html += '</div>';
+                  resultDiv.innerHTML = html;
+                } else {
+                  resultDiv.innerHTML = '<div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800"><i class="fas fa-exclamation-triangle mr-2"></i>このメールアドレスで登録された組織は見つかりませんでした。新規登録をお試しください。</div>';
+                }
+              } catch (error) {
+                resultDiv.classList.remove('hidden');
+                resultDiv.innerHTML = '<div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800"><i class="fas fa-times-circle mr-2"></i>検索中にエラーが発生しました。しばらくしてからお試しください。</div>';
+              } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search mr-1"></i>検索';
+              }
+            }
+            
+            // Enterキーで検索
+            document.getElementById('searchEmail').addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') searchOrganization();
+            });
+          </script>
         </body>
         </html>
       `, 400)
@@ -228,6 +311,51 @@ app.use('*', async (c, next) => {
   }
   
   await next()
+})
+
+// メールアドレスから組織を検索するAPI（サブドメインなしでもアクセス可能）
+app.post('/api/find-organization', async (c) => {
+  const { DB } = c.env
+  const { email } = await c.req.json()
+  
+  if (!email || typeof email !== 'string') {
+    return c.json({ found: false, error: 'メールアドレスを入力してください' }, 400)
+  }
+  
+  try {
+    // admin_usersテーブルからメールアドレスで組織を検索
+    const users = await DB.prepare(`
+      SELECT DISTINCT o.id, o.name, o.slug
+      FROM admin_users au
+      JOIN organizations o ON au.organization_id = o.id
+      WHERE au.email = ? AND o.status IN ('active', 'trial')
+    `).bind(email.toLowerCase().trim()).all()
+    
+    // 組織のメールアドレスでも検索
+    const orgs = await DB.prepare(`
+      SELECT id, name, slug
+      FROM organizations
+      WHERE email = ? AND status IN ('active', 'trial')
+    `).bind(email.toLowerCase().trim()).all()
+    
+    // 結果をマージ（重複除去）
+    const allOrgs = [...(users.results || []), ...(orgs.results || [])]
+    const uniqueOrgs = allOrgs.filter((org, index, self) => 
+      index === self.findIndex(o => o.id === org.id)
+    )
+    
+    if (uniqueOrgs.length > 0) {
+      return c.json({ 
+        found: true, 
+        organizations: uniqueOrgs.map(o => ({ name: o.name, slug: o.slug }))
+      })
+    }
+    
+    return c.json({ found: false })
+  } catch (error) {
+    console.error('Find organization error:', error)
+    return c.json({ found: false, error: '検索中にエラーが発生しました' }, 500)
+  }
 })
 
 // Mount routes
