@@ -39,17 +39,27 @@ routes.post('/clients/:clientId/report-transfer', async (c) => {
   
   try {
     const data = await c.req.json()
-    const caseId = data.case_id // 案件IDも受け取る
+    const caseId = data.case_id
+    const paymentType = data.payment_type || 'deposit' // 'deposit' or 'success_fee'
     
     // 金額を取得（案件から優先、なければクライアントから）
     let amount = data.amount || 0
     if (!amount && caseId) {
       const caseData = await DB.prepare(`
-        SELECT deposit_amount FROM cases WHERE id = ?
+        SELECT deposit_amount, success_fee_amount, success_fee_rate, approved_amount FROM cases WHERE id = ?
       `).bind(caseId).first() as any
-      amount = caseData?.deposit_amount || 0
+      if (paymentType === 'success_fee') {
+        // 成功報酬の金額を計算
+        if (caseData?.success_fee_amount > 0) {
+          amount = caseData.success_fee_amount
+        } else if (caseData?.success_fee_rate > 0 && caseData?.approved_amount > 0) {
+          amount = Math.floor(caseData.approved_amount * caseData.success_fee_rate / 100)
+        }
+      } else {
+        amount = caseData?.deposit_amount || 0
+      }
     }
-    if (!amount) {
+    if (!amount && paymentType === 'deposit') {
       const client = await DB.prepare(`
         SELECT deposit_amount FROM clients WHERE id = ?
       `).bind(clientId).first() as any
@@ -60,48 +70,61 @@ routes.post('/clients/:clientId/report-transfer', async (c) => {
     await DB.prepare(`
       INSERT INTO payment_history (client_id, payment_type, amount, payment_method, status, bank_transfer_reported_at, notes)
       VALUES (?, ?, ?, 'bank_transfer', 'reported', CURRENT_TIMESTAMP, ?)
-    `).bind(clientId, data.payment_type || 'deposit', amount, data.notes || '').run()
+    `).bind(clientId, paymentType, amount, data.notes || '').run()
     
-    // クライアントの振込報告フラグを更新
-    await DB.prepare(`
-      UPDATE clients 
-      SET deposit_transfer_reported = 1, 
-          deposit_transfer_reported_at = CURRENT_TIMESTAMP,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(clientId).run()
-    
-    // 案件の振込報告フラグも更新（案件IDがある場合）
-    if (caseId) {
+    // 支払いタイプに応じてフラグを更新
+    if (paymentType === 'success_fee') {
+      // 成功報酬の振込報告
+      if (caseId) {
+        await DB.prepare(`
+          UPDATE cases 
+          SET success_fee_transfer_reported = 1, 
+              success_fee_transfer_reported_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(caseId).run()
+      }
+    } else {
+      // 着手金の振込報告
       await DB.prepare(`
-        UPDATE cases 
+        UPDATE clients 
         SET deposit_transfer_reported = 1, 
             deposit_transfer_reported_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).bind(caseId).run()
-    } else {
-      // 案件IDがない場合は、このクライアントに紐づく全ての案件を更新
-      await DB.prepare(`
-        UPDATE cases 
-        SET deposit_transfer_reported = 1, 
-            deposit_transfer_reported_at = CURRENT_TIMESTAMP,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE client_id = ?
       `).bind(clientId).run()
+      
+      if (caseId) {
+        await DB.prepare(`
+          UPDATE cases 
+          SET deposit_transfer_reported = 1, 
+              deposit_transfer_reported_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(caseId).run()
+      } else {
+        await DB.prepare(`
+          UPDATE cases 
+          SET deposit_transfer_reported = 1, 
+              deposit_transfer_reported_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE client_id = ?
+        `).bind(clientId).run()
+      }
     }
     
     // 管理者に入金報告の通知を作成
     const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(clientId).first()
     const clientName = client?.company_name || client?.name || '顧客'
     const amountFormatted = amount ? `${amount.toLocaleString()}円` : ''
+    const typeLabel = paymentType === 'success_fee' ? '成功報酬' : '着手金'
     await DB.prepare(`
       INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
       VALUES (?, ?, ?, ?, ?)
     `).bind(
       'payment_report',
-      '入金報告がありました',
-      `${clientName}様から入金報告がありました${amountFormatted ? `（${amountFormatted}）` : ''}。確認をお願いします。`,
+      `${typeLabel}の入金報告がありました`,
+      `${clientName}様から${typeLabel}の入金報告がありました${amountFormatted ? `（${amountFormatted}）` : ''}。確認をお願いします。`,
       clientId,
       'clients'
     ).run()

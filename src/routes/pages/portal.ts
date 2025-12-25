@@ -1240,77 +1240,179 @@ routes.get('/portal/:token', async (c) => {
                     const section = document.getElementById('paymentReportSection');
                     const content = document.getElementById('paymentReportContent');
                     
-                    // 案件または顧客の支払い情報を取得
+                    // 案件の支払い情報を取得
                     let paymentInfo = null;
                     if (CASE_ID) {
                         const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
                         paymentInfo = caseRes.data;
                     }
                     
-                    // 手付金が必要で未払いの場合に表示
-                    if (paymentInfo && paymentInfo.deposit_required && !paymentInfo.deposit_paid) {
-                        section.classList.remove('hidden');
+                    if (!paymentInfo) {
+                        section.classList.add('hidden');
+                        return;
+                    }
+                    
+                    let htmlParts = [];
+                    
+                    // ========== 手付金セクション ==========
+                    if (paymentInfo.deposit_required) {
                         const depositAmount = paymentInfo.deposit_amount || 0;
-                        const isReported = paymentInfo.deposit_transfer_reported;
+                        const depositPaid = paymentInfo.deposit_paid;
+                        const depositReported = paymentInfo.deposit_transfer_reported;
                         
-                        if (isReported) {
-                            // 振込報告済みの場合
-                            content.innerHTML = \`
-                                <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                        if (depositPaid) {
+                            // 手付金支払い完了
+                            htmlParts.push(\`
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                                    <div class="flex items-center gap-2 text-green-700">
+                                        <i class="fas fa-check-circle text-lg"></i>
+                                        <div class="flex-1">
+                                            <span class="font-bold text-sm">着手金 確認済み</span>
+                                            <span class="text-xs text-green-600 ml-2">¥\${depositAmount.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            \`);
+                        } else if (depositReported) {
+                            // 手付金振込報告済み
+                            htmlParts.push(\`
+                                <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
                                     <div class="flex items-center gap-2 text-purple-700 mb-2">
                                         <i class="fas fa-hourglass-half"></i>
-                                        <span class="font-bold text-sm">振込報告済み - 確認中</span>
+                                        <span class="font-bold text-sm">着手金 振込報告済み - 確認中</span>
                                     </div>
                                     <p class="text-xs text-purple-600">
-                                        お振込みの報告を受け付けました。<br>
                                         担当者が確認中です。しばらくお待ちください。
                                     </p>
                                     <div class="mt-2 text-sm font-bold text-purple-800">
                                         報告金額: ¥\${depositAmount.toLocaleString()}
                                     </div>
                                 </div>
-                            \`;
+                            \`);
                         } else {
-                            // 未払いの場合
-                            content.innerHTML = \`
+                            // 手付金未払い
+                            htmlParts.push(\`
                                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
                                     <div class="flex items-center gap-2 text-yellow-700 mb-2">
-                                        <i class="fas fa-exclamation-circle"></i>
-                                        <span class="font-bold text-sm">お支払いをお願いします</span>
+                                        <i class="fas fa-hand-holding-usd"></i>
+                                        <span class="font-bold text-sm">着手金のお支払い</span>
                                     </div>
                                     <p class="text-xs text-yellow-600 mb-2">
                                         下記の金額のお振込みをお願いいたします。
                                     </p>
-                                    <div class="text-lg font-bold text-yellow-800">
+                                    <div class="text-lg font-bold text-yellow-800 mb-3">
                                         ¥\${depositAmount.toLocaleString()}
                                     </div>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button onclick="showBankTransferModal('¥\${depositAmount.toLocaleString()}')" 
-                                            class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
-                                        <i class="fas fa-university mr-1"></i>振込先を確認
-                                    </button>
-                                    <button onclick="showBankTransferModal('¥\${depositAmount.toLocaleString()}')" 
-                                            class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-                                        <i class="fas fa-check mr-1"></i>振込完了を報告
-                                    </button>
-                                </div>
-                            \`;
-                        }
-                    } else if (paymentInfo && paymentInfo.deposit_required && paymentInfo.deposit_paid) {
-                        // 支払い完了の場合
-                        section.classList.remove('hidden');
-                        content.innerHTML = \`
-                            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-                                <div class="flex items-center gap-2 text-green-700">
-                                    <i class="fas fa-check-circle text-lg"></i>
-                                    <div>
-                                        <span class="font-bold text-sm">お支払い確認済み</span>
-                                        <p class="text-xs text-green-600">ありがとうございました</p>
+                                    <div class="flex gap-2">
+                                        <button onclick="showPaymentTransferModal('deposit', \${depositAmount})" 
+                                                class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                                            <i class="fas fa-university mr-1"></i>振込先を確認
+                                        </button>
+                                        <button onclick="showPaymentTransferModal('deposit', \${depositAmount})" 
+                                                class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                                            <i class="fas fa-check mr-1"></i>振込完了を報告
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                        \`;
+                            \`);
+                        }
+                    }
+                    
+                    // ========== 成功報酬セクション ==========
+                    if (paymentInfo.success_fee_enabled) {
+                        // 成功報酬額を計算（固定額または採択額に対する割合）
+                        let successFeeAmount = 0;
+                        if (paymentInfo.success_fee_amount > 0) {
+                            successFeeAmount = paymentInfo.success_fee_amount;
+                        } else if (paymentInfo.success_fee_rate > 0 && paymentInfo.approved_amount > 0) {
+                            successFeeAmount = Math.floor(paymentInfo.approved_amount * paymentInfo.success_fee_rate / 100);
+                        }
+                        
+                        const successFeePaid = paymentInfo.success_fee_paid;
+                        const successFeeReported = paymentInfo.success_fee_transfer_reported;
+                        
+                        // 採択済み（申請完了）の場合のみ成功報酬の支払いを表示
+                        const isApproved = paymentInfo.status === 'completed' || paymentInfo.approved_amount > 0;
+                        
+                        if (isApproved && successFeeAmount > 0) {
+                            if (successFeePaid) {
+                                // 成功報酬支払い完了
+                                htmlParts.push(\`
+                                    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                                        <div class="flex items-center gap-2 text-green-700">
+                                            <i class="fas fa-trophy text-lg"></i>
+                                            <div class="flex-1">
+                                                <span class="font-bold text-sm">成功報酬 確認済み</span>
+                                                <span class="text-xs text-green-600 ml-2">¥\${successFeeAmount.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                \`);
+                            } else if (successFeeReported) {
+                                // 成功報酬振込報告済み
+                                htmlParts.push(\`
+                                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
+                                        <div class="flex items-center gap-2 text-purple-700 mb-2">
+                                            <i class="fas fa-trophy"></i>
+                                            <span class="font-bold text-sm">成功報酬 振込報告済み - 確認中</span>
+                                        </div>
+                                        <p class="text-xs text-purple-600">
+                                            担当者が確認中です。しばらくお待ちください。
+                                        </p>
+                                        <div class="mt-2 text-sm font-bold text-purple-800">
+                                            報告金額: ¥\${successFeeAmount.toLocaleString()}
+                                        </div>
+                                    </div>
+                                \`);
+                            } else {
+                                // 成功報酬未払い
+                                htmlParts.push(\`
+                                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-3">
+                                        <div class="flex items-center gap-2 text-indigo-700 mb-2">
+                                            <i class="fas fa-trophy"></i>
+                                            <span class="font-bold text-sm">成功報酬のお支払い</span>
+                                        </div>
+                                        <p class="text-xs text-indigo-600 mb-2">
+                                            採択おめでとうございます！成功報酬のお振込みをお願いいたします。
+                                        </p>
+                                        <div class="text-lg font-bold text-indigo-800 mb-3">
+                                            ¥\${successFeeAmount.toLocaleString()}
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button onclick="showPaymentTransferModal('success_fee', \${successFeeAmount})" 
+                                                    class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                                                <i class="fas fa-university mr-1"></i>振込先を確認
+                                            </button>
+                                            <button onclick="showPaymentTransferModal('success_fee', \${successFeeAmount})" 
+                                                    class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                                                <i class="fas fa-check mr-1"></i>振込完了を報告
+                                            </button>
+                                        </div>
+                                    </div>
+                                \`);
+                            }
+                        } else if (!isApproved && successFeeAmount > 0) {
+                            // まだ採択前の場合は参考情報として表示
+                            htmlParts.push(\`
+                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
+                                    <div class="flex items-center gap-2 text-gray-600">
+                                        <i class="fas fa-trophy"></i>
+                                        <div class="flex-1">
+                                            <span class="font-bold text-sm">成功報酬（採択後）</span>
+                                            <span class="text-xs text-gray-500 ml-2">
+                                                \${paymentInfo.success_fee_rate > 0 ? '採択額の' + paymentInfo.success_fee_rate + '%' : '¥' + successFeeAmount.toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            \`);
+                        }
+                    }
+                    
+                    // 表示するものがあればセクションを表示
+                    if (htmlParts.length > 0) {
+                        section.classList.remove('hidden');
+                        content.innerHTML = htmlParts.join('');
                     } else {
                         section.classList.add('hidden');
                     }
@@ -1318,6 +1420,16 @@ routes.get('/portal/:token', async (c) => {
                     console.error('Error loading payment report section:', error);
                 }
             }
+            
+            // 支払い報告モーダルを表示
+            function showPaymentTransferModal(paymentType, amount) {
+                const typeLabel = paymentType === 'deposit' ? '着手金' : '成功報酬';
+                currentPaymentType = paymentType;
+                currentTransferAmount = amount;
+                showBankTransferModal('¥' + amount.toLocaleString(), typeLabel);
+            }
+            
+            let currentPaymentType = 'deposit';
             
             // お知らせを読み込む
             async function loadAnnouncements() {
@@ -2061,10 +2173,12 @@ routes.get('/portal/:token', async (c) => {
             
             // 銀行振込モーダル
             let currentTransferAmount = 0; // モーダルで表示中の金額を保持
-            function showBankTransferModal(amount) {
+            function showBankTransferModal(amount, typeLabel = '') {
                 // 金額文字列から数値を抽出（¥10,000 -> 10000）
                 const numericAmount = parseInt(String(amount).replace(/[¥,]/g, '')) || 0;
                 currentTransferAmount = numericAmount;
+                
+                const titleText = typeLabel ? \`\${typeLabel}のお支払い（銀行振込）\` : '銀行振込でのお支払い';
                 
                 const modal = document.createElement('div');
                 modal.id = 'bankTransferModal';
@@ -2072,7 +2186,7 @@ routes.get('/portal/:token', async (c) => {
                 modal.innerHTML = \`
                     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
                         <div class="p-4 border-b flex justify-between items-center">
-                            <h3 class="text-lg font-bold">銀行振込でのお支払い</h3>
+                            <h3 class="text-lg font-bold">\${titleText}</h3>
                             <button onclick="closeBankTransferModal()" class="text-gray-400 hover:text-gray-600">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -2133,7 +2247,8 @@ routes.get('/portal/:token', async (c) => {
             
             // 振込完了報告
             async function reportBankTransfer() {
-                if (!confirm('振込完了を報告しますか？\\n\\n※まだお振込みが完了していない場合は、振込完了後に報告してください。')) {
+                const paymentTypeLabel = currentPaymentType === 'success_fee' ? '成功報酬' : '着手金';
+                if (!confirm(\`\${paymentTypeLabel}の振込完了を報告しますか？\\n\\n※まだお振込みが完了していない場合は、振込完了後に報告してください。\`)) {
                     return;
                 }
                 
@@ -2148,14 +2263,14 @@ routes.get('/portal/:token', async (c) => {
                 let reportSuccess = false;
                 
                 try {
-                    // モーダルで表示されていた金額を使用（クライアントDBから再取得ではなく）
+                    // モーダルで表示されていた金額を使用
                     const amount = currentTransferAmount || 0;
                     
                     await axios.post(\`/api/clients/\${CLIENT_ID}/report-transfer\`, {
-                        payment_type: 'deposit',
+                        payment_type: currentPaymentType || 'deposit',
                         amount: amount,
-                        case_id: CASE_ID, // 案件IDも送信
-                        notes: '顧客ポータルから報告'
+                        case_id: CASE_ID,
+                        notes: \`顧客ポータルから\${paymentTypeLabel}の振込報告\`
                     });
                     
                     reportSuccess = true;
@@ -2180,7 +2295,7 @@ routes.get('/portal/:token', async (c) => {
                     try { closeBankTransferModal(); } catch(e) { console.warn('closeBankTransferModal error:', e); }
                     
                     // 成功メッセージを表示
-                    alert('振込完了報告を送信しました。\\n確認までしばらくお待ちください。');
+                    alert(\`\${paymentTypeLabel}の振込完了報告を送信しました。\\n確認までしばらくお待ちください。\`);
                     
                     // ページをリロードしてUIを最新状態に更新
                     window.location.reload();
