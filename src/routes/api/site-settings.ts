@@ -103,34 +103,40 @@ routes.put('/settings', async (c) => {
   const orgId = getEffectiveOrgId(c, user)
   
   try {
+    // 組織テーブルのカラムマッピング（organizationsテーブルに保存する項目）
+    const orgColumnMap: Record<string, string> = {
+      'company_name': 'name',
+      'company_address': 'address',
+      'company_phone': 'phone',
+      'company_email': 'email',
+      'company_representative': 'representative_name',
+      'bank_name': 'bank_name',
+      'bank_branch': 'bank_branch',
+      'bank_account_type': 'bank_account_type',
+      'bank_account_number': 'bank_account_number',
+      'bank_account_holder': 'bank_account_holder',
+      'invoice_registration_number': 'invoice_registration_number'
+    }
+    
     // テナントIDがある場合はorganizationsテーブルを更新
     if (orgId) {
-      // 組織テーブルのカラムマッピング
-      const orgColumnMap: Record<string, string> = {
-        'company_name': 'name',
-        'company_address': 'address',
-        'company_phone': 'phone',
-        'company_email': 'email',
-        'company_representative': 'representative_name',
-        'bank_name': 'bank_name',
-        'bank_branch': 'bank_branch',
-        'bank_account_type': 'bank_account_type',
-        'bank_account_number': 'bank_account_number',
-        'bank_account_holder': 'bank_account_holder',
-        'invoice_registration_number': 'invoice_registration_number'
-      }
-      
       const updates: string[] = []
       const values: any[] = []
+      const siteSettingsData: Record<string, any> = {}
       
       for (const [key, value] of Object.entries(data)) {
         const column = orgColumnMap[key]
         if (column) {
+          // organizationsテーブルに保存
           updates.push(`${column} = ?`)
           values.push(value)
+        } else {
+          // マッピングにない項目はsite_settingsに保存
+          siteSettingsData[key] = value
         }
       }
       
+      // organizationsテーブルを更新
       if (updates.length > 0) {
         values.push(orgId)
         await DB.prepare(`
@@ -138,18 +144,33 @@ routes.put('/settings', async (c) => {
         `).bind(...values).run()
       }
       
+      // site_settingsテーブルにその他の設定を保存
+      for (const [key, value] of Object.entries(siteSettingsData)) {
+        if (value !== undefined && value !== null) {
+          await DB.prepare(`
+            INSERT INTO site_settings (setting_key, setting_value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(setting_key) DO UPDATE SET
+              setting_value = excluded.setting_value,
+              updated_at = CURRENT_TIMESTAMP
+          `).bind(key, String(value)).run()
+        }
+      }
+      
       return c.json({ success: true, message: '設定を保存しました' })
     }
     
-    // フォールバック: site_settingsテーブル（マスター管理用）
+    // フォールバック: site_settingsテーブル（マスター管理用、orgIdがない場合）
     for (const [key, value] of Object.entries(data)) {
-      await DB.prepare(`
-        INSERT INTO site_settings (setting_key, setting_value, updated_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(setting_key) DO UPDATE SET
-          setting_value = excluded.setting_value,
-          updated_at = CURRENT_TIMESTAMP
-      `).bind(key, value).run()
+      if (value !== undefined && value !== null) {
+        await DB.prepare(`
+          INSERT INTO site_settings (setting_key, setting_value, updated_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = CURRENT_TIMESTAMP
+        `).bind(key, String(value)).run()
+      }
     }
     
     return c.json({ success: true, message: '設定を保存しました' })
