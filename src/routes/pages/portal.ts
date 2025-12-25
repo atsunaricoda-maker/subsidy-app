@@ -1242,17 +1242,68 @@ routes.get('/portal/:token', async (c) => {
                     
                     // 案件の支払い情報を取得
                     let paymentInfo = null;
+                    let unpaidInvoices = [];
+                    
                     if (CASE_ID) {
                         const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
                         paymentInfo = caseRes.data;
-                    }
-                    
-                    if (!paymentInfo) {
-                        section.classList.add('hidden');
-                        return;
+                        
+                        // 未払い請求書を取得
+                        try {
+                            const invoicesRes = await axios.get(\`/api/cases/\${CASE_ID}/invoices\`);
+                            unpaidInvoices = (invoicesRes.data || []).filter(inv => 
+                                inv.status === 'issued' || inv.status === 'sent'
+                            );
+                        } catch (e) {
+                            console.log('No invoices found');
+                        }
                     }
                     
                     let htmlParts = [];
+                    
+                    // ========== 未払い請求書セクション ==========
+                    if (unpaidInvoices.length > 0) {
+                        for (const inv of unpaidInvoices) {
+                            const typeLabel = inv.invoice_type === 'success_fee' ? '成功報酬' : 
+                                              inv.invoice_type === 'deposit' ? '着手金' : 
+                                              inv.item_name || '請求';
+                            const isOverdue = inv.due_date && new Date(inv.due_date) < new Date();
+                            
+                            htmlParts.push(\`
+                                <div class="\${isOverdue ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'} border rounded-lg p-3 mb-3">
+                                    <div class="flex items-center gap-2 \${isOverdue ? 'text-red-700' : 'text-yellow-700'} mb-2">
+                                        <i class="fas \${isOverdue ? 'fa-exclamation-circle' : 'fa-file-invoice-dollar'}"></i>
+                                        <span class="font-bold text-sm">\${typeLabel}のお支払い</span>
+                                        \${isOverdue ? '<span class="text-xs bg-red-200 px-2 py-0.5 rounded">期限超過</span>' : ''}
+                                    </div>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div>
+                                            <div class="text-xs text-gray-600">\${inv.invoice_number}</div>
+                                            <div class="text-xs text-gray-500">期限: \${inv.due_date ? new Date(inv.due_date).toLocaleDateString('ja-JP') : '-'}</div>
+                                        </div>
+                                        <div class="text-lg font-bold \${isOverdue ? 'text-red-800' : 'text-yellow-800'}">
+                                            ¥\${inv.total_amount.toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button onclick="showInvoicePaymentModal(\${inv.id}, '\${typeLabel}', \${inv.total_amount})" 
+                                                class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                                            <i class="fas fa-university mr-1"></i>振込先を確認
+                                        </button>
+                                        <button onclick="reportInvoiceTransfer(\${inv.id}, \${inv.total_amount})" 
+                                                class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                                            <i class="fas fa-check mr-1"></i>振込完了を報告
+                                        </button>
+                                    </div>
+                                </div>
+                            \`);
+                        }
+                    }
+                    
+                    if (!paymentInfo && unpaidInvoices.length === 0) {
+                        section.classList.add('hidden');
+                        return;
+                    }
                     
                     // ========== 手付金セクション ==========
                     if (paymentInfo.deposit_required) {
@@ -1430,6 +1481,34 @@ routes.get('/portal/:token', async (c) => {
             }
             
             let currentPaymentType = 'deposit';
+            let currentInvoiceId = null;
+            
+            // 請求書の振込先モーダルを表示
+            function showInvoicePaymentModal(invoiceId, typeLabel, amount) {
+                currentInvoiceId = invoiceId;
+                currentTransferAmount = amount;
+                showBankTransferModal('¥' + amount.toLocaleString(), typeLabel);
+            }
+            
+            // 請求書の振込報告
+            async function reportInvoiceTransfer(invoiceId, amount) {
+                if (!confirm('振込完了を報告しますか？\\n\\n※まだお振込みが完了していない場合は、振込完了後に報告してください。')) {
+                    return;
+                }
+                
+                try {
+                    await axios.put(\`/api/invoices/\${invoiceId}/report-transfer\`, {
+                        amount: amount,
+                        notes: '顧客ポータルから振込報告'
+                    });
+                    
+                    alert('振込完了報告を送信しました。\\n確認までしばらくお待ちください。');
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Error reporting invoice transfer:', error);
+                    alert('報告の送信に失敗しました。\\n\\nお手数ですが、担当者に直接ご連絡ください。');
+                }
+            }
             
             // お知らせを読み込む
             async function loadAnnouncements() {
@@ -4672,6 +4751,9 @@ routes.get('/portal/:token', async (c) => {
             window.showPaymentModal = showPaymentModal;
             window.closeBankTransferModal = closeBankTransferModal;
             window.reportBankTransfer = reportBankTransfer;
+            window.showPaymentTransferModal = showPaymentTransferModal;
+            window.showInvoicePaymentModal = showInvoicePaymentModal;
+            window.reportInvoiceTransfer = reportInvoiceTransfer;
             window.switchHearingCategory = switchHearingCategory;
             window.useExampleById = useExampleById;
             window.showWritingGuide = showWritingGuide;

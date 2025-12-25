@@ -451,6 +451,98 @@ routes.put('/invoices/:id/status', async (c) => {
   return c.json({ success: true, message: 'ステータスを更新しました' })
 })
 
+// 請求書の振込報告（顧客ポータルから）
+routes.put('/invoices/:id/report-transfer', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    const data = await c.req.json()
+    
+    // 請求書情報を取得
+    const invoice = await DB.prepare(`
+      SELECT id, case_id, client_id, invoice_type, total_amount, status, organization_id
+      FROM invoices WHERE id = ?
+    `).bind(id).first() as any
+    
+    if (!invoice) {
+      return c.json({ error: '請求書が見つかりません' }, 404)
+    }
+    
+    // 既に入金済みの場合はエラー
+    if (invoice.status === 'paid') {
+      return c.json({ error: 'この請求書は既に入金確認済みです' }, 400)
+    }
+    
+    // ステータスを振込報告済みに更新
+    await DB.prepare(`
+      UPDATE invoices SET 
+        status = 'payment_reported', 
+        updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `).bind(id).run()
+    
+    // 案件の振込報告フラグも更新
+    if (invoice.case_id) {
+      if (invoice.invoice_type === 'success_fee') {
+        await DB.prepare(`
+          UPDATE cases SET 
+            success_fee_transfer_reported = 1, 
+            success_fee_transfer_reported_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(invoice.case_id).run()
+      } else {
+        await DB.prepare(`
+          UPDATE cases SET 
+            deposit_transfer_reported = 1, 
+            deposit_transfer_reported_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(invoice.case_id).run()
+      }
+    }
+    
+    // 支払い履歴を作成
+    if (invoice.client_id) {
+      await DB.prepare(`
+        INSERT INTO payment_history (client_id, payment_type, amount, payment_method, status, bank_transfer_reported_at, notes)
+        VALUES (?, ?, ?, 'bank_transfer', 'reported', CURRENT_TIMESTAMP, ?)
+      `).bind(
+        invoice.client_id, 
+        invoice.invoice_type || 'other', 
+        invoice.total_amount,
+        data.notes || '請求書からの振込報告'
+      ).run()
+    }
+    
+    // 管理者に通知を作成
+    const client = invoice.client_id 
+      ? await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(invoice.client_id).first() as any
+      : null
+    const clientName = client?.company_name || client?.name || '顧客'
+    const typeLabel = invoice.invoice_type === 'success_fee' ? '成功報酬' : 
+                      invoice.invoice_type === 'deposit' ? '着手金' : '請求'
+    
+    await DB.prepare(`
+      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      'payment_report',
+      `${typeLabel}の振込報告がありました`,
+      `${clientName}様から${typeLabel}の振込報告がありました（¥${invoice.total_amount.toLocaleString()}）。確認をお願いします。`,
+      id,
+      'invoices',
+      invoice.organization_id
+    ).run()
+    
+    return c.json({ success: true, message: '振込完了報告を送信しました' })
+  } catch (error: any) {
+    console.error('Invoice report transfer error:', error)
+    return c.json({ error: '振込報告の処理中にエラーが発生しました', details: error.message }, 500)
+  }
+})
+
 // 請求書発行（ステータスをissuedに変更）
 routes.post('/invoices/:id/issue', async (c) => {
   const { DB } = c.env
