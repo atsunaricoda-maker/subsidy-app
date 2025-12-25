@@ -469,9 +469,12 @@ routes.put('/invoices/:id/report-transfer', async (c) => {
       return c.json({ error: '請求書が見つかりません' }, 404)
     }
     
-    // 既に入金済みの場合はエラー
+    // 既に入金済みまたは報告済みの場合はエラー
     if (invoice.status === 'paid') {
       return c.json({ error: 'この請求書は既に入金確認済みです' }, 400)
+    }
+    if (invoice.status === 'payment_reported') {
+      return c.json({ error: 'この請求書は既に振込報告済みです' }, 400)
     }
     
     // ステータスを振込報告済みに更新

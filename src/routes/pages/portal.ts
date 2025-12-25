@@ -1254,12 +1254,39 @@ routes.get('/portal/:token', async (c) => {
                             unpaidInvoices = (invoicesRes.data || []).filter(inv => 
                                 inv.status === 'issued' || inv.status === 'sent'
                             );
+                            // 報告済み請求書も取得
+                            var reportedInvoices = (invoicesRes.data || []).filter(inv => 
+                                inv.status === 'payment_reported'
+                            );
                         } catch (e) {
                             console.log('No invoices found');
+                            var reportedInvoices = [];
                         }
                     }
                     
                     let htmlParts = [];
+                    
+                    // ========== 報告済み請求書セクション ==========
+                    if (reportedInvoices && reportedInvoices.length > 0) {
+                        for (const inv of reportedInvoices) {
+                            const typeLabel = inv.invoice_type === 'success_fee' ? '成功報酬' : 
+                                              inv.invoice_type === 'deposit' ? '着手金' : 
+                                              inv.item_name || '請求';
+                            
+                            htmlParts.push(\`
+                                <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
+                                    <div class="flex items-center gap-2 text-purple-700">
+                                        <i class="fas fa-hourglass-half"></i>
+                                        <div class="flex-1">
+                                            <span class="font-bold text-sm">\${typeLabel} 振込報告済み - 確認中</span>
+                                            <span class="text-xs text-purple-600 ml-2">¥\${inv.total_amount.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-purple-600 mt-1">担当者が確認中です。しばらくお待ちください。</p>
+                                </div>
+                            \`);
+                        }
+                    }
                     
                     // ========== 未払い請求書セクション ==========
                     if (unpaidInvoices.length > 0) {
@@ -1300,7 +1327,7 @@ routes.get('/portal/:token', async (c) => {
                         }
                     }
                     
-                    if (!paymentInfo && unpaidInvoices.length === 0) {
+                    if (!paymentInfo && unpaidInvoices.length === 0 && (!reportedInvoices || reportedInvoices.length === 0)) {
                         section.classList.add('hidden');
                         return;
                     }
