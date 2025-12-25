@@ -204,6 +204,18 @@ routes.get('/portal/:token', async (c) => {
                             </div>
                         </div>
                         
+                        <!-- 支払い報告セクション -->
+                        <div id="paymentReportSection" class="hidden mt-3">
+                            <div class="bg-white rounded-lg shadow p-3">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-sm font-bold"><i class="fas fa-yen-sign mr-1 text-yellow-600"></i>お支払い</span>
+                                </div>
+                                <div id="paymentReportContent">
+                                    <!-- 動的に内容が挿入される -->
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- フッターリンク -->
                         <div class="mt-3 flex flex-wrap gap-2 text-xs">
                             <a href="/privacy-policy" target="_blank" class="text-gray-500 hover:text-gray-700">
@@ -1222,6 +1234,91 @@ routes.get('/portal/:token', async (c) => {
                 }
             }
             
+            // 支払い報告セクションを読み込む
+            async function loadPaymentReportSection() {
+                try {
+                    const section = document.getElementById('paymentReportSection');
+                    const content = document.getElementById('paymentReportContent');
+                    
+                    // 案件または顧客の支払い情報を取得
+                    let paymentInfo = null;
+                    if (CASE_ID) {
+                        const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                        paymentInfo = caseRes.data;
+                    }
+                    
+                    // 手付金が必要で未払いの場合に表示
+                    if (paymentInfo && paymentInfo.deposit_required && !paymentInfo.deposit_paid) {
+                        section.classList.remove('hidden');
+                        const depositAmount = paymentInfo.deposit_amount || 0;
+                        const isReported = paymentInfo.deposit_transfer_reported;
+                        
+                        if (isReported) {
+                            // 振込報告済みの場合
+                            content.innerHTML = \`
+                                <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                    <div class="flex items-center gap-2 text-purple-700 mb-2">
+                                        <i class="fas fa-hourglass-half"></i>
+                                        <span class="font-bold text-sm">振込報告済み - 確認中</span>
+                                    </div>
+                                    <p class="text-xs text-purple-600">
+                                        お振込みの報告を受け付けました。<br>
+                                        担当者が確認中です。しばらくお待ちください。
+                                    </p>
+                                    <div class="mt-2 text-sm font-bold text-purple-800">
+                                        報告金額: ¥\${depositAmount.toLocaleString()}
+                                    </div>
+                                </div>
+                            \`;
+                        } else {
+                            // 未払いの場合
+                            content.innerHTML = \`
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                                    <div class="flex items-center gap-2 text-yellow-700 mb-2">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                        <span class="font-bold text-sm">お支払いをお願いします</span>
+                                    </div>
+                                    <p class="text-xs text-yellow-600 mb-2">
+                                        下記の金額のお振込みをお願いいたします。
+                                    </p>
+                                    <div class="text-lg font-bold text-yellow-800">
+                                        ¥\${depositAmount.toLocaleString()}
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="showBankTransferModal('¥\${depositAmount.toLocaleString()}')" 
+                                            class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                                        <i class="fas fa-university mr-1"></i>振込先を確認
+                                    </button>
+                                    <button onclick="showBankTransferModal('¥\${depositAmount.toLocaleString()}')" 
+                                            class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                                        <i class="fas fa-check mr-1"></i>振込完了を報告
+                                    </button>
+                                </div>
+                            \`;
+                        }
+                    } else if (paymentInfo && paymentInfo.deposit_required && paymentInfo.deposit_paid) {
+                        // 支払い完了の場合
+                        section.classList.remove('hidden');
+                        content.innerHTML = \`
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                                <div class="flex items-center gap-2 text-green-700">
+                                    <i class="fas fa-check-circle text-lg"></i>
+                                    <div>
+                                        <span class="font-bold text-sm">お支払い確認済み</span>
+                                        <p class="text-xs text-green-600">ありがとうございました</p>
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                    } else {
+                        section.classList.add('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error loading payment report section:', error);
+                }
+            }
+            
             // お知らせを読み込む
             async function loadAnnouncements() {
                 try {
@@ -1393,6 +1490,7 @@ routes.get('/portal/:token', async (c) => {
                         loadPipelineProgress();
                         loadServiceProgress();
                         loadNextActions();
+                        loadPaymentReportSection();
                     }
                 } catch (error) {
                     console.error('Error completing task:', error);
@@ -5145,6 +5243,7 @@ routes.get('/portal/:token', async (c) => {
                 // ステータス読み込み後に他の機能を並列で読み込む
                 loadAnnouncements();
                 loadNextActions();
+                loadPaymentReportSection();
                 loadPipelineProgress();
                 loadServiceProgress();
                 loadPortalInvoices();
