@@ -4167,6 +4167,15 @@ routes.get('/portal/:token', async (c) => {
                     titleText = '<i class="fas fa-building mr-2"></i>登記簿謄本 データ入力';
                     formHtml = \`
                         <div class="space-y-4">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm text-green-800"><i class="fas fa-magic mr-1"></i>アップロードした書類をAIで自動解析</p>
+                                    <button onclick="runAIAnalysis('registry')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                                        <i class="fas fa-robot mr-1"></i>AI自動入力
+                                    </button>
+                                </div>
+                                <p class="text-xs text-green-600 mt-1" id="aiAnalysisStatus"></p>
+                            </div>
                             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                                 <p class="text-sm text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>登記簿謄本に記載されている内容を入力してください</p>
                             </div>
@@ -4211,6 +4220,15 @@ routes.get('/portal/:token', async (c) => {
                     titleText = '<i class="fas fa-file-invoice-dollar mr-2"></i>財務諸表 データ入力';
                     formHtml = \`
                         <div class="space-y-4">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm text-green-800"><i class="fas fa-magic mr-1"></i>アップロードした書類をAIで自動解析</p>
+                                    <button onclick="runAIAnalysis('financial')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                                        <i class="fas fa-robot mr-1"></i>AI自動入力
+                                    </button>
+                                </div>
+                                <p class="text-xs text-green-600 mt-1" id="aiAnalysisStatus"></p>
+                            </div>
                             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                                 <p class="text-sm text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>決算書（損益計算書・貸借対照表）の主要項目を入力してください</p>
                             </div>
@@ -4320,6 +4338,15 @@ routes.get('/portal/:token', async (c) => {
                     titleText = '<i class="fas fa-file-alt mr-2"></i>確定申告書 データ入力';
                     formHtml = \`
                         <div class="space-y-4">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm text-green-800"><i class="fas fa-magic mr-1"></i>アップロードした書類をAIで自動解析</p>
+                                    <button onclick="runAIAnalysis('tax_return')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                                        <i class="fas fa-robot mr-1"></i>AI自動入力
+                                    </button>
+                                </div>
+                                <p class="text-xs text-green-600 mt-1" id="aiAnalysisStatus"></p>
+                            </div>
                             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                                 <p class="text-sm text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>確定申告書（青色申告決算書）の内容を入力してください（個人事業主向け）</p>
                             </div>
@@ -4540,6 +4567,129 @@ routes.get('/portal/:token', async (c) => {
                 }
             }
             
+            // AI自動入力機能（Claude/Gemini対応）
+            let lastUploadedDocumentId = null;
+            
+            async function runAIAnalysis(type) {
+                const statusEl = document.getElementById('aiAnalysisStatus');
+                
+                try {
+                    // 対応する書類タイプのドキュメントを検索
+                    statusEl.textContent = 'アップロードされた書類を検索中...';
+                    statusEl.className = 'text-xs text-blue-600 mt-1';
+                    
+                    // 書類一覧を取得
+                    const docsResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/documents\`);
+                    const documents = docsResponse.data || [];
+                    
+                    // 対応する書類タイプを検索
+                    let targetDoc = null;
+                    for (const doc of documents) {
+                        const docType = (doc.document_type || '').toLowerCase();
+                        if (type === 'registry' && (docType.includes('登記') || docType.includes('謄本') || docType.includes('履歴事項'))) {
+                            targetDoc = doc;
+                            break;
+                        } else if (type === 'financial' && (docType.includes('決算') || docType.includes('財務') || docType.includes('貸借') || docType.includes('損益'))) {
+                            targetDoc = doc;
+                            break;
+                        } else if (type === 'tax_return' && docType.includes('確定申告')) {
+                            targetDoc = doc;
+                            break;
+                        }
+                    }
+                    
+                    if (!targetDoc) {
+                        statusEl.textContent = '該当する書類が見つかりません。先に書類をアップロードしてください。';
+                        statusEl.className = 'text-xs text-red-600 mt-1';
+                        return;
+                    }
+                    
+                    statusEl.textContent = \`「\${targetDoc.document_type}」をAIで解析中... (数秒〜数十秒かかる場合があります)\`;
+                    statusEl.className = 'text-xs text-blue-600 mt-1 animate-pulse';
+                    
+                    // AI解析APIを呼び出し
+                    const analyzeResponse = await axios.post(\`/api/documents/\${targetDoc.id}/analyze\`);
+                    
+                    if (analyzeResponse.data.success) {
+                        const data = analyzeResponse.data.extracted_data;
+                        const usedModel = analyzeResponse.data.used_model || 'AI';
+                        
+                        // フォームに自動入力
+                        if (type === 'registry') {
+                            fillRegistryForm(data);
+                        } else if (type === 'financial') {
+                            fillFinancialForm(data);
+                        } else if (type === 'tax_return') {
+                            fillTaxReturnForm(data);
+                        }
+                        
+                        statusEl.textContent = \`✓ \${usedModel}で自動入力しました。内容を確認・修正してください。\`;
+                        statusEl.className = 'text-xs text-green-600 mt-1';
+                        
+                        // 警告があれば表示
+                        if (analyzeResponse.data.warnings && analyzeResponse.data.warnings.length > 0) {
+                            showMessage('info', analyzeResponse.data.warnings.join('\\n'));
+                        }
+                    } else {
+                        throw new Error(analyzeResponse.data.error || '解析に失敗しました');
+                    }
+                } catch (error) {
+                    console.error('AI解析エラー:', error);
+                    statusEl.textContent = 'AI解析に失敗しました: ' + (error.response?.data?.error || error.message);
+                    statusEl.className = 'text-xs text-red-600 mt-1';
+                }
+            }
+            
+            // 登記簿フォームに自動入力
+            function fillRegistryForm(data) {
+                if (data.company_name) document.getElementById('reg_company_name').value = data.company_name;
+                if (data.head_office_address) document.getElementById('reg_address').value = data.head_office_address;
+                if (data.establishment_date) document.getElementById('reg_establishment').value = data.establishment_date;
+                if (data.capital_amount) document.getElementById('reg_capital').value = data.capital_amount;
+                if (data.representative_name) document.getElementById('reg_representative').value = data.representative_name;
+                if (data.representative_title) document.getElementById('reg_rep_title').value = data.representative_title;
+                if (data.corporate_number) document.getElementById('reg_corporate_number').value = data.corporate_number;
+                if (data.business_purpose) {
+                    const purposes = Array.isArray(data.business_purpose) ? data.business_purpose : [data.business_purpose];
+                    document.getElementById('reg_business_purpose').value = purposes.join('\\n');
+                }
+            }
+            
+            // 財務諸表フォームに自動入力
+            function fillFinancialForm(data) {
+                if (data.fiscal_year) document.getElementById('fin_fiscal_year').value = data.fiscal_year;
+                if (data.employee_count) document.getElementById('fin_employee_count').value = data.employee_count;
+                if (data.revenue) document.getElementById('fin_revenue').value = data.revenue;
+                if (data.cost_of_sales) document.getElementById('fin_cost_of_sales').value = data.cost_of_sales;
+                if (data.gross_profit) document.getElementById('fin_gross_profit').value = data.gross_profit;
+                if (data.selling_admin_expenses) document.getElementById('fin_selling_admin').value = data.selling_admin_expenses;
+                if (data.operating_income) document.getElementById('fin_operating_income').value = data.operating_income;
+                if (data.ordinary_income) document.getElementById('fin_ordinary_income').value = data.ordinary_income;
+                if (data.net_income) document.getElementById('fin_net_income').value = data.net_income;
+                if (data.personnel_expenses) document.getElementById('fin_personnel').value = data.personnel_expenses;
+                if (data.depreciation) document.getElementById('fin_depreciation').value = data.depreciation;
+                if (data.rent_expenses) document.getElementById('fin_rent').value = data.rent_expenses;
+                if (data.rd_expenses) document.getElementById('fin_rd').value = data.rd_expenses;
+                if (data.total_assets) document.getElementById('fin_total_assets').value = data.total_assets;
+                if (data.current_assets) document.getElementById('fin_current_assets').value = data.current_assets;
+                if (data.total_liabilities) document.getElementById('fin_total_liabilities').value = data.total_liabilities;
+                if (data.current_liabilities) document.getElementById('fin_current_liabilities').value = data.current_liabilities;
+                if (data.total_net_assets) document.getElementById('fin_net_assets').value = data.total_net_assets;
+                if (data.capital_stock) document.getElementById('fin_capital_stock').value = data.capital_stock;
+            }
+            
+            // 確定申告フォームに自動入力
+            function fillTaxReturnForm(data) {
+                if (data.tax_year) document.getElementById('tax_year').value = data.tax_year;
+                if (data.employee_count) document.getElementById('tax_employee_count').value = data.employee_count;
+                if (data.business_income) document.getElementById('tax_business_income').value = data.business_income;
+                if (data.total_income) document.getElementById('tax_total_income').value = data.total_income;
+                if (data.total_expenses) document.getElementById('tax_total_expenses').value = data.total_expenses;
+                if (data.salary_wages) document.getElementById('tax_salary_wages').value = data.salary_wages;
+                if (data.depreciation_expense) document.getElementById('tax_depreciation').value = data.depreciation_expense;
+                if (data.taxable_income) document.getElementById('tax_taxable_income').value = data.taxable_income;
+            }
+            
             async function showFinancialIndicators() {
                 try {
                     const response = await axios.get(\`/api/clients/\${CLIENT_ID}/financial-indicators\`);
@@ -4745,6 +4895,7 @@ routes.get('/portal/:token', async (c) => {
             window.openTemplateModal = openTemplateModal;
             window.closeDataInputModal = closeDataInputModal;
             window.saveDataInput = saveDataInput;
+            window.runAIAnalysis = runAIAnalysis;
             window.closeFinancialIndicatorsModal = closeFinancialIndicatorsModal;
             window.completeTask = completeTask;
             window.markAnnouncementRead = markAnnouncementRead;
