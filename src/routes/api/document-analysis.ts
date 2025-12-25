@@ -1,10 +1,185 @@
 // 書類解析・財務データ抽出API
 // テナント分離: 自組織のクライアントのデータのみアクセス可能
+// ClaudeとGeminiの両方に対応したOCR/Vision機能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
+
+// APIキー取得ヘルパー関数
+async function getAPIKeys(env: any): Promise<{ claudeApiKey: string, geminiApiKey: string }> {
+  const { DB, CLAUDE_API_KEY, GEMINI_API_KEY } = env
+  
+  let claudeApiKey = CLAUDE_API_KEY || ''
+  let geminiApiKey = GEMINI_API_KEY || ''
+  
+  try {
+    const aiSettings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM site_settings 
+      WHERE setting_key IN ('claude_api_key', 'gemini_api_key')
+    `).all()
+    
+    for (const setting of (aiSettings.results || [])) {
+      if ((setting as any).setting_key === 'claude_api_key' && (setting as any).setting_value) {
+        claudeApiKey = (setting as any).setting_value
+      }
+      if ((setting as any).setting_key === 'gemini_api_key' && (setting as any).setting_value) {
+        geminiApiKey = (setting as any).setting_value
+      }
+    }
+  } catch (e) {
+    // site_settingsテーブルがない場合は環境変数のみ使用
+  }
+  
+  return { claudeApiKey, geminiApiKey }
+}
+
+// Gemini Vision APIで画像解析（PDF対応）
+async function analyzeImageWithGemini(imageBase64: string, mimeType: string, prompt: string, apiKey: string): Promise<string> {
+  // GeminiはPDFも画像と同様に扱える
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: imageBase64
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+        }
+      })
+    }
+  )
+  
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '')
+    throw new Error(`Gemini API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+  }
+  
+  const data = await response.json()
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+}
+
+// Claude Vision APIで画像解析（PDF対応）
+async function analyzeImageWithClaude(imageBase64: string, mimeType: string, prompt: string, apiKey: string): Promise<string> {
+  // ClaudeはPDFと画像で type が異なる
+  const contentType = mimeType.includes('pdf') ? 'document' : 'image'
+  
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 8192,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: contentType,
+            source: {
+              type: 'base64',
+              media_type: mimeType,
+              data: imageBase64
+            }
+          },
+          {
+            type: 'text',
+            text: prompt
+          }
+        ]
+      }]
+    })
+  })
+  
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '')
+    throw new Error(`Claude API error: ${response.status} - ${errorBody.substring(0, 200)}`)
+  }
+  
+  const data = await response.json()
+  return data.content?.[0]?.text || ''
+}
+
+// 統合Vision API（Claude優先、Geminiフォールバック）
+async function analyzeDocumentWithAI(
+  imageBase64: string, 
+  mimeType: string, 
+  prompt: string, 
+  claudeApiKey: string, 
+  geminiApiKey: string
+): Promise<{ result: string, usedModel: string }> {
+  // Claude APIキーがある場合はClaudeを優先
+  if (claudeApiKey) {
+    try {
+      console.log('Using Claude Vision API for document analysis')
+      const result = await analyzeImageWithClaude(imageBase64, mimeType, prompt, claudeApiKey)
+      return { result, usedModel: 'Claude' }
+    } catch (claudeError) {
+      console.error('Claude Vision API failed:', claudeError)
+      
+      // Geminiにフォールバック
+      if (geminiApiKey) {
+        console.log('Falling back to Gemini Vision API')
+        const result = await analyzeImageWithGemini(imageBase64, mimeType, prompt, geminiApiKey)
+        return { result, usedModel: 'Gemini (fallback)' }
+      }
+      throw claudeError
+    }
+  }
+  
+  // Claude APIキーがない場合はGeminiを使用
+  if (geminiApiKey) {
+    console.log('Using Gemini Vision API for document analysis')
+    const result = await analyzeImageWithGemini(imageBase64, mimeType, prompt, geminiApiKey)
+    return { result, usedModel: 'Gemini' }
+  }
+  
+  throw new Error('AIのAPIキーが設定されていません。システム設定からClaude APIキーまたはGemini APIキーを設定してください。')
+}
+
+// R2から画像/PDFを取得してBase64に変換
+async function getImageAsBase64(R2: any, filePath: string): Promise<{ base64: string, mimeType: string } | null> {
+  try {
+    const object = await R2.get(filePath)
+    if (!object) return null
+    
+    const arrayBuffer = await object.arrayBuffer()
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    
+    // MIMEタイプを判定
+    const ext = filePath.toLowerCase().split('.').pop()
+    const mimeTypes: Record<string, string> = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'pdf': 'application/pdf'
+    }
+    const mimeType = mimeTypes[ext || ''] || 'image/jpeg'
+    
+    return { base64, mimeType }
+  } catch (error) {
+    console.error('Error getting image from R2:', error)
+    return null
+  }
+}
 
 // 書類タイプに基づく解析種別の判定
 function getDocumentAnalysisType(documentType: string): string | null {
@@ -21,9 +196,93 @@ function getDocumentAnalysisType(documentType: string): string | null {
   return null;
 }
 
-// 書類解析をトリガー - テナント分離
+// 解析タイプ別のプロンプト生成
+function getAnalysisPrompt(analysisType: string): string {
+  if (analysisType === 'registry') {
+    return `この登記簿謄本（履歴事項全部証明書）から、以下の情報を抽出してJSON形式で返してください。
+数値は数字のみ（カンマなし）、日付は YYYY-MM-DD 形式で返してください。
+読み取れない項目は null としてください。
+
+必要な情報:
+- company_name: 会社名（商号）
+- company_name_kana: 会社名のフリガナ（読み取れない場合は null）
+- corporate_number: 法人番号（13桁、読み取れない場合は null）
+- head_office_address: 本店所在地
+- establishment_date: 設立年月日（YYYY-MM-DD形式）
+- capital_amount: 資本金の額（数値のみ、円単位）
+- business_purpose: 目的/事業内容（配列形式）
+- representative_name: 代表者氏名
+- representative_title: 代表者の役職（代表取締役、代表社員など）
+- directors: 役員一覧（配列形式、各要素は {name: 氏名, title: 役職}）
+- total_shares: 発行可能株式総数（数値のみ）
+- issued_shares: 発行済株式の総数（数値のみ）
+
+JSON形式のみで回答してください。説明文は不要です。`
+  } else if (analysisType === 'financial_statement') {
+    return `この財務諸表（決算書/貸借対照表/損益計算書）から、以下の情報を抽出してJSON形式で返してください。
+金額は数値のみ（カンマなし、円単位）で返してください。
+読み取れない項目は null としてください。
+
+必要な情報:
+- fiscal_year: 決算期（例: 2024年3月期 → "2024-03"）
+- revenue: 売上高
+- cost_of_sales: 売上原価
+- gross_profit: 売上総利益
+- selling_admin_expenses: 販売費及び一般管理費
+- operating_income: 営業利益
+- ordinary_income: 経常利益
+- net_income: 当期純利益
+- personnel_expenses: 人件費
+- depreciation: 減価償却費
+- total_assets: 総資産
+- current_assets: 流動資産
+- fixed_assets: 固定資産
+- total_liabilities: 負債合計
+- current_liabilities: 流動負債
+- fixed_liabilities: 固定負債
+- total_net_assets: 純資産合計
+- capital_stock: 資本金
+- retained_earnings: 利益剰余金
+- employee_count: 従業員数
+
+JSON形式のみで回答してください。説明文は不要です。`
+  } else if (analysisType === 'tax_return') {
+    return `この確定申告書から、以下の情報を抽出してJSON形式で返してください。
+金額は数値のみ（カンマなし、円単位）で返してください。
+読み取れない項目は null としてください。
+
+必要な情報:
+- tax_year: 申告年度（例: 令和5年 → "2023"）
+- business_income: 事業所得
+- total_income: 総所得金額
+- total_expenses: 必要経費合計
+- salary_wages: 給料賃金
+- depreciation_expense: 減価償却費
+- taxable_income: 課税所得金額
+- income_tax: 所得税額
+- employee_count: 従業員数（専従者を含む）
+
+JSON形式のみで回答してください。説明文は不要です。`
+  }
+  return ''
+}
+
+// JSONレスポンスをパース
+function parseAIResponse(response: string): any {
+  try {
+    // JSONブロックを抽出（```json ... ``` 形式の場合）
+    const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/)
+    const jsonStr = jsonMatch ? jsonMatch[1].trim() : response.trim()
+    return JSON.parse(jsonStr)
+  } catch (error) {
+    console.error('Failed to parse AI response as JSON:', error)
+    return null
+  }
+}
+
+// 書類解析をトリガー - テナント分離（Claude/Gemini対応）
 routes.post('/documents/:id/analyze', async (c) => {
-  const { DB } = c.env;
+  const { DB, R2 } = c.env;
   const documentId = c.req.param('id');
   const user = await getCurrentUser(c);
   const orgId = getEffectiveOrgId(c, user);
@@ -52,58 +311,53 @@ routes.post('/documents/:id/analyze', async (c) => {
       VALUES (?, ?, ?, 'processing')
     `).bind(document.client_id, documentId, analysisType).run();
     
-    // ここでは模擬データを返す（実際はAI APIを呼び出す）
-    // 本番環境ではOCR + AI解析を実装
     let extractedData: any = {};
     let warnings: string[] = [];
+    let usedModel = 'none';
     
-    if (analysisType === 'registry') {
-      extractedData = {
-        company_name: '',
-        company_name_kana: '',
-        corporate_number: '',
-        head_office_address: '',
-        establishment_date: '',
-        capital_amount: null,
-        business_purpose: [],
-        representative_name: '',
-        representative_title: '代表取締役',
-        directors: [],
-        total_shares: null,
-        issued_shares: null
-      };
-      warnings.push('登記簿謄本の解析にはAI連携が必要です。手動で入力してください。');
-    } else if (analysisType === 'financial_statement') {
-      extractedData = {
-        fiscal_year: '',
-        revenue: null,
-        cost_of_sales: null,
-        gross_profit: null,
-        selling_admin_expenses: null,
-        operating_income: null,
-        ordinary_income: null,
-        net_income: null,
-        personnel_expenses: null,
-        depreciation: null,
-        total_assets: null,
-        total_liabilities: null,
-        total_net_assets: null,
-        employee_count: null
-      };
-      warnings.push('財務諸表の解析にはAI連携が必要です。主要項目を手動で入力してください。');
-    } else if (analysisType === 'tax_return') {
-      extractedData = {
-        tax_year: '',
-        business_income: null,
-        total_income: null,
-        total_expenses: null,
-        salary_wages: null,
-        depreciation_expense: null,
-        taxable_income: null,
-        income_tax: null,
-        employee_count: null
-      };
-      warnings.push('確定申告書の解析にはAI連携が必要です。手動で入力してください。');
+    // APIキーを取得
+    const { claudeApiKey, geminiApiKey } = await getAPIKeys(c.env);
+    
+    // APIキーがある場合はAI解析を実行
+    if (claudeApiKey || geminiApiKey) {
+      // R2から書類を取得
+      const imageData = await getImageAsBase64(R2, document.file_path as string);
+      
+      if (imageData) {
+        const prompt = getAnalysisPrompt(analysisType);
+        
+        try {
+          const aiResult = await analyzeDocumentWithAI(
+            imageData.base64,
+            imageData.mimeType,
+            prompt,
+            claudeApiKey,
+            geminiApiKey
+          );
+          
+          usedModel = aiResult.usedModel;
+          const parsedData = parseAIResponse(aiResult.result);
+          
+          if (parsedData) {
+            extractedData = parsedData;
+            warnings.push(`${usedModel} で自動解析しました。内容を確認してください。`);
+          } else {
+            warnings.push('AI解析結果のパースに失敗しました。手動で入力してください。');
+            extractedData = getDefaultExtractedData(analysisType);
+          }
+        } catch (aiError: any) {
+          console.error('AI analysis failed:', aiError);
+          warnings.push(`AI解析に失敗しました: ${aiError.message}`);
+          extractedData = getDefaultExtractedData(analysisType);
+        }
+      } else {
+        warnings.push('書類ファイルの取得に失敗しました。');
+        extractedData = getDefaultExtractedData(analysisType);
+      }
+    } else {
+      // APIキーがない場合はデフォルトデータ
+      warnings.push('AIのAPIキーが設定されていません。システム設定からClaude APIキーまたはGemini APIキーを設定してください。');
+      extractedData = getDefaultExtractedData(analysisType);
     }
     
     // 解析ログを更新
@@ -126,7 +380,10 @@ routes.post('/documents/:id/analyze', async (c) => {
       analysis_type: analysisType,
       extracted_data: extractedData,
       warnings,
-      message: '書類の解析準備が完了しました。データを確認・入力してください。',
+      used_model: usedModel,
+      message: usedModel !== 'none' 
+        ? `${usedModel} で書類を解析しました。内容を確認・修正してください。`
+        : '書類の解析準備が完了しました。データを確認・入力してください。',
       requires_verification: true
     });
   } catch (error: any) {
@@ -134,6 +391,56 @@ routes.post('/documents/:id/analyze', async (c) => {
     return c.json({ error: '書類の解析に失敗しました', details: error.message }, 500);
   }
 });
+
+// デフォルトの抽出データを返す
+function getDefaultExtractedData(analysisType: string): any {
+  if (analysisType === 'registry') {
+    return {
+      company_name: '',
+      company_name_kana: '',
+      corporate_number: '',
+      head_office_address: '',
+      establishment_date: '',
+      capital_amount: null,
+      business_purpose: [],
+      representative_name: '',
+      representative_title: '代表取締役',
+      directors: [],
+      total_shares: null,
+      issued_shares: null
+    };
+  } else if (analysisType === 'financial_statement') {
+    return {
+      fiscal_year: '',
+      revenue: null,
+      cost_of_sales: null,
+      gross_profit: null,
+      selling_admin_expenses: null,
+      operating_income: null,
+      ordinary_income: null,
+      net_income: null,
+      personnel_expenses: null,
+      depreciation: null,
+      total_assets: null,
+      total_liabilities: null,
+      total_net_assets: null,
+      employee_count: null
+    };
+  } else if (analysisType === 'tax_return') {
+    return {
+      tax_year: '',
+      business_income: null,
+      total_income: null,
+      total_expenses: null,
+      salary_wages: null,
+      depreciation_expense: null,
+      taxable_income: null,
+      income_tax: null,
+      employee_count: null
+    };
+  }
+  return {};
+}
 
 // 登記簿データの保存・更新 - テナント分離
 routes.post('/clients/:id/registry-data', async (c) => {
