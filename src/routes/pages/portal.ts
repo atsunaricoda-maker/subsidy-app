@@ -1086,11 +1086,12 @@ routes.get('/portal/:token', async (c) => {
                     const client = { ...clientRes.data, ...depositInfo };
                     
                     if (client.deposit_required && !client.deposit_paid && !client.deposit_transfer_reported) {
+                        const depositAmount = client.deposit_amount || 0;
                         nextActions.push({
                             icon: 'fa-yen-sign',
                             text: '手付金のお支払い',
-                            description: '¥' + (client.deposit_amount || 0).toLocaleString() + ' のお支払いをお願いします',
-                            action: "scrollToSection('statusSection')",
+                            description: '¥' + depositAmount.toLocaleString() + ' のお支払いをお願いします',
+                            action: "showBankTransferModal('¥" + depositAmount.toLocaleString() + "')",
                             priority: 1
                         });
                     }

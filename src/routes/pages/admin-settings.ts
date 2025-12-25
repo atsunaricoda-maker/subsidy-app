@@ -1089,7 +1089,12 @@ routes.get('/admin/settings', async (c) => {
             // 設定値を取得するヘルパー
             function getSettingValue(settings, key) {
                 if (settings[key]) {
-                    return settings[key].value || settings[key] || '';
+                    // オブジェクト形式の場合はvalueを取得、それ以外は直接値を返す
+                    if (typeof settings[key] === 'object' && settings[key] !== null) {
+                        return settings[key].value || '';
+                    }
+                    // プリミティブ値の場合はそのまま返す
+                    return String(settings[key]);
                 }
                 return '';
             }

@@ -170,9 +170,8 @@ app.use('*', async (c, next) => {
       '/api/portal',
       '/api/find-organization',
       '/terms',
-      '/privacy',
+      '/privacy-policy',
       '/legal',
-      '/commercial-law',
       '/favicon.ico',
       '/robots.txt'
     ]
@@ -845,8 +844,8 @@ app.use('*', async (c, next) => {
                   <h4 class="font-bold mb-6 text-lg">法的情報</h4>
                   <ul class="space-y-3 text-gray-400">
                     <li><a href="/terms" class="hover:text-white transition">利用規約</a></li>
-                    <li><a href="/privacy" class="hover:text-white transition">プライバシーポリシー</a></li>
-                    <li><a href="/commercial-law" class="hover:text-white transition">特定商取引法に基づく表記</a></li>
+                    <li><a href="/privacy-policy" class="hover:text-white transition">プライバシーポリシー</a></li>
+                    <li><a href="/legal" class="hover:text-white transition">特定商取引法に基づく表記</a></li>
                   </ul>
                 </div>
               </div>
