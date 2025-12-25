@@ -15,61 +15,86 @@ routes.get('/settings', async (c) => {
   const orgId = getEffectiveOrgId(c, user)
   
   try {
-    // テナントIDがある場合は組織テーブルから設定を取得
-    if (orgId) {
-      const org = await DB.prepare(`
-        SELECT 
-          name as company_name,
-          address as company_address,
-          phone as company_phone,
-          email as company_email,
-          representative_name as company_representative,
-          bank_name,
-          bank_branch,
-          bank_account_type,
-          bank_account_number,
-          bank_account_holder,
-          invoice_registration_number
-        FROM organizations
-        WHERE id = ?
-      `).bind(orgId).first() as any
+    const settingsObj: Record<string, any> = {}
+    
+    // まずsite_settingsテーブルから全設定を取得
+    try {
+      const siteSettings = await DB.prepare(`
+        SELECT setting_key, setting_value, setting_type, description
+        FROM site_settings
+        ORDER BY id
+      `).all()
       
-      if (org) {
-        const settingsObj: Record<string, any> = {
-          company_name: { value: org.company_name || '', type: 'text' },
-          company_address: { value: org.company_address || '', type: 'text' },
-          company_phone: { value: org.company_phone || '', type: 'text' },
-          company_email: { value: org.company_email || '', type: 'text' },
-          company_representative: { value: org.company_representative || '', type: 'text' },
-          bank_name: { value: org.bank_name || '', type: 'text' },
-          bank_branch: { value: org.bank_branch || '', type: 'text' },
-          bank_account_type: { value: org.bank_account_type || '普通', type: 'text' },
-          bank_account_number: { value: org.bank_account_number || '', type: 'text' },
-          bank_account_holder: { value: org.bank_account_holder || '', type: 'text' },
-          invoice_registration_number: { value: org.invoice_registration_number || '', type: 'text' },
-          '_env_status': {
-            claude_api_key_set: !!CLAUDE_API_KEY,
-            claude_api_key_preview: CLAUDE_API_KEY ? `${CLAUDE_API_KEY.substring(0, 12)}...（環境変数で設定済み）` : null
-          }
+      for (const s of (siteSettings.results || [])) {
+        settingsObj[(s as any).setting_key] = {
+          value: (s as any).setting_value || '',
+          type: (s as any).setting_type || 'text',
+          description: (s as any).description
         }
-        return c.json(settingsObj)
+      }
+    } catch (e) {
+      console.log('site_settings table not found or error:', e)
+    }
+    
+    // テナントIDがある場合は組織テーブルから設定を取得して上書き
+    if (orgId) {
+      try {
+        const org = await DB.prepare(`
+          SELECT 
+            name as company_name,
+            address as company_address,
+            phone as company_phone,
+            email as company_email,
+            representative_name as company_representative,
+            bank_name,
+            bank_branch,
+            bank_account_type,
+            bank_account_number,
+            bank_account_holder
+          FROM organizations
+          WHERE id = ?
+        `).bind(orgId).first() as any
+        
+        if (org) {
+          // organizationsテーブルの値で上書き（値がある場合のみ）
+          if (org.company_name) settingsObj.company_name = { value: org.company_name, type: 'text' }
+          if (org.company_address) settingsObj.company_address = { value: org.company_address, type: 'text' }
+          if (org.company_phone) settingsObj.company_phone = { value: org.company_phone, type: 'text' }
+          if (org.company_email) settingsObj.company_email = { value: org.company_email, type: 'text' }
+          if (org.company_representative) settingsObj.company_representative = { value: org.company_representative, type: 'text' }
+          if (org.bank_name) settingsObj.bank_name = { value: org.bank_name, type: 'text' }
+          if (org.bank_branch) settingsObj.bank_branch = { value: org.bank_branch, type: 'text' }
+          if (org.bank_account_type) settingsObj.bank_account_type = { value: org.bank_account_type, type: 'text' }
+          if (org.bank_account_number) settingsObj.bank_account_number = { value: org.bank_account_number, type: 'text' }
+          if (org.bank_account_holder) settingsObj.bank_account_holder = { value: org.bank_account_holder, type: 'text' }
+        }
+      } catch (e) {
+        console.log('organizations table error:', e)
       }
     }
     
-    // フォールバック: site_settingsテーブル（マスター管理用）
-    const settings = await DB.prepare(`
-      SELECT setting_key, setting_value, setting_type, description
-      FROM site_settings
-      ORDER BY id
-    `).all()
+    // デフォルト値を設定（値がない場合）
+    const defaults: Record<string, { value: string, type: string }> = {
+      company_name: { value: '', type: 'text' },
+      company_address: { value: '', type: 'text' },
+      company_phone: { value: '', type: 'text' },
+      company_email: { value: '', type: 'text' },
+      company_representative: { value: '', type: 'text' },
+      bank_name: { value: '', type: 'text' },
+      bank_branch: { value: '', type: 'text' },
+      bank_account_type: { value: '普通', type: 'text' },
+      bank_account_number: { value: '', type: 'text' },
+      bank_account_holder: { value: '', type: 'text' },
+      invoice_registration_number: { value: '', type: 'text' },
+      privacy_policy: { value: '', type: 'textarea' },
+      legal_notice: { value: '', type: 'textarea' },
+      terms_of_service: { value: '', type: 'textarea' },
+      footer_text: { value: '', type: 'text' }
+    }
     
-    // キーと値のオブジェクトに変換
-    const settingsObj: Record<string, any> = {}
-    for (const s of (settings.results || [])) {
-      settingsObj[(s as any).setting_key] = {
-        value: (s as any).setting_value,
-        type: (s as any).setting_type,
-        description: (s as any).description
+    for (const [key, defaultVal] of Object.entries(defaults)) {
+      if (!settingsObj[key]) {
+        settingsObj[key] = defaultVal
       }
     }
     
@@ -81,6 +106,7 @@ routes.get('/settings', async (c) => {
     
     return c.json(settingsObj)
   } catch (error) {
+    console.error('Error getting settings:', error)
     // テーブルが存在しない場合はデフォルト値を返す
     return c.json({
       company_name: { value: '', type: 'text' },
@@ -102,8 +128,11 @@ routes.put('/settings', async (c) => {
   // テナントIDを取得
   const orgId = getEffectiveOrgId(c, user)
   
+  console.log('[PUT /settings] orgId:', orgId, 'user:', user?.id, 'data keys:', Object.keys(data))
+  
   try {
     // 組織テーブルのカラムマッピング（organizationsテーブルに保存する項目）
+    // 注意: organizationsテーブルに実際に存在するカラムのみマッピング
     const orgColumnMap: Record<string, string> = {
       'company_name': 'name',
       'company_address': 'address',
@@ -114,8 +143,8 @@ routes.put('/settings', async (c) => {
       'bank_branch': 'bank_branch',
       'bank_account_type': 'bank_account_type',
       'bank_account_number': 'bank_account_number',
-      'bank_account_holder': 'bank_account_holder',
-      'invoice_registration_number': 'invoice_registration_number'
+      'bank_account_holder': 'bank_account_holder'
+      // invoice_registration_numberはsite_settingsに保存（organizationsテーブルにカラムがない）
     }
     
     // テナントIDがある場合はorganizationsテーブルを更新
@@ -174,9 +203,10 @@ routes.put('/settings', async (c) => {
     }
     
     return c.json({ success: true, message: '設定を保存しました' })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving settings:', error)
-    return c.json({ error: '設定の保存に失敗しました' }, 500)
+    console.error('Error details:', error.message, error.cause)
+    return c.json({ error: '設定の保存に失敗しました', details: error.message }, 500)
   }
 })
 

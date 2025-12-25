@@ -1195,11 +1195,18 @@ routes.get('/admin/settings', async (c) => {
                         settings.stripe_enabled = stripeEnabledEl.checked ? 'true' : 'false';
                     }
                     
-                    await axios.put('/api/settings', settings);
+                    const response = await axios.put('/api/settings', settings);
+                    console.log('Settings saved:', response.data);
                     alert('設定を保存しました');
                 } catch (error) {
                     console.error('Error saving settings:', error);
-                    alert('設定の保存に失敗しました');
+                    if (error.response) {
+                        console.error('Response status:', error.response.status);
+                        console.error('Response data:', error.response.data);
+                        alert('設定の保存に失敗しました: ' + (error.response.data?.error || error.response.status));
+                    } else {
+                        alert('設定の保存に失敗しました: ' + error.message);
+                    }
                 }
             }
             
