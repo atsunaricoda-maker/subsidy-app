@@ -216,7 +216,7 @@ routes.get('/export/invoices/csv', async (c) => {
         i.notes,
         c.name as client_name,
         c.company_name,
-        cs.name as case_name
+        cs.case_number as case_name
       FROM invoices i
       LEFT JOIN clients c ON i.client_id = c.id
       LEFT JOIN cases cs ON i.case_id = cs.id
