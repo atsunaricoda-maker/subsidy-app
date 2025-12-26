@@ -81,6 +81,14 @@ app.use('*', async (c, next) => {
   const originalHost = c.req.header('x-original-host') || ''
   const host = originalHost || c.req.header('host') || ''
   const slug = extractSlugFromHost(host)
+  const path = c.req.path
+  
+  // プラットフォーム法務ページ（/master/privacy-policy, /master/terms, /master/legal）は
+  // サブドメインがあっても組織解決をスキップして通過させる
+  const platformPublicPaths = ['/master/privacy-policy', '/master/terms', '/master/legal']
+  if (platformPublicPaths.includes(path)) {
+    return next()
+  }
   
   // サブドメインがある場合、組織を解決
   if (slug) {
@@ -89,7 +97,6 @@ app.use('*', async (c, next) => {
     
     if (!org) {
       // 組織が見つからない場合
-      const path = c.req.path
       // APIはエラーを返す
       if (path.startsWith('/api/')) {
         return c.json({ error: '組織が見つかりません', slug }, 404)
@@ -127,7 +134,6 @@ app.use('*', async (c, next) => {
     
     // 組織のステータス確認
     if (!isOrganizationActive(org)) {
-      const path = c.req.path
       if (path.startsWith('/api/')) {
         return c.json({ error: '組織の利用が停止されています', status: org.status }, 403)
       }
