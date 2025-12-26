@@ -933,6 +933,75 @@ routes.get('/admin/settings', async (c) => {
                 </div>
             </div>
             
+            <!-- メール通知設定 -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="p-4 border-b bg-gradient-to-r from-blue-50 to-cyan-50">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold flex items-center gap-2">
+                                <i class="fas fa-envelope text-blue-600"></i>
+                                メール通知設定
+                            </h2>
+                            <p class="text-sm text-gray-500 mt-1">顧客への自動メール通知を設定します</p>
+                        </div>
+                        <button onclick="testEmailSend()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-2">
+                            <i class="fas fa-paper-plane"></i>
+                            テスト送信
+                        </button>
+                    </div>
+                </div>
+                <div class="p-4 space-y-4">
+                    <!-- メール通知有効/無効 -->
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                            <label class="font-medium text-gray-700">メール通知を有効にする</label>
+                            <p class="text-sm text-gray-500">ステータス変更時、書類アップロード時に自動でメールを送信します</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="email_notifications_enabled" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                    
+                    <!-- Resend API Key -->
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <i class="fas fa-key text-yellow-600 mr-1"></i>Resend APIキー
+                        </label>
+                        <input type="password" id="resend_api_key" class="w-full px-3 py-2 border rounded-lg" placeholder="re_xxxxxxxx...">
+                        <p class="text-xs text-gray-500 mt-1">
+                            <a href="https://resend.com" target="_blank" class="text-blue-600 hover:underline">Resend</a>でアカウントを作成し、APIキーを取得してください（無料枠: 月3,000通）
+                        </p>
+                    </div>
+                    
+                    <!-- 送信元メールアドレス -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">送信元メールアドレス</label>
+                        <input type="email" id="email_from" class="w-full px-3 py-2 border rounded-lg" placeholder="例: noreply@your-domain.com">
+                        <p class="text-xs text-gray-500 mt-1">Resendで認証済みのドメインのメールアドレスを入力してください</p>
+                    </div>
+                    
+                    <!-- 通知種別 -->
+                    <div class="border-t pt-4">
+                        <h3 class="font-medium text-gray-700 mb-3">通知タイミング</h3>
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="notify_status_change" checked class="rounded text-blue-600">
+                                <span class="text-sm">ステータス変更時（顧客へ通知）</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="notify_document_upload" checked class="rounded text-blue-600">
+                                <span class="text-sm">書類アップロード時（管理者へ通知）</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="notify_application_result" checked class="rounded text-blue-600">
+                                <span class="text-sm">採択/不採択結果（顧客へ通知）</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 法務設定 -->
             <div class="bg-white rounded-lg shadow mb-6">
                 <div class="p-4 border-b bg-gradient-to-r from-indigo-50 to-purple-50">
@@ -1127,6 +1196,15 @@ routes.get('/admin/settings', async (c) => {
                     setValue('company_registration', getSettingValue(settings, 'company_registration'));
                     setValue('invoice_registration_number', getSettingValue(settings, 'invoice_registration_number'));
                     
+                    // メール通知設定
+                    const emailEnabledEl = document.getElementById('email_notifications_enabled');
+                    if (emailEnabledEl) {
+                        const emailEnabled = getSettingValue(settings, 'email_notifications_enabled');
+                        emailEnabledEl.checked = emailEnabled === 'true' || emailEnabled === true;
+                    }
+                    setValue('resend_api_key', getSettingValue(settings, 'resend_api_key'));
+                    setValue('email_from', getSettingValue(settings, 'email_from'));
+                    
                     // 法務設定
                     setValue('company_website_url', getSettingValue(settings, 'company_website_url'));
                     setValue('privacy_policy_url', getSettingValue(settings, 'privacy_policy_url'));
@@ -1186,8 +1264,17 @@ routes.get('/admin/settings', async (c) => {
                         privacy_policy: getValue('privacy_policy'),
                         legal_notice: getValue('legal_notice'),
                         terms_of_service: getValue('terms_of_service'),
-                        footer_text: getValue('footer_text')
+                        footer_text: getValue('footer_text'),
+                        // メール通知設定
+                        resend_api_key: getValue('resend_api_key'),
+                        email_from: getValue('email_from')
                     };
+                    
+                    // メール通知有効/無効
+                    const emailEnabledEl = document.getElementById('email_notifications_enabled');
+                    if (emailEnabledEl) {
+                        settings.email_notifications_enabled = emailEnabledEl.checked ? 'true' : 'false';
+                    }
                     
                     // Stripe（要素が存在する場合のみ）
                     const stripeEnabledEl = document.getElementById('stripe_enabled');
@@ -1270,6 +1357,44 @@ routes.get('/admin/settings', async (c) => {
                 document.getElementById('previewModal').classList.add('hidden');
             }
             
+            // テストメール送信
+            async function testEmailSend() {
+                const apiKey = document.getElementById('resend_api_key')?.value;
+                const fromEmail = document.getElementById('email_from')?.value;
+                const toEmail = document.getElementById('company_email')?.value;
+                
+                if (!apiKey) {
+                    alert('Resend APIキーを入力してください');
+                    return;
+                }
+                
+                if (!toEmail) {
+                    alert('会社メールアドレス（送信先）を入力してください');
+                    return;
+                }
+                
+                if (!confirm('テストメールを送信しますか？\\n\\n送信先: ' + toEmail)) {
+                    return;
+                }
+                
+                try {
+                    const response = await axios.post('/api/email/test', {
+                        api_key: apiKey,
+                        from_email: fromEmail,
+                        to_email: toEmail
+                    });
+                    
+                    if (response.data.success) {
+                        alert('テストメールを送信しました！\\n\\n受信トレイを確認してください。');
+                    } else {
+                        alert('送信に失敗しました: ' + (response.data.error || '不明なエラー'));
+                    }
+                } catch (error) {
+                    console.error('Test email error:', error);
+                    alert('送信に失敗しました: ' + (error.response?.data?.error || error.message));
+                }
+            }
+            
             // 法務文書テンプレートを適用
             async function applyLegalTemplates() {
                 if (!confirm('法務文書テンプレートを適用しますか？\\n\\n現在入力されている内容は上書きされます。\\n（SaaS事業者に有利な免責条項を含む内容です）')) {
@@ -1298,6 +1423,7 @@ routes.get('/admin/settings', async (c) => {
             window.closePreview = closePreview;
             window.saveSettings = saveSettings;
             window.applyLegalTemplates = applyLegalTemplates;
+            window.testEmailSend = testEmailSend;
             
             // 資格情報の読み込み
             async function loadLicenseInfo() {

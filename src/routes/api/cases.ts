@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
+import { sendEmail, getEmailSettings, statusChangeEmail } from '../../utils/email'
 
 const routes = new Hono<AppEnv>()
 
@@ -289,6 +290,43 @@ routes.put('/cases/:id/status', async (c) => {
   await DB.prepare(`
     UPDATE cases SET status = ?, updated_at = datetime('now') WHERE id = ?
   `).bind(status, id).run()
+  
+  // メール通知を送信（非同期で実行）
+  try {
+    const emailSettings = await getEmailSettings(DB)
+    if (emailSettings.enabled && emailSettings.apiKey) {
+      // 顧客情報と案件情報を取得
+      const caseInfo = await DB.prepare(`
+        SELECT c.name as case_name, c.access_token,
+               cl.name as client_name, cl.email as client_email,
+               o.slug as org_slug
+        FROM cases c
+        JOIN clients cl ON c.client_id = cl.id
+        JOIN organizations o ON c.organization_id = o.id
+        WHERE c.id = ?
+      `).bind(id).first() as any
+      
+      if (caseInfo && caseInfo.client_email) {
+        const portalUrl = `https://${caseInfo.org_slug}.shinsei-raku.com/portal/${caseInfo.access_token}`
+        const emailContent = statusChangeEmail({
+          clientName: caseInfo.client_name,
+          caseName: caseInfo.case_name,
+          oldStatus: currentCase.status,
+          newStatus: status,
+          portalUrl
+        })
+        
+        await sendEmail(emailSettings.apiKey, {
+          to: caseInfo.client_email,
+          subject: emailContent.subject,
+          html: emailContent.html
+        }, emailSettings.fromEmail || undefined)
+      }
+    }
+  } catch (emailError) {
+    console.error('Failed to send status change email:', emailError)
+    // メール送信失敗してもステータス更新は成功とする
+  }
   
   return c.json({ success: true })
 })

@@ -67,6 +67,7 @@ import subsidy_typesPages from './routes/pages/subsidy-types'
 import authPages from './routes/pages/auth'
 import supportPages from './routes/pages/support'
 import supportRoutes from './routes/api/support'
+import emailRoutes from './routes/api/email'
 
 const app = new Hono<AppEnv>()
 
@@ -1155,6 +1156,7 @@ app.route('/api', success_casesRoutes)
 app.route('/api', organizationsRoutes)
 app.route('/api', debugTenantRoutes)
 app.route('/api', supportRoutes)
+app.route('/api', emailRoutes)
 app.route('', admin_settingsPages)
 app.route('', admin_usersPages)
 app.route('', backupPages)

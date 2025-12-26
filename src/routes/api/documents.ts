@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
+import { sendEmail, getEmailSettings, documentUploadedEmail } from '../../utils/email'
 
 const routes = new Hono<AppEnv>()
 
@@ -99,7 +100,7 @@ routes.post('/clients/:id/documents/upload', async (c) => {
     
     // 顧客からのアップロードの場合、管理者に通知を作成
     if (uploadedBy === 'client') {
-      const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(id).first()
+      const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(id).first() as any
       const clientName = client?.company_name || client?.name || '顧客'
       await DB.prepare(`
         INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
@@ -111,6 +112,43 @@ routes.post('/clients/:id/documents/upload', async (c) => {
         id,
         'clients'
       ).run()
+      
+      // 管理者にメール通知を送信
+      try {
+        const emailSettings = await getEmailSettings(DB)
+        if (emailSettings.enabled && emailSettings.apiKey) {
+          // 案件情報と管理者のメールアドレスを取得
+          const caseInfo = await DB.prepare(`
+            SELECT c.name as case_name, o.slug, o.email as admin_email
+            FROM cases c
+            JOIN organizations o ON c.organization_id = o.id
+            WHERE c.id = ?
+          `).bind(caseId).first() as any
+          
+          if (caseInfo && caseInfo.admin_email) {
+            const adminUrl = `https://${caseInfo.slug}.shinsei-raku.com/admin/clients/${id}`
+            const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+            
+            const emailContent = documentUploadedEmail({
+              clientName,
+              caseName: caseInfo.case_name || '（案件名なし）',
+              documentName: file.name,
+              documentType,
+              uploadedAt: now,
+              adminUrl
+            })
+            
+            await sendEmail(emailSettings.apiKey, {
+              to: caseInfo.admin_email,
+              subject: emailContent.subject,
+              html: emailContent.html
+            }, emailSettings.fromEmail || undefined)
+          }
+        }
+      } catch (emailError) {
+        console.error('Failed to send document upload email:', emailError)
+        // メール送信失敗しても書類アップロードは成功とする
+      }
     }
     
     return c.json({ 
