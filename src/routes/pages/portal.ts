@@ -2708,6 +2708,16 @@ routes.get('/portal/:token', async (c) => {
                     if (typeof loadDocumentChecklist === 'function') {
                         loadDocumentChecklist();
                     }
+                    
+                    // 特定の書類タイプの場合、データ入力モーダルを表示
+                    const docType = selectedCommonDocType.toLowerCase();
+                    if (docType.includes('登記') || docType.includes('謄本') || docType.includes('履歴事項')) {
+                        showDataInputModal('registry', selectedCommonDocType);
+                    } else if (docType.includes('決算') || docType.includes('財務') || docType.includes('貸借') || docType.includes('損益')) {
+                        showDataInputModal('financial', selectedCommonDocType);
+                    } else if (docType.includes('確定申告')) {
+                        showDataInputModal('tax_return', selectedCommonDocType);
+                    }
                 } catch (error) {
                     console.error('Error uploading common document:', error);
                     showMessage('error', 'アップロードに失敗しました');
