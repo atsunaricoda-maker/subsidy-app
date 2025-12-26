@@ -2545,6 +2545,19 @@ routes.get('/portal/:token', async (c) => {
                         const canAddMore = !hasDoc || (maxVer > 1 && docs.length < maxVer);
                         const multiVersionBadge = maxVer > 1 ? \`<span class="ml-1 text-xs px-1 py-0.5 rounded bg-purple-100 text-purple-600">\${docs.length}/\${maxVer}期</span>\` : '';
                         
+                        // 情報入力が必要な書類タイプかチェック
+                        const typeNameLower = type.name.toLowerCase();
+                        const needsDataInput = hasDoc && (typeNameLower.includes('登記') || typeNameLower.includes('謄本') || 
+                                              typeNameLower.includes('履歴事項') || typeNameLower.includes('決算') || 
+                                              typeNameLower.includes('財務') || typeNameLower.includes('貸借') || 
+                                              typeNameLower.includes('損益') || typeNameLower.includes('確定申告'));
+                        const dataInputBtn = needsDataInput ? \`
+                            <button onclick="event.stopPropagation(); openDataInputForCommonDoc('\${type.name.replace(/'/g, "\\\\'")}', event)" 
+                                    class="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center" title="情報入力">
+                                <i class="fas fa-edit text-white text-xs"></i>
+                            </button>
+                        \` : '';
+                        
                         return \`
                             <div onclick="openCommonDocUploadModal('\${type.name.replace(/'/g, "\\\\'")}', \${type.id}, \${hasDoc}, \${maxVer})" 
                                  class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all \${hasDoc ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200 hover:bg-blue-50 hover:border-blue-300'}">
@@ -2557,6 +2570,7 @@ routes.get('/portal/:token', async (c) => {
                                     \${validityStatus}
                                     \${hasDoc ? '<span class="block text-xs text-gray-500 truncate">' + (latestDoc.fiscal_year ? latestDoc.fiscal_year + '期 - ' : '') + latestDoc.file_name + (docs.length > 1 ? ' 他' + (docs.length - 1) + '件' : '') + '</span>' : ''}
                                 </div>
+                                \${dataInputBtn}
                                 <i class="fas fa-chevron-right text-xs \${hasDoc ? 'text-blue-400' : 'text-gray-400'}"></i>
                             </div>
                         \`;
