@@ -341,6 +341,9 @@ routes.get('/cases', async (c) => {
                                     <i class="fas fa-check-circle mr-2"></i>完了済み${archivedCount > 0 ? ' (' + archivedCount + ')' : ''}
                                 </a>
                             `}
+                            <a href="/api/export/cases/csv" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border hover:bg-gray-50 text-sm" title="CSVエクスポート">
+                                <i class="fas fa-file-csv mr-2"></i>CSV出力
+                            </a>
                             <a href="/?openNewCase=true" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
                                 <i class="fas fa-plus mr-2"></i>新規案件登録
                             </a>

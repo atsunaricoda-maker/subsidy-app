@@ -46,10 +46,16 @@ routes.get('/clients', async (c) => {
                                 <p class="text-blue-100 text-sm mt-0.5">Customer Management</p>
                             </div>
                         </div>
-                        <button onclick="openNewCustomerModal()" class="bg-white text-blue-700 px-5 py-2.5 rounded-xl hover:bg-blue-50 font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
-                            <i class="fas fa-user-plus"></i>
-                            <span>新規顧客追加</span>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="exportClientsCSV()" class="bg-white/20 text-white px-4 py-2.5 rounded-xl hover:bg-white/30 font-medium transition-all flex items-center gap-2" title="CSVエクスポート">
+                                <i class="fas fa-file-csv"></i>
+                                <span class="hidden sm:inline">CSV出力</span>
+                            </button>
+                            <button onclick="openNewCustomerModal()" class="bg-white text-blue-700 px-5 py-2.5 rounded-xl hover:bg-blue-50 font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
+                                <i class="fas fa-user-plus"></i>
+                                <span>新規顧客追加</span>
+                            </button>
+                        </div>
                     </div>
                 </header>
 
@@ -701,6 +707,11 @@ routes.get('/clients', async (c) => {
             function createCaseForClient(clientId) {
                 modalManager.close('clientQuickViewModal');
                 window.location.href = '/?openNewCase=true&client_id=' + clientId;
+            }
+            
+            // CSVエクスポート
+            function exportClientsCSV() {
+                window.location.href = '/api/export/clients/csv';
             }
             
             // 新規顧客モーダルを開く

@@ -1,10 +1,283 @@
-// フェーズ4: エクスポート機能（PDF/Word）
+// フェーズ4: エクスポート機能（PDF/Word/CSV）
 // テナント分離: 自組織のデータのみエクスポート可能
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
+
+// ============================================
+// CSVエクスポート機能
+// ============================================
+
+// CSVエスケープ関数
+function escapeCSV(value: any): string {
+  if (value === null || value === undefined) return ''
+  const str = String(value)
+  // カンマ、改行、ダブルクォートを含む場合はダブルクォートで囲む
+  if (str.includes(',') || str.includes('\n') || str.includes('"') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"'
+  }
+  return str
+}
+
+// CSV行を生成
+function toCSVRow(values: any[]): string {
+  return values.map(escapeCSV).join(',')
+}
+
+// 日付フォーマット
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return ''
+  try {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  } catch {
+    return dateStr
+  }
+}
+
+// ステータスラベル
+const statusLabels: Record<string, string> = {
+  'inquiry': '見込み',
+  'new': '新規',
+  'document_collecting': '書類収集中',
+  'document_reviewing': '書類確認中',
+  'preparing': '準備中',
+  'applying': '申請中',
+  'under_review': '審査中',
+  'approved': '採択',
+  'rejected': '不採択',
+  'completed': '完了',
+  'cancelled': 'キャンセル'
+}
+
+// 顧客一覧CSVエクスポート
+routes.get('/export/clients/csv', async (c) => {
+  const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  try {
+    const clients = await DB.prepare(`
+      SELECT 
+        c.id,
+        c.name,
+        c.company_name,
+        c.email,
+        c.phone,
+        c.address,
+        c.postal_code,
+        c.notes,
+        c.created_at,
+        st.name as subsidy_type_name,
+        (SELECT COUNT(*) FROM cases WHERE client_id = c.id) as case_count
+      FROM clients c
+      LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+      WHERE c.organization_id = ?
+      ORDER BY c.created_at DESC
+    `).bind(orgId).all()
+    
+    // CSVヘッダー
+    const headers = ['ID', '担当者名', '会社名', 'メールアドレス', '電話番号', '住所', '郵便番号', '補助金種別', '案件数', '備考', '登録日']
+    
+    // CSVデータ
+    const rows = (clients.results || []).map((client: any) => [
+      client.id,
+      client.name,
+      client.company_name || '',
+      client.email || '',
+      client.phone || '',
+      client.address || '',
+      client.postal_code || '',
+      client.subsidy_type_name || '',
+      client.case_count || 0,
+      client.notes || '',
+      formatDate(client.created_at)
+    ])
+    
+    // CSV生成（BOM付きUTF-8でExcel対応）
+    const BOM = '\uFEFF'
+    const csv = BOM + [toCSVRow(headers), ...rows.map(toCSVRow)].join('\r\n')
+    
+    const filename = `顧客一覧_${new Date().toISOString().split('T')[0]}.csv`
+    
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
+      }
+    })
+  } catch (error: any) {
+    console.error('Export clients CSV error:', error)
+    return c.json({ error: 'エクスポートに失敗しました' }, 500)
+  }
+})
+
+// 案件一覧CSVエクスポート
+routes.get('/export/cases/csv', async (c) => {
+  const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  try {
+    const cases = await DB.prepare(`
+      SELECT 
+        cs.id,
+        cs.name as case_name,
+        cs.status,
+        cs.amount,
+        cs.deadline,
+        cs.notes,
+        cs.created_at,
+        cs.updated_at,
+        c.name as client_name,
+        c.company_name,
+        c.email as client_email,
+        c.phone as client_phone,
+        st.name as subsidy_type_name
+      FROM cases cs
+      LEFT JOIN clients c ON cs.client_id = c.id
+      LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
+      WHERE cs.organization_id = ?
+      ORDER BY cs.created_at DESC
+    `).bind(orgId).all()
+    
+    // CSVヘッダー
+    const headers = ['案件ID', '案件名', '顧客名', '会社名', '補助金種別', 'ステータス', '申請金額', '締切日', 'メール', '電話番号', '備考', '登録日', '更新日']
+    
+    // CSVデータ
+    const rows = (cases.results || []).map((cs: any) => [
+      cs.id,
+      cs.case_name || '',
+      cs.client_name || '',
+      cs.company_name || '',
+      cs.subsidy_type_name || '',
+      statusLabels[cs.status] || cs.status || '',
+      cs.amount || '',
+      formatDate(cs.deadline),
+      cs.client_email || '',
+      cs.client_phone || '',
+      cs.notes || '',
+      formatDate(cs.created_at),
+      formatDate(cs.updated_at)
+    ])
+    
+    // CSV生成（BOM付きUTF-8でExcel対応）
+    const BOM = '\uFEFF'
+    const csv = BOM + [toCSVRow(headers), ...rows.map(toCSVRow)].join('\r\n')
+    
+    const filename = `案件一覧_${new Date().toISOString().split('T')[0]}.csv`
+    
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
+      }
+    })
+  } catch (error: any) {
+    console.error('Export cases CSV error:', error)
+    return c.json({ error: 'エクスポートに失敗しました' }, 500)
+  }
+})
+
+// 請求書一覧CSVエクスポート
+routes.get('/export/invoices/csv', async (c) => {
+  const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  try {
+    const invoices = await DB.prepare(`
+      SELECT 
+        i.id,
+        i.invoice_number,
+        i.invoice_type,
+        i.status,
+        i.subtotal,
+        i.tax_amount,
+        i.total_amount,
+        i.issue_date,
+        i.due_date,
+        i.paid_at,
+        i.item_name,
+        i.notes,
+        c.name as client_name,
+        c.company_name,
+        cs.name as case_name
+      FROM invoices i
+      LEFT JOIN clients c ON i.client_id = c.id
+      LEFT JOIN cases cs ON i.case_id = cs.id
+      WHERE i.organization_id = ?
+      ORDER BY i.created_at DESC
+    `).bind(orgId).all()
+    
+    const invoiceTypeLabels: Record<string, string> = {
+      'deposit': '着手金',
+      'success_fee': '成功報酬',
+      'monthly': '月額料金',
+      'other': 'その他'
+    }
+    
+    const invoiceStatusLabels: Record<string, string> = {
+      'draft': '下書き',
+      'issued': '発行済',
+      'sent': '送付済',
+      'payment_reported': '振込報告済',
+      'paid': '入金済',
+      'cancelled': 'キャンセル'
+    }
+    
+    // CSVヘッダー
+    const headers = ['請求書番号', '顧客名', '会社名', '案件名', '種別', 'ステータス', '品目', '小計', '消費税', '合計金額', '発行日', '支払期限', '入金日', '備考']
+    
+    // CSVデータ
+    const rows = (invoices.results || []).map((inv: any) => [
+      inv.invoice_number || '',
+      inv.client_name || '',
+      inv.company_name || '',
+      inv.case_name || '',
+      invoiceTypeLabels[inv.invoice_type] || inv.invoice_type || '',
+      invoiceStatusLabels[inv.status] || inv.status || '',
+      inv.item_name || '',
+      inv.subtotal || 0,
+      inv.tax_amount || 0,
+      inv.total_amount || 0,
+      formatDate(inv.issue_date),
+      formatDate(inv.due_date),
+      formatDate(inv.paid_at),
+      inv.notes || ''
+    ])
+    
+    // CSV生成（BOM付きUTF-8でExcel対応）
+    const BOM = '\uFEFF'
+    const csv = BOM + [toCSVRow(headers), ...rows.map(toCSVRow)].join('\r\n')
+    
+    const filename = `請求書一覧_${new Date().toISOString().split('T')[0]}.csv`
+    
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
+      }
+    })
+  } catch (error: any) {
+    console.error('Export invoices CSV error:', error)
+    return c.json({ error: 'エクスポートに失敗しました' }, 500)
+  }
+})
 
 // 文書エクスポートAPI（HTML形式 - PDF/Word変換用）
 routes.get('/generated-documents/:id/export', async (c) => {
