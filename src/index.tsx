@@ -54,6 +54,7 @@ import master_adminsPages from './routes/pages/master-admins'
 import master_billingPages from './routes/pages/master-billing'
 import master_dataPages from './routes/pages/master-data'
 import master_legalPages from './routes/pages/master-legal'
+import masterPublicLegalPages from './routes/pages/master-public-legal'
 import master_logsPages from './routes/pages/master-logs'
 import master_plansPages from './routes/pages/master-plans'
 import masterPages from './routes/pages/master'
@@ -844,9 +845,9 @@ app.use('*', async (c, next) => {
                 <div>
                   <h4 class="font-bold mb-6 text-lg">法的情報</h4>
                   <ul class="space-y-3 text-gray-400">
-                    <li><a href="/terms" class="hover:text-white transition">利用規約</a></li>
-                    <li><a href="/privacy-policy" class="hover:text-white transition">プライバシーポリシー</a></li>
-                    <li><a href="/legal" class="hover:text-white transition">特定商取引法に基づく表記</a></li>
+                    <li><a href="/master/terms" class="hover:text-white transition">利用規約</a></li>
+                    <li><a href="/master/privacy-policy" class="hover:text-white transition">プライバシーポリシー</a></li>
+                    <li><a href="/master/legal" class="hover:text-white transition">特定商取引法に基づく表記</a></li>
                   </ul>
                 </div>
               </div>
@@ -1171,6 +1172,7 @@ app.route('', master_adminsPages)
 app.route('', master_billingPages)
 app.route('', master_dataPages)
 app.route('', master_legalPages)
+app.route('', masterPublicLegalPages)
 app.route('', master_logsPages)
 app.route('', master_plansPages)
 app.route('', masterPages)
