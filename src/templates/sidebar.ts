@@ -127,8 +127,18 @@ export function generateSidebar(activePage: string = '') {
             </div>
         </nav>
         
-        <!-- 法的リンク -->
-        <div class="px-3 py-2 border-t border-blue-700/50">
+        <!-- プラットフォーム規約リンク -->
+        <div class="px-3 py-1.5 border-t border-blue-700/50">
+            <a href="/master/terms" target="_blank" class="flex items-center gap-2 text-xs text-yellow-300 hover:text-yellow-100 transition-colors">
+                <i class="fas fa-file-contract w-3 text-center"></i>
+                <span>プラットフォーム利用規約</span>
+                <i class="fas fa-external-link-alt text-[10px] ml-auto opacity-60"></i>
+            </a>
+        </div>
+        
+        <!-- 顧客向け法的リンク -->
+        <div class="px-3 py-1.5 border-t border-blue-700/30">
+            <p class="text-[10px] text-blue-400 mb-1">顧客向け規約</p>
             <div class="flex gap-2 text-xs text-blue-300">
                 <a href="/terms" target="_blank" class="hover:text-white">利用規約</a>
                 <span class="text-blue-500">|</span>
