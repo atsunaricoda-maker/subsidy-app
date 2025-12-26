@@ -71,7 +71,6 @@ routes.get('/export/clients/csv', async (c) => {
         c.email,
         c.phone,
         c.address,
-        c.postal_code,
         c.notes,
         c.created_at,
         st.name as subsidy_type_name,
@@ -83,7 +82,7 @@ routes.get('/export/clients/csv', async (c) => {
     `).bind(orgId).all()
     
     // CSVヘッダー
-    const headers = ['ID', '担当者名', '会社名', 'メールアドレス', '電話番号', '住所', '郵便番号', '補助金種別', '案件数', '備考', '登録日']
+    const headers = ['ID', '担当者名', '会社名', 'メールアドレス', '電話番号', '住所', '補助金種別', '案件数', '備考', '登録日']
     
     // CSVデータ
     const rows = (clients.results || []).map((client: any) => [
@@ -93,7 +92,6 @@ routes.get('/export/clients/csv', async (c) => {
       client.email || '',
       client.phone || '',
       client.address || '',
-      client.postal_code || '',
       client.subsidy_type_name || '',
       client.case_count || 0,
       client.notes || '',
@@ -132,9 +130,10 @@ routes.get('/export/cases/csv', async (c) => {
     const cases = await DB.prepare(`
       SELECT 
         cs.id,
-        cs.name as case_name,
+        cs.case_number,
         cs.status,
-        cs.amount,
+        cs.deposit_amount,
+        cs.success_fee_amount,
         cs.deadline,
         cs.notes,
         cs.created_at,
@@ -152,17 +151,18 @@ routes.get('/export/cases/csv', async (c) => {
     `).bind(orgId).all()
     
     // CSVヘッダー
-    const headers = ['案件ID', '案件名', '顧客名', '会社名', '補助金種別', 'ステータス', '申請金額', '締切日', 'メール', '電話番号', '備考', '登録日', '更新日']
+    const headers = ['案件ID', '案件番号', '顧客名', '会社名', '補助金種別', 'ステータス', '着手金', '成功報酬', '締切日', 'メール', '電話番号', '備考', '登録日', '更新日']
     
     // CSVデータ
     const rows = (cases.results || []).map((cs: any) => [
       cs.id,
-      cs.case_name || '',
+      cs.case_number || '',
       cs.client_name || '',
       cs.company_name || '',
       cs.subsidy_type_name || '',
       statusLabels[cs.status] || cs.status || '',
-      cs.amount || '',
+      cs.deposit_amount || '',
+      cs.success_fee_amount || '',
       formatDate(cs.deadline),
       cs.client_email || '',
       cs.client_phone || '',
