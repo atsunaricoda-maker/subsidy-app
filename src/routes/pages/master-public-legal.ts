@@ -5,6 +5,44 @@ import type { AppEnv } from '../../types'
 
 const routes = new Hono<AppEnv>()
 
+// プラットフォーム設定を取得するヘルパー関数
+async function getPlatformSettings(DB: any): Promise<Record<string, string>> {
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM master_settings
+    `).all()
+    
+    const result: Record<string, string> = {}
+    for (const s of (settings.results || []) as any[]) {
+      result[s.setting_key] = s.setting_value || ''
+    }
+    
+    return {
+      platform_company_name: result.platform_company_name || '申請らくらく君 運営事務局',
+      platform_representative: result.platform_representative || '（マスター管理画面で設定してください）',
+      platform_postal_code: result.platform_postal_code || '',
+      platform_address: result.platform_address || '（マスター管理画面で設定してください）',
+      platform_phone: result.platform_phone || '（メールでのお問い合わせをお願いします）',
+      platform_email: result.platform_email || 'support@shinsei-raku.com',
+      platform_business_hours: result.platform_business_hours || '平日 10:00〜18:00（土日祝・年末年始を除く）',
+      platform_invoice_number: result.platform_invoice_number || ''
+    }
+  } catch (error) {
+    console.error('Error fetching platform settings:', error)
+    // テーブルがない場合のフォールバック
+    return {
+      platform_company_name: '申請らくらく君 運営事務局',
+      platform_representative: '（マスター管理画面で設定してください）',
+      platform_postal_code: '',
+      platform_address: '（マスター管理画面で設定してください）',
+      platform_phone: '（メールでのお問い合わせをお願いします）',
+      platform_email: 'support@shinsei-raku.com',
+      platform_business_hours: '平日 10:00〜18:00（土日祝・年末年始を除く）',
+      platform_invoice_number: ''
+    }
+  }
+}
+
 // 共通のヘッダー・フッターコンポーネント
 const getLayout = (title: string, headerColor: string, icon: string, content: string) => `
 <!DOCTYPE html>
@@ -75,10 +113,13 @@ const getLayout = (title: string, headerColor: string, icon: string, content: st
 // プライバシーポリシー（プラットフォーム用）
 // ========================================
 routes.get('/master/privacy-policy', async (c) => {
+  const { DB } = c.env
+  const settings = await getPlatformSettings(DB)
+  
   const content = `
     <p class="text-gray-600 text-sm mb-6">最終更新日: ${new Date().toLocaleDateString('ja-JP')}</p>
     
-    <p>申請らくらく君運営（以下「当社」といいます）は、本プラットフォーム「申請らくらく君」（以下「本サービス」といいます）における、サービス利用事業者（以下「利用事業者」といいます）および利用事業者の顧客（以下「エンドユーザー」といいます）の個人情報の取扱いについて、以下のとおりプライバシーポリシーを定めます。</p>
+    <p>${settings.platform_company_name}（以下「当社」といいます）は、本プラットフォーム「申請らくらく君」（以下「本サービス」といいます）における、サービス利用事業者（以下「利用事業者」といいます）および利用事業者の顧客（以下「エンドユーザー」といいます）の個人情報の取扱いについて、以下のとおりプライバシーポリシーを定めます。</p>
     
     <h2>第1条（個人情報の定義）</h2>
     <p>「個人情報」とは、個人情報保護法に定める個人情報を指し、生存する個人に関する情報であって、当該情報に含まれる氏名、生年月日その他の記述等により特定の個人を識別できるものを指します。</p>
@@ -183,8 +224,8 @@ routes.get('/master/privacy-policy', async (c) => {
     <h2>第13条（お問い合わせ先）</h2>
     <p>本ポリシーに関するお問い合わせは、以下までお願いいたします。</p>
     <div class="bg-gray-50 p-4 rounded-lg">
-        <p class="mb-1"><strong>申請らくらく君 運営事務局</strong></p>
-        <p class="mb-1">メール: support@shinsei-raku.com</p>
+        <p class="mb-1"><strong>${settings.platform_company_name}</strong></p>
+        <p class="mb-1">メール: ${settings.platform_email}</p>
     </div>
   `
   
@@ -200,6 +241,9 @@ routes.get('/master/privacy-policy', async (c) => {
 // 特定商取引法に基づく表記（プラットフォーム用）
 // ========================================
 routes.get('/master/legal', async (c) => {
+  const { DB } = c.env
+  const settings = await getPlatformSettings(DB)
+  
   const content = `
     <p class="text-gray-600 text-sm mb-6">申請らくらく君 サブスクリプションサービスに関する表記</p>
     
@@ -207,24 +251,30 @@ routes.get('/master/legal', async (c) => {
         <tbody>
             <tr>
                 <th>事業者名</th>
-                <td>申請らくらく君 運営事務局</td>
+                <td>${settings.platform_company_name}</td>
             </tr>
             <tr>
                 <th>運営責任者</th>
-                <td>（代表者名を記載）</td>
+                <td>${settings.platform_representative}</td>
             </tr>
             <tr>
                 <th>所在地</th>
-                <td>（住所を記載）<br><span class="text-sm text-gray-500">※請求があった場合、遅滞なく開示いたします</span></td>
+                <td>${settings.platform_address ? `〒${settings.platform_postal_code} ${settings.platform_address}` : '（マスター管理画面で設定してください）'}</td>
             </tr>
             <tr>
                 <th>電話番号</th>
-                <td>（電話番号を記載）<br><span class="text-sm text-gray-500">※お問い合わせはメールにてお願いいたします</span></td>
+                <td>${settings.platform_phone}<br><span class="text-sm text-gray-500">※お問い合わせはメールにてお願いいたします</span></td>
             </tr>
             <tr>
                 <th>メールアドレス</th>
-                <td>support@shinsei-raku.com</td>
+                <td>${settings.platform_email}</td>
             </tr>
+            ${settings.platform_invoice_number ? `
+            <tr>
+                <th>適格請求書発行事業者登録番号</th>
+                <td>${settings.platform_invoice_number}</td>
+            </tr>
+            ` : ''}
             <tr>
                 <th>販売価格</th>
                 <td>
@@ -308,10 +358,13 @@ routes.get('/master/legal', async (c) => {
 // SaaS利用規約（プラットフォーム用）
 // ========================================
 routes.get('/master/terms', async (c) => {
+  const { DB } = c.env
+  const settings = await getPlatformSettings(DB)
+  
   const content = `
     <p class="text-gray-600 text-sm mb-6">最終更新日: ${new Date().toLocaleDateString('ja-JP')}</p>
     
-    <p>この利用規約（以下「本規約」といいます）は、申請らくらく君運営（以下「当社」といいます）が提供するSaaSプラットフォーム「申請らくらく君」（以下「本サービス」といいます）の利用条件を定めるものです。本サービスを利用する事業者（以下「利用事業者」といいます）は、本規約に同意した上で本サービスを利用するものとします。</p>
+    <p>この利用規約（以下「本規約」といいます）は、${settings.platform_company_name}（以下「当社」といいます）が提供するSaaSプラットフォーム「申請らくらく君」（以下「本サービス」といいます）の利用条件を定めるものです。本サービスを利用する事業者（以下「利用事業者」といいます）は、本規約に同意した上で本サービスを利用するものとします。</p>
     
     <h2>第1条（適用）</h2>
     <p>1. 本規約は、利用事業者と当社との間の本サービスの利用に関わる一切の関係に適用されます。</p>
@@ -462,8 +515,8 @@ routes.get('/master/terms', async (c) => {
     
     <h2>お問い合わせ先</h2>
     <div class="bg-gray-50 p-4 rounded-lg">
-        <p class="mb-1"><strong>申請らくらく君 運営事務局</strong></p>
-        <p class="mb-1">メール: support@shinsei-raku.com</p>
+        <p class="mb-1"><strong>${settings.platform_company_name}</strong></p>
+        <p class="mb-1">メール: ${settings.platform_email}</p>
     </div>
   `
   

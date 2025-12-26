@@ -29,8 +29,8 @@ routes.get('/master/legal-settings', (c) => {
                 
                 <!-- プレビューリンク -->
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                    <div class="flex items-center gap-4 flex-wrap">
-                        <span class="text-blue-800 font-medium">プレビュー:</span>
+                    <div class="flex items-center gap-4 flex-wrap mb-3">
+                        <span class="text-blue-800 font-medium">顧客向けプレビュー:</span>
                         <a href="/legal" target="_blank" class="text-blue-600 hover:text-blue-800 underline">
                             <i class="fas fa-external-link-alt mr-1"></i>特定商取引法に基づく表記
                         </a>
@@ -41,7 +41,79 @@ routes.get('/master/legal-settings', (c) => {
                             <i class="fas fa-external-link-alt mr-1"></i>プライバシーポリシー
                         </a>
                     </div>
+                    <div class="flex items-center gap-4 flex-wrap border-t border-blue-200 pt-3">
+                        <span class="text-yellow-700 font-medium">プラットフォームプレビュー:</span>
+                        <a href="/master/legal" target="_blank" class="text-yellow-600 hover:text-yellow-800 underline">
+                            <i class="fas fa-external-link-alt mr-1"></i>特定商取引法に基づく表記
+                        </a>
+                        <a href="/master/terms" target="_blank" class="text-yellow-600 hover:text-yellow-800 underline">
+                            <i class="fas fa-external-link-alt mr-1"></i>SaaS利用規約
+                        </a>
+                        <a href="/master/privacy-policy" target="_blank" class="text-yellow-600 hover:text-yellow-800 underline">
+                            <i class="fas fa-external-link-alt mr-1"></i>プライバシーポリシー
+                        </a>
+                    </div>
                 </div>
+                
+                <!-- プラットフォーム事業者情報（SaaS運営元） -->
+                <form id="platformSettingsForm" class="mb-6">
+                    <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl shadow-sm p-6">
+                        <h2 class="text-lg font-semibold mb-4 pb-2 border-b border-yellow-300">
+                            <i class="fas fa-crown text-yellow-600 mr-2"></i>プラットフォーム事業者情報（SaaS運営元）
+                        </h2>
+                        <p class="text-sm text-yellow-700 mb-4">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            この情報は <strong>/master/legal</strong>、<strong>/master/terms</strong>、<strong>/master/privacy-policy</strong> に表示されます。
+                            SaaS利用者向けの法務ページです。
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">運営会社名 *</label>
+                                <input type="text" name="platform_company_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">代表者名 *</label>
+                                <input type="text" name="platform_representative" placeholder="（公開されます）" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">郵便番号</label>
+                                <input type="text" name="platform_postal_code" placeholder="000-0000" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">所在地 *</label>
+                                <input type="text" name="platform_address" placeholder="（公開されます）" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
+                                <input type="text" name="platform_phone" placeholder="お問い合わせはメールを推奨" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス *</label>
+                                <input type="email" name="platform_email" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">営業時間</label>
+                                <input type="text" name="platform_business_hours" placeholder="平日 10:00〜18:00" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">適格請求書発行事業者登録番号</label>
+                                <input type="text" name="platform_invoice_number" placeholder="T0000000000000" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                            </div>
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button type="submit" class="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
+                                <i class="fas fa-save mr-2"></i>プラットフォーム情報を保存
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <hr class="my-8 border-gray-300">
+                
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">
+                    <i class="fas fa-users text-blue-600 mr-2"></i>SaaS利用者（組織）のデフォルト設定
+                </h2>
+                <p class="text-sm text-gray-500 mb-6">以下の設定は、SaaS利用者が /legal, /terms, /privacy-policy で顧客に表示する内容のデフォルトです。</p>
                 
                 <form id="settingsForm" class="space-y-6">
                     <!-- 事業者情報 -->
@@ -204,10 +276,11 @@ routes.get('/master/legal-settings', (c) => {
         <script>
             ${masterSidebarScripts}
             
-            async function loadSettings() {
+            // プラットフォーム設定の読み込み
+            async function loadPlatformSettings() {
                 try {
                     const token = localStorage.getItem('master_token');
-                    const response = await axios.get('/api/site-settings', {
+                    const response = await axios.get('/api/master/platform-settings', {
                         headers: { 'Authorization': 'Bearer ' + token }
                     });
                     const settings = response.data;
@@ -220,17 +293,67 @@ routes.get('/master/legal-settings', (c) => {
                         }
                     });
                 } catch (error) {
+                    console.error('Platform settings load error:', error);
+                }
+            }
+            
+            // 組織デフォルト設定の読み込み
+            async function loadSettings() {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/site-settings', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const settings = response.data;
+                    
+                    // フォームに値をセット（platform_で始まるもの以外）
+                    Object.keys(settings).forEach(key => {
+                        if (!key.startsWith('platform_')) {
+                            const input = document.querySelector('#settingsForm [name="' + key + '"]');
+                            if (input) {
+                                input.value = settings[key] || '';
+                            }
+                        }
+                    });
+                } catch (error) {
                     console.error('Settings load error:', error);
                 }
             }
             
+            // プラットフォーム設定の保存
+            document.getElementById('platformSettingsForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(e.target);
+                const data = {};
+                formData.forEach((value, key) => {
+                    if (key.startsWith('platform_')) {
+                        data[key] = value;
+                    }
+                });
+                
+                try {
+                    const token = localStorage.getItem('master_token');
+                    await axios.put('/api/master/platform-settings', data, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    alert('プラットフォーム設定を保存しました');
+                } catch (error) {
+                    console.error('Save error:', error);
+                    alert('保存に失敗しました');
+                }
+            });
+            
+            // 組織デフォルト設定の保存
             document.getElementById('settingsForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
                 const formData = new FormData(e.target);
                 const data = {};
                 formData.forEach((value, key) => {
-                    data[key] = value;
+                    if (!key.startsWith('platform_')) {
+                        data[key] = value;
+                    }
                 });
                 
                 try {
@@ -246,6 +369,7 @@ routes.get('/master/legal-settings', (c) => {
             });
             
             // ページ読み込み時に設定を取得
+            loadPlatformSettings();
             loadSettings();
         </script>
     </body>

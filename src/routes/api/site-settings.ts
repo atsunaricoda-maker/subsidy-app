@@ -2909,4 +2909,92 @@ routes.delete('/master/inquiries/:id', async (c) => {
   }
 })
 
+// ==================== プラットフォーム設定API ====================
+
+// プラットフォーム設定取得
+routes.get('/master/platform-settings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM master_settings
+    `).all()
+    
+    const result: Record<string, string> = {}
+    for (const s of (settings.results || []) as any[]) {
+      result[s.setting_key] = s.setting_value || ''
+    }
+    
+    return c.json(result)
+  } catch (error) {
+    console.error('Error getting platform settings:', error)
+    // テーブルがない場合はデフォルト値を返す
+    return c.json({
+      platform_company_name: '申請らくらく君 運営事務局',
+      platform_representative: '',
+      platform_postal_code: '',
+      platform_address: '',
+      platform_phone: '',
+      platform_email: 'support@shinsei-raku.com',
+      platform_business_hours: '平日 10:00〜18:00（土日祝・年末年始を除く）',
+      platform_invoice_number: ''
+    })
+  }
+})
+
+// プラットフォーム設定更新
+routes.put('/master/platform-settings', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    for (const [key, value] of Object.entries(data)) {
+      if (key.startsWith('platform_')) {
+        await DB.prepare(`
+          INSERT INTO master_settings (setting_key, setting_value, updated_at)
+          VALUES (?, ?, datetime('now'))
+          ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = datetime('now')
+        `).bind(key, value).run()
+      }
+    }
+    
+    return c.json({ success: true, message: 'プラットフォーム設定を保存しました' })
+  } catch (error) {
+    console.error('Error saving platform settings:', error)
+    return c.json({ error: 'プラットフォーム設定の保存に失敗しました' }, 500)
+  }
+})
+
+// 公開用プラットフォーム設定取得（認証不要）
+routes.get('/public/platform-settings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT setting_key, setting_value FROM master_settings
+    `).all()
+    
+    const result: Record<string, string> = {}
+    for (const s of (settings.results || []) as any[]) {
+      result[s.setting_key] = s.setting_value || ''
+    }
+    
+    return c.json(result)
+  } catch (error) {
+    // テーブルがない場合はデフォルト値を返す
+    return c.json({
+      platform_company_name: '申請らくらく君 運営事務局',
+      platform_representative: '',
+      platform_postal_code: '',
+      platform_address: '',
+      platform_phone: '',
+      platform_email: 'support@shinsei-raku.com',
+      platform_business_hours: '平日 10:00〜18:00（土日祝・年末年始を除く）',
+      platform_invoice_number: ''
+    })
+  }
+})
+
 export default routes
