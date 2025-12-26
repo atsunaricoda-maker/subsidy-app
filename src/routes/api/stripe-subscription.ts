@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
+import { hashPassword } from '../../utils/password'
 
 const routes = new Hono<AppEnv>()
 
@@ -351,10 +352,12 @@ routes.post('/stripe/subscription-webhook', async (c) => {
               username = username + '_' + Date.now().toString().slice(-4)
             }
             
+            // パスワードをハッシュ化
+            const hashedPassword = await hashPassword(initialPassword)
             await DB.prepare(`
               INSERT INTO admin_users (username, password_hash, name, role, organization_id)
               VALUES (?, ?, ?, 'admin', ?)
-            `).bind(username, initialPassword, adminName, orgId).run()
+            `).bind(username, hashedPassword, adminName, orgId).run()
             console.log('Created missing admin user:', username)
           }
           
@@ -393,11 +396,12 @@ routes.post('/stripe/subscription-webhook', async (c) => {
             username = username + '_' + Date.now().toString().slice(-4)
           }
           
-          // 管理者アカウントを作成
+          // 管理者アカウントを作成（パスワードをハッシュ化）
+          const hashedPassword = await hashPassword(initialPassword)
           await DB.prepare(`
             INSERT INTO admin_users (username, password_hash, name, role, organization_id)
             VALUES (?, ?, ?, 'admin', ?)
-          `).bind(username, initialPassword, adminName, orgId).run()
+          `).bind(username, hashedPassword, adminName, orgId).run()
           
           console.log('Created admin user:', username)
           

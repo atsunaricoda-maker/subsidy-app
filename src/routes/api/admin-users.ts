@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
+import { hashPassword } from '../../utils/password'
 
 const routes = new Hono<AppEnv>()
 
@@ -75,11 +76,14 @@ routes.post('/admin/users', async (c) => {
   // ロールのバリデーション
   const validRole = ['admin', 'staff'].includes(role) ? role : 'staff'
   
+  // パスワードをハッシュ化
+  const hashedPassword = await hashPassword(password)
+  
   // ユーザー追加（organization_id付き）
   const result = await DB.prepare(`
     INSERT INTO admin_users (username, password_hash, name, organization_id, role)
     VALUES (?, ?, ?, ?, ?)
-  `).bind(username, password, name, orgId, validRole).run()
+  `).bind(username, hashedPassword, name, orgId, validRole).run()
   
   return c.json({ 
     success: true, 
@@ -127,11 +131,13 @@ routes.put('/admin/users/:id', async (c) => {
   
   // パスワードが空でない場合のみ更新
   if (password) {
+    // パスワードをハッシュ化
+    const hashedPassword = await hashPassword(password)
     await DB.prepare(`
       UPDATE admin_users 
       SET username = ?, password_hash = ?, name = ?, role = ?
       WHERE id = ?
-    `).bind(username, password, name, validRole, id).run()
+    `).bind(username, hashedPassword, name, validRole, id).run()
   } else {
     await DB.prepare(`
       UPDATE admin_users 

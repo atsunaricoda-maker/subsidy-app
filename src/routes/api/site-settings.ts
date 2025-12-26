@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 import { generateMasterSidebar, masterSidebarScripts } from '../../templates/master-sidebar'
+import { hashPassword } from '../../utils/password'
 
 const routes = new Hono<AppEnv>()
 
@@ -425,8 +426,8 @@ routes.post('/master/admins', async (c) => {
   const data = await c.req.json()
   
   try {
-    // パスワードハッシュ（実際はbcryptなどを使う）
-    const passwordHash = data.password // TODO: ハッシュ化
+    // パスワードをハッシュ化
+    const passwordHash = await hashPassword(data.password)
     
     await DB.prepare(`
       INSERT INTO admin_users (username, password_hash, role, email, is_master_admin, is_active)
@@ -1772,11 +1773,12 @@ routes.post('/master/organizations', async (c) => {
     
     const orgId = orgResult.meta?.last_row_id
     
-    // 2. 管理者アカウントを作成
+    // 2. 管理者アカウントを作成（パスワードをハッシュ化）
+    const hashedPassword = await hashPassword(data.admin_password)
     await DB.prepare(`
       INSERT INTO admin_users (username, password_hash, name, role, organization_id)
       VALUES (?, ?, ?, 'admin', ?)
-    `).bind(data.admin_username, data.admin_password, data.admin_name, orgId).run()
+    `).bind(data.admin_username, hashedPassword, data.admin_name, orgId).run()
     
     // 3. サブスクリプションを作成
     const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE id = ?`).bind(data.plan_id).first()
