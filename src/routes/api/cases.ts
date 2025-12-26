@@ -15,14 +15,8 @@ routes.get('/cases', async (c) => {
   const statusFilter = c.req.query('status') // 'inquiry', 'preparing', 'applying', 'adopted', 'rejected'
   const resultFilter = c.req.query('result') // 'approved', 'rejected', 'pending'
   
-  // デバッグ: テナント情報をログ出力
-  const tenantOrgId = c.get('tenantOrgId')
-  const tenantSlug = c.get('tenantSlug')
-  console.log('[DEBUG /api/cases] tenantOrgId:', tenantOrgId, 'tenantSlug:', tenantSlug, 'user:', user?.id, 'user.org_id:', user?.organization_id)
-  
   // organization_idでテナント分離（|| 1 フォールバック廃止）
   const orgId = getEffectiveOrgId(c, user)
-  console.log('[DEBUG /api/cases] effectiveOrgId:', orgId)
   
   if (!orgId) {
     return c.json({ error: '組織が特定できません' }, 401)
@@ -851,13 +845,14 @@ routes.get('/cases/:id/pipelines', async (c) => {
   
   // パイプラインのタスクを取得
   const pipelineIds = pipelines.results.map((p: any) => p.id)
+  const placeholders = pipelineIds.map(() => '?').join(',')
   const tasks = await DB.prepare(`
     SELECT cpt.*, au.name as assignee_name
     FROM client_pipeline_tasks cpt
     LEFT JOIN admin_users au ON cpt.assigned_to = au.id
-    WHERE cpt.pipeline_id IN (${pipelineIds.join(',')})
+    WHERE cpt.pipeline_id IN (${placeholders})
     ORDER BY cpt.sort_order ASC, cpt.id ASC
-  `).all()
+  `).bind(...pipelineIds).all()
   
   return c.json(tasks.results || [])
 })

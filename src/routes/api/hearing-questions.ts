@@ -99,13 +99,15 @@ routes.get('/hearing-questions', async (c) => {
     LEFT JOIN subsidy_types st ON hq.subsidy_type_id = st.id
   `
   
+  const params: any[] = []
   if (subsidyTypeId !== undefined) {
-    query += ` WHERE hq.subsidy_type_id = ${parseInt(subsidyTypeId)}`
+    query += ` WHERE hq.subsidy_type_id = ?`
+    params.push(parseInt(subsidyTypeId) || 0)
   }
   
   query += ` ORDER BY hq.subsidy_type_id, hq.display_order`
   
-  const result = await DB.prepare(query).all()
+  const result = await DB.prepare(query).bind(...params).all()
   return c.json(result.results || [])
 })
 
