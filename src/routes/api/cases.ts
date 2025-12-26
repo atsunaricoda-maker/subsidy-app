@@ -297,12 +297,14 @@ routes.put('/cases/:id/status', async (c) => {
     if (emailSettings.enabled && emailSettings.apiKey) {
       // 顧客情報と案件情報を取得
       const caseInfo = await DB.prepare(`
-        SELECT c.name as case_name, c.access_token,
+        SELECT c.case_number as case_name, c.access_token,
                cl.name as client_name, cl.email as client_email,
-               o.slug as org_slug
+               o.slug as org_slug,
+               st.name as subsidy_name
         FROM cases c
         JOIN clients cl ON c.client_id = cl.id
         JOIN organizations o ON c.organization_id = o.id
+        LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
         WHERE c.id = ?
       `).bind(id).first() as any
       

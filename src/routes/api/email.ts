@@ -109,12 +109,14 @@ routes.post('/email/send-portal-access', async (c) => {
     
     // 案件情報を取得
     const caseInfo = await DB.prepare(`
-      SELECT c.name as case_name, c.access_token,
+      SELECT c.case_number as case_name, c.access_token,
              cl.name as client_name, cl.email as client_email,
-             o.slug
+             o.slug,
+             st.name as subsidy_name
       FROM cases c
       JOIN clients cl ON c.client_id = cl.id
       JOIN organizations o ON c.organization_id = o.id
+      LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
       WHERE c.id = ? AND c.organization_id = ?
     `).bind(case_id, orgId).first() as any
     

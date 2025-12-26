@@ -119,9 +119,11 @@ routes.post('/clients/:id/documents/upload', async (c) => {
         if (emailSettings.enabled && emailSettings.apiKey) {
           // 案件情報と管理者のメールアドレスを取得
           const caseInfo = await DB.prepare(`
-            SELECT c.name as case_name, o.slug, o.email as admin_email
+            SELECT c.case_number as case_name, o.slug, o.email as admin_email,
+                   st.name as subsidy_name
             FROM cases c
             JOIN organizations o ON c.organization_id = o.id
+            LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
             WHERE c.id = ?
           `).bind(caseId).first() as any
           
