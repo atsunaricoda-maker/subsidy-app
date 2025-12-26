@@ -368,7 +368,7 @@ routes.get('/pipelines/all-active', async (c) => {
   const pipelines = await DB.prepare(`
     SELECT cp.*, 
            pt.name as template_name,
-           c.title as case_title,
+           c.case_number as case_title,
            cl.name as client_name,
            cl.company_name as client_company,
            st.name as subsidy_name
