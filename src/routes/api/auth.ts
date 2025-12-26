@@ -2,6 +2,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser } from '../../utils/auth'
+import { hashPassword, verifyPassword, isPasswordHashed } from '../../utils/password'
 
 const routes = new Hono<AppEnv>()
 
@@ -93,11 +94,12 @@ routes.post('/signup', async (c) => {
     
     const orgId = orgResult.meta?.last_row_id
     
-    // 2. 管理者アカウントを作成
+    // 2. 管理者アカウントを作成（パスワードをハッシュ化）
+    const hashedPassword = await hashPassword(data.password)
     await DB.prepare(`
       INSERT INTO admin_users (username, password_hash, name, role, organization_id)
       VALUES (?, ?, ?, 'admin', ?)
-    `).bind(data.username, data.password, data.admin_name, orgId).run()
+    `).bind(data.username, hashedPassword, data.admin_name, orgId).run()
     
     // 3. トライアル用サブスクリプションを作成
     const periodEnd = new Date()
@@ -150,12 +152,12 @@ routes.post('/auth/login', async (c) => {
   // サブドメインからテナント組織IDを取得
   const tenantOrgId = c.get('tenantOrgId')
   
-  // ユーザー取得クエリ
+  // ユーザー取得クエリ（パスワードは後で検証するため、ここでは条件に含めない）
   let query = `
     SELECT au.*, o.name as organization_name, o.status as org_status, o.slug as organization_slug
     FROM admin_users au
     LEFT JOIN organizations o ON au.organization_id = o.id
-    WHERE au.username = ? AND au.password_hash = ?
+    WHERE au.username = ?
   `
   
   // サブドメインがある場合、その組織のユーザーのみ許可
@@ -164,10 +166,10 @@ routes.post('/auth/login', async (c) => {
   }
   
   const bindValues = tenantOrgId 
-    ? [username, password, tenantOrgId]
-    : [username, password]
+    ? [username, tenantOrgId]
+    : [username]
   
-  const user = await DB.prepare(query).bind(...bindValues).first()
+  const user = await DB.prepare(query).bind(...bindValues).first() as any
   
   if (!user) {
     // サブドメインがある場合はより具体的なエラーメッセージ
@@ -175,6 +177,23 @@ routes.post('/auth/login', async (c) => {
       return c.json({ error: 'このサブドメインで有効なアカウントではありません' }, 401)
     }
     return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401)
+  }
+  
+  // パスワードを検証（ハッシュ化されたパスワードと平文パスワードの両方に対応）
+  const isPasswordValid = await verifyPassword(password, user.password_hash)
+  if (!isPasswordValid) {
+    return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401)
+  }
+  
+  // 旧形式（平文）のパスワードの場合、ハッシュ化して更新
+  if (!isPasswordHashed(user.password_hash)) {
+    try {
+      const hashedPassword = await hashPassword(password)
+      await DB.prepare(`UPDATE admin_users SET password_hash = ? WHERE id = ?`).bind(hashedPassword, user.id).run()
+      console.log(`Password migrated to hash for user: ${username}`)
+    } catch (e) {
+      console.error('Failed to migrate password:', e)
+    }
   }
   
   // 組織が停止中の場合はログインを拒否
