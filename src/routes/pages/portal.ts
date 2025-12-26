@@ -2618,25 +2618,41 @@ routes.get('/portal/:token', async (c) => {
                         return;
                     }
                     
-                    container.innerHTML = docs.map(doc => \`
-                        <div class="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1.5 border">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <i class="fas fa-file text-blue-500"></i>
-                                <span class="text-purple-600 font-medium">\${doc.fiscal_year ? doc.fiscal_year + '期' : ''}</span>
-                                <span class="text-gray-600 truncate">\${doc.file_name}</span>
+                    container.innerHTML = docs.map(doc => {
+                        // 情報入力が必要な書類タイプかチェック
+                        const docTypeLower = doc.document_type.toLowerCase();
+                        const needsDataInput = docTypeLower.includes('登記') || docTypeLower.includes('謄本') || 
+                                              docTypeLower.includes('履歴事項') || docTypeLower.includes('決算') || 
+                                              docTypeLower.includes('財務') || docTypeLower.includes('貸借') || 
+                                              docTypeLower.includes('損益') || docTypeLower.includes('確定申告');
+                        const dataInputBtn = needsDataInput ? \`
+                            <button onclick="openDataInputForCommonDoc('\${doc.document_type.replace(/'/g, "\\\\'")}', event)" 
+                                    class="text-green-600 hover:text-green-800" title="情報入力">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        \` : '';
+                        
+                        return \`
+                            <div class="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1.5 border">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <i class="fas fa-file text-blue-500"></i>
+                                    <span class="text-purple-600 font-medium">\${doc.fiscal_year ? doc.fiscal_year + '期' : ''}</span>
+                                    <span class="text-gray-600 truncate">\${doc.file_name}</span>
+                                </div>
+                                <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+                                    \${dataInputBtn}
+                                    <a href="/api/common-documents/\${doc.id}/download" 
+                                       class="text-blue-600 hover:text-blue-800" title="ダウンロード">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    <button onclick="deleteCommonDocument(\${doc.id}, event)" 
+                                            class="text-red-500 hover:text-red-700" title="削除">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2 ml-2 flex-shrink-0">
-                                <a href="/api/common-documents/\${doc.id}/download" 
-                                   class="text-blue-600 hover:text-blue-800" title="ダウンロード">
-                                    <i class="fas fa-download"></i>
-                                </a>
-                                <button onclick="deleteCommonDocument(\${doc.id}, event)" 
-                                        class="text-red-500 hover:text-red-700" title="削除">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
-                        </div>
-                    \`).join('');
+                        \`;
+                    }).join('');
                 } catch (error) {
                     console.error('Error loading existing docs:', error);
                     container.innerHTML = '<div class="text-xs text-red-500 py-2">読み込みに失敗しました</div>';
@@ -2701,6 +2717,9 @@ routes.get('/portal/:token', async (c) => {
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
                     
+                    // モーダルを閉じる前に書類タイプを保存
+                    const uploadedDocType = selectedCommonDocType;
+                    
                     showMessage('success', '共通書類をアップロードしました');
                     closeCommonDocUploadModal();
                     loadCommonDocuments();
@@ -2710,13 +2729,15 @@ routes.get('/portal/:token', async (c) => {
                     }
                     
                     // 特定の書類タイプの場合、データ入力モーダルを表示
-                    const docType = selectedCommonDocType.toLowerCase();
-                    if (docType.includes('登記') || docType.includes('謄本') || docType.includes('履歴事項')) {
-                        showDataInputModal('registry', selectedCommonDocType);
-                    } else if (docType.includes('決算') || docType.includes('財務') || docType.includes('貸借') || docType.includes('損益')) {
-                        showDataInputModal('financial', selectedCommonDocType);
-                    } else if (docType.includes('確定申告')) {
-                        showDataInputModal('tax_return', selectedCommonDocType);
+                    if (uploadedDocType) {
+                        const docType = uploadedDocType.toLowerCase();
+                        if (docType.includes('登記') || docType.includes('謄本') || docType.includes('履歴事項')) {
+                            showDataInputModal('registry', uploadedDocType);
+                        } else if (docType.includes('決算') || docType.includes('財務') || docType.includes('貸借') || docType.includes('損益')) {
+                            showDataInputModal('financial', uploadedDocType);
+                        } else if (docType.includes('確定申告')) {
+                            showDataInputModal('tax_return', uploadedDocType);
+                        }
                     }
                 } catch (error) {
                     console.error('Error uploading common document:', error);
@@ -2767,11 +2788,25 @@ routes.get('/portal/:token', async (c) => {
                 uploadBtn.innerHTML = '<i class="fas fa-upload mr-1"></i>ファイルを選択してください';
             }
             
+            // 共通書類の情報入力モーダルを開く
+            function openDataInputForCommonDoc(documentType, event) {
+                if (event) event.stopPropagation();
+                const docType = documentType.toLowerCase();
+                if (docType.includes('登記') || docType.includes('謄本') || docType.includes('履歴事項')) {
+                    showDataInputModal('registry', documentType);
+                } else if (docType.includes('決算') || docType.includes('財務') || docType.includes('貸借') || docType.includes('損益')) {
+                    showDataInputModal('financial', documentType);
+                } else if (docType.includes('確定申告')) {
+                    showDataInputModal('tax_return', documentType);
+                }
+            }
+            
             window.onCommonDocFileSelected = onCommonDocFileSelected;
             window.clearCommonDocFile = clearCommonDocFile;
             window.openCommonDocUploadModal = openCommonDocUploadModal;
             window.closeCommonDocUploadModal = closeCommonDocUploadModal;
             window.uploadCommonDocument = uploadCommonDocument;
+            window.openDataInputForCommonDoc = openDataInputForCommonDoc;
             
             // 共通書類ドロップゾーンのドラッグ&ドロップ設定
             const commonDocDropZone = document.getElementById('commonDocDropZone');
