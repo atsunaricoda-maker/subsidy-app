@@ -359,6 +359,8 @@ routes.get('/clients/:clientId/cases', async (c) => {
 // 全アクティブパイプライン取得（案件進捗ボード用）
 routes.get('/pipelines/all-active', async (c) => {
   const { DB } = c.env
+  
+  try {
   const user = await getCurrentUser(c)
   
   // 組織IDで絞り込み
@@ -388,7 +390,7 @@ routes.get('/pipelines/all-active', async (c) => {
   const result = []
   for (const pipeline of (pipelines.results || [])) {
     const tasks = await DB.prepare(`
-      SELECT id, task_name, task_type, status, due_date, description, sort_order
+      SELECT id, task_name, task_type, status, end_date, description, sort_order
       FROM client_pipeline_tasks
       WHERE pipeline_id = ?
       ORDER BY sort_order ASC
@@ -401,6 +403,10 @@ routes.get('/pipelines/all-active', async (c) => {
   }
   
   return c.json(result)
+  } catch (error: any) {
+    console.error('Pipeline all-active error:', error)
+    return c.json({ error: 'パイプライン取得に失敗しました', details: error.message }, 500)
+  }
 })
 
 // 顧客のパイプライン一覧取得（顧客ポータル用）
