@@ -870,6 +870,22 @@ routes.get('/portal/:token', async (c) => {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             // ========================================
+            // XSS対策: HTMLエスケープ関数
+            // ========================================
+            function escapeHtml(text) {
+                if (text === null || text === undefined) return '';
+                const str = String(text);
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return str.replace(/[&<>"']/g, m => map[m]);
+            }
+            
+            // ========================================
             // メインタブ切り替え関数
             // ========================================
             function switchMainTab(tabId) {
@@ -1580,11 +1596,11 @@ routes.get('/portal/:token', async (c) => {
                                 <div class="flex items-start gap-3">
                                     <i class="fas \${style.icon} mt-0.5"></i>
                                     <div class="flex-1">
-                                        <div class="font-medium \${style.text}">\${a.title}</div>
-                                        <div class="text-sm \${style.text} mt-1">\${a.content}</div>
+                                        <div class="font-medium \${style.text}">\${escapeHtml(a.title)}</div>
+                                        <div class="text-sm \${style.text} mt-1">\${escapeHtml(a.content)}</div>
                                     </div>
                                     \${!a.is_read ? \`
-                                        <button onclick="markAnnouncementRead(\${a.id})" class="text-xs text-gray-500 hover:text-gray-700">
+                                        <button onclick="markAnnouncementRead(\${parseInt(a.id) || 0})" class="text-xs text-gray-500 hover:text-gray-700">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     \` : ''}
@@ -1682,17 +1698,17 @@ routes.get('/portal/:token', async (c) => {
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-2 mb-1">
-                                            <span class="font-medium text-sm \${style.text}">\${task.task_name}</span>
+                                            <span class="font-medium text-sm \${style.text}">\${escapeHtml(task.task_name)}</span>
                                             \${isCustomerTask ? '<span class="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">顧客</span>' : ''}
                                             \${isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-600 rounded">完了</span>' : ''}
                                         </div>
                                         <div class="text-xs text-gray-500">
-                                            \${task.description || ''}
-                                            \${task.end_date ? '<span class="ml-1">期限: ' + task.end_date + '</span>' : ''}
+                                            \${escapeHtml(task.description || '')}
+                                            \${task.end_date ? '<span class="ml-1">期限: ' + escapeHtml(task.end_date) + '</span>' : ''}
                                         </div>
                                     </div>
                                     \${canComplete ? \`
-                                        <button onclick="completeTask(\${task.id})" 
+                                        <button onclick="completeTask(\${parseInt(task.id) || 0})" 
                                                 class="flex-shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
                                             <i class="fas fa-check mr-1"></i>完了
                                         </button>
