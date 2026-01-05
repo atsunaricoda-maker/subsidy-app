@@ -283,6 +283,23 @@ routes.post('/cases/:caseId/invoices', async (c) => {
       return c.json({ error: '案件が見つかりません' }, 404)
     }
     
+    // 重複チェック: 同じ案件・同じタイプで有効な請求書が既に存在しないか確認
+    const invoiceType = data.invoice_type || 'deposit'
+    const existingInvoice = await DB.prepare(`
+      SELECT id, invoice_number, status FROM invoices 
+      WHERE case_id = ? AND invoice_type = ? AND organization_id = ?
+        AND status NOT IN ('cancelled')
+      LIMIT 1
+    `).bind(caseId, invoiceType, orgId).first()
+    
+    if (existingInvoice) {
+      const typeLabel = invoiceType === 'deposit' ? '着手金' : '成功報酬'
+      return c.json({ 
+        error: `この案件には既に${typeLabel}の請求書（${(existingInvoice as any).invoice_number}）が存在します。`,
+        existing_invoice_id: (existingInvoice as any).id 
+      }, 400)
+    }
+    
     // 請求書番号を生成（シンプルなタイムスタンプベース）
     const now = new Date()
     const year = now.getFullYear()
@@ -569,6 +586,21 @@ routes.post('/invoices/:id/report-payment', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   
+  // 請求書の現在のステータスを確認
+  const invoice = await DB.prepare(`SELECT * FROM invoices WHERE id = ?`).bind(id).first() as any
+  
+  if (!invoice) {
+    return c.json({ error: '請求書が見つかりません' }, 404)
+  }
+  
+  // 既に報告済みまたは入金済みの場合はエラー
+  if (invoice.status === 'payment_reported') {
+    return c.json({ error: 'この請求書は既に振込報告済みです' }, 400)
+  }
+  if (invoice.status === 'paid') {
+    return c.json({ error: 'この請求書は既に入金確認済みです' }, 400)
+  }
+  
   await DB.prepare(`
     UPDATE invoices SET 
       status = 'payment_reported',
@@ -578,17 +610,14 @@ routes.post('/invoices/:id/report-payment', async (c) => {
   `).bind(id).run()
   
   // 通知を作成
-  const invoice = await DB.prepare(`SELECT * FROM invoices WHERE id = ?`).bind(id).first() as any
-  if (invoice) {
-    await DB.prepare(`
-      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
-      VALUES ('payment_report', '振込報告', ?, ?, 'invoices', ?)
-    `).bind(
-      `請求書 ${invoice.invoice_number} の振込報告がありました`,
-      id,
-      invoice.organization_id
-    ).run()
-  }
+  await DB.prepare(`
+    INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
+    VALUES ('payment_report', '振込報告', ?, ?, 'invoices', ?)
+  `).bind(
+    `請求書 ${invoice.invoice_number} の振込報告がありました`,
+    id,
+    invoice.organization_id
+  ).run()
   
   return c.json({ success: true, message: '振込報告を送信しました' })
 })

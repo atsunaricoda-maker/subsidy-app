@@ -505,9 +505,17 @@ routes.post('/cases', async (c) => {
   // 手付金が設定されている場合、請求書を自動作成
   if (data.deposit_required && data.deposit_amount > 0) {
     try {
-      // invoicesテーブルが存在しない場合は作成
-      await DB.prepare(`
-        CREATE TABLE IF NOT EXISTS invoices (
+      // 既存の着手金請求書がないか確認（重複防止）
+      const existingDepositInvoice = await DB.prepare(`
+        SELECT id FROM invoices WHERE case_id = ? AND invoice_type = 'deposit' AND status != 'cancelled'
+      `).bind(caseId).first()
+      
+      if (existingDepositInvoice) {
+        console.log('Deposit invoice already exists for case:', caseId)
+      } else {
+        // invoicesテーブルが存在しない場合は作成
+        await DB.prepare(`
+          CREATE TABLE IF NOT EXISTS invoices (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           organization_id INTEGER NOT NULL,
           case_id INTEGER NOT NULL,
@@ -583,7 +591,8 @@ routes.post('/cases', async (c) => {
         itemName
       ).run()
       
-      console.log('Deposit invoice created for case:', caseId, 'invoice_number:', invoiceNumber)
+        console.log('Deposit invoice created for case:', caseId, 'invoice_number:', invoiceNumber)
+      }
     } catch (invoiceError) {
       console.error('Error creating deposit invoice:', invoiceError)
       // 請求書作成に失敗してもケース作成は続行

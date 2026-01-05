@@ -42,6 +42,20 @@ routes.post('/clients/:clientId/report-transfer', async (c) => {
     const caseId = data.case_id
     const paymentType = data.payment_type || 'deposit' // 'deposit' or 'success_fee'
     
+    // 重複報告チェック: 同じクライアント・同じタイプで未確認の報告が既にないか確認
+    const existingReport = await DB.prepare(`
+      SELECT id FROM payment_history 
+      WHERE client_id = ? AND payment_type = ? AND status = 'reported'
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(clientId, paymentType).first()
+    
+    if (existingReport) {
+      const typeLabel = paymentType === 'success_fee' ? '成功報酬' : '着手金'
+      return c.json({ 
+        error: `既に${typeLabel}の振込報告が送信されています。確認をお待ちください。` 
+      }, 400)
+    }
+    
     // 金額を取得（案件から優先、なければクライアントから）
     let amount = data.amount || 0
     if (!amount && caseId) {

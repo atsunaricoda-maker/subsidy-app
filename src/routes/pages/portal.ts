@@ -1517,11 +1517,18 @@ routes.get('/portal/:token', async (c) => {
                 showBankTransferModal('¥' + amount.toLocaleString(), typeLabel);
             }
             
-            // 請求書の振込報告
+            // 請求書の振込報告（重複送信防止付き）
+            let isReportingTransfer = false;
             async function reportInvoiceTransfer(invoiceId, amount) {
+                if (isReportingTransfer) {
+                    return; // 既に処理中
+                }
+                
                 if (!confirm('振込完了を報告しますか？\\n\\n※まだお振込みが完了していない場合は、振込完了後に報告してください。')) {
                     return;
                 }
+                
+                isReportingTransfer = true;
                 
                 try {
                     await axios.put(\`/api/invoices/\${invoiceId}/report-transfer\`, {
@@ -1533,7 +1540,9 @@ routes.get('/portal/:token', async (c) => {
                     window.location.reload();
                 } catch (error) {
                     console.error('Error reporting invoice transfer:', error);
-                    alert('報告の送信に失敗しました。\\n\\nお手数ですが、担当者に直接ご連絡ください。');
+                    const errorMessage = error.response?.data?.error || '報告の送信に失敗しました。';
+                    alert(errorMessage + '\\n\\nお手数ですが、担当者に直接ご連絡ください。');
+                    isReportingTransfer = false;
                 }
             }
             
