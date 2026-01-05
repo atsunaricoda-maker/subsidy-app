@@ -16,6 +16,40 @@ function generatePassword(length: number = 12): string {
   return password
 }
 
+// リダイレクトURLを安全に取得（サブドメイン対応）
+function getSafeRedirectBaseUrl(c: any): string {
+  const allowedDomains = ['shinsei-raku.com', 'subsidy-app.pages.dev', 'localhost']
+  
+  // RefererまたはOriginヘッダーから取得を試みる
+  const referer = c.req.header('Referer')
+  const origin = c.req.header('Origin')
+  const requestUrl = new URL(c.req.url).origin
+  
+  // 優先順位: Referer > Origin > Request URL
+  const candidates = [referer, origin, requestUrl].filter(Boolean)
+  
+  for (const candidate of candidates) {
+    try {
+      const url = new URL(candidate as string)
+      const hostname = url.hostname
+      
+      // 許可されたドメインのチェック（サブドメインを含む）
+      const isAllowed = allowedDomains.some(domain => 
+        hostname === domain || hostname.endsWith('.' + domain)
+      )
+      
+      if (isAllowed) {
+        return url.origin
+      }
+    } catch {
+      continue
+    }
+  }
+  
+  // フォールバック: リクエストURLのoriginを使用
+  return requestUrl
+}
+
 // Stripe Price ID設定（テスト環境）
 const STRIPE_PRICES = {
   // プラン別Price ID
@@ -118,7 +152,7 @@ routes.post('/stripe/create-subscription-checkout', async (c) => {
     }
     
     // 既存のサブスクリプションがある場合は変更、ない場合は新規作成
-    const baseUrl = new URL(c.req.url).origin
+    const baseUrl = getSafeRedirectBaseUrl(c)
     
     const checkoutParams: Record<string, string> = {
       'customer': stripeCustomerId,
@@ -225,7 +259,7 @@ routes.post('/stripe/create-slot-checkout', async (c) => {
       `).bind(stripeCustomerId, orgId).run()
     }
     
-    const baseUrl = new URL(c.req.url).origin
+    const baseUrl = getSafeRedirectBaseUrl(c)
     
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
@@ -754,7 +788,7 @@ routes.post('/stripe/create-signup-checkout', async (c) => {
     }
     
     const stripeCustomerId = customer.id
-    const baseUrl = new URL(c.req.url).origin
+    const baseUrl = getSafeRedirectBaseUrl(c)
     
     // Checkout Session作成（14日無料トライアル付きサブスク）
     const checkoutParams: Record<string, string> = {
@@ -844,7 +878,7 @@ routes.post('/stripe/create-portal-session', async (c) => {
   }
   
   try {
-    const baseUrl = new URL(c.req.url).origin
+    const baseUrl = getSafeRedirectBaseUrl(c)
     
     const response = await fetch('https://api.stripe.com/v1/billing_portal/sessions', {
       method: 'POST',
