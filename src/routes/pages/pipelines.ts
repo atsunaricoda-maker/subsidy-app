@@ -415,21 +415,12 @@ routes.get('/admin/pipelines', (c) => {
                     // カテゴリ別にグループ化
                     const grouped = {};
                     
-                    // ツリー表示の場合はトップレベルのみグループ化
-                    const treeMode = document.getElementById('treeViewToggle')?.checked;
-                    if (treeMode) {
-                        templates.forEach(t => {
-                            const cat = t.category || 'license';
-                            if (!grouped[cat]) grouped[cat] = [];
-                            grouped[cat].push(t);
-                        });
-                    } else {
-                        templates.forEach(t => {
-                            const cat = t.category || 'license';
-                            if (!grouped[cat]) grouped[cat] = [];
-                            grouped[cat].push(t);
-                        });
-                    }
+                    // グループ化（ツリー/フラット共通）
+                    templates.forEach(t => {
+                        const cat = t.category || 'license';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(t);
+                    });
                     
                     // カテゴリ順序
                     const categoryOrder = ['subsidy', 'grant', 'license'];
