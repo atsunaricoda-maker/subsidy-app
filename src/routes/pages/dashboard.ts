@@ -2739,6 +2739,86 @@ routes.get('/', async (c) => {
                 }, 500);
             }
             
+            // 新規登録後のウェルカムモーダル表示
+            if (urlParams.get('welcome') === 'true') {
+                setTimeout(() => {
+                    showTrialWelcomeModal();
+                    // URLからパラメータを削除
+                    history.replaceState({}, document.title, window.location.pathname);
+                }, 800);
+            }
+            
+            // トライアルウェルカムモーダル表示
+            function showTrialWelcomeModal() {
+                const modal = document.createElement('div');
+                modal.id = 'trialWelcomeModal';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4';
+                modal.innerHTML = \`
+                    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+                        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white text-center">
+                            <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                                <i class="fas fa-rocket text-4xl"></i>
+                            </div>
+                            <h2 class="text-2xl font-bold mb-2">申請らくらく君へようこそ！</h2>
+                            <p class="text-blue-100">14日間の無料トライアルが開始されました</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                                <h3 class="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-gift"></i>トライアル期間中の特典
+                                </h3>
+                                <ul class="space-y-2 text-sm text-blue-700">
+                                    <li class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-green-500"></i>
+                                        <span><strong>1件分の案件</strong>を無料でお試しいただけます</span>
+                                    </li>
+                                    <li class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-green-500"></i>
+                                        <span>すべての機能を制限なく利用可能</span>
+                                    </li>
+                                    <li class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle text-green-500"></i>
+                                        <span>見込み客の登録は無制限</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                                <h3 class="font-bold text-yellow-800 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-info-circle"></i>ご利用の流れ
+                                </h3>
+                                <div class="space-y-2 text-sm text-yellow-700">
+                                    <div class="flex items-start gap-2">
+                                        <span class="w-5 h-5 bg-yellow-600 text-white rounded-full flex items-center justify-center flex-shrink-0 text-xs">1</span>
+                                        <span>「見込み」ステータスで顧客・案件を登録（無制限）</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="w-5 h-5 bg-yellow-600 text-white rounded-full flex items-center justify-center flex-shrink-0 text-xs">2</span>
+                                        <span>案件を「書類準備中」に変更すると枠を1つ消費</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="w-5 h-5 bg-yellow-600 text-white rounded-full flex items-center justify-center flex-shrink-0 text-xs">3</span>
+                                        <span>継続利用時は「プラン管理」から有料プランを選択</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex gap-3">
+                                <a href="/admin/subscription" class="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-center font-medium">
+                                    <i class="fas fa-ticket-alt mr-2"></i>プラン確認
+                                </a>
+                                <button onclick="document.getElementById('trialWelcomeModal').remove()" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold">
+                                    <i class="fas fa-play-circle mr-2"></i>始める
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                \`;
+                document.body.appendChild(modal);
+                modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+            }
+            window.showTrialWelcomeModal = showTrialWelcomeModal;
+            
             ${sidebarScripts}
         </script>
     </body>

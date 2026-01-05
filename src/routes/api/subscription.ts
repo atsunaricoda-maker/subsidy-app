@@ -34,12 +34,12 @@ routes.get('/subscription/status', async (c) => {
     return c.json({ error: '組織が特定できません' }, 401)
   }
   
-  // 組織のサブスクリプションを取得
+  // 組織のサブスクリプションを取得（active または trial ステータス）
   let subscription = await DB.prepare(`
     SELECT us.*, sp.plan_code, sp.plan_name, sp.monthly_price, sp.monthly_slots
     FROM user_subscriptions us
     JOIN subscription_plans sp ON us.plan_id = sp.id
-    WHERE us.organization_id = ? AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status IN ('active', 'trial')
     ORDER BY us.created_at DESC
     LIMIT 1
   `).bind(orgId).first()

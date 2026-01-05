@@ -127,8 +127,8 @@ routes.get('/signup', (c) => {
                     </div>
                     <div class="bg-white rounded-lg p-4 text-center shadow-sm">
                         <i class="fas fa-credit-card text-2xl text-green-500 mb-2"></i>
-                        <p class="text-sm font-medium">カード不要</p>
-                        <p class="text-xs text-gray-500">クレジットカード不要</p>
+                        <p class="text-sm font-medium">登録時カード不要</p>
+                        <p class="text-xs text-gray-500">トライアル中は無料</p>
                     </div>
                     <div class="bg-white rounded-lg p-4 text-center shadow-sm">
                         <i class="fas fa-gift text-2xl text-purple-500 mb-2"></i>
