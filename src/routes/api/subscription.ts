@@ -463,10 +463,10 @@ routes.post('/subscription/purchase-slots', async (c) => {
   })
 })
 
-// プラン変更（次回切り替わり日から適用）
+// プラン変更（トライアルからの変更は即時適用、それ以外は次回切り替わり日から適用）
 routes.post('/subscription/change-plan', async (c) => {
   const { DB } = c.env
-  const { plan_id } = await c.req.json()
+  const { plan_id, immediate } = await c.req.json()
   const user = await getCurrentUser(c)
   
   // 管理者権限チェック
@@ -492,16 +492,97 @@ routes.post('/subscription/change-plan', async (c) => {
     return c.json({ error: 'Plan not found' }, 404)
   }
   
-  // 現在のサブスクリプションを取得
+  // 現在のサブスクリプションを取得（trial も含む）
   const currentSub = await DB.prepare(`
-    SELECT * FROM user_subscriptions WHERE organization_id = ? AND status = 'active' LIMIT 1
+    SELECT us.*, sp.plan_code as current_plan_code
+    FROM user_subscriptions us
+    JOIN subscription_plans sp ON us.plan_id = sp.id
+    WHERE us.organization_id = ? AND us.status IN ('active', 'trial') 
+    ORDER BY us.created_at DESC
+    LIMIT 1
   `).bind(orgId).first()
   
   if (!currentSub) {
     return c.json({ error: 'No active subscription' }, 400)
   }
   
-  // 次回切り替わり日を計算
+  // トライアルからの変更、または即時適用フラグがある場合は即時適用
+  const isFromTrial = currentSub.status === 'trial' || currentSub.current_plan_code === 'trial'
+  const shouldApplyImmediately = isFromTrial || immediate === true
+  
+  if (shouldApplyImmediately) {
+    // 即時適用：プランを今すぐ変更し、月間枠を付与
+    const today = new Date()
+    const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0) // 月末
+    
+    // サブスクリプションを更新
+    await DB.prepare(`
+      UPDATE user_subscriptions 
+      SET plan_id = ?, status = 'active', 
+          scheduled_plan_id = NULL, scheduled_plan_date = NULL,
+          current_period_start = ?, current_period_end = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      plan_id, 
+      today.toISOString().split('T')[0],
+      periodEnd.toISOString().split('T')[0],
+      currentSub.id
+    ).run()
+    
+    // 枠残高を更新（新プランの月間枠を即時付与）
+    const newMonthlySlots = plan.monthly_slots === -1 ? 0 : plan.monthly_slots
+    
+    // slot_balances が存在するか確認
+    const existingBalance = await DB.prepare(`
+      SELECT * FROM slot_balances WHERE subscription_id = ?
+    `).bind(currentSub.id).first()
+    
+    if (existingBalance) {
+      // 既存の枠残高を更新（購入枠は維持、月間枠は新プランの枠数に更新）
+      await DB.prepare(`
+        UPDATE slot_balances 
+        SET monthly_slots_remaining = ?, last_monthly_reset = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE subscription_id = ?
+      `).bind(newMonthlySlots, today.toISOString().split('T')[0], currentSub.id).run()
+    } else {
+      // 新規作成
+      await DB.prepare(`
+        INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+        VALUES (?, ?, ?, 0, ?)
+      `).bind(currentSub.id, orgId, newMonthlySlots, today.toISOString().split('T')[0]).run()
+    }
+    
+    // プラン変更履歴を記録
+    const changeNote = isFromTrial 
+      ? `トライアルから${plan.plan_name}に変更（月間${plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots + '枠'}付与）`
+      : `${plan.plan_name}に即時変更（月間${plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots + '枠'}付与）`
+    
+    await DB.prepare(`
+      INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
+      VALUES (?, 'monthly', 'plan_changed', ?, ?, ?)
+    `).bind(currentSub.id, newMonthlySlots, newMonthlySlots, changeNote).run()
+    
+    // 枠付与の履歴も記録
+    const grantNote = plan.monthly_slots === -1 
+      ? `${today.getFullYear()}年${today.getMonth() + 1}月分 - 無制限プラン`
+      : `${today.getFullYear()}年${today.getMonth() + 1}月分の枠を付与（プラン変更）`
+    
+    await DB.prepare(`
+      INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
+      VALUES (?, 'monthly', 'granted', ?, ?, ?)
+    `).bind(currentSub.id, newMonthlySlots, newMonthlySlots, grantNote).run()
+    
+    return c.json({ 
+      success: true, 
+      new_plan: plan,
+      applied_immediately: true,
+      monthly_slots_granted: plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots,
+      message: `プランを${plan.plan_name}に変更しました。${plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots + '枠'}が即時付与されました。`
+    })
+  }
+  
+  // 通常の予約変更：次回切り替わり日から適用
   let nextResetDate
   if (currentSub.current_period_end) {
     const periodEnd = new Date(currentSub.current_period_end)
@@ -516,12 +597,13 @@ routes.post('/subscription/change-plan', async (c) => {
   await DB.prepare(`
     UPDATE user_subscriptions 
     SET scheduled_plan_id = ?, scheduled_plan_date = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE organization_id = ? AND status = 'active'
-  `).bind(plan_id, nextResetDate.toISOString().split('T')[0], orgId).run()
+    WHERE id = ?
+  `).bind(plan_id, nextResetDate.toISOString().split('T')[0], currentSub.id).run()
   
   return c.json({ 
     success: true, 
     new_plan: plan,
+    applied_immediately: false,
     scheduled_date: nextResetDate.toISOString().split('T')[0],
     message: `${nextResetDate.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}からプランが変更されます`
   })

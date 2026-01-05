@@ -470,29 +470,39 @@ routes.post('/stripe/subscription-webhook', async (c) => {
     }
     
     if (type === 'subscription') {
-      // サブスクリプション開始処理
+      // サブスクリプション開始処理（トライアルからの変更も含む）
       const planCode = session.metadata?.plan_code
       const stripeSubscriptionId = session.subscription
       
       // プラン情報を取得
       const plan = await DB.prepare(`
         SELECT * FROM subscription_plans WHERE plan_code = ?
-      `).bind(planCode).first()
+      `).bind(planCode).first() as any
       
       if (plan) {
-        // 既存のサブスクリプションを取得
+        // 既存のサブスクリプションを取得（active または trial の両方を対象）
         const existingSub = await DB.prepare(`
-          SELECT * FROM user_subscriptions WHERE organization_id = ? AND status = 'active'
-        `).bind(orgId).first()
+          SELECT us.*, sp.plan_code as current_plan_code
+          FROM user_subscriptions us
+          JOIN subscription_plans sp ON us.plan_id = sp.id
+          WHERE us.organization_id = ? AND us.status IN ('active', 'trial')
+          ORDER BY us.created_at DESC
+          LIMIT 1
+        `).bind(orgId).first() as any
         
         const today = new Date()
         const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+        const newMonthlySlots = plan.monthly_slots === -1 ? 0 : plan.monthly_slots
+        
+        // トライアルからの変更かどうかを判定
+        const isFromTrial = existingSub?.status === 'trial' || existingSub?.current_plan_code === 'trial'
         
         if (existingSub) {
-          // 既存サブスクリプションを更新
+          // 既存サブスクリプションを更新（トライアルからactiveへ変更を含む）
           await DB.prepare(`
             UPDATE user_subscriptions 
-            SET plan_id = ?, stripe_subscription_id = ?, stripe_customer_id = ?,
+            SET plan_id = ?, status = 'active', stripe_subscription_id = ?, stripe_customer_id = ?,
+                scheduled_plan_id = NULL, scheduled_plan_date = NULL,
                 current_period_start = ?, current_period_end = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
           `).bind(
@@ -501,12 +511,36 @@ routes.post('/stripe/subscription-webhook', async (c) => {
             existingSub.id
           ).run()
           
-          // 枠残高をリセット
+          // slot_balancesが存在するか確認
+          const existingBalance = await DB.prepare(`
+            SELECT * FROM slot_balances WHERE subscription_id = ?
+          `).bind(existingSub.id).first()
+          
+          if (existingBalance) {
+            // 枠残高を更新（月間枠は新プランの枠数に、購入枠は維持）
+            await DB.prepare(`
+              UPDATE slot_balances 
+              SET monthly_slots_remaining = ?, last_monthly_reset = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE subscription_id = ?
+            `).bind(newMonthlySlots, today.toISOString().split('T')[0], existingSub.id).run()
+          } else {
+            // slot_balancesが存在しない場合は新規作成
+            await DB.prepare(`
+              INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+              VALUES (?, ?, ?, 0, ?)
+            `).bind(existingSub.id, orgId, newMonthlySlots, today.toISOString().split('T')[0]).run()
+          }
+          
+          // プラン変更履歴を記録
+          const changeNote = isFromTrial 
+            ? `トライアルから${plan.plan_name}に変更（Stripe決済完了、月間${plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots + '枠'}付与）`
+            : `Stripe経由で${plan.plan_name}に変更（月間${plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots + '枠'}付与）`
+          
           await DB.prepare(`
-            UPDATE slot_balances 
-            SET monthly_slots_remaining = ?, last_monthly_reset = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE subscription_id = ?
-          `).bind(plan.monthly_slots === -1 ? 0 : plan.monthly_slots, today.toISOString().split('T')[0], existingSub.id).run()
+            INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
+            VALUES (?, 'monthly', 'plan_changed', ?, ?, ?)
+          `).bind(existingSub.id, newMonthlySlots, newMonthlySlots, changeNote).run()
+          
         } else {
           // 新規サブスクリプション作成
           const subResult = await DB.prepare(`
@@ -520,27 +554,30 @@ routes.post('/stripe/subscription-webhook', async (c) => {
             await DB.prepare(`
               INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
               VALUES (?, ?, ?, 0, ?)
-            `).bind(subscriptionId, orgId, plan.monthly_slots === -1 ? 0 : plan.monthly_slots, today.toISOString().split('T')[0]).run()
+            `).bind(subscriptionId, orgId, newMonthlySlots, today.toISOString().split('T')[0]).run()
+            
+            // 履歴を記録
+            await DB.prepare(`
+              INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
+              VALUES (?, 'monthly', 'subscription_started', ?, ?, ?)
+            `).bind(subscriptionId, newMonthlySlots, newMonthlySlots, `Stripe経由で${plan.plan_name}を開始（月間${plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots + '枠'}付与）`).run()
           }
         }
         
-        // 履歴を記録
-        await DB.prepare(`
-          INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
-          VALUES ((SELECT id FROM user_subscriptions WHERE organization_id = ? AND status = 'active'), 'monthly', 'subscription_started', 0, 0, ?)
-        `).bind(orgId, `Stripe経由で${plan.plan_name}を開始`).run()
+        console.log(`Subscription updated for org ${orgId}: ${plan.plan_name}, ${newMonthlySlots} slots granted`)
       }
     } else if (type === 'slot_purchase') {
       // 追加枠購入処理
       const slots = parseInt(session.metadata?.slots || '0')
       
       if (slots > 0) {
-        // サブスクリプション取得
+        // サブスクリプション取得（active または trial の両方を対象）
         const subscription = await DB.prepare(`
           SELECT us.id, sb.purchased_slots_remaining
           FROM user_subscriptions us
           JOIN slot_balances sb ON us.id = sb.subscription_id
-          WHERE us.organization_id = ? AND us.status = 'active'
+          WHERE us.organization_id = ? AND us.status IN ('active', 'trial')
+          ORDER BY us.created_at DESC
           LIMIT 1
         `).bind(orgId).first() as any
         
@@ -565,6 +602,8 @@ routes.post('/stripe/subscription-webhook', async (c) => {
             INSERT INTO slot_usage_history (subscription_id, slot_type, action, slots_changed, balance_after, note)
             VALUES (?, 'purchased', 'purchased', ?, ?, ?)
           `).bind(subscription.id, slots, newPurchased, `Stripe経由で${slots}枠を購入`).run()
+          
+          console.log(`Slots purchased for org ${orgId}: ${slots} slots added, total purchased: ${newPurchased}`)
         }
       }
     }

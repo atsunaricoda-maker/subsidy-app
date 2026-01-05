@@ -146,10 +146,16 @@ routes.get('/admin/subscription', async (c) => {
                 <h2 class="text-lg font-bold mb-2">
                     <i class="fas fa-list mr-2 text-blue-600"></i>料金プラン
                 </h2>
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <div id="planChangeNotice" class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                     <p class="text-sm text-yellow-800">
                         <i class="fas fa-exclamation-triangle mr-1"></i>
                         <strong>重要</strong>：プラン変更は<strong>次回切り替わり日</strong>から適用されます。即座には反映されません。
+                    </p>
+                </div>
+                <div id="trialPlanNotice" class="hidden bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                    <p class="text-sm text-green-800">
+                        <i class="fas fa-gift mr-1"></i>
+                        <strong>トライアル中</strong>：プランを選択すると、<strong>即座に月間枠が付与</strong>されます。Stripe決済完了後、すぐにご利用いただけます。
                     </p>
                 </div>
                 <div id="plansList" class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -269,6 +275,18 @@ routes.get('/admin/subscription', async (c) => {
                         scheduledInfo.classList.remove('hidden');
                     } else {
                         scheduledInfo.classList.add('hidden');
+                    }
+                    
+                    // トライアル状態の場合は専用の案内を表示
+                    const isTrialStatus = data.subscription?.status === 'trial' || data.subscription?.plan_code === 'trial';
+                    const planChangeNotice = document.getElementById('planChangeNotice');
+                    const trialPlanNotice = document.getElementById('trialPlanNotice');
+                    if (isTrialStatus) {
+                        planChangeNotice?.classList.add('hidden');
+                        trialPlanNotice?.classList.remove('hidden');
+                    } else {
+                        planChangeNotice?.classList.remove('hidden');
+                        trialPlanNotice?.classList.add('hidden');
                     }
                     
                     // 業務範囲の表示
