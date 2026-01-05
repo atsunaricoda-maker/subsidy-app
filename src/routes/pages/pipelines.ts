@@ -47,14 +47,20 @@ routes.get('/admin/pipelines', (c) => {
                 <div class="p-4 lg:p-6">
                     <!-- テンプレート一覧 -->
                     <div class="bg-white rounded-xl shadow-sm">
-                        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                        <div class="p-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
                             <h3 class="text-base font-bold text-gray-800">パイプラインテンプレート</h3>
-                            <select id="filterCategory" onchange="loadTemplates()" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm">
-                                <option value="">すべてのカテゴリ</option>
-                                <option value="subsidy">行政書士管轄</option>
-                                <option value="grant">社労士管轄</option>
-                                <option value="license">許認可</option>
-                            </select>
+                            <div class="flex items-center gap-3">
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" id="treeViewToggle" onchange="loadTemplates()" class="rounded text-blue-600">
+                                    <span>ツリー表示</span>
+                                </label>
+                                <select id="filterCategory" onchange="loadTemplates()" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm">
+                                    <option value="">すべてのカテゴリ</option>
+                                    <option value="subsidy">行政書士管轄</option>
+                                    <option value="grant">社労士管轄</option>
+                                    <option value="license">許認可</option>
+                                </select>
+                            </div>
                         </div>
                         <div id="templatesList" class="divide-y divide-gray-100">
                             <div class="text-center py-12 text-gray-500">
@@ -102,6 +108,17 @@ routes.get('/admin/pipelines', (c) => {
                             <select name="created_by" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                                 <option value="">選択してください</option>
                             </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">親パイプライン（オプション）</label>
+                            <select name="parent_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">なし（最上位）</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">ツリー構造で管理する場合に親を選択</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">表示順</label>
+                            <input type="number" name="display_order" value="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
                     
@@ -300,9 +317,10 @@ routes.get('/admin/pipelines', (c) => {
             async function loadTemplates() {
                 try {
                     const category = document.getElementById('filterCategory').value;
-                    let url = '/api/pipeline-templates';
+                    const treeMode = document.getElementById('treeViewToggle')?.checked;
+                    let url = '/api/pipeline-templates?tree=' + (treeMode ? 'true' : 'false');
                     if (category) {
-                        url += '?category=' + category;
+                        url += '&category=' + category;
                     }
                     
                     const response = await axios.get(url);
@@ -356,13 +374,62 @@ routes.get('/admin/pipelines', (c) => {
                         }
                     };
                     
+                    // ツリー表示のヘルパー関数
+                    function renderTreeItem(item, config, depth = 0) {
+                        const indent = depth * 24;
+                        const hasChildren = item.children && item.children.length > 0;
+                        const isChild = depth > 0;
+                        
+                        let html = \`
+                            <div class="p-3 hover:bg-gray-50 cursor-pointer" style="padding-left: \${16 + indent}px" onclick="showTemplateDetail(\${item.id})">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        \${isChild ? '<i class="fas fa-level-up-alt fa-rotate-90 text-gray-300 text-xs mr-1"></i>' : ''}
+                                        <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
+                                            <i class="fas \${hasChildren ? 'fa-folder' : 'fa-project-diagram'} text-sm"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-gray-900 \${isChild ? 'text-sm' : ''}">\${item.name}</div>
+                                            <div class="text-xs text-gray-500 line-clamp-1">\${item.description || ''}</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        \${hasChildren ? '<span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">' + item.children.length + '子パイプライン</span>' : ''}
+                                        <span class="text-sm text-gray-500">\${item.task_count || 0}タスク</span>
+                                        <i class="fas fa-chevron-right text-gray-400"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        \`;
+                        
+                        // 子アイテムを再帰的にレンダリング
+                        if (hasChildren) {
+                            item.children.forEach(child => {
+                                html += renderTreeItem(child, config, depth + 1);
+                            });
+                        }
+                        
+                        return html;
+                    }
+                    
                     // カテゴリ別にグループ化
                     const grouped = {};
-                    templates.forEach(t => {
-                        const cat = t.category || 'license';
-                        if (!grouped[cat]) grouped[cat] = [];
-                        grouped[cat].push(t);
-                    });
+                    
+                    // ツリー表示の場合はトップレベルのみグループ化
+                    const treeMode = document.getElementById('treeViewToggle')?.checked;
+                    if (treeMode) {
+                        templates.forEach(t => {
+                            const cat = t.category || 'license';
+                            if (!grouped[cat]) grouped[cat] = [];
+                            grouped[cat].push(t);
+                        });
+                    } else {
+                        templates.forEach(t => {
+                            const cat = t.category || 'license';
+                            if (!grouped[cat]) grouped[cat] = [];
+                            grouped[cat].push(t);
+                        });
+                    }
                     
                     // カテゴリ順序
                     const categoryOrder = ['subsidy', 'grant', 'license'];
@@ -374,33 +441,48 @@ routes.get('/admin/pipelines', (c) => {
                         
                         const config = categoryConfig[catKey] || categoryConfig['license'];
                         
+                        // アイテム数をカウント（ツリーの場合は全階層）
+                        function countItems(arr) {
+                            let count = 0;
+                            arr.forEach(item => {
+                                count++;
+                                if (item.children) count += countItems(item.children);
+                            });
+                            return count;
+                        }
+                        const totalCount = treeMode ? countItems(items) : items.length;
+                        
                         html += \`
                             <div class="mb-6">
                                 <div class="flex items-center gap-3 px-4 py-3 \${config.headerClass} border-l-4 rounded-r-lg">
                                     <i class="fas \${config.icon} \${config.iconClass}"></i>
                                     <h3 class="font-bold \${config.titleClass}">\${config.label}</h3>
-                                    <span class="ml-auto text-sm \${config.countClass}">\${items.length}件</span>
+                                    <span class="ml-auto text-sm \${config.countClass}">\${totalCount}件</span>
                                 </div>
                                 <div class="divide-y divide-gray-100 ml-4 border-l-2 border-gray-200">
-                                    \${items.map(t => \`
-                                        <div class="p-3 hover:bg-gray-50 cursor-pointer pl-6" onclick="showTemplateDetail(\${t.id})">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-3">
-                                                    <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
-                                                        <i class="fas fa-project-diagram text-sm"></i>
+                                    \${treeMode 
+                                        ? items.map(t => renderTreeItem(t, config, 0)).join('')
+                                        : items.map(t => \`
+                                            <div class="p-3 hover:bg-gray-50 cursor-pointer pl-6" onclick="showTemplateDetail(\${t.id})">
+                                                <div class="flex items-center justify-between">
+                                                    <div class="flex items-center gap-3">
+                                                        \${t.parent_id ? '<i class="fas fa-level-up-alt fa-rotate-90 text-gray-300 text-xs mr-1"></i>' : ''}
+                                                        <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
+                                                            <i class="fas fa-project-diagram text-sm"></i>
+                                                        </div>
+                                                        <div>
+                                                            <div class="font-medium text-gray-900">\${t.name}</div>
+                                                            <div class="text-xs text-gray-500 line-clamp-1">\${t.description || ''}</div>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <div class="font-medium text-gray-900">\${t.name}</div>
-                                                        <div class="text-xs text-gray-500 line-clamp-1">\${t.description || ''}</div>
+                                                    <div class="flex items-center gap-3">
+                                                        <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
+                                                        <i class="fas fa-chevron-right text-gray-400"></i>
                                                     </div>
-                                                </div>
-                                                <div class="flex items-center gap-3">
-                                                    <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
-                                                    <i class="fas fa-chevron-right text-gray-400"></i>
                                                 </div>
                                             </div>
-                                        </div>
-                                    \`).join('')}
+                                        \`).join('')
+                                    }
                                 </div>
                             </div>
                         \`;
@@ -565,7 +647,32 @@ routes.get('/admin/pipelines', (c) => {
                 document.getElementById('newTemplateModal').classList.remove('hidden');
                 loadUsers();
                 loadSubsidyTypesForCheckbox(); // 申請種別のチェックボックスを読み込み
+                loadParentPipelineOptions(); // 親パイプライン選択肢を読み込み
                 editingTemplateId = null; // 新規作成モードに設定
+            }
+            
+            // 親パイプライン選択肢を読み込む
+            async function loadParentPipelineOptions(excludeId = null, selectedParentId = null) {
+                try {
+                    const response = await axios.get('/api/pipeline-templates');
+                    const templates = response.data;
+                    
+                    const select = document.querySelector('select[name="parent_id"]');
+                    select.innerHTML = '<option value="">なし（最上位）</option>';
+                    
+                    // 親候補になれるテンプレート（自分自身と自分の子孫は除外）
+                    templates.filter(t => t.id !== excludeId && !t.parent_id).forEach(t => {
+                        const option = document.createElement('option');
+                        option.value = t.id;
+                        option.textContent = t.name;
+                        if (selectedParentId && t.id == selectedParentId) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error loading parent pipeline options:', error);
+                }
             }
             
             // 申請種別一覧を読み込んでチェックボックスを生成
@@ -625,6 +732,26 @@ routes.get('/admin/pipelines', (c) => {
                     container.innerHTML = html || '<p class="text-gray-500 text-sm">申請種別がありません</p>';
                 } catch (error) {
                     console.error('Error loading subsidy types:', error);
+                }
+            }
+            
+            // 親パイプライン選択の読み込み
+            async function loadParentPipelines(excludeId = null, selectedParentId = null) {
+                try {
+                    const response = await axios.get('/api/pipeline-templates');
+                    const templates = response.data;
+                    const select = document.querySelector('select[name="parent_id"]');
+                    if (!select) return;
+                    
+                    select.innerHTML = '<option value="">親パイプラインなし（ルートレベル）</option>';
+                    
+                    // 親を持たないテンプレートのみを親候補として表示（2階層まで）
+                    templates.filter(t => !t.parent_id && t.id !== excludeId).forEach(t => {
+                        const selected = selectedParentId === t.id ? 'selected' : '';
+                        select.innerHTML += '<option value="' + t.id + '" ' + selected + '>' + t.name + '</option>';
+                    });
+                } catch (error) {
+                    console.error('Error loading parent pipelines:', error);
                 }
             }
             
@@ -713,6 +840,9 @@ routes.get('/admin/pipelines', (c) => {
                     document.getElementById('newTemplateModal').classList.remove('hidden');
                     loadUsers();
                     
+                    // 親パイプラインの選択を読み込み（編集中のものを除外）
+                    await loadParentPipelines(id, template.parent_id);
+                    
                     // 申請種別のチェックボックスを読み込み（選択済みのIDを渡す）
                     let selectedSubsidyIds = [];
                     if (template.subsidy_type_ids) {
@@ -741,10 +871,15 @@ routes.get('/admin/pipelines', (c) => {
                     subsidyTypeIds.push(parseInt(cb.value));
                 });
                 
+                // 親パイプラインID
+                const parentIdValue = formData.get('parent_id');
+                const parentId = parentIdValue && parentIdValue !== '' ? parseInt(parentIdValue) : null;
+                
                 const data = {
                     name: formData.get('name'),
                     description: formData.get('description'),
                     category: formData.get('category'),
+                    parent_id: parentId,
                     service_start_offset: parseInt(formData.get('service_start_offset')) || 0,
                     service_end_offset: parseInt(formData.get('service_end_offset')) || 30,
                     progress_reflection: formData.get('progress_reflection') === 'on',

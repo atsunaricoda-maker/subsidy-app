@@ -3132,6 +3132,41 @@ routes.put('/master/platform-settings', async (c) => {
   }
 })
 
+// パイプラインテンプレートにツリー構造を追加するマイグレーション
+routes.post('/master/migrate/pipeline-tree-structure', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // parent_id カラムを追加（既に存在する場合はスキップ）
+    try {
+      await DB.prepare(`ALTER TABLE pipeline_templates ADD COLUMN parent_id INTEGER REFERENCES pipeline_templates(id)`).run()
+      console.log('Added parent_id column to pipeline_templates')
+    } catch (e: any) {
+      if (!e.message?.includes('duplicate column')) {
+        console.log('parent_id column might already exist:', e.message)
+      }
+    }
+    
+    // display_order カラムを追加（ツリー内での表示順）
+    try {
+      await DB.prepare(`ALTER TABLE pipeline_templates ADD COLUMN display_order INTEGER DEFAULT 0`).run()
+      console.log('Added display_order column to pipeline_templates')
+    } catch (e: any) {
+      if (!e.message?.includes('duplicate column')) {
+        console.log('display_order column might already exist:', e.message)
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'パイプラインテンプレートのツリー構造マイグレーションが完了しました'
+    })
+  } catch (error: any) {
+    console.error('Migration error:', error)
+    return c.json({ error: 'マイグレーションに失敗しました: ' + error.message }, 500)
+  }
+})
+
 // 公開用プラットフォーム設定取得（認証不要）
 routes.get('/public/platform-settings', async (c) => {
   const { DB } = c.env

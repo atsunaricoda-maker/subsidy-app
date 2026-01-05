@@ -5,11 +5,12 @@ import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-// パイプラインテンプレート一覧取得
+// ツリー構造でパイプラインテンプレート一覧取得
 routes.get('/pipeline-templates', async (c) => {
   const { DB } = c.env
   const category = c.req.query('category')
   const subsidyTypeId = c.req.query('subsidy_type_id')
+  const treeView = c.req.query('tree') === 'true'
   
   // パイプラインテンプレートは全組織共通のマスターデータ
   let query = `
@@ -22,6 +23,11 @@ routes.get('/pipeline-templates', async (c) => {
   // カテゴリでフィルタリング
   if (category) {
     query += ` AND pt.category = '${category}'`
+  }
+  
+  // 親のみを取得するフラグ（tree表示時は親からスタート）
+  if (treeView) {
+    query += ` ORDER BY COALESCE(pt.parent_id, pt.id), pt.parent_id IS NOT NULL, pt.display_order, pt.id`
   }
   
   const templates = await DB.prepare(query).all()
@@ -46,8 +52,38 @@ routes.get('/pipeline-templates', async (c) => {
     })
   }
   
+  // ツリー構造に変換
+  if (treeView) {
+    const treeData = buildPipelineTree(results)
+    return c.json(treeData)
+  }
+  
   return c.json(results)
 })
+
+// パイプラインをツリー構造に変換するヘルパー関数
+function buildPipelineTree(templates: any[]): any[] {
+  const map = new Map<number, any>()
+  const roots: any[] = []
+  
+  // まず全てのテンプレートをマップに登録
+  for (const t of templates) {
+    map.set(t.id, { ...t, children: [] })
+  }
+  
+  // 親子関係を構築
+  for (const t of templates) {
+    const node = map.get(t.id)
+    if (t.parent_id && map.has(t.parent_id)) {
+      const parent = map.get(t.parent_id)
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  }
+  
+  return roots
+}
 
 // パイプラインテンプレート詳細取得
 routes.get('/pipeline-templates/:id', async (c) => {
@@ -90,8 +126,9 @@ routes.post('/pipeline-templates', async (c) => {
     const result = await DB.prepare(`
       INSERT INTO pipeline_templates 
       (name, description, category, service_start_offset, service_end_offset, 
-       requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids,
+       parent_id, display_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       data.name,
       data.description || '',
@@ -102,7 +139,9 @@ routes.post('/pipeline-templates', async (c) => {
       data.allow_external_tasks ? 1 : 0,
       data.progress_reflection !== false ? 1 : 0,
       data.created_by || null,
-      subsidyTypeIds
+      subsidyTypeIds,
+      data.parent_id || null,
+      parseInt(data.display_order) || 0
     ).run()
     
     const templateId = result.meta.last_row_id
@@ -176,7 +215,7 @@ routes.put('/pipeline-templates/:id', async (c) => {
       name = ?, description = ?, category = ?, 
       service_start_offset = ?, service_end_offset = ?,
       requires_approval = ?, allow_external_tasks = ?, progress_reflection = ?,
-      subsidy_type_ids = ?,
+      subsidy_type_ids = ?, parent_id = ?, display_order = ?,
       updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
@@ -189,6 +228,8 @@ routes.put('/pipeline-templates/:id', async (c) => {
       data.allow_external_tasks ? 1 : 0,
       data.progress_reflection !== false ? 1 : 0,
       subsidyTypeIds,
+      data.parent_id || null,
+      parseInt(data.display_order) || 0,
       templateId
     ).run()
     
