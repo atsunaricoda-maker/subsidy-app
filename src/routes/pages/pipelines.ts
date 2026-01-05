@@ -726,26 +726,6 @@ routes.get('/admin/pipelines', (c) => {
                 }
             }
             
-            // 親パイプライン選択の読み込み
-            async function loadParentPipelines(excludeId = null, selectedParentId = null) {
-                try {
-                    const response = await axios.get('/api/pipeline-templates');
-                    const templates = response.data;
-                    const select = document.querySelector('select[name="parent_id"]');
-                    if (!select) return;
-                    
-                    select.innerHTML = '<option value="">親パイプラインなし（ルートレベル）</option>';
-                    
-                    // 親を持たないテンプレートのみを親候補として表示（2階層まで）
-                    templates.filter(t => !t.parent_id && t.id !== excludeId).forEach(t => {
-                        const selected = selectedParentId === t.id ? 'selected' : '';
-                        select.innerHTML += '<option value="' + t.id + '" ' + selected + '>' + t.name + '</option>';
-                    });
-                } catch (error) {
-                    console.error('Error loading parent pipelines:', error);
-                }
-            }
-            
             function closeNewTemplateModal() {
                 document.getElementById('newTemplateModal').classList.add('hidden');
             }
@@ -832,7 +812,7 @@ routes.get('/admin/pipelines', (c) => {
                     loadUsers();
                     
                     // 親パイプラインの選択を読み込み（編集中のものを除外）
-                    await loadParentPipelines(id, template.parent_id);
+                    await loadParentPipelineOptions(id, template.parent_id);
                     
                     // 申請種別のチェックボックスを読み込み（選択済みのIDを渡す）
                     let selectedSubsidyIds = [];
