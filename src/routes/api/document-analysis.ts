@@ -1071,15 +1071,36 @@ routes.get('/clients/:id/extracted-data-summary', async (c) => {
   }
 });
 
-// 選択的インポート（特定テーブルのみ）
+// 選択的インポート（特定テーブルのみ）- 認証必須（管理者のみ）
 routes.post('/backup/import-selective', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック（管理者のみ）
+  if (!user || user.role !== 'admin') {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
+  
+  // 許可されたテーブル名のみ（SQLインジェクション対策）
+  const allowedTables = [
+    'clients', 'cases', 'documents', 'communications', 'hearing_answers',
+    'ai_chat_history', 'generated_documents', 'client_profiles', 
+    'subsidy_match_scores', 'payment_history', 'client_pipelines',
+    'company_registry_data', 'financial_statements', 'financial_indicators', 'tax_return_data'
+  ]
   
   try {
     const { tables: selectedTables, data, merge_mode = false } = await c.req.json()
     
     if (!selectedTables || !Array.isArray(selectedTables) || !data?.tables) {
       return c.json({ error: '無効なリクエストです' }, 400)
+    }
+    
+    // テーブル名の検証（SQLインジェクション対策）
+    for (const table of selectedTables) {
+      if (!allowedTables.includes(table)) {
+        return c.json({ error: `許可されていないテーブル: ${table}` }, 400)
+      }
     }
 
     const results = {

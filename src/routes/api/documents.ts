@@ -165,9 +165,15 @@ routes.post('/clients/:id/documents/upload', async (c) => {
   }
 })
 
-// 汎用ファイルアップロード（パイプラインタスク添付など）
+// 汎用ファイルアップロード（パイプラインタスク添付など）- 認証必須
 routes.post('/documents/upload-file', async (c) => {
   const { R2 } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
   
   try {
     const formData = await c.req.formData()
@@ -176,6 +182,18 @@ routes.post('/documents/upload-file', async (c) => {
     
     if (!file) {
       return c.json({ error: 'No file provided' }, 400)
+    }
+    
+    // 許可されたファイルタイプのみ
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain', 'text/csv'
+    ]
+    if (!allowedTypes.includes(file.type)) {
+      return c.json({ error: '許可されていないファイル形式です' }, 400)
     }
     
     // ファイルサイズ制限（10MB）

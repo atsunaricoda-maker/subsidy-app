@@ -41,9 +41,16 @@ routes.get('/document-templates/:id', async (c) => {
   return c.json(result)
 })
 
-// テンプレート作成
+// テンプレート作成 - 認証必須（管理者のみ）
 routes.post('/document-templates', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
+  
   const body = await c.req.json()
   
   const result = await DB.prepare(`
@@ -60,9 +67,16 @@ routes.post('/document-templates', async (c) => {
   return c.json({ id: result.meta.last_row_id, success: true })
 })
 
-// テンプレート更新
+// テンプレート更新 - 認証必須（管理者のみ）
 routes.put('/document-templates/:id', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
+  
   const id = c.req.param('id')
   const body = await c.req.json()
   
@@ -82,9 +96,16 @@ routes.put('/document-templates/:id', async (c) => {
   return c.json({ success: true })
 })
 
-// テンプレート削除
+// テンプレート削除 - 認証必須（管理者のみ）
 routes.delete('/document-templates/:id', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
+  
   const id = c.req.param('id')
   
   await DB.prepare(`

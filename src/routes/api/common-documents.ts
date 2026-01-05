@@ -17,9 +17,15 @@ routes.get('/common-document-types', async (c) => {
   return c.json(result.results || [])
 })
 
-// 共通書類タイプの初期化・更新（決算書3期分対応など）
+// 共通書類タイプの初期化・更新（決算書3期分対応など）- 認証必須
 routes.post('/common-document-types/initialize', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
   
   // デフォルトの共通書類タイプ
   const defaultTypes = [

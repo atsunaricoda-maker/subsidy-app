@@ -1,13 +1,20 @@
 // お知らせ管理API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-// お知らせ一覧取得（管理者用）
+// お知らせ一覧取得（管理者用）- 認証必須
 routes.get('/announcements', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック（マスター管理者のみアクセス可能）
+  if (!user || !user.is_master_admin) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
+  
   const includeInactive = c.req.query('include_inactive') === 'true'
   
   let query = `SELECT * FROM announcements`
@@ -43,9 +50,16 @@ routes.get('/clients/:clientId/announcements', async (c) => {
   return c.json(announcements.results || [])
 })
 
-// お知らせ作成
+// お知らせ作成 - 認証必須（マスター管理者のみ）
 routes.post('/announcements', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック（マスター管理者のみ作成可能）
+  if (!user || !user.is_master_admin) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
+  
   const data = await c.req.json()
   
   const result = await DB.prepare(`
@@ -60,7 +74,7 @@ routes.post('/announcements', async (c) => {
     data.target_ids || null,
     data.start_date || null,
     data.end_date || null,
-    data.created_by || null
+    user.id
   ).run()
   
   return c.json({ 
@@ -113,9 +127,16 @@ routes.get('/organizations/:orgId/announcements', async (c) => {
   }
 })
 
-// お知らせ更新
+// お知らせ更新 - 認証必須（マスター管理者のみ）
 routes.put('/announcements/:id', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック（マスター管理者のみ更新可能）
+  if (!user || !user.is_master_admin) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
+  
   const id = c.req.param('id')
   const data = await c.req.json()
   
@@ -139,9 +160,16 @@ routes.put('/announcements/:id', async (c) => {
   return c.json({ success: true, message: 'お知らせを更新しました' })
 })
 
-// お知らせ削除
+// お知らせ削除 - 認証必須（マスター管理者のみ）
 routes.delete('/announcements/:id', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック（マスター管理者のみ削除可能）
+  if (!user || !user.is_master_admin) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
+  }
+  
   const id = c.req.param('id')
   
   await DB.prepare('DELETE FROM announcement_reads WHERE announcement_id = ?').bind(id).run()

@@ -19,9 +19,16 @@ routes.get('/subsidy-watch-urls', async (c) => {
   return c.json(result.results)
 })
 
-// 監視URL追加
+// 監視URL追加 - 認証必須（管理者のみ）
 routes.post('/subsidy-watch-urls', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
+  
   const data = await c.req.json()
   
   const result = await DB.prepare(`
@@ -37,9 +44,16 @@ routes.post('/subsidy-watch-urls', async (c) => {
   return c.json({ id: result.meta.last_row_id })
 })
 
-// 監視URL削除
+// 監視URL削除 - 認証必須（管理者のみ）
 routes.delete('/subsidy-watch-urls/:id', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
+  
   const id = c.req.param('id')
   
   await DB.prepare(`DELETE FROM subsidy_watch_urls WHERE id = ?`).bind(id).run()
@@ -47,9 +61,15 @@ routes.delete('/subsidy-watch-urls/:id', async (c) => {
   return c.json({ success: true })
 })
 
-// 更新チェック実行（手動 or Cron）
+// 更新チェック実行（手動 or Cron）- 認証必須
 routes.post('/subsidy-check-updates', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  
+  // 認証チェック（手動実行の場合。CRONの場合は別ルートを使用）
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
   
   // アクティブな監視URLを取得
   const watchUrls = await DB.prepare(`
