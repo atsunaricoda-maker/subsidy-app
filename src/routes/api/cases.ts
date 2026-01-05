@@ -45,8 +45,9 @@ routes.get('/cases', async (c) => {
     query += ` AND (cases.is_archived = 0 OR cases.is_archived IS NULL)`
   }
   
-  // ステータスフィルタ
-  if (statusFilter) {
+  // ステータスフィルタ（許可された値のみ - SQLインジェクション対策）
+  const allowedStatuses = ['inquiry', 'preparing', 'applying', 'adopted', 'rejected', 'completed', 'submitted']
+  if (statusFilter && allowedStatuses.includes(statusFilter)) {
     query += ` AND cases.status = '${statusFilter}'`
   }
   

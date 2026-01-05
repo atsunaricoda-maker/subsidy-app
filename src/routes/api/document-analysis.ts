@@ -1126,18 +1126,29 @@ routes.post('/backup/import-selective', async (c) => {
         for (const record of records) {
           const columns = Object.keys(record)
           const values = Object.values(record)
+          
+          // カラム名の検証（SQLインジェクション対策）
+          // 安全な識別子のみを許可: 英数字、アンダースコアのみ
+          const safeColumnPattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+          const invalidColumns = columns.filter(col => !safeColumnPattern.test(col))
+          if (invalidColumns.length > 0) {
+            console.warn(`Invalid column names in ${tableName}:`, invalidColumns)
+            continue // このレコードをスキップ
+          }
+          
           const placeholders = columns.map(() => '?').join(', ')
+          const safeColumns = columns.join(', ')
           
           try {
             if (merge_mode) {
               // マージモード: INSERT OR REPLACE
               await DB.prepare(`
-                INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) 
+                INSERT OR REPLACE INTO ${tableName} (${safeColumns}) 
                 VALUES (${placeholders})
               `).bind(...values).run()
             } else {
               await DB.prepare(`
-                INSERT INTO ${tableName} (${columns.join(', ')}) 
+                INSERT INTO ${tableName} (${safeColumns}) 
                 VALUES (${placeholders})
               `).bind(...values).run()
             }

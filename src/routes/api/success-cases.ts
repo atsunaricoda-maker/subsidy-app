@@ -16,13 +16,23 @@ routes.get('/success-cases', async (c) => {
     WHERE sc.is_public = 1
   `
   
+  // パラメータバインディングでSQLインジェクション対策
+  const params: any[] = []
+  
   if (subsidyTypeId) {
-    query += ` AND sc.subsidy_type_id = ${subsidyTypeId}`
+    // 数値のみを許可
+    const parsedId = parseInt(subsidyTypeId)
+    if (!isNaN(parsedId)) {
+      query += ` AND sc.subsidy_type_id = ?`
+      params.push(parsedId)
+    }
   }
   
   query += ` ORDER BY sc.fiscal_year DESC`
   
-  const result = await DB.prepare(query).all()
+  const result = params.length > 0 
+    ? await DB.prepare(query).bind(...params).all()
+    : await DB.prepare(query).all()
   
   return c.json(result.results)
 })

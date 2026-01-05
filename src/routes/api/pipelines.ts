@@ -20,9 +20,14 @@ routes.get('/pipeline-templates', async (c) => {
     WHERE pt.is_active = 1
   `
   
-  // カテゴリでフィルタリング
-  if (category) {
-    query += ` AND pt.category = '${category}'`
+  const params: any[] = []
+  
+  // カテゴリでフィルタリング（パラメータバインディングでSQLインジェクション対策）
+  // 許可されたカテゴリのみ
+  const allowedCategories = ['subsidy', 'grant', 'license']
+  if (category && allowedCategories.includes(category)) {
+    query += ` AND pt.category = ?`
+    params.push(category)
   }
   
   // 親のみを取得するフラグ（tree表示時は親からスタート）
@@ -30,7 +35,9 @@ routes.get('/pipeline-templates', async (c) => {
     query += ` ORDER BY COALESCE(pt.parent_id, pt.id), pt.parent_id IS NOT NULL, pt.display_order, pt.id`
   }
   
-  const templates = await DB.prepare(query).all()
+  const templates = params.length > 0 
+    ? await DB.prepare(query).bind(...params).all()
+    : await DB.prepare(query).all()
   let results = templates.results || []
   
   // 申請種別IDが指定されている場合、紐付けられたパイプラインのみを返す
