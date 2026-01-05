@@ -1,7 +1,7 @@
 // API: 公募要領管理
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -414,15 +414,22 @@ routes.put('/subsidy-update-logs/:id', async (c) => {
 // 通知一覧取得
 routes.get('/admin/notifications', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json([])
+  }
+  
   const unreadOnly = c.req.query('unread_only') === 'true'
   
-  let query = `SELECT * FROM admin_notifications`
+  // organization_idでテナント分離（自組織の通知のみ取得）
+  let query = `SELECT * FROM admin_notifications WHERE organization_id = ?`
   if (unreadOnly) {
-    query += ` WHERE is_read = 0`
+    query += ` AND is_read = 0`
   }
   query += ` ORDER BY created_at DESC LIMIT 50`
   
-  const result = await DB.prepare(query).all()
+  const result = await DB.prepare(query).bind(orgId).all()
   let notifications = result.results || []
   
   // 支払い報告通知の場合、関連する請求書が既にpaid状態ならフィルタリング
@@ -472,10 +479,16 @@ routes.put('/admin/notifications/:id/read', async (c) => {
 // 未読通知数取得
 routes.get('/admin/notifications/unread-count', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ count: 0 })
+  }
   
+  // organization_idでテナント分離
   const result = await DB.prepare(`
-    SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0
-  `).first()
+    SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0 AND organization_id = ?
+  `).bind(orgId).first()
   
   return c.json({ count: result?.count || 0 })
 })
@@ -483,13 +496,18 @@ routes.get('/admin/notifications/unread-count', async (c) => {
 // 種類別未読通知数取得
 routes.get('/admin/notifications/summary', async (c) => {
   const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ new_message: 0, document_upload: 0, payment_report: 0, other: 0 })
+  }
   
-  // 未読通知を全て取得
+  // organization_idでテナント分離（自組織の未読通知のみ取得）
   const allNotifications = await DB.prepare(`
     SELECT id, notification_type, related_table, related_id
     FROM admin_notifications 
-    WHERE is_read = 0
-  `).all()
+    WHERE is_read = 0 AND organization_id = ?
+  `).bind(orgId).all()
   
   let notifications = allNotifications.results || []
   

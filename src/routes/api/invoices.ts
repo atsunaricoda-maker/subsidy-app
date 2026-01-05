@@ -578,14 +578,15 @@ routes.post('/invoices/:id/report-payment', async (c) => {
   `).bind(id).run()
   
   // 通知を作成
-  const invoice = await DB.prepare(`SELECT * FROM invoices WHERE id = ?`).bind(id).first()
+  const invoice = await DB.prepare(`SELECT * FROM invoices WHERE id = ?`).bind(id).first() as any
   if (invoice) {
     await DB.prepare(`
-      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
-      VALUES ('payment_report', '振込報告', ?, ?, 'invoices')
+      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
+      VALUES ('payment_report', '振込報告', ?, ?, 'invoices', ?)
     `).bind(
-      `請求書 ${(invoice as any).invoice_number} の振込報告がありました`,
-      id
+      `請求書 ${invoice.invoice_number} の振込報告がありました`,
+      id,
+      invoice.organization_id
     ).run()
   }
   

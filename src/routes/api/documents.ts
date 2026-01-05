@@ -100,17 +100,19 @@ routes.post('/clients/:id/documents/upload', async (c) => {
     
     // 顧客からのアップロードの場合、管理者に通知を作成
     if (uploadedBy === 'client') {
-      const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(id).first() as any
+      const client = await DB.prepare(`SELECT name, company_name, organization_id FROM clients WHERE id = ?`).bind(id).first() as any
       const clientName = client?.company_name || client?.name || '顧客'
+      const clientOrgId = client?.organization_id
       await DB.prepare(`
-        INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
+        VALUES (?, ?, ?, ?, ?, ?)
       `).bind(
         'document_upload',
         '書類がアップロードされました',
         `${clientName}様が「${documentType}」をアップロードしました`,
         id,
-        'clients'
+        'clients',
+        clientOrgId
       ).run()
       
       // 管理者にメール通知を送信

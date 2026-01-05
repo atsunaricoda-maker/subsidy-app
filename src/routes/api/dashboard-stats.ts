@@ -91,11 +91,11 @@ routes.get('/dashboard/stats', async (c) => {
     // テーブルが存在しない場合はスキップ
   }
   
-  // 未読通知数（organization_idでテナント分離）
+  // 未読通知数（organization_idでテナント分離 - 自組織のみ）
   let unreadNotifications: any = { count: 0 }
   try {
     unreadNotifications = await DB.prepare(`
-      SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0 AND (organization_id = ? OR organization_id IS NULL)
+      SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0 AND organization_id = ?
     `).bind(orgId).first() || unreadNotifications
   } catch (e) {
     // テーブルが存在しない場合はスキップ

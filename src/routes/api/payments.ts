@@ -114,19 +114,21 @@ routes.post('/clients/:clientId/report-transfer', async (c) => {
     }
     
     // 管理者に入金報告の通知を作成
-    const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(clientId).first()
+    const client = await DB.prepare(`SELECT name, company_name, organization_id FROM clients WHERE id = ?`).bind(clientId).first() as any
     const clientName = client?.company_name || client?.name || '顧客'
+    const clientOrgId = client?.organization_id
     const amountFormatted = amount ? `${amount.toLocaleString()}円` : ''
     const typeLabel = paymentType === 'success_fee' ? '成功報酬' : '着手金'
     await DB.prepare(`
-      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).bind(
       'payment_report',
       `${typeLabel}の入金報告がありました`,
       `${clientName}様から${typeLabel}の入金報告がありました${amountFormatted ? `（${amountFormatted}）` : ''}。確認をお願いします。`,
       clientId,
-      'clients'
+      'clients',
+      clientOrgId
     ).run()
     
     return c.json({ success: true, message: '振込完了報告を送信しました。確認まで少々お待ちください。' })

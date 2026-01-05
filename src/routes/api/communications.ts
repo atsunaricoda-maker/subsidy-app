@@ -58,17 +58,19 @@ routes.post('/clients/:id/communications', async (c) => {
   
   // 顧客からのメッセージの場合、管理者に通知を作成
   if (data.sender_type === 'client') {
-    const client = await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(id).first()
+    const client = await DB.prepare(`SELECT name, company_name, organization_id FROM clients WHERE id = ?`).bind(id).first() as any
     const clientName = client?.company_name || client?.name || '顧客'
+    const clientOrgId = client?.organization_id
     await DB.prepare(`
-      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).bind(
       'new_message',
       '新しいメッセージ',
       `${clientName}様から新しいメッセージが届きました`,
       id,
-      'clients'
+      'clients',
+      clientOrgId
     ).run()
   }
   
