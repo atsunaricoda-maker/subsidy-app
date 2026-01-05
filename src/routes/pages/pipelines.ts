@@ -379,11 +379,12 @@ routes.get('/admin/pipelines', (c) => {
                         const indent = depth * 24;
                         const hasChildren = item.children && item.children.length > 0;
                         const isChild = depth > 0;
+                        const canAddChild = depth < 1; // 2階層まで（親の子まで）
                         
                         let html = \`
-                            <div class="p-3 hover:bg-gray-50 cursor-pointer" style="padding-left: \${16 + indent}px" onclick="showTemplateDetail(\${item.id})">
+                            <div class="p-3 hover:bg-gray-50 group" style="padding-left: \${16 + indent}px">
                                 <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
+                                    <div class="flex items-center gap-3 cursor-pointer flex-1" onclick="showTemplateDetail(\${item.id})">
                                         \${isChild ? '<i class="fas fa-level-up-alt fa-rotate-90 text-gray-300 text-xs mr-1"></i>' : ''}
                                         <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
                                             <i class="fas \${hasChildren ? 'fa-folder' : 'fa-project-diagram'} text-sm"></i>
@@ -393,10 +394,22 @@ routes.get('/admin/pipelines', (c) => {
                                             <div class="text-xs text-gray-500 line-clamp-1">\${item.description || ''}</div>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        \${hasChildren ? '<span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">' + item.children.length + '子パイプライン</span>' : ''}
+                                    <div class="flex items-center gap-2">
+                                        \${hasChildren ? '<span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">' + item.children.length + '子</span>' : ''}
                                         <span class="text-sm text-gray-500">\${item.task_count || 0}タスク</span>
-                                        <i class="fas fa-chevron-right text-gray-400"></i>
+                                        \${canAddChild ? \`
+                                            <button onclick="event.stopPropagation(); createChildPipeline(\${item.id})" 
+                                                    class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-all"
+                                                    title="子パイプラインを追加">
+                                                <i class="fas fa-plus text-xs"></i>
+                                            </button>
+                                        \` : ''}
+                                        <button onclick="event.stopPropagation(); duplicatePipeline(\${item.id})" 
+                                                class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-all"
+                                                title="複製">
+                                            <i class="fas fa-copy text-xs"></i>
+                                        </button>
+                                        <i class="fas fa-chevron-right text-gray-400 cursor-pointer" onclick="showTemplateDetail(\${item.id})"></i>
                                     </div>
                                 </div>
                             </div>
@@ -454,9 +467,9 @@ routes.get('/admin/pipelines', (c) => {
                                     \${treeMode 
                                         ? items.map(t => renderTreeItem(t, config, 0)).join('')
                                         : items.map(t => \`
-                                            <div class="p-3 hover:bg-gray-50 cursor-pointer pl-6" onclick="showTemplateDetail(\${t.id})">
+                                            <div class="p-3 hover:bg-gray-50 group pl-6">
                                                 <div class="flex items-center justify-between">
-                                                    <div class="flex items-center gap-3">
+                                                    <div class="flex items-center gap-3 cursor-pointer flex-1" onclick="showTemplateDetail(\${t.id})">
                                                         \${t.parent_id ? '<i class="fas fa-level-up-alt fa-rotate-90 text-gray-300 text-xs mr-1"></i>' : ''}
                                                         <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
                                                             <i class="fas fa-project-diagram text-sm"></i>
@@ -466,9 +479,21 @@ routes.get('/admin/pipelines', (c) => {
                                                             <div class="text-xs text-gray-500 line-clamp-1">\${t.description || ''}</div>
                                                         </div>
                                                     </div>
-                                                    <div class="flex items-center gap-3">
+                                                    <div class="flex items-center gap-2">
                                                         <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
-                                                        <i class="fas fa-chevron-right text-gray-400"></i>
+                                                        \${!t.parent_id ? \`
+                                                            <button onclick="event.stopPropagation(); createChildPipeline(\${t.id})" 
+                                                                    class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-all"
+                                                                    title="子パイプラインを追加">
+                                                                <i class="fas fa-plus text-xs"></i>
+                                                            </button>
+                                                        \` : ''}
+                                                        <button onclick="event.stopPropagation(); duplicatePipeline(\${t.id})" 
+                                                                class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-all"
+                                                                title="複製">
+                                                            <i class="fas fa-copy text-xs"></i>
+                                                        </button>
+                                                        <i class="fas fa-chevron-right text-gray-400 cursor-pointer" onclick="showTemplateDetail(\${t.id})"></i>
                                                     </div>
                                                 </div>
                                             </div>
@@ -640,6 +665,93 @@ routes.get('/admin/pipelines', (c) => {
                 loadSubsidyTypesForCheckbox(); // 申請種別のチェックボックスを読み込み
                 loadParentPipelineOptions(); // 親パイプライン選択肢を読み込み
                 editingTemplateId = null; // 新規作成モードに設定
+            }
+            
+            // 子パイプラインを作成（親をコピーして子として作成）
+            async function createChildPipeline(parentId) {
+                try {
+                    // 親パイプラインの情報を取得
+                    const response = await axios.get('/api/pipeline-templates/' + parentId);
+                    const parent = response.data;
+                    
+                    // 子パイプラインを作成
+                    const childData = {
+                        name: parent.name + '（バリエーション）',
+                        description: parent.description || '',
+                        category: parent.category,
+                        parent_id: parentId,
+                        service_start_offset: parent.service_start_offset || 0,
+                        service_end_offset: parent.service_end_offset || 30,
+                        progress_reflection: parent.progress_reflection,
+                        allow_external_tasks: parent.allow_external_tasks,
+                        requires_approval: parent.requires_approval,
+                        subsidy_type_ids: parent.subsidy_type_ids ? JSON.parse(parent.subsidy_type_ids) : null,
+                        tasks: (parent.tasks || []).map(t => ({
+                            task_name: t.task_name,
+                            task_type: t.task_type,
+                            description: t.description,
+                            days_offset_start: t.days_offset_start,
+                            days_offset_end: t.days_offset_end,
+                            is_required: t.is_required
+                        }))
+                    };
+                    
+                    const createResponse = await axios.post('/api/pipeline-templates', childData);
+                    
+                    if (createResponse.data.success !== false) {
+                        showToast('子パイプラインを作成しました。編集画面を開きます。');
+                        // 作成した子パイプラインの編集画面を開く
+                        setTimeout(() => {
+                            editTemplate(createResponse.data.id);
+                        }, 500);
+                        loadTemplates();
+                    }
+                } catch (error) {
+                    console.error('Error creating child pipeline:', error);
+                    alert('子パイプラインの作成に失敗しました');
+                }
+            }
+            
+            // パイプラインを複製（親なしでコピー）
+            async function duplicatePipeline(templateId) {
+                try {
+                    const response = await axios.get('/api/pipeline-templates/' + templateId);
+                    const original = response.data;
+                    
+                    const copyData = {
+                        name: original.name + '（コピー）',
+                        description: original.description || '',
+                        category: original.category,
+                        parent_id: null, // 複製は親なし
+                        service_start_offset: original.service_start_offset || 0,
+                        service_end_offset: original.service_end_offset || 30,
+                        progress_reflection: original.progress_reflection,
+                        allow_external_tasks: original.allow_external_tasks,
+                        requires_approval: original.requires_approval,
+                        subsidy_type_ids: original.subsidy_type_ids ? JSON.parse(original.subsidy_type_ids) : null,
+                        tasks: (original.tasks || []).map(t => ({
+                            task_name: t.task_name,
+                            task_type: t.task_type,
+                            description: t.description,
+                            days_offset_start: t.days_offset_start,
+                            days_offset_end: t.days_offset_end,
+                            is_required: t.is_required
+                        }))
+                    };
+                    
+                    const createResponse = await axios.post('/api/pipeline-templates', copyData);
+                    
+                    if (createResponse.data.success !== false) {
+                        showToast('パイプラインを複製しました。編集画面を開きます。');
+                        setTimeout(() => {
+                            editTemplate(createResponse.data.id);
+                        }, 500);
+                        loadTemplates();
+                    }
+                } catch (error) {
+                    console.error('Error duplicating pipeline:', error);
+                    alert('パイプラインの複製に失敗しました');
+                }
             }
             
             // 親パイプライン選択肢を読み込む
@@ -987,6 +1099,8 @@ routes.get('/admin/pipelines', (c) => {
             window.deleteTemplate = deleteTemplate;
             window.handleTaskFileUpload = handleTaskFileUpload;
             window.clearTaskAttachment = clearTaskAttachment;
+            window.createChildPipeline = createChildPipeline;
+            window.duplicatePipeline = duplicatePipeline;
             
             // 初期読み込み
             loadTemplates();
