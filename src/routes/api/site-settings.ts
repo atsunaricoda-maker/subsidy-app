@@ -3167,6 +3167,37 @@ routes.post('/master/migrate/pipeline-tree-structure', async (c) => {
   }
 })
 
+// パイプラインテンプレートタスクに添付ファイルカラムを追加するマイグレーション
+routes.post('/master/migrate/pipeline-task-attachments', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // attachment_url カラムを追加
+    try {
+      await DB.prepare(`ALTER TABLE pipeline_template_tasks ADD COLUMN attachment_url TEXT`).run()
+      console.log('Added attachment_url column to pipeline_template_tasks')
+    } catch (e: any) {
+      console.log('attachment_url column might already exist:', e.message)
+    }
+    
+    // attachment_name カラムを追加
+    try {
+      await DB.prepare(`ALTER TABLE pipeline_template_tasks ADD COLUMN attachment_name TEXT`).run()
+      console.log('Added attachment_name column to pipeline_template_tasks')
+    } catch (e: any) {
+      console.log('attachment_name column might already exist:', e.message)
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'パイプラインタスクの添付ファイルカラム追加が完了しました'
+    })
+  } catch (error: any) {
+    console.error('Migration error:', error)
+    return c.json({ error: 'マイグレーションに失敗しました: ' + error.message }, 500)
+  }
+})
+
 // 公開用プラットフォーム設定取得（認証不要）
 routes.get('/public/platform-settings', async (c) => {
   const { DB } = c.env
