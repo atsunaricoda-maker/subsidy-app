@@ -110,14 +110,18 @@ routes.post('/stripe/create-subscription-checkout', async (c) => {
   // 組織情報を取得
   const org = await DB.prepare(`SELECT * FROM organizations WHERE id = ?`).bind(orgId).first() as any
   
-  // 現在のサブスクリプションを取得
+  // 現在のサブスクリプションを取得（active と trial の両方を検索）
   const currentSub = await DB.prepare(`
     SELECT us.*, sp.plan_code as current_plan_code
     FROM user_subscriptions us
     JOIN subscription_plans sp ON us.plan_id = sp.id
-    WHERE us.organization_id = ? AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status IN ('active', 'trial')
+    ORDER BY us.created_at DESC
     LIMIT 1
   `).bind(orgId).first() as any
+  
+  // トライアル中かどうかを判定
+  const isCurrentlyTrial = currentSub?.status === 'trial' || currentSub?.current_plan_code === 'trial'
   
   try {
     // 既存のStripe Customerがあるか確認、なければ作成
@@ -168,9 +172,14 @@ routes.post('/stripe/create-subscription-checkout', async (c) => {
       'subscription_data[metadata][plan_code]': resolvedPlanCode
     }
     
-    // 試用期間を設定（新規の場合）
-    if (!currentSub || !currentSub.stripe_subscription_id) {
+    // 試用期間を設定（完全に新規の場合のみ - トライアル中からの変更は即時課金）
+    // トライアル中のユーザーが有料プランに変更する場合は、トライアルを付けない（即時課金）
+    if (!currentSub && !isCurrentlyTrial) {
       checkoutParams['subscription_data[trial_period_days]'] = '14'
+    }
+    // トライアル中からの変更の場合、即時決済を明示
+    if (isCurrentlyTrial) {
+      console.log(`Trial user ${orgId} upgrading to ${resolvedPlanCode} - no trial period, immediate billing`)
     }
     
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
