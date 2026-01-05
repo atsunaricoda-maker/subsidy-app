@@ -399,13 +399,13 @@ routes.get('/admin/pipelines', (c) => {
                                         <span class="text-sm text-gray-500">\${item.task_count || 0}タスク</span>
                                         \${canAddChild ? \`
                                             <button onclick="event.stopPropagation(); createChildPipeline(\${item.id})" 
-                                                    class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-all"
+                                                    class="w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center"
                                                     title="子パイプラインを追加">
                                                 <i class="fas fa-plus text-xs"></i>
                                             </button>
                                         \` : ''}
                                         <button onclick="event.stopPropagation(); duplicatePipeline(\${item.id})" 
-                                                class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-all"
+                                                class="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center"
                                                 title="複製">
                                             <i class="fas fa-copy text-xs"></i>
                                         </button>
@@ -483,13 +483,13 @@ routes.get('/admin/pipelines', (c) => {
                                                         <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
                                                         \${!t.parent_id ? \`
                                                             <button onclick="event.stopPropagation(); createChildPipeline(\${t.id})" 
-                                                                    class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-all"
+                                                                    class="w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center"
                                                                     title="子パイプラインを追加">
                                                                 <i class="fas fa-plus text-xs"></i>
                                                             </button>
                                                         \` : ''}
                                                         <button onclick="event.stopPropagation(); duplicatePipeline(\${t.id})" 
-                                                                class="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-all"
+                                                                class="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center"
                                                                 title="複製">
                                                             <i class="fas fa-copy text-xs"></i>
                                                         </button>
