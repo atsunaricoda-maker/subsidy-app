@@ -1,7 +1,7 @@
 // 編集履歴API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -9,6 +9,21 @@ const routes = new Hono<AppEnv>()
 routes.get('/generated-documents/:id/edit-history', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: 文書がcase経由でorganization_idに紐づいているか確認
+  if (orgId) {
+    const docCheck = await DB.prepare(`
+      SELECT gd.id 
+      FROM generated_documents gd
+      JOIN cases cs ON gd.case_id = cs.id
+      WHERE gd.id = ? AND cs.organization_id = ?
+    `).bind(id, orgId).first()
+    if (!docCheck) {
+      return c.json([]) // 他テナントの文書にはアクセス不可
+    }
+  }
   
   const result = await DB.prepare(`
     SELECT * FROM document_section_edits 
@@ -25,17 +40,25 @@ routes.post('/generated-documents/:id/analyze-quality', async (c) => {
   const { DB } = c.env
   const env = c.env
   const id = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
-  // 文書取得
+  // 文書取得（テナント分離: case経由でorganization_idをチェック）
   const doc = await DB.prepare(`
-    SELECT gd.*, dt.sections as template_sections
+    SELECT gd.*, dt.sections as template_sections, cs.organization_id
     FROM generated_documents gd
     JOIN document_templates dt ON gd.template_id = dt.id
+    JOIN cases cs ON gd.case_id = cs.id
     WHERE gd.id = ?
-  `).bind(id).first()
+  `).bind(id).first() as any
   
   if (!doc) {
     return c.json({ error: '文書が見つかりません' }, 404)
+  }
+  
+  // テナント分離チェック
+  if (orgId && doc.organization_id !== orgId) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
   }
   
   const sections = JSON.parse(doc.template_sections || '[]')

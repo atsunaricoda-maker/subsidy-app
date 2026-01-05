@@ -1,7 +1,7 @@
 // ヒアリング質問API
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
+import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
@@ -207,6 +207,16 @@ routes.put('/hearing-questions/reorder', async (c) => {
 routes.get('/clients/:clientId/hearing-answers', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: クライアントが自組織のものか確認
+  if (orgId) {
+    const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(clientId, orgId).first()
+    if (!clientCheck) {
+      return c.json([]) // 他テナントのクライアントにはアクセス不可
+    }
+  }
   
   const result = await DB.prepare(`
     SELECT ha.*, hq.question_key, hq.question_text, hq.category
@@ -224,6 +234,16 @@ routes.post('/clients/:clientId/hearing-answers', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: クライアントが自組織のものか確認
+  if (orgId) {
+    const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(clientId, orgId).first()
+    if (!clientCheck) {
+      return c.json({ error: 'アクセス権限がありません' }, 403)
+    }
+  }
   
   // question_keyとclient_profilesフィールドのマッピング
   const profileFieldMapping: Record<string, string> = {

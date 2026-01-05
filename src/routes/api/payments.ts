@@ -313,7 +313,7 @@ routes.get('/payments/history', async (c) => {
   }
   
   try {
-    // 旧payment_historyからの確認済み支払い - organization_idでテナント分離
+    // 旧payment_historyからの確認済み支払い - organization_idでテナント分離（パラメータバインド使用）
     let oldQuery = `
       SELECT 
         ph.id,
@@ -331,7 +331,7 @@ routes.get('/payments/history', async (c) => {
       JOIN clients c ON ph.client_id = c.id
       LEFT JOIN cases cs ON cs.client_id = ph.client_id
       LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
-      WHERE ph.status = 'confirmed' AND c.organization_id = ${orgId}
+      WHERE ph.status = 'confirmed' AND c.organization_id = ?
     `
     
     if (type === 'deposit') {
@@ -342,9 +342,9 @@ routes.get('/payments/history', async (c) => {
     
     oldQuery += ` GROUP BY ph.id`
     
-    const oldPayments = await DB.prepare(oldQuery).all()
+    const oldPayments = await DB.prepare(oldQuery).bind(orgId).all()
     
-    // invoicesテーブルからの確認済み支払い（status = 'paid'） - organization_idでテナント分離
+    // invoicesテーブルからの確認済み支払い（status = 'paid'） - organization_idでテナント分離（パラメータバインド使用）
     let invoicePayments: any[] = []
     try {
       let invoiceQuery = `
@@ -364,7 +364,7 @@ routes.get('/payments/history', async (c) => {
         JOIN clients c ON i.client_id = c.id
         LEFT JOIN cases cs ON i.case_id = cs.id
         LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
-        WHERE i.status = 'paid' AND i.organization_id = ${orgId}
+        WHERE i.status = 'paid' AND i.organization_id = ?
       `
       
       if (type === 'deposit') {
@@ -373,7 +373,7 @@ routes.get('/payments/history', async (c) => {
         invoiceQuery += ` AND i.invoice_type = 'success_fee'`
       }
       
-      const invoices = await DB.prepare(invoiceQuery).all()
+      const invoices = await DB.prepare(invoiceQuery).bind(orgId).all()
       invoicePayments = invoices.results || []
     } catch (e) {
       // invoicesテーブルがない場合は空配列

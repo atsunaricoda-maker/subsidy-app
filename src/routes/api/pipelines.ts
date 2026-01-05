@@ -257,6 +257,16 @@ routes.post('/clients/:clientId/apply-pipeline', async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId')
   const { template_id, service_start_date } = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テナント分離: クライアントが自組織のものか確認
+  if (orgId) {
+    const clientCheck = await DB.prepare(`SELECT id FROM clients WHERE id = ? AND organization_id = ?`).bind(clientId, orgId).first()
+    if (!clientCheck) {
+      return c.json({ error: 'アクセス権限がありません' }, 403)
+    }
+  }
   
   // テンプレート取得
   const template = await DB.prepare(`
@@ -363,10 +373,13 @@ routes.get('/pipelines/all-active', async (c) => {
   try {
   const user = await getCurrentUser(c)
   
-  // 組織IDで絞り込み
-  const orgId = user?.organization_id || (c as any).get?.('tenantOrgId')
+  // 組織IDで絞り込み（必須）
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
   
-  // アクティブな案件のパイプラインをタスク付きで取得
+  // アクティブな案件のパイプラインをタスク付きで取得（テナント分離必須）
   const pipelines = await DB.prepare(`
     SELECT cp.*, 
            pt.name as template_name,
@@ -381,10 +394,10 @@ routes.get('/pipelines/all-active', async (c) => {
     LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
     WHERE (c.is_archived = 0 OR c.is_archived IS NULL)
       AND cp.status = 'active'
-      ${orgId ? 'AND cl.organization_id = ?' : ''}
+      AND cl.organization_id = ?
     ORDER BY cp.created_at DESC
     LIMIT 50
-  `).bind(...(orgId ? [orgId] : [])).all()
+  `).bind(orgId).all()
   
   // 各パイプラインのタスクを取得
   const result = []
@@ -470,14 +483,25 @@ routes.put('/pipeline-tasks/:taskId', async (c) => {
   const { DB } = c.env
   const taskId = c.req.param('taskId')
   const data = await c.req.json()
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
-  // 現在の状態を取得
+  // 現在の状態を取得（テナント分離: クライアント経由で組織をチェック）
   const currentTask = await DB.prepare(`
-    SELECT * FROM client_pipeline_tasks WHERE id = ?
-  `).bind(taskId).first()
+    SELECT cpt.*, cl.organization_id
+    FROM client_pipeline_tasks cpt
+    JOIN client_pipelines cp ON cpt.pipeline_id = cp.id
+    JOIN clients cl ON cp.client_id = cl.id
+    WHERE cpt.id = ?
+  `).bind(taskId).first() as any
   
   if (!currentTask) {
     return c.json({ error: 'タスクが見つかりません' }, 404)
+  }
+  
+  // テナント分離チェック
+  if (orgId && currentTask.organization_id !== orgId) {
+    return c.json({ error: 'アクセス権限がありません' }, 403)
   }
   
   // 進捗率に応じてステータスを自動設定
@@ -558,18 +582,28 @@ routes.post('/pipeline-tasks', async (c) => {
   try {
     const { DB } = c.env
     const data = await c.req.json()
+    const user = await getCurrentUser(c)
+    const orgId = getEffectiveOrgId(c, user)
     
     if (!data.pipeline_id || !data.task_name) {
       return c.json({ error: 'pipeline_id と task_name は必須です' }, 400)
     }
     
-    // パイプラインが存在するか確認
+    // パイプラインが存在するか確認（テナント分離: クライアント経由で組織をチェック）
     const pipeline = await DB.prepare(`
-      SELECT * FROM client_pipelines WHERE id = ?
-    `).bind(data.pipeline_id).first()
+      SELECT cp.*, cl.organization_id
+      FROM client_pipelines cp
+      JOIN clients cl ON cp.client_id = cl.id
+      WHERE cp.id = ?
+    `).bind(data.pipeline_id).first() as any
     
     if (!pipeline) {
       return c.json({ error: 'パイプラインが見つかりません' }, 404)
+    }
+    
+    // テナント分離チェック
+    if (orgId && pipeline.organization_id !== orgId) {
+      return c.json({ error: 'アクセス権限がありません' }, 403)
     }
     
     // 挿入位置を計算
