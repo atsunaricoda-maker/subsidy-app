@@ -537,21 +537,26 @@ routes.get('/admin/notifications/summary', async (c) => {
   )
   
   if (paymentNotifications.length > 0) {
-    const invoiceIds = paymentNotifications.map((n: any) => n.related_id)
-    try {
-      const paidInvoices = await DB.prepare(`
-        SELECT id FROM invoices WHERE id IN (${invoiceIds.join(',')}) AND status = 'paid'
-      `).all()
-      const paidIds = new Set((paidInvoices.results || []).map((inv: any) => inv.id))
-      
-      notifications = notifications.filter((n: any) => {
-        if (n.notification_type === 'payment_report' && n.related_table === 'invoices' && n.related_id) {
-          return !paidIds.has(n.related_id)
-        }
-        return true
-      })
-    } catch (e) {
-      // エラーの場合はそのまま
+    const invoiceIds = paymentNotifications.map((n: any) => n.related_id).filter(id => id != null)
+    if (invoiceIds.length > 0) {
+      try {
+        // パラメータバインディングを使用（SQLインジェクション対策）
+        const placeholders = invoiceIds.map(() => '?').join(',')
+        const paidInvoices = await DB.prepare(`
+          SELECT id FROM invoices WHERE id IN (${placeholders}) AND status = 'paid'
+        `).bind(...invoiceIds).all()
+        const paidIds = new Set((paidInvoices.results || []).map((inv: any) => inv.id))
+        
+        notifications = notifications.filter((n: any) => {
+          if (n.notification_type === 'payment_report' && n.related_table === 'invoices' && n.related_id) {
+            return !paidIds.has(n.related_id)
+          }
+          return true
+        })
+      } catch (e) {
+        console.error('Error filtering paid invoices:', e)
+        // エラーの場合はそのまま
+      }
     }
   }
   

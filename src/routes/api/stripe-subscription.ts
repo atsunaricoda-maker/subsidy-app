@@ -155,7 +155,18 @@ routes.post('/stripe/create-subscription-checkout', async (c) => {
       `).bind(stripeCustomerId, orgId).run()
     }
     
-    // 既存のサブスクリプションがある場合は変更、ない場合は新規作成
+    // 既存のアクティブなStripeサブスクリプションがある場合は、
+    // Stripeカスタマーポータルでプラン変更するよう案内
+    if (currentSub?.stripe_subscription_id && currentSub?.status === 'active') {
+      // 既に有効なサブスクリプションがある場合、重複作成を防ぐ
+      console.log(`Organization ${orgId} already has active subscription: ${currentSub.stripe_subscription_id}`)
+      return c.json({ 
+        error: '既にアクティブなサブスクリプションがあります。プラン変更はカスタマーポータルから行ってください。',
+        has_active_subscription: true,
+        current_plan: currentSub.current_plan_code
+      }, 400)
+    }
+    
     const baseUrl = getSafeRedirectBaseUrl(c)
     
     const checkoutParams: Record<string, string> = {
