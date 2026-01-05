@@ -2704,7 +2704,7 @@ routes.post('/master/organizations/:id/sync-status', async (c) => {
   try {
     // サブスクリプションのステータスを確認
     const subscription = await DB.prepare(`
-      SELECT us.status as sub_status, us.stripe_subscription_id, o.status as org_status, o.name
+      SELECT us.id as sub_id, us.status as sub_status, us.stripe_subscription_id, o.status as org_status, o.name
       FROM user_subscriptions us
       JOIN organizations o ON us.organization_id = o.id
       WHERE us.organization_id = ?
@@ -2741,6 +2741,89 @@ routes.post('/master/organizations/:id/sync-status', async (c) => {
   } catch (error: any) {
     console.error('Sync status error:', error)
     return c.json({ error: 'ステータス同期に失敗しました' }, 500)
+  }
+})
+
+// 組織を強制的にactiveに変更（Stripe決済完了済みの場合用）
+routes.post('/master/organizations/:id/activate', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  const { plan_code } = await c.req.json().catch(() => ({}))
+  
+  try {
+    // 組織情報を取得
+    const org = await DB.prepare(`SELECT * FROM organizations WHERE id = ?`).bind(orgId).first() as any
+    if (!org) {
+      return c.json({ error: '組織が見つかりません' }, 404)
+    }
+    
+    // プラン情報を取得
+    const planCodeToUse = plan_code || 'standard'
+    const plan = await DB.prepare(`SELECT * FROM subscription_plans WHERE plan_code = ?`).bind(planCodeToUse).first() as any
+    if (!plan) {
+      return c.json({ error: 'プランが見つかりません' }, 404)
+    }
+    
+    const today = new Date()
+    const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+    const newMonthlySlots = plan.monthly_slots === -1 ? 0 : plan.monthly_slots
+    
+    // 既存のサブスクリプションを確認
+    const existingSub = await DB.prepare(`
+      SELECT * FROM user_subscriptions WHERE organization_id = ? ORDER BY created_at DESC LIMIT 1
+    `).bind(orgId).first() as any
+    
+    if (existingSub) {
+      // 既存サブスクリプションを更新
+      await DB.prepare(`
+        UPDATE user_subscriptions 
+        SET plan_id = ?, status = 'active', current_period_start = ?, current_period_end = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(plan.id, today.toISOString().split('T')[0], periodEnd.toISOString().split('T')[0], existingSub.id).run()
+      
+      // slot_balancesを更新
+      const existingBalance = await DB.prepare(`SELECT * FROM slot_balances WHERE subscription_id = ?`).bind(existingSub.id).first()
+      if (existingBalance) {
+        await DB.prepare(`
+          UPDATE slot_balances SET monthly_slots_remaining = ?, last_monthly_reset = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE subscription_id = ?
+        `).bind(newMonthlySlots, today.toISOString().split('T')[0], existingSub.id).run()
+      } else {
+        await DB.prepare(`
+          INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+          VALUES (?, ?, ?, 0, ?)
+        `).bind(existingSub.id, orgId, newMonthlySlots, today.toISOString().split('T')[0]).run()
+      }
+    } else {
+      // 新規サブスクリプション作成
+      const subResult = await DB.prepare(`
+        INSERT INTO user_subscriptions (organization_id, plan_id, status, current_period_start, current_period_end)
+        VALUES (?, ?, 'active', ?, ?)
+      `).bind(orgId, plan.id, today.toISOString().split('T')[0], periodEnd.toISOString().split('T')[0]).run()
+      
+      const subscriptionId = subResult.meta?.last_row_id
+      if (subscriptionId) {
+        await DB.prepare(`
+          INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining, last_monthly_reset)
+          VALUES (?, ?, ?, 0, ?)
+        `).bind(subscriptionId, orgId, newMonthlySlots, today.toISOString().split('T')[0]).run()
+      }
+    }
+    
+    // organizationsテーブルも更新
+    await DB.prepare(`
+      UPDATE organizations SET status = 'active', trial_ends_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(orgId).run()
+    
+    return c.json({ 
+      success: true, 
+      message: `${org.name}を${plan.plan_name}でアクティブ化しました（月間${newMonthlySlots}枠付与）`,
+      plan: plan.plan_name,
+      monthly_slots: newMonthlySlots
+    })
+  } catch (error: any) {
+    console.error('Activate error:', error)
+    return c.json({ error: 'アクティブ化に失敗しました: ' + error.message }, 500)
   }
 })
 
