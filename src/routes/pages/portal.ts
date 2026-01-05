@@ -1332,8 +1332,14 @@ routes.get('/portal/:token', async (c) => {
                         return;
                     }
                     
-                    // ========== 手付金セクション ==========
-                    if (paymentInfo.deposit_required) {
+                    // 請求書ベースの支払いがある場合は、案件直接の支払い情報は表示しない（重複防止）
+                    // 請求書に着手金(deposit)タイプがあるかチェック
+                    const allInvoices = [...unpaidInvoices, ...(reportedInvoices || [])];
+                    const hasDepositInvoice = allInvoices.some(inv => inv.invoice_type === 'deposit');
+                    const hasSuccessFeeInvoice = allInvoices.some(inv => inv.invoice_type === 'success_fee');
+                    
+                    // ========== 手付金セクション（請求書がない場合のみ表示） ==========
+                    if (paymentInfo.deposit_required && !hasDepositInvoice) {
                         const depositAmount = paymentInfo.deposit_amount || 0;
                         const depositPaid = paymentInfo.deposit_paid;
                         const depositReported = paymentInfo.deposit_transfer_reported;
@@ -1396,8 +1402,8 @@ routes.get('/portal/:token', async (c) => {
                         }
                     }
                     
-                    // ========== 成功報酬セクション ==========
-                    if (paymentInfo.success_fee_enabled) {
+                    // ========== 成功報酬セクション（請求書がない場合のみ表示） ==========
+                    if (paymentInfo.success_fee_enabled && !hasSuccessFeeInvoice) {
                         // 成功報酬額を計算（固定額または採択額に対する割合）
                         let successFeeAmount = 0;
                         if (paymentInfo.success_fee_amount > 0) {
