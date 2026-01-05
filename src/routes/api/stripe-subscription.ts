@@ -565,6 +565,16 @@ routes.post('/stripe/subscription-webhook', async (c) => {
             `).bind(existingSub.id, orgId, newMonthlySlots, today.toISOString().split('T')[0]).run()
           }
           
+          // トライアルからの変更の場合、organizationsテーブルのステータスも更新
+          if (isFromTrial) {
+            await DB.prepare(`
+              UPDATE organizations 
+              SET status = 'active', trial_ends_at = NULL, updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).bind(orgId).run()
+            console.log(`Organization ${orgId} status updated from trial to active`)
+          }
+          
           // プラン変更履歴を記録
           const changeNote = isFromTrial 
             ? `トライアルから${plan.plan_name}に変更（Stripe決済完了、月間${plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots + '枠'}付与）`
@@ -596,6 +606,13 @@ routes.post('/stripe/subscription-webhook', async (c) => {
               VALUES (?, 'monthly', 'subscription_started', ?, ?, ?)
             `).bind(subscriptionId, newMonthlySlots, newMonthlySlots, `Stripe経由で${plan.plan_name}を開始（月間${plan.monthly_slots === -1 ? '無制限' : plan.monthly_slots + '枠'}付与）`).run()
           }
+          
+          // organizationsテーブルのステータスも更新（新規の場合もtrialから変更の可能性がある）
+          await DB.prepare(`
+            UPDATE organizations 
+            SET status = 'active', trial_ends_at = NULL, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND status = 'trial'
+          `).bind(orgId).run()
         }
         
         console.log(`Subscription updated for org ${orgId}: ${plan.plan_name}, ${newMonthlySlots} slots granted`)
