@@ -2696,6 +2696,88 @@ routes.post('/master/organizations/:id/suspend', async (c) => {
   return c.json({ success: true })
 })
 
+// 組織ステータス同期API（トライアル→active の不整合を修正）
+routes.post('/master/organizations/:id/sync-status', async (c) => {
+  const { DB } = c.env
+  const orgId = c.req.param('id')
+  
+  try {
+    // サブスクリプションのステータスを確認
+    const subscription = await DB.prepare(`
+      SELECT us.status as sub_status, us.stripe_subscription_id, o.status as org_status, o.name
+      FROM user_subscriptions us
+      JOIN organizations o ON us.organization_id = o.id
+      WHERE us.organization_id = ?
+      ORDER BY us.created_at DESC
+      LIMIT 1
+    `).bind(orgId).first() as any
+    
+    if (!subscription) {
+      return c.json({ error: '組織またはサブスクリプションが見つかりません' }, 404)
+    }
+    
+    // サブスクリプションがactiveで組織がtrialの場合、同期
+    if (subscription.sub_status === 'active' && subscription.org_status === 'trial') {
+      await DB.prepare(`
+        UPDATE organizations 
+        SET status = 'active', trial_ends_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(orgId).run()
+      
+      return c.json({ 
+        success: true, 
+        message: `${subscription.name}のステータスを 'trial' から 'active' に更新しました`,
+        previous: subscription.org_status,
+        current: 'active'
+      })
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: '同期不要（ステータスは一致しています）',
+      subscription_status: subscription.sub_status,
+      organization_status: subscription.org_status
+    })
+  } catch (error: any) {
+    console.error('Sync status error:', error)
+    return c.json({ error: 'ステータス同期に失敗しました' }, 500)
+  }
+})
+
+// 全組織のステータス同期（一括修正）
+routes.post('/master/organizations/sync-all-status', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // サブスクリプションがactiveなのに組織がtrialのケースを検出
+    const mismatched = await DB.prepare(`
+      SELECT o.id, o.name, o.status as org_status, us.status as sub_status
+      FROM organizations o
+      JOIN user_subscriptions us ON o.id = us.organization_id
+      WHERE us.status = 'active' AND o.status = 'trial'
+    `).all()
+    
+    let updated = 0
+    for (const org of (mismatched.results || [])) {
+      await DB.prepare(`
+        UPDATE organizations 
+        SET status = 'active', trial_ends_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind((org as any).id).run()
+      updated++
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: `${updated}件の組織ステータスを同期しました`,
+      updated_organizations: mismatched.results
+    })
+  } catch (error: any) {
+    console.error('Sync all status error:', error)
+    return c.json({ error: '一括ステータス同期に失敗しました' }, 500)
+  }
+})
+
 // 法人削除API
 routes.delete('/master/organizations/:id', async (c) => {
   const { DB } = c.env
