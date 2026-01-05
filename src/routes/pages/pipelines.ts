@@ -374,24 +374,57 @@ routes.get('/admin/pipelines', (c) => {
                         }
                     };
                     
+                    // ツリー開閉状態を管理
+                    const treeState = JSON.parse(localStorage.getItem('pipelineTreeState') || '{}');
+                    
+                    function toggleTreeItem(itemId) {
+                        const childrenDiv = document.getElementById('children-' + itemId);
+                        const toggleIcon = document.getElementById('toggle-' + itemId);
+                        if (childrenDiv && toggleIcon) {
+                            const isHidden = childrenDiv.classList.contains('hidden');
+                            if (isHidden) {
+                                childrenDiv.classList.remove('hidden');
+                                toggleIcon.classList.remove('fa-chevron-right');
+                                toggleIcon.classList.add('fa-chevron-down');
+                                treeState[itemId] = true;
+                            } else {
+                                childrenDiv.classList.add('hidden');
+                                toggleIcon.classList.remove('fa-chevron-down');
+                                toggleIcon.classList.add('fa-chevron-right');
+                                treeState[itemId] = false;
+                            }
+                            localStorage.setItem('pipelineTreeState', JSON.stringify(treeState));
+                        }
+                    }
+                    window.toggleTreeItem = toggleTreeItem;
+                    
                     // ツリー表示のヘルパー関数
                     function renderTreeItem(item, config, depth = 0) {
                         const indent = depth * 24;
                         const hasChildren = item.children && item.children.length > 0;
                         const isChild = depth > 0;
                         const canAddChild = depth < 1; // 2階層まで（親の子まで）
+                        const isExpanded = treeState[item.id] !== false; // デフォルトは開いた状態
                         
                         let html = \`
                             <div class="p-3 hover:bg-gray-50 group" style="padding-left: \${16 + indent}px">
                                 <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3 cursor-pointer flex-1" onclick="showTemplateDetail(\${item.id})">
-                                        \${isChild ? '<i class="fas fa-level-up-alt fa-rotate-90 text-gray-300 text-xs mr-1"></i>' : ''}
-                                        <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
-                                            <i class="fas \${hasChildren ? 'fa-folder' : 'fa-project-diagram'} text-sm"></i>
-                                        </div>
-                                        <div>
-                                            <div class="font-medium text-gray-900 \${isChild ? 'text-sm' : ''}">\${item.name}</div>
-                                            <div class="text-xs text-gray-500 line-clamp-1">\${item.description || ''}</div>
+                                    <div class="flex items-center gap-2 flex-1">
+                                        \${hasChildren ? \`
+                                            <button onclick="event.stopPropagation(); toggleTreeItem(\${item.id})" 
+                                                    class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded">
+                                                <i id="toggle-\${item.id}" class="fas \${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'} text-xs"></i>
+                                            </button>
+                                        \` : '<div class="w-6"></div>'}
+                                        <div class="flex items-center gap-3 cursor-pointer flex-1" onclick="showTemplateDetail(\${item.id})">
+                                            \${isChild ? '<i class="fas fa-level-up-alt fa-rotate-90 text-gray-300 text-xs mr-1"></i>' : ''}
+                                            <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
+                                                <i class="fas \${hasChildren ? 'fa-folder' : 'fa-project-diagram'} text-sm"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-900 \${isChild ? 'text-sm' : ''}">\${item.name}</div>
+                                                <div class="text-xs text-gray-500 line-clamp-1">\${item.description || ''}</div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
@@ -415,11 +448,13 @@ routes.get('/admin/pipelines', (c) => {
                             </div>
                         \`;
                         
-                        // 子アイテムを再帰的にレンダリング
+                        // 子アイテムを再帰的にレンダリング（折りたたみ可能）
                         if (hasChildren) {
+                            html += \`<div id="children-\${item.id}" class="\${isExpanded ? '' : 'hidden'}">\`;
                             item.children.forEach(child => {
                                 html += renderTreeItem(child, config, depth + 1);
                             });
+                            html += '</div>';
                         }
                         
                         return html;
