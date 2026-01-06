@@ -174,7 +174,7 @@ routes.get('/portal/:token', async (c) => {
                     
                     <!-- クイックアクション（カード形式） -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div onclick="openModal('hearingModal')" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-indigo-500">
+                        <button type="button" id="btnHearing" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-indigo-500 text-left w-full">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
                                     <i class="fas fa-clipboard-list text-indigo-600"></i>
@@ -184,8 +184,8 @@ routes.get('/portal/:token', async (c) => {
                                     <div id="hearingQuickStatus" class="font-bold text-indigo-600">0/0</div>
                                 </div>
                             </div>
-                        </div>
-                        <div onclick="openModal('documentsModal')" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-green-500">
+                        </button>
+                        <button type="button" id="btnDocuments" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-green-500 text-left w-full">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                                     <i class="fas fa-file-upload text-green-600"></i>
@@ -195,8 +195,8 @@ routes.get('/portal/:token', async (c) => {
                                     <div id="documentsQuickStatus" class="font-bold text-green-600">確認する</div>
                                 </div>
                             </div>
-                        </div>
-                        <div onclick="openModal('createModal')" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-purple-500">
+                        </button>
+                        <button type="button" id="btnCreate" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-purple-500 text-left w-full">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                                     <i class="fas fa-file-signature text-purple-600"></i>
@@ -206,8 +206,8 @@ routes.get('/portal/:token', async (c) => {
                                     <div class="font-bold text-purple-600">作成する</div>
                                 </div>
                             </div>
-                        </div>
-                        <div onclick="openModal('messagesModal')" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
+                        </button>
+                        <button type="button" id="btnMessages" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500 text-left w-full">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                                     <i class="fas fa-comments text-blue-600"></i>
@@ -217,7 +217,7 @@ routes.get('/portal/:token', async (c) => {
                                     <div id="messagesQuickStatus" class="font-bold text-blue-600">0件</div>
                                 </div>
                             </div>
-                        </div>
+                        </button>
                     </div>
                     
                     <!-- パイプライン進捗（メイン表示） -->
@@ -6494,6 +6494,39 @@ routes.get('/portal/:token', async (c) => {
             
             // 初期化処理（ステータス読み込み後に他の機能を読み込む）
             async function initPortal() {
+                // クイックアクションボタンのイベントリスナーを設定
+                const btnHearing = document.getElementById('btnHearing');
+                const btnDocuments = document.getElementById('btnDocuments');
+                const btnCreate = document.getElementById('btnCreate');
+                const btnMessages = document.getElementById('btnMessages');
+                
+                if (btnHearing) {
+                    btnHearing.addEventListener('click', function() {
+                        console.log('Hearing button clicked');
+                        openModal('hearingModal');
+                    });
+                }
+                if (btnDocuments) {
+                    btnDocuments.addEventListener('click', function() {
+                        console.log('Documents button clicked');
+                        openModal('documentsModal');
+                    });
+                }
+                if (btnCreate) {
+                    btnCreate.addEventListener('click', function() {
+                        console.log('Create button clicked');
+                        openModal('createModal');
+                    });
+                }
+                if (btnMessages) {
+                    btnMessages.addEventListener('click', function() {
+                        console.log('Messages button clicked');
+                        openModal('messagesModal');
+                    });
+                }
+                
+                console.log('Portal initialized - buttons:', { btnHearing, btnDocuments, btnCreate, btnMessages });
+                
                 // まずステータスを読み込む（見込みステータスの判定に必要）
                 await loadStatus();
                 
