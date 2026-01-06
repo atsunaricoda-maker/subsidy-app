@@ -1223,32 +1223,39 @@ routes.get('/portal/:token', async (c) => {
                     // 案件の支払い情報を取得
                     let paymentInfo = null;
                     let unpaidInvoices = [];
+                    let reportedInvoices = [];
+                    let paidInvoices = [];
+                    let allInvoicesFromAPI = [];
                     
                     if (CASE_ID) {
                         const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
                         paymentInfo = caseRes.data;
+                        console.log('Payment Info from case:', paymentInfo);
                         
                         // 請求書を取得
                         try {
                             const invoicesRes = await axios.get(\`/api/cases/\${CASE_ID}/invoices\`);
-                            const allInvoicesFromAPI = invoicesRes.data || [];
+                            allInvoicesFromAPI = invoicesRes.data || [];
+                            console.log('All invoices from API:', allInvoicesFromAPI);
                             
                             // 未払い請求書（issued, sent）
                             unpaidInvoices = allInvoicesFromAPI.filter(inv => 
                                 inv.status === 'issued' || inv.status === 'sent'
                             );
                             // 報告済み請求書（payment_reported）
-                            var reportedInvoices = allInvoicesFromAPI.filter(inv => 
+                            reportedInvoices = allInvoicesFromAPI.filter(inv => 
                                 inv.status === 'payment_reported'
                             );
                             // 支払い確認済み請求書（paid）
-                            var paidInvoices = allInvoicesFromAPI.filter(inv => 
+                            paidInvoices = allInvoicesFromAPI.filter(inv => 
                                 inv.status === 'paid'
                             );
+                            
+                            console.log('Unpaid invoices:', unpaidInvoices.length, unpaidInvoices);
+                            console.log('Reported invoices:', reportedInvoices.length, reportedInvoices);
+                            console.log('Paid invoices:', paidInvoices.length, paidInvoices);
                         } catch (e) {
-                            console.log('No invoices found');
-                            var reportedInvoices = [];
-                            var paidInvoices = [];
+                            console.log('No invoices found or error:', e);
                         }
                     }
                     
@@ -1343,12 +1350,18 @@ routes.get('/portal/:token', async (c) => {
                     
                     // 請求書ベースの支払いがある場合は、案件直接の支払い情報は表示しない（重複防止）
                     // 全ての請求書（未払い、報告済み、確認済み）を含めてチェック
-                    const allInvoices = [...unpaidInvoices, ...(reportedInvoices || []), ...(paidInvoices || [])];
+                    const allInvoices = [...unpaidInvoices, ...reportedInvoices, ...paidInvoices];
                     const hasDepositInvoice = allInvoices.some(inv => inv.invoice_type === 'deposit');
                     const hasSuccessFeeInvoice = allInvoices.some(inv => inv.invoice_type === 'success_fee');
                     
+                    console.log('allInvoices count:', allInvoices.length);
+                    console.log('hasDepositInvoice:', hasDepositInvoice);
+                    console.log('hasSuccessFeeInvoice:', hasSuccessFeeInvoice);
+                    console.log('paymentInfo.deposit_required:', paymentInfo?.deposit_required);
+                    
                     // ========== 手付金セクション（請求書がない場合のみ表示） ==========
-                    if (paymentInfo.deposit_required && !hasDepositInvoice) {
+                    if (paymentInfo && paymentInfo.deposit_required && !hasDepositInvoice) {
+                        console.log('Showing case deposit section (no invoice found)');
                         const depositAmount = paymentInfo.deposit_amount || 0;
                         const depositPaid = paymentInfo.deposit_paid;
                         const depositReported = paymentInfo.deposit_transfer_reported;
