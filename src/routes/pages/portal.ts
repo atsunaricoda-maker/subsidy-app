@@ -1239,11 +1239,18 @@ routes.get('/portal/:token', async (c) => {
             function openModal(modalId) {
                 console.log('openModal called:', modalId);
                 const modal = document.getElementById(modalId);
+                console.log('Modal element:', modal);
                 if (modal) {
-                    // hiddenクラスを削除し、displayをflexに設定
+                    // hiddenクラスを削除
                     modal.classList.remove('hidden');
-                    modal.style.display = 'flex';
-                    console.log('Modal opened, display:', modal.style.display, 'classList:', modal.className);
+                    // display: flex を!importantで強制設定（Tailwindの優先順位を上書き）
+                    modal.style.setProperty('display', 'flex', 'important');
+                    modal.style.setProperty('visibility', 'visible', 'important');
+                    modal.style.setProperty('opacity', '1', 'important');
+                    
+                    const computedStyle = window.getComputedStyle(modal);
+                    console.log('Modal after style change - display:', computedStyle.display, ', visibility:', computedStyle.visibility, ', className:', modal.className);
+                    
                     // モーダルのコンテンツを読み込む
                     if (modalId === 'hearingModal' && typeof loadHearingForModal === 'function') loadHearingForModal();
                     if (modalId === 'documentsModal' && typeof loadDocumentsForModal === 'function') loadDocumentsForModal();
@@ -1257,7 +1264,8 @@ routes.get('/portal/:token', async (c) => {
                 const modal = document.getElementById(modalId);
                 if (modal) {
                     modal.classList.add('hidden');
-                    modal.style.display = 'none';
+                    modal.style.setProperty('display', 'none', 'important');
+                    modal.style.setProperty('visibility', 'hidden', 'important');
                 }
             }
             
