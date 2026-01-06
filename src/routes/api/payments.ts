@@ -97,6 +97,14 @@ routes.post('/clients/:clientId/report-transfer', async (c) => {
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `).bind(caseId).run()
+        
+        // 関連する成功報酬請求書のステータスも更新
+        await DB.prepare(`
+          UPDATE invoices 
+          SET status = 'payment_reported', 
+              updated_at = CURRENT_TIMESTAMP
+          WHERE case_id = ? AND invoice_type = 'success_fee' AND status IN ('issued', 'sent')
+        `).bind(caseId).run()
       }
     } else {
       // 着手金の振込報告
@@ -116,6 +124,14 @@ routes.post('/clients/:clientId/report-transfer', async (c) => {
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `).bind(caseId).run()
+        
+        // 関連する着手金請求書のステータスも更新
+        await DB.prepare(`
+          UPDATE invoices 
+          SET status = 'payment_reported', 
+              updated_at = CURRENT_TIMESTAMP
+          WHERE case_id = ? AND invoice_type = 'deposit' AND status IN ('issued', 'sent')
+        `).bind(caseId).run()
       } else {
         await DB.prepare(`
           UPDATE cases 
@@ -123,6 +139,14 @@ routes.post('/clients/:clientId/report-transfer', async (c) => {
               deposit_transfer_reported_at = CURRENT_TIMESTAMP,
               updated_at = CURRENT_TIMESTAMP
           WHERE client_id = ?
+        `).bind(clientId).run()
+        
+        // クライアントに紐づく着手金請求書のステータスも更新
+        await DB.prepare(`
+          UPDATE invoices 
+          SET status = 'payment_reported', 
+              updated_at = CURRENT_TIMESTAMP
+          WHERE client_id = ? AND invoice_type = 'deposit' AND status IN ('issued', 'sent')
         `).bind(clientId).run()
       }
     }
@@ -393,6 +417,93 @@ routes.get('/payments/history', async (c) => {
   } catch (error: any) {
     console.error('Payment history error:', error)
     return c.json({ error: error.message || 'Failed to load payment history' }, 500)
+  }
+})
+
+// データ整合性修正: 案件で振込報告済みだが請求書が未更新の場合を修正
+routes.post('/admin/fix-invoice-status', async (c) => {
+  const { DB } = c.env
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+  
+  try {
+    // 案件で振込報告済みだが、請求書が未更新のケースを検索
+    // 着手金
+    const depositCases = await DB.prepare(`
+      SELECT c.id as case_id, c.client_id, c.deposit_transfer_reported, i.id as invoice_id, i.status as invoice_status
+      FROM cases c
+      LEFT JOIN invoices i ON i.case_id = c.id AND i.invoice_type = 'deposit' AND i.status != 'cancelled'
+      WHERE c.organization_id = ?
+        AND c.deposit_transfer_reported = 1
+        AND i.id IS NOT NULL
+        AND i.status IN ('issued', 'sent')
+    `).bind(orgId).all()
+    
+    let fixedDeposit = 0
+    for (const row of (depositCases.results || []) as any[]) {
+      await DB.prepare(`
+        UPDATE invoices SET status = 'payment_reported', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND status IN ('issued', 'sent')
+      `).bind(row.invoice_id).run()
+      fixedDeposit++
+    }
+    
+    // 成功報酬
+    const successFeeCases = await DB.prepare(`
+      SELECT c.id as case_id, c.client_id, c.success_fee_transfer_reported, i.id as invoice_id, i.status as invoice_status
+      FROM cases c
+      LEFT JOIN invoices i ON i.case_id = c.id AND i.invoice_type = 'success_fee' AND i.status != 'cancelled'
+      WHERE c.organization_id = ?
+        AND c.success_fee_transfer_reported = 1
+        AND i.id IS NOT NULL
+        AND i.status IN ('issued', 'sent')
+    `).bind(orgId).all()
+    
+    let fixedSuccessFee = 0
+    for (const row of (successFeeCases.results || []) as any[]) {
+      await DB.prepare(`
+        UPDATE invoices SET status = 'payment_reported', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND status IN ('issued', 'sent')
+      `).bind(row.invoice_id).run()
+      fixedSuccessFee++
+    }
+    
+    // 案件で入金確認済みだが、請求書が未更新のケースを検索
+    const paidDepositCases = await DB.prepare(`
+      SELECT c.id as case_id, c.client_id, c.deposit_paid, i.id as invoice_id, i.status as invoice_status
+      FROM cases c
+      LEFT JOIN invoices i ON i.case_id = c.id AND i.invoice_type = 'deposit' AND i.status != 'cancelled'
+      WHERE c.organization_id = ?
+        AND c.deposit_paid = 1
+        AND i.id IS NOT NULL
+        AND i.status IN ('issued', 'sent', 'payment_reported')
+    `).bind(orgId).all()
+    
+    let fixedPaidDeposit = 0
+    for (const row of (paidDepositCases.results || []) as any[]) {
+      await DB.prepare(`
+        UPDATE invoices SET status = 'paid', payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND status IN ('issued', 'sent', 'payment_reported')
+      `).bind(row.invoice_id).run()
+      fixedPaidDeposit++
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'データ整合性を修正しました',
+      fixed: {
+        deposit_reported: fixedDeposit,
+        success_fee_reported: fixedSuccessFee,
+        deposit_paid: fixedPaidDeposit
+      }
+    })
+  } catch (error: any) {
+    console.error('Fix invoice status error:', error)
+    return c.json({ error: error.message || '修正に失敗しました' }, 500)
   }
 })
 
