@@ -46,6 +46,22 @@ routes.get('/admin/guidelines', (c) => {
                 </header>
 
                 <div class="p-4 lg:p-6">
+                <!-- 閲覧専用バナー -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-eye text-blue-600"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-blue-800">閲覧専用モード</h3>
+                            <p class="text-sm text-blue-700 mt-1">
+                                公募要領データはマスター管理画面で一元管理されています。<br>
+                                こちらでは最新の公募情報を確認できますが、編集はできません。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- 管轄別サマリー -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div class="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-lg shadow p-4 border-l-4 border-emerald-500">
@@ -178,16 +194,7 @@ routes.get('/admin/guidelines', (c) => {
                 <div id="content-watch" class="space-y-6">
                     <div class="flex justify-between items-center">
                         <h2 class="text-lg font-bold">監視URL一覧</h2>
-                        <div class="flex gap-2">
-                            <button onclick="checkUpdatesNow()" 
-                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                                <i class="fas fa-sync mr-2"></i>今すぐチェック
-                            </button>
-                            <button onclick="openAddUrlModal()" 
-                                    class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
-                                <i class="fas fa-plus mr-2"></i>URL追加
-                            </button>
-                        </div>
+                        <span class="text-sm text-gray-500"><i class="fas fa-lock mr-1"></i>閲覧専用</span>
                     </div>
                     <div class="bg-white rounded-lg shadow overflow-hidden">
                         <table class="w-full text-sm">
@@ -196,11 +203,10 @@ routes.get('/admin/guidelines', (c) => {
                                     <th class="px-4 py-3 text-left">補助金</th>
                                     <th class="px-4 py-3 text-left">URL</th>
                                     <th class="px-4 py-3 text-left">最終チェック</th>
-                                    <th class="px-4 py-3 text-left">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="watchUrlsList" class="divide-y">
-                                <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">読み込み中...</td></tr>
+                                <tr><td colspan="3" class="px-4 py-8 text-center text-gray-500">読み込み中...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -208,7 +214,10 @@ routes.get('/admin/guidelines', (c) => {
 
                 <!-- 更新履歴タブ -->
                 <div id="content-updates" class="hidden space-y-6">
-                    <h2 class="text-lg font-bold">更新検知履歴</h2>
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold">更新検知履歴</h2>
+                        <span class="text-sm text-gray-500"><i class="fas fa-lock mr-1"></i>閲覧専用</span>
+                    </div>
                     <div class="bg-white rounded-lg shadow overflow-hidden">
                         <table class="w-full text-sm">
                             <thead class="bg-gray-50 border-b">
@@ -217,11 +226,10 @@ routes.get('/admin/guidelines', (c) => {
                                     <th class="px-4 py-3 text-left">補助金</th>
                                     <th class="px-4 py-3 text-left">変更種別</th>
                                     <th class="px-4 py-3 text-left">ステータス</th>
-                                    <th class="px-4 py-3 text-left">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="updateLogsList" class="divide-y">
-                                <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">読み込み中...</td></tr>
+                                <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">読み込み中...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -229,35 +237,10 @@ routes.get('/admin/guidelines', (c) => {
 
                 <!-- 公募要領詳細タブ -->
                 <div id="content-guidelines" class="hidden space-y-6">
-                    <!-- AI自動更新セクション -->
-                    <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
-                        <div class="flex flex-wrap items-center justify-between gap-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-robot text-white"></i>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-purple-900">AI自動更新</h3>
-                                    <p class="text-sm text-purple-700">公式サイトからAIが最新情報を自動抽出します</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-2">
-                                <select id="aiExtractSubsidy" class="px-3 py-2 border border-purple-300 rounded-lg text-sm bg-white">
-                                    <option value="">補助金を選択</option>
-                                </select>
-                                <button onclick="openAiExtractModal()" 
-                                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2">
-                                    <i class="fas fa-magic"></i>
-                                    <span>AIで情報取得</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <div class="flex flex-wrap justify-between items-center gap-4">
                         <div>
                             <h2 class="text-lg font-bold">公募要領詳細</h2>
-                            <p class="text-sm text-gray-500">補助金・助成金ごとに公募情報を管理します</p>
+                            <p class="text-sm text-gray-500">補助金・助成金ごとの公募情報を確認できます</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <select id="categoryFilter" onchange="filterGuidelines()" class="px-3 py-2 border rounded-lg text-sm">
@@ -270,10 +253,7 @@ routes.get('/admin/guidelines', (c) => {
                                 <option value="active">有効のみ</option>
                                 <option value="inactive">終了のみ</option>
                             </select>
-                            <button onclick="openAddGuidelineModal()" 
-                                    class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
-                                <i class="fas fa-plus mr-2"></i>新規追加
-                            </button>
+                            <span class="text-sm text-gray-500 flex items-center"><i class="fas fa-lock mr-1"></i>閲覧専用</span>
                         </div>
                     </div>
                     <div id="guidelinesList" class="space-y-8">
@@ -1179,11 +1159,6 @@ routes.get('/admin/guidelines', (c) => {
                         <td class="px-4 py-3 text-xs text-gray-500">
                             \${url.last_checked_at ? new Date(url.last_checked_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未チェック'}
                         </td>
-                        <td class="px-4 py-3">
-                            <button onclick="deleteWatchUrl(\${url.id})" class="text-red-600 hover:text-red-800">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
                     </tr>
                 \`).join('');
             }
@@ -1195,7 +1170,7 @@ routes.get('/admin/guidelines', (c) => {
                 
                 const tbody = document.getElementById('updateLogsList');
                 if (logs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">更新履歴がありません</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">更新履歴がありません</td></tr>';
                     return;
                 }
                 
@@ -1215,14 +1190,6 @@ routes.get('/admin/guidelines', (c) => {
                         <td class="px-4 py-3 text-sm">\${log.change_type || '-'}</td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-1 rounded text-xs \${statusLabels[log.status]?.class || ''}">\${statusLabels[log.status]?.label || log.status}</span>
-                        </td>
-                        <td class="px-4 py-3">
-                            <select onchange="updateLogStatus(\${log.id}, this.value)" class="text-sm border rounded px-2 py-1">
-                                <option value="pending" \${log.status === 'pending' ? 'selected' : ''}>未確認</option>
-                                <option value="reviewed" \${log.status === 'reviewed' ? 'selected' : ''}>確認済み</option>
-                                <option value="applied" \${log.status === 'applied' ? 'selected' : ''}>対応済み</option>
-                                <option value="ignored" \${log.status === 'ignored' ? 'selected' : ''}>対応不要</option>
-                            </select>
                         </td>
                     </tr>
                 \`).join('');

@@ -60,6 +60,8 @@ import master_plansPages from './routes/pages/master-plans'
 import masterPages from './routes/pages/master'
 import masterInquiriesPages from './routes/pages/master-inquiries'
 import masterAnnouncementsPages from './routes/pages/master-announcements'
+import masterGuidelinesPages from './routes/pages/master-guidelines'
+import masterPipelinesPages from './routes/pages/master-pipelines'
 import pipelinesPages from './routes/pages/pipelines'
 import pipelineBoardPages from './routes/pages/pipeline-board'
 import portalPages from './routes/pages/portal'
@@ -1184,6 +1186,8 @@ app.route('', master_plansPages)
 app.route('', masterPages)
 app.route('', masterInquiriesPages)
 app.route('', masterAnnouncementsPages)
+app.route('', masterGuidelinesPages)
+app.route('', masterPipelinesPages)
 // site_settingsの/master/*ページルートをルートレベルでもマウント
 app.route('', site_settingsRoutes)
 app.route('', pipelinesPages)
