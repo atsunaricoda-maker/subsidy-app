@@ -6,7 +6,7 @@ import { getCurrentUser } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-// ヒアリング質問管理ページ
+// ヒアリング質問管理ページ（ツリービュー）
 routes.get('/master/hearing-questions', async (c) => {
   return c.html(`
     <!DOCTYPE html>
@@ -18,62 +18,69 @@ routes.get('/master/hearing-questions', async (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <style>
+            .tree-toggle { cursor: pointer; user-select: none; }
+            .tree-toggle:hover { background: rgba(59, 130, 246, 0.1); }
+            .tree-content { overflow: hidden; transition: max-height 0.3s ease; }
+            .tree-content.collapsed { max-height: 0 !important; }
+            .category-subsidy { background: #dbeafe; color: #1e40af; border-left: 3px solid #3b82f6; }
+            .category-grant { background: #dcfce7; color: #166534; border-left: 3px solid #22c55e; }
+            .category-license { background: #fef3c7; color: #92400e; border-left: 3px solid #f59e0b; }
+            .category-common { background: #f3e8ff; color: #7c3aed; border-left: 3px solid #8b5cf6; }
+            .question-item:hover { background: #f9fafb; }
+            .badge-required { background: #fee2e2; color: #dc2626; }
+            .badge-optional { background: #f3f4f6; color: #6b7280; }
+        </style>
     </head>
     <body class="bg-gray-100">
         <div class="flex min-h-screen">
             ${generateMasterSidebar('hearing')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-6">
                 <div class="mb-6 flex items-center justify-between">
                     <div>
-                        <h1 class="text-3xl font-bold text-gray-800">ヒアリング質問管理</h1>
-                        <p class="text-gray-600 mt-1">顧客ポータルで表示される質問を管理</p>
+                        <h1 class="text-2xl font-bold text-gray-800">ヒアリング質問管理</h1>
+                        <p class="text-gray-600 text-sm mt-1">補助金種別・カテゴリ別にツリー表示</p>
                     </div>
-                    <button onclick="openAddModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                        <i class="fas fa-plus"></i>新規質問追加
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button onclick="expandAll()" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-expand-alt mr-1"></i>すべて展開
+                        </button>
+                        <button onclick="collapseAll()" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-compress-alt mr-1"></i>すべて折りたたむ
+                        </button>
+                        <button onclick="openAddModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                            <i class="fas fa-plus"></i>新規質問追加
+                        </button>
+                    </div>
                 </div>
                 
-                <!-- フィルター -->
-                <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+                <!-- 検索・フィルター -->
+                <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
                     <div class="flex items-center gap-4">
                         <div class="flex-1">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">補助金種別</label>
-                            <select id="filterSubsidyType" onchange="loadQuestions()" class="w-full px-3 py-2 border rounded-lg">
-                                <option value="">すべて</option>
-                                <option value="0">共通質問</option>
+                            <input type="text" id="searchQuery" placeholder="質問文で検索..." 
+                                class="w-full px-4 py-2 border rounded-lg" oninput="filterQuestions()">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-gray-500">表示:</span>
+                            <select id="viewFilter" onchange="loadQuestions()" class="px-3 py-2 border rounded-lg text-sm">
+                                <option value="all">すべて</option>
+                                <option value="subsidy">補助金（行政書士）</option>
+                                <option value="grant">助成金（社労士）</option>
+                                <option value="license">許認可</option>
+                                <option value="common">共通質問</option>
                             </select>
                         </div>
-                        <div class="flex-1">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
-                            <select id="filterCategory" onchange="loadQuestions()" class="w-full px-3 py-2 border rounded-lg">
-                                <option value="">すべて</option>
-                                <option value="企業情報">企業情報</option>
-                                <option value="課題分析">課題分析</option>
-                                <option value="IT計画">IT計画</option>
-                                <option value="事業計画">事業計画</option>
-                                <option value="将来計画">将来計画</option>
-                                <option value="期待効果">期待効果</option>
-                            </select>
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">検索</label>
-                            <input type="text" id="searchQuery" placeholder="質問文で検索..." class="w-full px-3 py-2 border rounded-lg" oninput="loadQuestions()">
-                        </div>
+                        <span id="totalCount" class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full"></span>
                     </div>
                 </div>
                 
-                <!-- 質問一覧 -->
-                <div class="bg-white rounded-xl shadow-sm">
-                    <div class="p-4 border-b flex items-center justify-between">
-                        <h2 class="font-semibold">質問一覧</h2>
-                        <span id="questionCount" class="text-sm text-gray-500">0件</span>
-                    </div>
-                    <div id="questionList" class="divide-y">
-                        <div class="p-8 text-center text-gray-500">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>読み込み中...</p>
-                        </div>
+                <!-- ツリービュー -->
+                <div id="treeView" class="space-y-3">
+                    <div class="bg-white rounded-lg p-8 text-center text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>読み込み中...</p>
                     </div>
                 </div>
             </main>
@@ -82,7 +89,7 @@ routes.get('/master/hearing-questions', async (c) => {
         <!-- 質問編集モーダル -->
         <div id="questionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-4 border-b flex items-center justify-between sticky top-0 bg-white">
+                <div class="p-4 border-b flex items-center justify-between sticky top-0 bg-white z-10">
                     <h3 id="modalTitle" class="text-lg font-bold">質問を編集</h3>
                     <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
                         <i class="fas fa-times text-xl"></i>
@@ -91,23 +98,18 @@ routes.get('/master/hearing-questions', async (c) => {
                 <form id="questionForm" class="p-6 space-y-4">
                     <input type="hidden" id="questionId">
                     
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">補助金種別 <span class="text-red-500">*</span></label>
-                        <select id="subsidyTypeId" class="w-full px-3 py-2 border rounded-lg" required>
-                            <option value="0">共通質問（全種別で表示）</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">カテゴリ <span class="text-red-500">*</span></label>
-                        <select id="category" class="w-full px-3 py-2 border rounded-lg" required>
-                            <option value="企業情報">企業情報</option>
-                            <option value="課題分析">課題分析</option>
-                            <option value="IT計画">IT計画</option>
-                            <option value="事業計画">事業計画</option>
-                            <option value="将来計画">将来計画</option>
-                            <option value="期待効果">期待効果</option>
-                        </select>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">補助金種別 <span class="text-red-500">*</span></label>
+                            <select id="subsidyTypeId" class="w-full px-3 py-2 border rounded-lg" required>
+                                <option value="0">共通質問（全種別で表示）</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">カテゴリ <span class="text-red-500">*</span></label>
+                            <input type="text" id="category" list="categoryList" class="w-full px-3 py-2 border rounded-lg" required placeholder="企業情報、課題分析など">
+                            <datalist id="categoryList"></datalist>
+                        </div>
                     </div>
                     
                     <div>
@@ -116,19 +118,28 @@ routes.get('/master/hearing-questions', async (c) => {
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">ヒント文</label>
-                        <textarea id="hintText" rows="2" class="w-full px-3 py-2 border rounded-lg" placeholder="回答者へのヒントや補足説明"></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ヒント・説明</label>
+                        <textarea id="helpText" rows="2" class="w-full px-3 py-2 border rounded-lg" placeholder="回答者へのヒントや補足説明"></textarea>
                     </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">記入例</label>
-                        <textarea id="exampleText" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="回答例を記載"></textarea>
+                        <textarea id="exampleAnswer" rows="2" class="w-full px-3 py-2 border rounded-lg" placeholder="回答例を記載"></textarea>
                     </div>
                     
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">表示順</label>
                             <input type="number" id="displayOrder" class="w-full px-3 py-2 border rounded-lg" value="0" min="0">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">質問タイプ</label>
+                            <select id="questionType" class="w-full px-3 py-2 border rounded-lg">
+                                <option value="text">テキスト</option>
+                                <option value="textarea">長文</option>
+                                <option value="select">選択式</option>
+                                <option value="number">数値</option>
+                            </select>
                         </div>
                         <div class="flex items-center gap-2 pt-6">
                             <input type="checkbox" id="isRequired" class="rounded">
@@ -136,7 +147,7 @@ routes.get('/master/hearing-questions', async (c) => {
                         </div>
                     </div>
                     
-                    <div class="flex justify-end gap-3 pt-4">
+                    <div class="flex justify-end gap-3 pt-4 border-t">
                         <button type="button" onclick="closeModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-50">キャンセル</button>
                         <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                             <i class="fas fa-save mr-1"></i>保存
@@ -147,24 +158,44 @@ routes.get('/master/hearing-questions', async (c) => {
         </div>
         
         <script>
+            ${masterSidebarScripts}
+            
             const masterToken = localStorage.getItem('master_token');
             if (!masterToken) window.location.href = '/master/login';
             axios.defaults.headers.common['Authorization'] = 'Bearer ' + masterToken;
             
+            let allQuestions = [];
             let subsidyTypes = [];
+            let categories = new Set();
+            let expandedNodes = new Set();
             
             // 補助金種別を読み込み
             async function loadSubsidyTypes() {
                 try {
-                    const res = await axios.get('/api/subsidy-types');
+                    const res = await axios.get('/api/master/subsidy-types');
                     subsidyTypes = res.data || [];
                     
-                    const filterSelect = document.getElementById('filterSubsidyType');
                     const formSelect = document.getElementById('subsidyTypeId');
+                    formSelect.innerHTML = '<option value="0">共通質問（全種別で表示）</option>';
                     
+                    // カテゴリ別にグループ化
+                    const grouped = {};
                     subsidyTypes.forEach(st => {
-                        filterSelect.innerHTML += \`<option value="\${st.id}">\${st.name}</option>\`;
-                        formSelect.innerHTML += \`<option value="\${st.id}">\${st.name}</option>\`;
+                        const cat = st.category || 'その他';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(st);
+                    });
+                    
+                    Object.keys(grouped).sort().forEach(cat => {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = cat;
+                        grouped[cat].forEach(st => {
+                            const opt = document.createElement('option');
+                            opt.value = st.id;
+                            opt.textContent = st.name;
+                            optgroup.appendChild(opt);
+                        });
+                        formSelect.appendChild(optgroup);
                     });
                 } catch (e) {
                     console.error('Load subsidy types error:', e);
@@ -173,62 +204,214 @@ routes.get('/master/hearing-questions', async (c) => {
             
             // 質問一覧を読み込み
             async function loadQuestions() {
-                const subsidyTypeId = document.getElementById('filterSubsidyType').value;
-                const category = document.getElementById('filterCategory').value;
-                const search = document.getElementById('searchQuery').value;
-                
                 try {
-                    let url = '/api/master/hearing-questions?';
-                    if (subsidyTypeId) url += \`subsidy_type_id=\${subsidyTypeId}&\`;
-                    if (category) url += \`category=\${encodeURIComponent(category)}&\`;
-                    if (search) url += \`search=\${encodeURIComponent(search)}&\`;
+                    const res = await axios.get('/api/master/hearing-questions');
+                    allQuestions = res.data || [];
                     
-                    const res = await axios.get(url);
-                    const questions = res.data || [];
+                    // カテゴリリストを更新
+                    categories.clear();
+                    allQuestions.forEach(q => {
+                        if (q.category) categories.add(q.category);
+                    });
+                    updateCategoryDatalist();
                     
-                    document.getElementById('questionCount').textContent = questions.length + '件';
-                    
-                    if (questions.length === 0) {
-                        document.getElementById('questionList').innerHTML = \`
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fas fa-clipboard-list text-4xl mb-3 text-gray-300"></i>
-                                <p>質問がありません</p>
-                            </div>
-                        \`;
-                        return;
-                    }
-                    
-                    document.getElementById('questionList').innerHTML = questions.map(q => \`
-                        <div class="p-4 hover:bg-gray-50">
-                            <div class="flex items-start justify-between gap-4">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="px-2 py-0.5 text-xs rounded-full \${q.subsidy_type_id === 0 ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
-                                            \${q.subsidy_type_id === 0 ? '共通' : (q.subsidy_name || '種別不明')}
-                                        </span>
-                                        <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">\${q.category}</span>
-                                        \${q.is_required ? '<span class="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">必須</span>' : ''}
-                                    </div>
-                                    <p class="font-medium text-gray-800">\${q.question_text}</p>
-                                    \${q.hint_text ? \`<p class="text-sm text-gray-500 mt-1"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>\${q.hint_text}</p>\` : ''}
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs text-gray-400">順序: \${q.display_order}</span>
-                                    <button onclick="editQuestion(\${q.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button onclick="deleteQuestion(\${q.id})" class="p-2 text-red-600 hover:bg-red-50 rounded">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    \`).join('');
-                    
+                    renderTreeView();
                 } catch (e) {
                     console.error('Load questions error:', e);
-                    document.getElementById('questionList').innerHTML = '<p class="p-4 text-red-500">読み込みに失敗しました</p>';
+                    document.getElementById('treeView').innerHTML = '<div class="bg-white rounded-lg p-8 text-center text-red-500">読み込みに失敗しました</div>';
                 }
+            }
+            
+            function updateCategoryDatalist() {
+                const datalist = document.getElementById('categoryList');
+                datalist.innerHTML = Array.from(categories).sort().map(c => 
+                    '<option value="' + c + '">'
+                ).join('');
+            }
+            
+            function filterQuestions() {
+                renderTreeView();
+            }
+            
+            function renderTreeView() {
+                const viewFilter = document.getElementById('viewFilter').value;
+                const searchQuery = document.getElementById('searchQuery').value.toLowerCase();
+                
+                // フィルタリング
+                let filtered = allQuestions;
+                if (viewFilter === 'common') {
+                    filtered = filtered.filter(q => q.subsidy_type_id === 0);
+                } else if (viewFilter !== 'all') {
+                    const stIds = subsidyTypes
+                        .filter(st => {
+                            if (viewFilter === 'subsidy') return st.category === '行政書士管轄';
+                            if (viewFilter === 'grant') return st.category === '社労士管轄';
+                            if (viewFilter === 'license') return st.category === '許認可';
+                            return false;
+                        })
+                        .map(st => st.id);
+                    filtered = filtered.filter(q => stIds.includes(q.subsidy_type_id));
+                }
+                
+                if (searchQuery) {
+                    filtered = filtered.filter(q => 
+                        q.question_text.toLowerCase().includes(searchQuery) ||
+                        (q.category && q.category.toLowerCase().includes(searchQuery))
+                    );
+                }
+                
+                document.getElementById('totalCount').textContent = '全 ' + filtered.length + ' 件';
+                
+                // 補助金種別カテゴリ別にグループ化
+                const tree = {};
+                
+                // 共通質問を先に追加
+                const commonQuestions = filtered.filter(q => q.subsidy_type_id === 0);
+                if (commonQuestions.length > 0) {
+                    tree['共通質問'] = { questions: commonQuestions, category: 'common' };
+                }
+                
+                // 補助金種別ごとにグループ化
+                const stMap = {};
+                subsidyTypes.forEach(st => stMap[st.id] = st);
+                
+                filtered.filter(q => q.subsidy_type_id !== 0).forEach(q => {
+                    const st = stMap[q.subsidy_type_id];
+                    if (!st) return;
+                    
+                    const stCategory = st.category || 'その他';
+                    const key = st.name;
+                    
+                    if (!tree[key]) {
+                        tree[key] = { 
+                            questions: [], 
+                            stCategory: stCategory,
+                            stId: st.id,
+                            category: stCategory === '行政書士管轄' ? 'subsidy' : 
+                                     stCategory === '社労士管轄' ? 'grant' : 
+                                     stCategory === '許認可' ? 'license' : 'other'
+                        };
+                    }
+                    tree[key].questions.push(q);
+                });
+                
+                // ツリーをレンダリング
+                const container = document.getElementById('treeView');
+                
+                if (Object.keys(tree).length === 0) {
+                    container.innerHTML = '<div class="bg-white rounded-lg p-8 text-center text-gray-500"><i class="fas fa-clipboard-list text-4xl mb-3 text-gray-300"></i><p>該当する質問がありません</p></div>';
+                    return;
+                }
+                
+                let html = '';
+                
+                // カテゴリ順でソート（共通 → 補助金 → 助成金 → 許認可）
+                const sortOrder = { 'common': 0, 'subsidy': 1, 'grant': 2, 'license': 3, 'other': 4 };
+                const sortedKeys = Object.keys(tree).sort((a, b) => {
+                    const catA = sortOrder[tree[a].category] || 4;
+                    const catB = sortOrder[tree[b].category] || 4;
+                    if (catA !== catB) return catA - catB;
+                    return a.localeCompare(b, 'ja');
+                });
+                
+                sortedKeys.forEach(stName => {
+                    const node = tree[stName];
+                    const nodeId = 'node-' + stName.replace(/[^a-zA-Z0-9]/g, '_');
+                    const isExpanded = expandedNodes.has(stName);
+                    const catClass = 'category-' + node.category;
+                    
+                    // カテゴリ別に質問をグループ化
+                    const byCategory = {};
+                    node.questions.forEach(q => {
+                        const cat = q.category || '未分類';
+                        if (!byCategory[cat]) byCategory[cat] = [];
+                        byCategory[cat].push(q);
+                    });
+                    
+                    html += '<div class="bg-white rounded-lg shadow-sm overflow-hidden ' + catClass + '">';
+                    html += '<div class="tree-toggle p-3 flex items-center justify-between" onclick="toggleNode(\\'' + stName.replace(/'/g, "\\\\'") + '\\')">';
+                    html += '<div class="flex items-center gap-3">';
+                    html += '<i class="fas fa-chevron-' + (isExpanded ? 'down' : 'right') + ' text-gray-400 w-4 transition-transform"></i>';
+                    html += '<span class="font-medium">' + stName + '</span>';
+                    html += '<span class="text-xs px-2 py-0.5 rounded-full bg-white/50">' + node.questions.length + '件</span>';
+                    html += '</div>';
+                    html += '<button onclick="event.stopPropagation(); openAddModalForType(' + (node.stId || 0) + ')" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-plus mr-1"></i>追加</button>';
+                    html += '</div>';
+                    
+                    html += '<div id="' + nodeId + '" class="tree-content ' + (isExpanded ? '' : 'collapsed') + '" style="max-height: ' + (isExpanded ? '9999px' : '0') + ';">';
+                    
+                    // カテゴリごとに表示
+                    Object.keys(byCategory).sort().forEach(cat => {
+                        html += '<div class="border-t border-gray-100">';
+                        html += '<div class="px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-2">';
+                        html += '<i class="fas fa-folder text-gray-400"></i>' + cat + ' (' + byCategory[cat].length + ')';
+                        html += '</div>';
+                        
+                        byCategory[cat].sort((a, b) => (a.display_order || 0) - (b.display_order || 0)).forEach(q => {
+                            html += '<div class="question-item px-4 py-3 border-t border-gray-50 flex items-start justify-between gap-3">';
+                            html += '<div class="flex-1 min-w-0">';
+                            html += '<div class="flex items-center gap-2 mb-1">';
+                            html += '<span class="text-xs px-1.5 py-0.5 rounded ' + (q.is_required ? 'badge-required' : 'badge-optional') + '">' + (q.is_required ? '必須' : '任意') + '</span>';
+                            html += '<span class="text-xs text-gray-400">順序: ' + (q.display_order || 0) + '</span>';
+                            html += '</div>';
+                            html += '<p class="text-sm text-gray-800">' + q.question_text + '</p>';
+                            if (q.help_text) {
+                                html += '<p class="text-xs text-gray-500 mt-1"><i class="fas fa-info-circle mr-1"></i>' + q.help_text + '</p>';
+                            }
+                            html += '</div>';
+                            html += '<div class="flex items-center gap-1 flex-shrink-0">';
+                            html += '<button onclick="editQuestion(' + q.id + ')" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="編集"><i class="fas fa-edit"></i></button>';
+                            html += '<button onclick="deleteQuestion(' + q.id + ')" class="p-1.5 text-red-600 hover:bg-red-50 rounded" title="削除"><i class="fas fa-trash"></i></button>';
+                            html += '</div>';
+                            html += '</div>';
+                        });
+                        
+                        html += '</div>';
+                    });
+                    
+                    html += '</div></div>';
+                });
+                
+                container.innerHTML = html;
+            }
+            
+            function toggleNode(stName) {
+                const nodeId = 'node-' + stName.replace(/[^a-zA-Z0-9]/g, '_');
+                const content = document.getElementById(nodeId);
+                const icon = content.parentElement.querySelector('.fa-chevron-right, .fa-chevron-down');
+                
+                if (expandedNodes.has(stName)) {
+                    expandedNodes.delete(stName);
+                    content.classList.add('collapsed');
+                    content.style.maxHeight = '0';
+                    icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+                } else {
+                    expandedNodes.add(stName);
+                    content.classList.remove('collapsed');
+                    content.style.maxHeight = '9999px';
+                    icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+                }
+            }
+            
+            function expandAll() {
+                document.querySelectorAll('.tree-content').forEach(el => {
+                    el.classList.remove('collapsed');
+                    el.style.maxHeight = '9999px';
+                    const icon = el.parentElement.querySelector('.fa-chevron-right');
+                    if (icon) icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+                });
+                // expandedNodesを更新
+                Object.keys(subsidyTypes).forEach(st => expandedNodes.add(st.name));
+            }
+            
+            function collapseAll() {
+                document.querySelectorAll('.tree-content').forEach(el => {
+                    el.classList.add('collapsed');
+                    el.style.maxHeight = '0';
+                    const icon = el.parentElement.querySelector('.fa-chevron-down');
+                    if (icon) icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+                });
+                expandedNodes.clear();
             }
             
             function openAddModal() {
@@ -239,19 +422,28 @@ routes.get('/master/hearing-questions', async (c) => {
                 document.getElementById('questionModal').classList.remove('hidden');
             }
             
+            function openAddModalForType(stId) {
+                openAddModal();
+                document.getElementById('subsidyTypeId').value = stId;
+            }
+            
             async function editQuestion(id) {
                 try {
-                    const res = await axios.get(\`/api/master/hearing-questions/\${id}\`);
-                    const q = res.data;
+                    const q = allQuestions.find(q => q.id === id);
+                    if (!q) {
+                        alert('質問が見つかりません');
+                        return;
+                    }
                     
                     document.getElementById('modalTitle').textContent = '質問を編集';
                     document.getElementById('questionId').value = q.id;
                     document.getElementById('subsidyTypeId').value = q.subsidy_type_id;
-                    document.getElementById('category').value = q.category;
+                    document.getElementById('category').value = q.category || '';
                     document.getElementById('questionText').value = q.question_text;
-                    document.getElementById('hintText').value = q.hint_text || '';
-                    document.getElementById('exampleText').value = q.example_text || '';
+                    document.getElementById('helpText').value = q.help_text || '';
+                    document.getElementById('exampleAnswer').value = q.example_answer || '';
                     document.getElementById('displayOrder').value = q.display_order || 0;
+                    document.getElementById('questionType').value = q.question_type || 'text';
                     document.getElementById('isRequired').checked = q.is_required;
                     
                     document.getElementById('questionModal').classList.remove('hidden');
@@ -264,7 +456,7 @@ routes.get('/master/hearing-questions', async (c) => {
                 if (!confirm('この質問を削除しますか？')) return;
                 
                 try {
-                    await axios.delete(\`/api/master/hearing-questions/\${id}\`);
+                    await axios.delete('/api/master/hearing-questions/' + id);
                     loadQuestions();
                 } catch (e) {
                     alert('削除に失敗しました');
@@ -283,32 +475,33 @@ routes.get('/master/hearing-questions', async (c) => {
                     subsidy_type_id: parseInt(document.getElementById('subsidyTypeId').value),
                     category: document.getElementById('category').value,
                     question_text: document.getElementById('questionText').value,
-                    hint_text: document.getElementById('hintText').value,
-                    example_text: document.getElementById('exampleText').value,
+                    help_text: document.getElementById('helpText').value,
+                    example_answer: document.getElementById('exampleAnswer').value,
                     display_order: parseInt(document.getElementById('displayOrder').value) || 0,
-                    is_required: document.getElementById('isRequired').checked
+                    question_type: document.getElementById('questionType').value,
+                    is_required: document.getElementById('isRequired').checked ? 1 : 0
                 };
                 
                 try {
                     if (id) {
-                        await axios.put(\`/api/master/hearing-questions/\${id}\`, data);
+                        await axios.put('/api/master/hearing-questions/' + id, data);
                     } else {
                         await axios.post('/api/master/hearing-questions', data);
                     }
                     closeModal();
                     loadQuestions();
                 } catch (e) {
-                    alert('保存に失敗しました');
+                    alert('保存に失敗しました: ' + (e.response?.data?.error || e.message));
                 }
             });
             
-            function masterLogout() {
-                localStorage.removeItem('master_token');
-                window.location.href = '/master/login';
-            }
-            
-            loadSubsidyTypes();
-            loadQuestions();
+            // 初期化
+            (async () => {
+                await loadSubsidyTypes();
+                await loadQuestions();
+                // 共通質問を初期展開
+                expandedNodes.add('共通質問');
+            })();
         </script>
     </body>
     </html>
