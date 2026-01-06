@@ -965,16 +965,28 @@ routes.get('/admin/guidelines', (c) => {
 
             // 補助金種別読み込み
             async function loadSubsidyTypes() {
-                const response = await axios.get('/api/subsidy-types');
-                subsidyTypes = response.data;
-                
-                const options = '<option value="">選択してください</option>' + 
-                    subsidyTypes.map(s => \`<option value="\${s.id}">\${s.name}</option>\`).join('');
-                document.getElementById('addUrlSubsidyType').innerHTML = options;
-                document.getElementById('addGuidelineSubsidyType').innerHTML = options;
-                document.getElementById('aiExtractSubsidy').innerHTML = '<option value="">補助金を選択</option>' + 
-                    subsidyTypes.map(s => \`<option value="\${s.id}" data-url="\${s.source_url || ''}">\${s.name}</option>\`).join('');
-                document.getElementById('aiExtractSubsidyType').innerHTML = options;
+                try {
+                    const response = await axios.get('/api/subsidy-types');
+                    subsidyTypes = response.data || [];
+                    
+                    const options = '<option value="">選択してください</option>' + 
+                        subsidyTypes.map(s => \`<option value="\${s.id}">\${s.name}</option>\`).join('');
+                    
+                    const addUrlSubsidyType = document.getElementById('addUrlSubsidyType');
+                    const addGuidelineSubsidyType = document.getElementById('addGuidelineSubsidyType');
+                    const aiExtractSubsidy = document.getElementById('aiExtractSubsidy');
+                    const aiExtractSubsidyType = document.getElementById('aiExtractSubsidyType');
+                    
+                    if (addUrlSubsidyType) addUrlSubsidyType.innerHTML = options;
+                    if (addGuidelineSubsidyType) addGuidelineSubsidyType.innerHTML = options;
+                    if (aiExtractSubsidy) {
+                        aiExtractSubsidy.innerHTML = '<option value="">補助金を選択</option>' + 
+                            subsidyTypes.map(s => \`<option value="\${s.id}" data-url="\${s.source_url || ''}">\${s.name}</option>\`).join('');
+                    }
+                    if (aiExtractSubsidyType) aiExtractSubsidyType.innerHTML = options;
+                } catch (error) {
+                    console.error('Error loading subsidy types:', error);
+                }
             }
             
             // AI抽出モーダル
