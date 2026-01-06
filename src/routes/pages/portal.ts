@@ -1232,6 +1232,46 @@ routes.get('/portal/:token', async (c) => {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             // ========================================
+            // グローバル関数（最初に定義）
+            // ========================================
+            
+            // モーダル開閉関数
+            function openModal(modalId) {
+                console.log('openModal called:', modalId);
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    // モーダルのコンテンツを読み込む
+                    if (modalId === 'hearingModal' && typeof loadHearingForModal === 'function') loadHearingForModal();
+                    if (modalId === 'documentsModal' && typeof loadDocumentsForModal === 'function') loadDocumentsForModal();
+                    if (modalId === 'messagesModal' && typeof loadMessagesForModal === 'function') loadMessagesForModal();
+                } else {
+                    console.error('Modal not found:', modalId);
+                }
+            }
+            
+            function closeModal(modalId) {
+                const modal = document.getElementById(modalId);
+                if (modal) modal.classList.add('hidden');
+            }
+            
+            // AIサイドバー関数
+            function toggleAiSidebar() {
+                const sidebar = document.getElementById('aiSidebar');
+                const overlay = document.getElementById('aiSidebarOverlay');
+                if (sidebar) sidebar.classList.toggle('mobile-open');
+                if (overlay) overlay.classList.toggle('hidden');
+            }
+            
+            function setAiQuestion(question) {
+                const input = document.getElementById('aiChatInput');
+                if (input) {
+                    input.value = question;
+                    sendAiMessage();
+                }
+            }
+            
+            // ========================================
             // XSS対策: HTMLエスケープ関数
             // ========================================
             function escapeHtml(text) {
@@ -4452,18 +4492,15 @@ routes.get('/portal/:token', async (c) => {
                 sidebar.classList.toggle('mobile-open');
                 if (overlay) overlay.classList.toggle('hidden');
             }
-            
-            function setAiQuestion(question) {
-                document.getElementById('aiChatInput').value = question;
-                sendAiMessage();
-            }
-            
+            // sendAiMessage関数（CLIENT_IDとCASE_IDが必要なのでここで定義）
             async function sendAiMessage() {
                 const input = document.getElementById('aiChatInput');
+                if (!input) return;
                 const message = input.value.trim();
                 if (!message) return;
                 
                 const chatMessages = document.getElementById('aiChatMessages');
+                if (!chatMessages) return;
                 
                 // ユーザーメッセージを追加
                 chatMessages.innerHTML += \`
@@ -4514,31 +4551,6 @@ routes.get('/portal/:token', async (c) => {
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
             }
-            
-            // 汎用モーダル開閉
-            function openModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.remove('hidden');
-                    // モーダルのコンテンツを読み込む
-                    if (modalId === 'hearingModal') loadHearingForModal();
-                    if (modalId === 'documentsModal') loadDocumentsForModal();
-                    if (modalId === 'messagesModal') loadMessagesForModal();
-                }
-            }
-            
-            function closeModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) modal.classList.add('hidden');
-            }
-            
-            // グローバルスコープに公開
-            window.openModal = openModal;
-            window.closeModal = closeModal;
-            window.toggleAiSidebar = toggleAiSidebar;
-            window.setAiQuestion = setAiQuestion;
-            window.sendAiMessage = sendAiMessage;
-            window.sendModalMessage = sendModalMessage;
             
             // モーダル用データ読み込み
             async function loadHearingForModal() {
