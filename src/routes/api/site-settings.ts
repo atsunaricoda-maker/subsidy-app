@@ -490,6 +490,111 @@ routes.get('/master/logs', async (c) => {
   }
 })
 
+// =============================================
+// マスター管理用: 補助金種別API
+// =============================================
+
+// 補助金種別一覧取得（マスター管理用 - 全種別表示）
+routes.get('/master/subsidy-types', async (c) => {
+  const { DB } = c.env
+  const category = c.req.query('category')
+  
+  try {
+    let query = `SELECT * FROM subsidy_types WHERE id > 0`
+    const params: string[] = []
+    
+    if (category) {
+      query += ` AND category = ?`
+      params.push(category)
+    }
+    
+    query += ` ORDER BY category, name`
+    
+    const result = params.length > 0
+      ? await DB.prepare(query).bind(...params).all()
+      : await DB.prepare(query).all()
+    
+    return c.json(result.results || [])
+  } catch (error: any) {
+    console.error('Load subsidy types error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 補助金種別作成（マスター管理用）
+routes.post('/master/subsidy-types', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO subsidy_types (name, description, category)
+      VALUES (?, ?, ?)
+    `).bind(
+      data.name,
+      data.description || null,
+      data.category || null
+    ).run()
+    
+    return c.json({ id: result.meta.last_row_id, success: true })
+  } catch (error: any) {
+    console.error('Create subsidy type error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 補助金種別更新（マスター管理用）
+routes.put('/master/subsidy-types/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE subsidy_types 
+      SET name = ?, description = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      data.name,
+      data.description || null,
+      data.category || null,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Update subsidy type error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 補助金種別削除（マスター管理用）
+routes.delete('/master/subsidy-types/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  // id = 0 は共通質問用なので削除不可
+  if (id === '0') {
+    return c.json({ error: '共通質問用のレコードは削除できません' }, 400)
+  }
+  
+  try {
+    // 関連データも削除
+    await DB.prepare(`DELETE FROM hearing_questions WHERE subsidy_type_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM subsidy_type_documents WHERE subsidy_type_id = ?`).bind(id).run()
+    await DB.prepare(`DELETE FROM subsidy_types WHERE id = ?`).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete subsidy type error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// =============================================
+// マスター管理用: ヒアリング質問API
+// =============================================
+
 // ヒアリング質問一覧取得（マスター管理用）
 routes.get('/master/hearing-questions', async (c) => {
   const { DB } = c.env
