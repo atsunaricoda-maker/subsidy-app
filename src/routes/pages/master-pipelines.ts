@@ -1,109 +1,92 @@
-// パイプライン管理ページ
+// マスター管理 - パイプライン管理ページ
 import { Hono } from 'hono'
-import { generateSidebar, sidebarStyles, sidebarScripts } from '../../templates/sidebar'
+import { generateMasterSidebar, masterSidebarStyles, masterSidebarScripts } from '../../templates/master-sidebar'
 import type { AppEnv } from '../../types'
-import { getCurrentUser } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-routes.get('/admin/pipelines', (c) => {
+routes.get('/master/pipelines', (c) => {
   return c.html(`
     <!DOCTYPE html>
     <html lang="ja">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>パイプライン管理 - 申請らくらく君</title>
+        <title>パイプライン管理 - マスター管理</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
-            ${sidebarStyles}
+            ${masterSidebarStyles}
             .task-card { transition: all 0.2s; }
             .task-card:hover { transform: translateX(4px); }
         </style>
     </head>
     <body class="bg-gray-100">
         <div class="min-h-screen flex">
-            ${generateSidebar('pipelines')}
+            ${generateMasterSidebar('master-pipelines')}
             
             <!-- メインコンテンツ -->
             <main class="flex-1 min-h-screen">
+                <!-- 警告バナー -->
+                <div class="bg-yellow-100 border-b border-yellow-300 px-4 py-2 flex items-center gap-2">
+                    <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                    <span class="text-yellow-800 text-sm font-medium">
+                        マスターデータ編集 - ここで編集したパイプラインテンプレートは、すべての法人組織で標準テンプレートとして利用可能になります
+                    </span>
+                </div>
+                
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
                             <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
                                 <i class="fas fa-bars text-xl"></i>
                             </button>
-                            <h2 class="text-lg font-semibold text-gray-800">パイプライン管理</h2>
+                            <h2 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-project-diagram text-blue-600 mr-2"></i>
+                                標準パイプラインテンプレート管理
+                            </h2>
                         </div>
                         <div class="flex items-center gap-3">
                             <button onclick="openNewTemplateModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                                <i class="fas fa-plus mr-2"></i>カスタムテンプレート作成
+                                <i class="fas fa-plus mr-2"></i>新規標準テンプレート
                             </button>
                         </div>
                     </div>
                 </header>
                 
-                <div class="p-4 lg:p-6 space-y-6">
+                <div class="p-4 lg:p-6">
                     <!-- 説明カード -->
-                    <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                    <div class="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200">
                         <h3 class="font-bold text-blue-800 mb-2 flex items-center gap-2">
-                            <i class="fas fa-info-circle"></i>パイプラインテンプレートの使い方
+                            <i class="fas fa-info-circle"></i>標準パイプラインテンプレートについて
                         </h3>
                         <div class="text-sm text-blue-700 space-y-1">
-                            <p>• <span class="font-medium">標準テンプレート</span>：すべての組織で共有されるテンプレート。そのまま使用するか、複製してカスタマイズできます</p>
-                            <p>• <span class="font-medium">カスタムテンプレート</span>：自社専用のテンプレート。自由に編集・削除できます</p>
+                            <p>• ここで作成したテンプレートは、すべての法人組織で「標準テンプレート」として表示されます</p>
+                            <p>• 各組織は標準テンプレートを「そのまま使用」または「複製してカスタマイズ」できます</p>
+                            <p>• 標準テンプレートの編集・削除はマスター管理画面からのみ可能です</p>
                         </div>
                     </div>
                     
-                    <!-- フィルター -->
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="checkbox" id="treeViewToggle" onchange="loadAllTemplates()" class="rounded text-blue-600" checked>
-                            <span>ツリー表示</span>
-                        </label>
-                        <select id="filterCategory" onchange="loadAllTemplates()" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm">
-                            <option value="">すべてのカテゴリ</option>
-                            <option value="subsidy">行政書士管轄</option>
-                            <option value="grant">社労士管轄</option>
-                            <option value="license">許認可</option>
-                        </select>
-                    </div>
-                    
-                    <!-- 標準テンプレート一覧 -->
+                    <!-- テンプレート一覧 -->
                     <div class="bg-white rounded-xl shadow-sm">
-                        <div class="p-4 border-b border-gray-100 bg-yellow-50">
-                            <div class="flex items-center gap-2">
-                                <i class="fas fa-star text-yellow-500"></i>
-                                <h3 class="text-base font-bold text-gray-800">標準テンプレート</h3>
-                                <span class="text-xs text-gray-500">（そのまま使用 or 複製してカスタマイズ）</span>
+                        <div class="p-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+                            <h3 class="text-base font-bold text-gray-800">標準パイプラインテンプレート</h3>
+                            <div class="flex items-center gap-3">
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" id="treeViewToggle" onchange="loadTemplates()" class="rounded text-blue-600" checked>
+                                    <span>ツリー表示</span>
+                                </label>
+                                <select id="filterCategory" onchange="loadTemplates()" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm">
+                                    <option value="">すべてのカテゴリ</option>
+                                    <option value="subsidy">行政書士管轄</option>
+                                    <option value="grant">社労士管轄</option>
+                                    <option value="license">許認可</option>
+                                </select>
                             </div>
                         </div>
-                        <div id="masterTemplatesList" class="divide-y divide-gray-100">
-                            <div class="text-center py-8 text-gray-500">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <div>読み込み中...</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- カスタムテンプレート一覧 -->
-                    <div class="bg-white rounded-xl shadow-sm">
-                        <div class="p-4 border-b border-gray-100 bg-green-50">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    <i class="fas fa-edit text-green-600"></i>
-                                    <h3 class="text-base font-bold text-gray-800">カスタムテンプレート</h3>
-                                    <span class="text-xs text-gray-500">（自社専用、自由に編集可能）</span>
-                                </div>
-                                <button onclick="openNewTemplateModal()" class="text-green-600 hover:text-green-700 text-sm">
-                                    <i class="fas fa-plus mr-1"></i>新規作成
-                                </button>
-                            </div>
-                        </div>
-                        <div id="orgTemplatesList" class="divide-y divide-gray-100">
-                            <div class="text-center py-8 text-gray-500">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <div id="templatesList" class="divide-y divide-gray-100">
+                            <div class="text-center py-12 text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
                                 <div>読み込み中...</div>
                             </div>
                         </div>
@@ -117,11 +100,15 @@ routes.get('/admin/pipelines', (c) => {
             <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                 <div class="p-6 border-b sticky top-0 bg-white z-10">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-xl font-bold" id="modalTitle">新規カスタムテンプレート作成</h3>
+                        <h3 class="text-xl font-bold">
+                            <i class="fas fa-star text-yellow-500 mr-2"></i>
+                            新規標準パイプラインテンプレート作成
+                        </h3>
                         <button onclick="closeNewTemplateModal()" class="text-gray-500 hover:text-gray-700">
                             <i class="fas fa-times text-xl"></i>
                         </button>
                     </div>
+                    <p class="text-sm text-gray-500 mt-1">※ すべての法人組織で利用可能な標準テンプレートとして登録されます</p>
                 </div>
                 <form id="newTemplateForm" class="p-6 space-y-6">
                     <!-- 基本情報 -->
@@ -140,12 +127,6 @@ routes.get('/admin/pipelines', (c) => {
                                 <option value="subsidy">行政書士管轄（補助金）</option>
                                 <option value="grant">社労士管轄（助成金）</option>
                                 <option value="license">許認可</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">担当者</label>
-                            <select name="created_by" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                                <option value="">選択してください</option>
                             </select>
                         </div>
                         <div>
@@ -168,6 +149,7 @@ routes.get('/admin/pipelines', (c) => {
                             <span class="text-xs text-gray-500 font-normal ml-2">（空の場合はすべての申請種別で利用可能）</span>
                         </h4>
                         <div id="subsidyTypeCheckboxes" class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                            <!-- 申請種別のチェックボックスがここに追加される -->
                         </div>
                     </div>
                     
@@ -218,12 +200,13 @@ routes.get('/admin/pipelines', (c) => {
                             </button>
                         </div>
                         <div id="tasksList" class="space-y-3">
+                            <!-- タスク行がここに追加される -->
                         </div>
                     </div>
                     
                     <div class="flex gap-3 pt-4">
                         <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium">
-                            <i class="fas fa-save mr-2"></i>保存
+                            <i class="fas fa-save mr-2"></i>標準テンプレートとして保存
                         </button>
                         <button type="button" onclick="closeNewTemplateModal()" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 font-medium">
                             キャンセル
@@ -245,15 +228,18 @@ routes.get('/admin/pipelines', (c) => {
                     </div>
                 </div>
                 <div id="templateDetailContent" class="p-6">
+                    <!-- 詳細がここに表示される -->
                 </div>
             </div>
         </div>
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
-            ${sidebarScripts}
-        </script>
-        <script>
+            ${masterSidebarScripts}
+            
+            // マスター認証チェック
+            checkMasterAuth();
+            
             // トースト通知
             function showToast(message, type = 'success') {
                 const toast = document.createElement('div');
@@ -324,16 +310,8 @@ routes.get('/admin/pipelines', (c) => {
                 if (row) row.remove();
             }
             
-            // 全テンプレート読み込み
-            async function loadAllTemplates() {
-                await Promise.all([
-                    loadMasterTemplates(),
-                    loadOrgTemplates()
-                ]);
-            }
-            
-            // マスターテンプレート読み込み
-            async function loadMasterTemplates() {
+            // テンプレート一覧読み込み（マスターテンプレートのみ）
+            async function loadTemplates() {
                 try {
                     const category = document.getElementById('filterCategory').value;
                     const treeMode = document.getElementById('treeViewToggle')?.checked;
@@ -342,56 +320,21 @@ routes.get('/admin/pipelines', (c) => {
                         url += '&category=' + category;
                     }
                     
-                    const response = await axios.get(url);
+                    // マスター認証トークンを追加
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get(url, {
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                    });
                     const templates = response.data;
                     
-                    const container = document.getElementById('masterTemplatesList');
+                    const container = document.getElementById('templatesList');
                     
                     if (templates.length === 0) {
                         container.innerHTML = \`
-                            <div class="text-center py-8 text-gray-500">
-                                <i class="fas fa-folder-open text-3xl mb-2 text-gray-300"></i>
-                                <p>標準テンプレートがありません</p>
-                            </div>
-                        \`;
-                        return;
-                    }
-                    
-                    renderTemplates(container, templates, true);
-                    
-                } catch (error) {
-                    console.error('Error loading master templates:', error);
-                    document.getElementById('masterTemplatesList').innerHTML = \`
-                        <div class="text-center py-8 text-red-500">
-                            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-                            <p>読み込みエラー</p>
-                        </div>
-                    \`;
-                }
-            }
-            
-            // 組織テンプレート読み込み
-            async function loadOrgTemplates() {
-                try {
-                    const category = document.getElementById('filterCategory').value;
-                    const treeMode = document.getElementById('treeViewToggle')?.checked;
-                    let url = '/api/pipeline-templates?tree=' + (treeMode ? 'true' : 'false') + '&org_only=true';
-                    if (category) {
-                        url += '&category=' + category;
-                    }
-                    
-                    const response = await axios.get(url);
-                    const templates = response.data;
-                    
-                    const container = document.getElementById('orgTemplatesList');
-                    
-                    if (templates.length === 0) {
-                        container.innerHTML = \`
-                            <div class="text-center py-8 text-gray-500">
-                                <i class="fas fa-folder-open text-3xl mb-2 text-gray-300"></i>
-                                <p>カスタムテンプレートがありません</p>
-                                <p class="text-sm mt-1">標準テンプレートを複製するか、新規作成してください</p>
-                                <button onclick="openNewTemplateModal()" class="mt-3 text-green-600 hover:text-green-700">
+                            <div class="text-center py-12 text-gray-500">
+                                <i class="fas fa-folder-open text-4xl mb-3 text-gray-300"></i>
+                                <p>標準パイプラインテンプレートがありません</p>
+                                <button onclick="openNewTemplateModal()" class="mt-3 text-blue-600 hover:text-blue-700">
                                     <i class="fas fa-plus mr-1"></i>新規作成
                                 </button>
                             </div>
@@ -399,124 +342,100 @@ routes.get('/admin/pipelines', (c) => {
                         return;
                     }
                     
-                    renderTemplates(container, templates, false);
-                    
-                } catch (error) {
-                    console.error('Error loading org templates:', error);
-                    document.getElementById('orgTemplatesList').innerHTML = \`
-                        <div class="text-center py-8 text-red-500">
-                            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-                            <p>読み込みエラー</p>
-                        </div>
-                    \`;
-                }
-            }
-            
-            // テンプレート描画
-            function renderTemplates(container, templates, isMaster) {
-                const treeMode = document.getElementById('treeViewToggle')?.checked;
-                
-                const categoryConfig = {
-                    'subsidy': { 
-                        label: '補助金（行政書士管轄）', 
-                        icon: 'fa-file-signature',
-                        headerClass: 'bg-emerald-50 border-emerald-500',
-                        iconClass: 'text-emerald-600',
-                        titleClass: 'text-emerald-800',
-                        countClass: 'text-emerald-600',
-                        itemBgClass: 'bg-emerald-100',
-                        itemIconClass: 'text-emerald-600'
-                    },
-                    'grant': { 
-                        label: '助成金（社労士管轄）', 
-                        icon: 'fa-users',
-                        headerClass: 'bg-blue-50 border-blue-500',
-                        iconClass: 'text-blue-600',
-                        titleClass: 'text-blue-800',
-                        countClass: 'text-blue-600',
-                        itemBgClass: 'bg-blue-100',
-                        itemIconClass: 'text-blue-600'
-                    },
-                    'license': { 
-                        label: '許認可申請', 
-                        icon: 'fa-stamp',
-                        headerClass: 'bg-indigo-50 border-indigo-500',
-                        iconClass: 'text-indigo-600',
-                        titleClass: 'text-indigo-800',
-                        countClass: 'text-indigo-600',
-                        itemBgClass: 'bg-indigo-100',
-                        itemIconClass: 'text-indigo-600'
-                    }
-                };
-                
-                // ツリー開閉状態を管理
-                const stateKey = isMaster ? 'masterPipelineTreeState' : 'orgPipelineTreeState';
-                const treeState = JSON.parse(localStorage.getItem(stateKey) || '{}');
-                
-                window['toggleTreeItem' + (isMaster ? 'Master' : 'Org')] = function(itemId) {
-                    const childrenDiv = document.getElementById((isMaster ? 'master-' : 'org-') + 'children-' + itemId);
-                    const toggleIcon = document.getElementById((isMaster ? 'master-' : 'org-') + 'toggle-' + itemId);
-                    if (childrenDiv && toggleIcon) {
-                        const isHidden = childrenDiv.classList.contains('hidden');
-                        if (isHidden) {
-                            childrenDiv.classList.remove('hidden');
-                            toggleIcon.classList.remove('fa-chevron-right');
-                            toggleIcon.classList.add('fa-chevron-down');
-                            treeState[itemId] = true;
-                        } else {
-                            childrenDiv.classList.add('hidden');
-                            toggleIcon.classList.remove('fa-chevron-down');
-                            toggleIcon.classList.add('fa-chevron-right');
-                            treeState[itemId] = false;
+                    const categoryConfig = {
+                        'subsidy': { 
+                            label: '補助金（行政書士管轄）', 
+                            icon: 'fa-file-signature',
+                            headerClass: 'bg-emerald-50 border-emerald-500',
+                            iconClass: 'text-emerald-600',
+                            titleClass: 'text-emerald-800',
+                            countClass: 'text-emerald-600',
+                            itemBgClass: 'bg-emerald-100',
+                            itemIconClass: 'text-emerald-600'
+                        },
+                        'grant': { 
+                            label: '助成金（社労士管轄）', 
+                            icon: 'fa-users',
+                            headerClass: 'bg-blue-50 border-blue-500',
+                            iconClass: 'text-blue-600',
+                            titleClass: 'text-blue-800',
+                            countClass: 'text-blue-600',
+                            itemBgClass: 'bg-blue-100',
+                            itemIconClass: 'text-blue-600'
+                        },
+                        'license': { 
+                            label: '許認可申請', 
+                            icon: 'fa-stamp',
+                            headerClass: 'bg-indigo-50 border-indigo-500',
+                            iconClass: 'text-indigo-600',
+                            titleClass: 'text-indigo-800',
+                            countClass: 'text-indigo-600',
+                            itemBgClass: 'bg-indigo-100',
+                            itemIconClass: 'text-indigo-600'
                         }
-                        localStorage.setItem(stateKey, JSON.stringify(treeState));
-                    }
-                };
-                
-                // ツリー表示のヘルパー関数
-                function renderTreeItem(item, config, depth = 0) {
-                    const indent = depth * 24;
-                    const hasChildren = item.children && item.children.length > 0;
-                    const isChild = depth > 0;
-                    const canAddChild = depth < 1 && !isMaster;
-                    const isExpanded = treeState[item.id] !== false;
-                    const prefix = isMaster ? 'master-' : 'org-';
-                    const toggleFn = isMaster ? 'toggleTreeItemMaster' : 'toggleTreeItemOrg';
+                    };
                     
-                    let html = \`
-                        <div class="p-3 hover:bg-gray-50 group" style="padding-left: \${16 + indent}px">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-2 flex-1">
-                                    \${hasChildren ? \`
-                                        <button onclick="event.stopPropagation(); \${toggleFn}(\${item.id})" 
-                                                class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded">
-                                            <i id="\${prefix}toggle-\${item.id}" class="fas \${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'} text-xs"></i>
-                                        </button>
-                                    \` : '<div class="w-6"></div>'}
-                                    <div class="flex items-center gap-3 cursor-pointer flex-1" onclick="showTemplateDetail(\${item.id}, \${isMaster})">
-                                        \${isChild ? '<i class="fas fa-level-up-alt fa-rotate-90 text-gray-300 text-xs mr-1"></i>' : ''}
-                                        <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
-                                            <i class="fas \${hasChildren ? 'fa-folder' : 'fa-project-diagram'} text-sm"></i>
-                                        </div>
-                                        <div>
-                                            <div class="font-medium text-gray-900 \${isChild ? 'text-sm' : ''} flex items-center gap-2">
-                                                \${item.name}
-                                                \${isMaster ? '<span class="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800"><i class="fas fa-star text-xs mr-1"></i>標準</span>' : ''}
+                    // ツリー開閉状態を管理
+                    const treeState = JSON.parse(localStorage.getItem('masterPipelineTreeState') || '{}');
+                    
+                    function toggleTreeItem(itemId) {
+                        const childrenDiv = document.getElementById('children-' + itemId);
+                        const toggleIcon = document.getElementById('toggle-' + itemId);
+                        if (childrenDiv && toggleIcon) {
+                            const isHidden = childrenDiv.classList.contains('hidden');
+                            if (isHidden) {
+                                childrenDiv.classList.remove('hidden');
+                                toggleIcon.classList.remove('fa-chevron-right');
+                                toggleIcon.classList.add('fa-chevron-down');
+                                treeState[itemId] = true;
+                            } else {
+                                childrenDiv.classList.add('hidden');
+                                toggleIcon.classList.remove('fa-chevron-down');
+                                toggleIcon.classList.add('fa-chevron-right');
+                                treeState[itemId] = false;
+                            }
+                            localStorage.setItem('masterPipelineTreeState', JSON.stringify(treeState));
+                        }
+                    }
+                    window.toggleTreeItem = toggleTreeItem;
+                    
+                    // ツリー表示のヘルパー関数
+                    function renderTreeItem(item, config, depth = 0) {
+                        const indent = depth * 24;
+                        const hasChildren = item.children && item.children.length > 0;
+                        const isChild = depth > 0;
+                        const canAddChild = depth < 1;
+                        const isExpanded = treeState[item.id] !== false;
+                        
+                        let html = \`
+                            <div class="p-3 hover:bg-gray-50 group" style="padding-left: \${16 + indent}px">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2 flex-1">
+                                        \${hasChildren ? \`
+                                            <button onclick="event.stopPropagation(); toggleTreeItem(\${item.id})" 
+                                                    class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded">
+                                                <i id="toggle-\${item.id}" class="fas \${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'} text-xs"></i>
+                                            </button>
+                                        \` : '<div class="w-6"></div>'}
+                                        <div class="flex items-center gap-3 cursor-pointer flex-1" onclick="showTemplateDetail(\${item.id})">
+                                            \${isChild ? '<i class="fas fa-level-up-alt fa-rotate-90 text-gray-300 text-xs mr-1"></i>' : ''}
+                                            <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
+                                                <i class="fas \${hasChildren ? 'fa-folder' : 'fa-project-diagram'} text-sm"></i>
                                             </div>
-                                            <div class="text-xs text-gray-500 line-clamp-1">\${item.description || ''}</div>
+                                            <div>
+                                                <div class="font-medium text-gray-900 \${isChild ? 'text-sm' : ''} flex items-center gap-2">
+                                                    \${item.name}
+                                                    <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">
+                                                        <i class="fas fa-star text-xs mr-1"></i>標準
+                                                    </span>
+                                                </div>
+                                                <div class="text-xs text-gray-500 line-clamp-1">\${item.description || ''}</div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    \${hasChildren ? '<span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">' + item.children.length + '子</span>' : ''}
-                                    <span class="text-sm text-gray-500">\${item.task_count || 0}タスク</span>
-                                    \${isMaster ? \`
-                                        <button onclick="event.stopPropagation(); duplicateToOrg(\${item.id})" 
-                                                class="w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center"
-                                                title="カスタマイズして使用">
-                                            <i class="fas fa-copy text-xs"></i>
-                                        </button>
-                                    \` : \`
+                                    <div class="flex items-center gap-2">
+                                        \${hasChildren ? '<span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">' + item.children.length + '子</span>' : ''}
+                                        <span class="text-sm text-gray-500">\${item.task_count || 0}タスク</span>
                                         \${canAddChild ? \`
                                             <button onclick="event.stopPropagation(); createChildPipeline(\${item.id})" 
                                                     class="w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center"
@@ -524,220 +443,110 @@ routes.get('/admin/pipelines', (c) => {
                                                 <i class="fas fa-plus text-xs"></i>
                                             </button>
                                         \` : ''}
-                                        <button onclick="event.stopPropagation(); duplicatePipeline(\${item.id})" 
-                                                class="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center"
-                                                title="複製">
-                                            <i class="fas fa-copy text-xs"></i>
-                                        </button>
-                                    \`}
-                                    <i class="fas fa-chevron-right text-gray-400 cursor-pointer" onclick="showTemplateDetail(\${item.id}, \${isMaster})"></i>
+                                        <i class="fas fa-chevron-right text-gray-400 cursor-pointer" onclick="showTemplateDetail(\${item.id})"></i>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    \`;
-                    
-                    if (hasChildren) {
-                        html += \`<div id="\${prefix}children-\${item.id}" class="\${isExpanded ? '' : 'hidden'}">\`;
-                        item.children.forEach(child => {
-                            html += renderTreeItem(child, config, depth + 1);
-                        });
-                        html += '</div>';
+                        \`;
+                        
+                        if (hasChildren) {
+                            html += \`<div id="children-\${item.id}" class="\${isExpanded ? '' : 'hidden'}">\`;
+                            item.children.forEach(child => {
+                                html += renderTreeItem(child, config, depth + 1);
+                            });
+                            html += '</div>';
+                        }
+                        
+                        return html;
                     }
                     
-                    return html;
-                }
-                
-                // カテゴリ別にグループ化
-                const grouped = {};
-                templates.forEach(t => {
-                    const cat = t.category || 'license';
-                    if (!grouped[cat]) grouped[cat] = [];
-                    grouped[cat].push(t);
-                });
-                
-                const categoryOrder = ['subsidy', 'grant', 'license'];
-                
-                let html = '';
-                categoryOrder.forEach(catKey => {
-                    const items = grouped[catKey];
-                    if (!items || items.length === 0) return;
+                    // カテゴリ別にグループ化
+                    const grouped = {};
+                    templates.forEach(t => {
+                        const cat = t.category || 'license';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(t);
+                    });
                     
-                    const config = categoryConfig[catKey] || categoryConfig['license'];
+                    const categoryOrder = ['subsidy', 'grant', 'license'];
                     
-                    function countItems(arr) {
-                        let count = 0;
-                        arr.forEach(item => {
-                            count++;
-                            if (item.children) count += countItems(item.children);
-                        });
-                        return count;
-                    }
-                    const totalCount = treeMode ? countItems(items) : items.length;
-                    
-                    html += \`
-                        <div class="mb-4 last:mb-0">
-                            <div class="flex items-center gap-3 px-4 py-2 \${config.headerClass} border-l-4 rounded-r-lg">
-                                <i class="fas \${config.icon} \${config.iconClass} text-sm"></i>
-                                <h4 class="font-medium text-sm \${config.titleClass}">\${config.label}</h4>
-                                <span class="ml-auto text-xs \${config.countClass}">\${totalCount}件</span>
-                            </div>
-                            <div class="divide-y divide-gray-100 ml-4 border-l-2 border-gray-200">
-                                \${treeMode 
-                                    ? items.map(t => renderTreeItem(t, config, 0)).join('')
-                                    : items.map(t => \`
-                                        <div class="p-3 hover:bg-gray-50 group pl-6">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-3 cursor-pointer flex-1" onclick="showTemplateDetail(\${t.id}, \${isMaster})">
-                                                    <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
-                                                        <i class="fas fa-project-diagram text-sm"></i>
-                                                    </div>
-                                                    <div>
-                                                        <div class="font-medium text-gray-900 flex items-center gap-2">
-                                                            \${t.name}
-                                                            \${isMaster ? '<span class="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800"><i class="fas fa-star text-xs mr-1"></i>標準</span>' : ''}
+                    let html = '';
+                    categoryOrder.forEach(catKey => {
+                        const items = grouped[catKey];
+                        if (!items || items.length === 0) return;
+                        
+                        const config = categoryConfig[catKey] || categoryConfig['license'];
+                        
+                        function countItems(arr) {
+                            let count = 0;
+                            arr.forEach(item => {
+                                count++;
+                                if (item.children) count += countItems(item.children);
+                            });
+                            return count;
+                        }
+                        const totalCount = treeMode ? countItems(items) : items.length;
+                        
+                        html += \`
+                            <div class="mb-6">
+                                <div class="flex items-center gap-3 px-4 py-3 \${config.headerClass} border-l-4 rounded-r-lg">
+                                    <i class="fas \${config.icon} \${config.iconClass}"></i>
+                                    <h3 class="font-bold \${config.titleClass}">\${config.label}</h3>
+                                    <span class="ml-auto text-sm \${config.countClass}">\${totalCount}件</span>
+                                </div>
+                                <div class="divide-y divide-gray-100 ml-4 border-l-2 border-gray-200">
+                                    \${treeMode 
+                                        ? items.map(t => renderTreeItem(t, config, 0)).join('')
+                                        : items.map(t => \`
+                                            <div class="p-3 hover:bg-gray-50 group pl-6">
+                                                <div class="flex items-center justify-between">
+                                                    <div class="flex items-center gap-3 cursor-pointer flex-1" onclick="showTemplateDetail(\${t.id})">
+                                                        <div class="w-8 h-8 rounded-lg \${config.itemBgClass} flex items-center justify-center \${config.itemIconClass}">
+                                                            <i class="fas fa-project-diagram text-sm"></i>
                                                         </div>
-                                                        <div class="text-xs text-gray-500 line-clamp-1">\${t.description || ''}</div>
+                                                        <div>
+                                                            <div class="font-medium text-gray-900 flex items-center gap-2">
+                                                                \${t.name}
+                                                                <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">
+                                                                    <i class="fas fa-star text-xs mr-1"></i>標準
+                                                                </span>
+                                                            </div>
+                                                            <div class="text-xs text-gray-500 line-clamp-1">\${t.description || ''}</div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
-                                                    \${isMaster ? \`
-                                                        <button onclick="event.stopPropagation(); duplicateToOrg(\${t.id})" 
-                                                                class="w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center"
-                                                                title="カスタマイズして使用">
-                                                            <i class="fas fa-copy text-xs"></i>
-                                                        </button>
-                                                    \` : \`
-                                                        <button onclick="event.stopPropagation(); duplicatePipeline(\${t.id})" 
-                                                                class="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center"
-                                                                title="複製">
-                                                            <i class="fas fa-copy text-xs"></i>
-                                                        </button>
-                                                    \`}
-                                                    <i class="fas fa-chevron-right text-gray-400 cursor-pointer" onclick="showTemplateDetail(\${t.id}, \${isMaster})"></i>
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-sm text-gray-500">\${t.task_count || 0}タスク</span>
+                                                        <i class="fas fa-chevron-right text-gray-400 cursor-pointer" onclick="showTemplateDetail(\${t.id})"></i>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    \`).join('')
-                                }
+                                        \`).join('')
+                                    }
+                                </div>
                             </div>
+                        \`;
+                    });
+                    
+                    container.innerHTML = html;
+                    
+                } catch (error) {
+                    console.error('Error loading templates:', error);
+                    document.getElementById('templatesList').innerHTML = \`
+                        <div class="text-center py-12 text-red-500">
+                            <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                            <p>読み込みエラー</p>
                         </div>
                     \`;
-                });
-                
-                container.innerHTML = html || '<div class="text-center py-8 text-gray-500">テンプレートがありません</div>';
-            }
-            
-            // マスターテンプレートを組織用に複製
-            async function duplicateToOrg(templateId) {
-                if (!confirm('このテンプレートをカスタムテンプレートとして複製しますか？\\n複製後、自由に編集できます。')) return;
-                
-                try {
-                    const response = await axios.post('/api/pipeline-templates/' + templateId + '/duplicate');
-                    
-                    if (response.data.success !== false) {
-                        showToast('テンプレートを複製しました。編集画面を開きます。');
-                        setTimeout(() => {
-                            editTemplate(response.data.id);
-                        }, 500);
-                        loadAllTemplates();
-                    } else {
-                        alert('複製に失敗しました: ' + (response.data.error || '不明なエラー'));
-                    }
-                } catch (error) {
-                    console.error('Error duplicating template:', error);
-                    alert('複製に失敗しました');
-                }
-            }
-            
-            // 組織テンプレートを複製
-            async function duplicatePipeline(templateId) {
-                try {
-                    const response = await axios.get('/api/pipeline-templates/' + templateId);
-                    const original = response.data;
-                    
-                    const copyData = {
-                        name: original.name + '（コピー）',
-                        description: original.description || '',
-                        category: original.category,
-                        parent_id: null,
-                        service_start_offset: original.service_start_offset || 0,
-                        service_end_offset: original.service_end_offset || 30,
-                        progress_reflection: original.progress_reflection,
-                        allow_external_tasks: original.allow_external_tasks,
-                        requires_approval: original.requires_approval,
-                        subsidy_type_ids: original.subsidy_type_ids ? JSON.parse(original.subsidy_type_ids) : null,
-                        tasks: (original.tasks || []).map(t => ({
-                            task_name: t.task_name,
-                            task_type: t.task_type,
-                            description: t.description,
-                            days_offset_start: t.days_offset_start,
-                            days_offset_end: t.days_offset_end,
-                            is_required: t.is_required
-                        }))
-                    };
-                    
-                    const createResponse = await axios.post('/api/pipeline-templates', copyData);
-                    
-                    if (createResponse.data.success !== false) {
-                        showToast('パイプラインを複製しました。編集画面を開きます。');
-                        setTimeout(() => {
-                            editTemplate(createResponse.data.id);
-                        }, 500);
-                        loadAllTemplates();
-                    }
-                } catch (error) {
-                    console.error('Error duplicating pipeline:', error);
-                    alert('パイプラインの複製に失敗しました');
-                }
-            }
-            
-            // 子パイプラインを作成
-            async function createChildPipeline(parentId) {
-                try {
-                    const response = await axios.get('/api/pipeline-templates/' + parentId);
-                    const parent = response.data;
-                    
-                    const childData = {
-                        name: parent.name + '（バリエーション）',
-                        description: parent.description || '',
-                        category: parent.category,
-                        parent_id: parentId,
-                        service_start_offset: parent.service_start_offset || 0,
-                        service_end_offset: parent.service_end_offset || 30,
-                        progress_reflection: parent.progress_reflection,
-                        allow_external_tasks: parent.allow_external_tasks,
-                        requires_approval: parent.requires_approval,
-                        subsidy_type_ids: parent.subsidy_type_ids ? JSON.parse(parent.subsidy_type_ids) : null,
-                        tasks: (parent.tasks || []).map(t => ({
-                            task_name: t.task_name,
-                            task_type: t.task_type,
-                            description: t.description,
-                            days_offset_start: t.days_offset_start,
-                            days_offset_end: t.days_offset_end,
-                            is_required: t.is_required
-                        }))
-                    };
-                    
-                    const createResponse = await axios.post('/api/pipeline-templates', childData);
-                    
-                    if (createResponse.data.success !== false) {
-                        showToast('子パイプラインを作成しました。編集画面を開きます。');
-                        setTimeout(() => {
-                            editTemplate(createResponse.data.id);
-                        }, 500);
-                        loadAllTemplates();
-                    }
-                } catch (error) {
-                    console.error('Error creating child pipeline:', error);
-                    alert('子パイプラインの作成に失敗しました');
                 }
             }
             
             // テンプレート詳細表示
-            async function showTemplateDetail(id, isMaster = false) {
+            async function showTemplateDetail(id) {
                 try {
-                    const response = await axios.get('/api/pipeline-templates/' + id);
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/pipeline-templates/' + id, {
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                    });
                     const template = response.data;
                     
                     document.getElementById('templateDetailTitle').textContent = template.name;
@@ -757,15 +566,13 @@ routes.get('/admin/pipelines', (c) => {
                     
                     let content = \`
                         <div class="space-y-6">
-                            \${isMaster ? \`
-                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                    <div class="flex items-center gap-2 text-yellow-800">
-                                        <i class="fas fa-star"></i>
-                                        <span class="font-medium">標準テンプレート</span>
-                                    </div>
-                                    <p class="text-sm text-yellow-700 mt-1">このテンプレートは編集できません。「カスタマイズして使用」で複製してください。</p>
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                                <div class="flex items-center gap-2 text-yellow-800">
+                                    <i class="fas fa-star"></i>
+                                    <span class="font-medium">標準テンプレート</span>
                                 </div>
-                            \` : ''}
+                                <p class="text-sm text-yellow-700 mt-1">すべての法人組織で利用可能</p>
+                            </div>
                             
                             <!-- 基本情報 -->
                             <div class="grid grid-cols-2 gap-4">
@@ -830,18 +637,12 @@ routes.get('/admin/pipelines', (c) => {
                             
                             <!-- アクション -->
                             <div class="flex gap-3 pt-4 border-t">
-                                \${isMaster ? \`
-                                    <button onclick="duplicateToOrg(\${template.id}); closeTemplateDetailModal();" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
-                                        <i class="fas fa-copy mr-2"></i>カスタマイズして使用
-                                    </button>
-                                \` : \`
-                                    <button onclick="editTemplate(\${template.id})" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-                                        <i class="fas fa-edit mr-2"></i>編集
-                                    </button>
-                                    <button onclick="deleteTemplate(\${template.id})" class="flex-1 bg-red-100 text-red-600 py-2 rounded-lg hover:bg-red-200">
-                                        <i class="fas fa-trash mr-2"></i>削除
-                                    </button>
-                                \`}
+                                <button onclick="editTemplate(\${template.id})" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                                    <i class="fas fa-edit mr-2"></i>編集
+                                </button>
+                                <button onclick="deleteTemplate(\${template.id})" class="flex-1 bg-red-100 text-red-600 py-2 rounded-lg hover:bg-red-200">
+                                    <i class="fas fa-trash mr-2"></i>削除
+                                </button>
                             </div>
                         </div>
                     \`;
@@ -859,20 +660,69 @@ routes.get('/admin/pipelines', (c) => {
             function openNewTemplateModal() {
                 document.getElementById('newTemplateForm').reset();
                 document.getElementById('tasksList').innerHTML = '';
-                document.getElementById('modalTitle').textContent = '新規カスタムテンプレート作成';
                 taskCounter = 0;
                 addTaskRow();
                 document.getElementById('newTemplateModal').classList.remove('hidden');
-                loadUsers();
                 loadSubsidyTypesForCheckbox();
                 loadParentPipelineOptions();
                 editingTemplateId = null;
             }
             
-            // 親パイプライン選択肢を読み込む（組織テンプレートのみ）
+            // 子パイプラインを作成
+            async function createChildPipeline(parentId) {
+                try {
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/pipeline-templates/' + parentId, {
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                    });
+                    const parent = response.data;
+                    
+                    const childData = {
+                        name: parent.name + '（バリエーション）',
+                        description: parent.description || '',
+                        category: parent.category,
+                        parent_id: parentId,
+                        service_start_offset: parent.service_start_offset || 0,
+                        service_end_offset: parent.service_end_offset || 30,
+                        progress_reflection: parent.progress_reflection,
+                        allow_external_tasks: parent.allow_external_tasks,
+                        requires_approval: parent.requires_approval,
+                        subsidy_type_ids: parent.subsidy_type_ids ? JSON.parse(parent.subsidy_type_ids) : null,
+                        is_master_template: true,  // マスターテンプレートとして作成
+                        tasks: (parent.tasks || []).map(t => ({
+                            task_name: t.task_name,
+                            task_type: t.task_type,
+                            description: t.description,
+                            days_offset_start: t.days_offset_start,
+                            days_offset_end: t.days_offset_end,
+                            is_required: t.is_required
+                        }))
+                    };
+                    
+                    const createResponse = await axios.post('/api/pipeline-templates', childData, {
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                    });
+                    
+                    if (createResponse.data.success !== false) {
+                        showToast('子パイプラインを作成しました。編集画面を開きます。');
+                        setTimeout(() => {
+                            editTemplate(createResponse.data.id);
+                        }, 500);
+                        loadTemplates();
+                    }
+                } catch (error) {
+                    console.error('Error creating child pipeline:', error);
+                    alert('子パイプラインの作成に失敗しました');
+                }
+            }
+            
+            // 親パイプライン選択肢を読み込む（マスターのみ）
             async function loadParentPipelineOptions(excludeId = null, selectedParentId = null) {
                 try {
-                    const response = await axios.get('/api/pipeline-templates?org_only=true');
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/pipeline-templates?master_only=true', {
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                    });
                     const templates = response.data;
                     
                     const select = document.querySelector('select[name="parent_id"]');
@@ -896,14 +746,26 @@ routes.get('/admin/pipelines', (c) => {
             let allSubsidyTypes = [];
             async function loadSubsidyTypesForCheckbox(selectedIds = []) {
                 try {
-                    const response = await axios.get('/api/subsidy-types');
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/subsidy-types', {
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                    });
                     allSubsidyTypes = response.data;
                     
                     const container = document.getElementById('subsidyTypeCheckboxes');
                     if (!container) return;
                     
-                    const grouped = { 'subsidy': [], 'grant': [], 'license': [] };
-                    const categoryLabels = { 'subsidy': '補助金', 'grant': '助成金', 'license': '許認可' };
+                    const grouped = {
+                        'subsidy': [],
+                        'grant': [],
+                        'license': []
+                    };
+                    
+                    const categoryLabels = {
+                        'subsidy': '補助金',
+                        'grant': '助成金',
+                        'license': '許認可'
+                    };
                     
                     allSubsidyTypes.forEach(type => {
                         if (type.category === 'システム') return;
@@ -915,8 +777,10 @@ routes.get('/admin/pipelines', (c) => {
                     let html = '';
                     Object.entries(grouped).forEach(([category, types]) => {
                         if (types.length === 0) return;
+                        
                         const label = categoryLabels[category] || category;
                         html += '<div class="col-span-full text-xs font-bold text-gray-500 mt-2 mb-1">' + label + '</div>';
+                        
                         types.forEach(type => {
                             const checked = selectedIds.includes(type.id) ? 'checked' : '';
                             html += \`
@@ -942,30 +806,18 @@ routes.get('/admin/pipelines', (c) => {
                 document.getElementById('templateDetailModal').classList.add('hidden');
             }
             
-            // ユーザー読み込み
-            async function loadUsers() {
-                try {
-                    const response = await axios.get('/api/admin/users');
-                    const users = response.data;
-                    const select = document.querySelector('select[name="created_by"]');
-                    select.innerHTML = '<option value="">選択してください</option>';
-                    users.forEach(u => {
-                        select.innerHTML += '<option value="' + u.name + '">' + u.name + '</option>';
-                    });
-                } catch (error) {
-                    console.error('Error loading users:', error);
-                }
-            }
-            
             // テンプレート削除
             async function deleteTemplate(id) {
-                if (!confirm('このテンプレートを削除しますか？')) return;
+                if (!confirm('この標準テンプレートを削除しますか？\\n※ すべての法人組織で使用できなくなります')) return;
                 
                 try {
-                    await axios.delete('/api/pipeline-templates/' + id);
+                    const token = localStorage.getItem('master_token');
+                    await axios.delete('/api/pipeline-templates/' + id, {
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                    });
                     showToast('テンプレートを削除しました');
                     closeTemplateDetailModal();
-                    loadAllTemplates();
+                    loadTemplates();
                 } catch (error) {
                     console.error('Error deleting template:', error);
                     alert('削除に失敗しました');
@@ -978,16 +830,12 @@ routes.get('/admin/pipelines', (c) => {
             async function editTemplate(id) {
                 try {
                     editingTemplateId = id;
-                    const response = await axios.get('/api/pipeline-templates/' + id);
+                    const token = localStorage.getItem('master_token');
+                    const response = await axios.get('/api/pipeline-templates/' + id, {
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                    });
                     const template = response.data;
                     
-                    // マスターテンプレートは編集不可
-                    if (template.is_master_template) {
-                        alert('標準テンプレートは編集できません。「カスタマイズして使用」で複製してください。');
-                        return;
-                    }
-                    
-                    document.getElementById('modalTitle').textContent = 'カスタムテンプレート編集';
                     document.querySelector('input[name="name"]').value = template.name;
                     document.querySelector('textarea[name="description"]').value = template.description || '';
                     document.querySelector('select[name="category"]').value = template.category || 'license';
@@ -1022,7 +870,6 @@ routes.get('/admin/pipelines', (c) => {
                     
                     closeTemplateDetailModal();
                     document.getElementById('newTemplateModal').classList.remove('hidden');
-                    loadUsers();
                     
                     await loadParentPipelineOptions(id, template.parent_id);
                     
@@ -1065,9 +912,8 @@ routes.get('/admin/pipelines', (c) => {
                     progress_reflection: formData.get('progress_reflection') === 'on',
                     allow_external_tasks: true,
                     requires_approval: formData.get('requires_approval') === 'on',
-                    created_by: formData.get('created_by'),
                     subsidy_type_ids: subsidyTypeIds.length > 0 ? subsidyTypeIds : null,
-                    is_master_template: false,  // 組織テンプレート
+                    is_master_template: true,  // マスターテンプレートとして登録
                     tasks: []
                 };
                 
@@ -1087,11 +933,16 @@ routes.get('/admin/pipelines', (c) => {
                 });
                 
                 try {
+                    const token = localStorage.getItem('master_token');
                     let response;
                     if (editingTemplateId) {
-                        response = await axios.put('/api/pipeline-templates/' + editingTemplateId, data);
+                        response = await axios.put('/api/pipeline-templates/' + editingTemplateId, data, {
+                            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                        });
                     } else {
-                        response = await axios.post('/api/pipeline-templates', data);
+                        response = await axios.post('/api/pipeline-templates', data, {
+                            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+                        });
                     }
                     
                     if (response.data && response.data.success === false) {
@@ -1100,10 +951,10 @@ routes.get('/admin/pipelines', (c) => {
                         return;
                     }
                     
-                    showToast(editingTemplateId ? 'テンプレートを更新しました' : 'テンプレートを作成しました');
+                    showToast(editingTemplateId ? 'テンプレートを更新しました' : '標準テンプレートを作成しました');
                     editingTemplateId = null;
                     closeNewTemplateModal();
-                    loadAllTemplates();
+                    loadTemplates();
                 } catch (error) {
                     console.error('Error saving template:', error);
                     const errorMsg = error.response?.data?.error || error.message || '不明なエラー';
@@ -1129,11 +980,9 @@ routes.get('/admin/pipelines', (c) => {
             window.editTemplate = editTemplate;
             window.deleteTemplate = deleteTemplate;
             window.createChildPipeline = createChildPipeline;
-            window.duplicatePipeline = duplicatePipeline;
-            window.duplicateToOrg = duplicateToOrg;
             
             // 初期読み込み
-            loadAllTemplates();
+            loadTemplates();
             loadSubsidyTypesForCheckbox();
         </script>
     </body>

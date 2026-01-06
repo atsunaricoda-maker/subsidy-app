@@ -46,6 +46,18 @@ export function generateMasterSidebar(activePage: string = '') {
             <div class="pt-4 pb-2">
                 <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">マスターデータ</p>
             </div>
+            <a href="/master/guidelines" class="sidebar-link ${isActive('guidelines')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-book-open w-5"></i>
+                <span>公募要領管理</span>
+            </a>
+            <a href="/master/subsidy-types" class="sidebar-link ${isActive('subsidy-types')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-list-alt w-5"></i>
+                <span>補助金種別</span>
+            </a>
+            <a href="/master/pipelines" class="sidebar-link ${isActive('master-pipelines')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
+                <i class="fas fa-project-diagram w-5"></i>
+                <span>パイプライン</span>
+            </a>
             <a href="/master/hearing-questions" class="sidebar-link ${isActive('hearing')} flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700">
                 <i class="fas fa-clipboard-list w-5"></i>
                 <span>ヒアリング質問</span>
@@ -114,6 +126,15 @@ export function generateMasterSidebar(activePage: string = '') {
 }
 
 export const masterSidebarScripts = `
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar.classList.contains('-translate-x-full')) {
+            sidebar.classList.remove('-translate-x-full');
+        } else {
+            sidebar.classList.add('-translate-x-full');
+        }
+    }
+    
     function masterLogout() {
         localStorage.removeItem('master_token');
         localStorage.removeItem('master_name');
@@ -131,4 +152,14 @@ export const masterSidebarScripts = `
     
     // 認証チェック
     checkMasterAuth();
+`;
+
+export const masterSidebarStyles = `
+    .sidebar-link.active {
+        background: rgba(59, 130, 246, 0.3);
+        border-left: 3px solid #3B82F6;
+    }
+    .sidebar-link:hover {
+        background: rgba(255,255,255,0.1);
+    }
 `;

@@ -11,8 +11,14 @@ routes.get('/pipeline-templates', async (c) => {
   const category = c.req.query('category')
   const subsidyTypeId = c.req.query('subsidy_type_id')
   const treeView = c.req.query('tree') === 'true'
+  const masterOnly = c.req.query('master_only') === 'true'  // マスターテンプレートのみ
+  const orgOnly = c.req.query('org_only') === 'true'  // 組織テンプレートのみ
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
   
-  // パイプラインテンプレートは全組織共通のマスターデータ
+  // パイプラインテンプレートのクエリ
+  // - マスターテンプレート (is_master_template = 1) は全組織で表示
+  // - 組織テンプレート (is_master_template = 0) は該当組織のみ表示
   let query = `
     SELECT pt.*, 
            (SELECT COUNT(*) FROM pipeline_template_tasks WHERE template_id = pt.id) as task_count
@@ -21,6 +27,29 @@ routes.get('/pipeline-templates', async (c) => {
   `
   
   const params: any[] = []
+  
+  // マスターのみ/組織のみフィルター
+  if (masterOnly) {
+    query += ` AND pt.is_master_template = 1`
+  } else if (orgOnly) {
+    // 組織テンプレートのみ（マスターから複製したもの含む）
+    if (orgId) {
+      query += ` AND pt.is_master_template = 0 AND pt.organization_id = ?`
+      params.push(orgId)
+    } else {
+      // 組織IDがない場合は空配列を返す
+      return c.json([])
+    }
+  } else {
+    // 両方表示: マスターテンプレート OR 自組織のテンプレート
+    if (orgId) {
+      query += ` AND (pt.is_master_template = 1 OR pt.organization_id = ?)`
+      params.push(orgId)
+    } else {
+      // 組織IDがない場合はマスターテンプレートのみ
+      query += ` AND pt.is_master_template = 1`
+    }
+  }
   
   // カテゴリでフィルタリング（パラメータバインディングでSQLインジェクション対策）
   // 許可されたカテゴリのみ
@@ -32,7 +61,9 @@ routes.get('/pipeline-templates', async (c) => {
   
   // 親のみを取得するフラグ（tree表示時は親からスタート）
   if (treeView) {
-    query += ` ORDER BY COALESCE(pt.parent_id, pt.id), pt.parent_id IS NOT NULL, pt.display_order, pt.id`
+    query += ` ORDER BY pt.is_master_template DESC, COALESCE(pt.parent_id, pt.id), pt.parent_id IS NOT NULL, pt.display_order, pt.id`
+  } else {
+    query += ` ORDER BY pt.is_master_template DESC, pt.display_order, pt.id`
   }
   
   const templates = params.length > 0 
@@ -122,8 +153,15 @@ routes.get('/pipeline-templates/:id', async (c) => {
 routes.post('/pipeline-templates', async (c) => {
   try {
     const { DB } = c.env
+    const user = await getCurrentUser(c)
+    const orgId = getEffectiveOrgId(c, user)
     
     const data = await c.req.json()
+    
+    // マスターテンプレートの場合は is_master = true が必要
+    // 組織テンプレートの場合は organization_id が必要
+    const isMaster = data.is_master_template === true || data.is_master_template === 1
+    const templateOrgId = isMaster ? null : (orgId || null)
     
     // subsidy_type_idsをJSON文字列に変換
     const subsidyTypeIds = data.subsidy_type_ids && Array.isArray(data.subsidy_type_ids) && data.subsidy_type_ids.length > 0
@@ -134,8 +172,8 @@ routes.post('/pipeline-templates', async (c) => {
       INSERT INTO pipeline_templates 
       (name, description, category, service_start_offset, service_end_offset, 
        requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids,
-       parent_id, display_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       parent_id, display_order, is_master_template, organization_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       data.name,
       data.description || '',
@@ -148,7 +186,9 @@ routes.post('/pipeline-templates', async (c) => {
       data.created_by || null,
       subsidyTypeIds,
       data.parent_id || null,
-      parseInt(data.display_order) || 0
+      parseInt(data.display_order) || 0,
+      isMaster ? 1 : 0,
+      templateOrgId
     ).run()
     
     const templateId = result.meta.last_row_id
@@ -200,14 +240,22 @@ routes.put('/pipeline-templates/:id', async (c) => {
   try {
     const { DB } = c.env
     const templateId = c.req.param('id')
+    const user = await getCurrentUser(c)
+    const orgId = getEffectiveOrgId(c, user)
     
-    // テンプレートの存在確認
+    // テンプレートの存在確認と権限チェック
     const existing = await DB.prepare(`
-      SELECT id FROM pipeline_templates WHERE id = ?
-    `).bind(templateId).first()
+      SELECT id, is_master_template, organization_id FROM pipeline_templates WHERE id = ?
+    `).bind(templateId).first() as any
     
     if (!existing) {
       return c.json({ error: 'テンプレートが見つかりません' }, 404)
+    }
+    
+    // マスターテンプレートは組織側から編集不可（マスター管理画面からのみ）
+    // 組織テンプレートは該当組織のみ編集可能
+    if (!existing.is_master_template && existing.organization_id && orgId && existing.organization_id !== orgId) {
+      return c.json({ error: 'このテンプレートを編集する権限がありません' }, 403)
     }
     
     const data = await c.req.json()
@@ -287,6 +335,23 @@ routes.put('/pipeline-templates/:id', async (c) => {
 routes.delete('/pipeline-templates/:id', async (c) => {
   const { DB } = c.env
   const templateId = c.req.param('id')
+  const user = await getCurrentUser(c)
+  const orgId = getEffectiveOrgId(c, user)
+  
+  // テンプレートの存在確認と権限チェック
+  const existing = await DB.prepare(`
+    SELECT id, is_master_template, organization_id FROM pipeline_templates WHERE id = ?
+  `).bind(templateId).first() as any
+  
+  if (!existing) {
+    return c.json({ error: 'テンプレートが見つかりません' }, 404)
+  }
+  
+  // マスターテンプレートは組織側から削除不可
+  // 組織テンプレートは該当組織のみ削除可能
+  if (!existing.is_master_template && existing.organization_id && orgId && existing.organization_id !== orgId) {
+    return c.json({ error: 'このテンプレートを削除する権限がありません' }, 403)
+  }
   
   // テンプレートを無効化（論理削除）
   await DB.prepare(`
@@ -298,6 +363,95 @@ routes.delete('/pipeline-templates/:id', async (c) => {
     success: true,
     message: 'パイプラインテンプレートを削除しました' 
   })
+})
+
+// マスターテンプレートを組織用にコピー（複製）
+routes.post('/pipeline-templates/:id/duplicate', async (c) => {
+  try {
+    const { DB } = c.env
+    const templateId = c.req.param('id')
+    const user = await getCurrentUser(c)
+    const orgId = getEffectiveOrgId(c, user)
+    
+    if (!orgId) {
+      return c.json({ error: '組織が特定できません' }, 401)
+    }
+    
+    // 元テンプレートを取得
+    const source = await DB.prepare(`
+      SELECT * FROM pipeline_templates WHERE id = ? AND is_active = 1
+    `).bind(templateId).first() as any
+    
+    if (!source) {
+      return c.json({ error: '複製元のテンプレートが見つかりません' }, 404)
+    }
+    
+    // 新しい組織テンプレートを作成
+    const newName = source.name + ' (カスタマイズ)'
+    const result = await DB.prepare(`
+      INSERT INTO pipeline_templates 
+      (name, description, category, service_start_offset, service_end_offset, 
+       requires_approval, allow_external_tasks, progress_reflection, created_by, subsidy_type_ids,
+       parent_id, display_order, is_master_template, organization_id, copied_from_template_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+    `).bind(
+      newName,
+      source.description || '',
+      source.category,
+      source.service_start_offset,
+      source.service_end_offset,
+      source.requires_approval,
+      source.allow_external_tasks,
+      source.progress_reflection,
+      user?.id || null,
+      source.subsidy_type_ids,
+      null, // 複製されたテンプレートは親なし
+      0,
+      orgId,
+      templateId // 複製元のIDを記録（copied_from_template_id）
+    ).run()
+    
+    const newTemplateId = result.meta.last_row_id
+    
+    // タスクも複製
+    const tasks = await DB.prepare(`
+      SELECT * FROM pipeline_template_tasks WHERE template_id = ? ORDER BY sort_order ASC
+    `).bind(templateId).all()
+    
+    for (const task of (tasks.results || []) as any[]) {
+      await DB.prepare(`
+        INSERT INTO pipeline_template_tasks 
+        (template_id, task_name, task_type, description, sort_order, 
+         days_offset_start, days_offset_end, is_required, default_assignee_role,
+         attachment_url, attachment_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        newTemplateId,
+        task.task_name,
+        task.task_type,
+        task.description,
+        task.sort_order,
+        task.days_offset_start,
+        task.days_offset_end,
+        task.is_required,
+        task.default_assignee_role,
+        task.attachment_url,
+        task.attachment_name
+      ).run()
+    }
+    
+    return c.json({ 
+      success: true, 
+      id: newTemplateId,
+      message: 'テンプレートを複製しました。カスタマイズして使用できます。' 
+    })
+  } catch (error: any) {
+    console.error('Pipeline template duplicate error:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message || 'テンプレートの複製に失敗しました'
+    }, 500)
+  }
 })
 
 // クライアントにパイプラインを適用

@@ -162,8 +162,13 @@ routes.get('/master/admins', (c) => {
 // マスター管理者API
 routes.get('/master/admins', async (c) => {
   const { DB } = c.env
-  const admins = await DB.prepare(`SELECT id, username, name, created_at FROM master_admins ORDER BY id`).all()
-  return c.json(admins?.results || [])
+  try {
+    const admins = await DB.prepare(`SELECT id, username, name, created_at FROM master_admins ORDER BY id`).all()
+    return c.json(admins?.results || [])
+  } catch (error: any) {
+    console.error('master-admins.ts Load admins error:', error)
+    return c.json({ error: error.message || 'Unknown error', source: 'master-admins.ts' }, 500)
+  }
 })
 
 routes.post('/master/admins', async (c) => {

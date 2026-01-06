@@ -403,20 +403,35 @@ routes.delete('/master/plans/:id', async (c) => {
   }
 })
 
+// マスター管理者一覧取得（テスト用エンドポイント）
+routes.get('/master/admins-test', async (c) => {
+  const { DB } = c.env
+  try {
+    const admins = await DB.prepare(`
+      SELECT id, username, name, email, role, created_at 
+      FROM master_admins 
+      ORDER BY created_at DESC
+    `).all()
+    return c.json({ data: admins.results || [], count: (admins.results || []).length, source: 'admins-test' })
+  } catch (error: any) {
+    console.error('Load admins error:', error)
+    return c.json({ error: error.message || 'Unknown error', source: 'master_admins' }, 500)
+  }
+})
+
 // マスター管理者一覧取得
 routes.get('/master/admins', async (c) => {
   const { DB } = c.env
   try {
     const admins = await DB.prepare(`
-      SELECT id, username, role, email, is_active, created_at 
-      FROM admin_users 
-      WHERE is_master_admin = 1
+      SELECT id, username, name, email, role, created_at 
+      FROM master_admins 
       ORDER BY created_at DESC
     `).all()
     return c.json(admins.results || [])
-  } catch (error) {
+  } catch (error: any) {
     console.error('Load admins error:', error)
-    return c.json([])
+    return c.json({ error: error.message || 'Unknown error', source: 'master_admins' }, 500)
   }
 })
 
@@ -430,9 +445,9 @@ routes.post('/master/admins', async (c) => {
     const passwordHash = await hashPassword(data.password)
     
     await DB.prepare(`
-      INSERT INTO admin_users (username, password_hash, role, email, is_master_admin, is_active)
-      VALUES (?, ?, 'master_admin', ?, 1, 1)
-    `).bind(data.username, passwordHash, data.email || '').run()
+      INSERT INTO master_admins (username, password_hash, name, email, role)
+      VALUES (?, ?, ?, ?, 'admin')
+    `).bind(data.username, passwordHash, data.name || data.username, data.email || '').run()
     
     return c.json({ success: true })
   } catch (error: any) {
@@ -499,13 +514,13 @@ routes.get('/master/hearing-questions', async (c) => {
       params.push(category)
     }
     
-    query += ` ORDER BY hq.subsidy_type_id, hq.sort_order ASC`
+    query += ` ORDER BY hq.subsidy_type_id, hq.display_order ASC`
     
     const questions = await DB.prepare(query).bind(...params).all()
     return c.json(questions.results || [])
-  } catch (error) {
+  } catch (error: any) {
     console.error('Load hearing questions error:', error)
-    return c.json([])
+    return c.json({ error: error.message || 'Unknown error', source: 'hearing_questions' }, 500)
   }
 })
 
