@@ -1240,7 +1240,10 @@ routes.get('/portal/:token', async (c) => {
                 console.log('openModal called:', modalId);
                 const modal = document.getElementById(modalId);
                 if (modal) {
+                    // hiddenクラスを削除し、displayをflexに設定
                     modal.classList.remove('hidden');
+                    modal.style.display = 'flex';
+                    console.log('Modal opened, display:', modal.style.display, 'classList:', modal.className);
                     // モーダルのコンテンツを読み込む
                     if (modalId === 'hearingModal' && typeof loadHearingForModal === 'function') loadHearingForModal();
                     if (modalId === 'documentsModal' && typeof loadDocumentsForModal === 'function') loadDocumentsForModal();
@@ -1252,7 +1255,10 @@ routes.get('/portal/:token', async (c) => {
             
             function closeModal(modalId) {
                 const modal = document.getElementById(modalId);
-                if (modal) modal.classList.add('hidden');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
+                }
             }
             
             // AIサイドバー関数
