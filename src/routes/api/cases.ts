@@ -385,10 +385,10 @@ routes.post('/cases', async (c) => {
   const result = await DB.prepare(`
     INSERT INTO cases (
       client_id, case_number, subsidy_type_id, status, assigned_to, notes,
-      deposit_required, deposit_amount, withholding_tax,
-      success_fee_enabled, success_fee_rate, success_fee_amount,
+      deposit_required, deposit_amount, deposit_tax_included, withholding_tax,
+      success_fee_enabled, success_fee_rate, success_fee_amount, success_fee_tax_included,
       contract_url, access_token, organization_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.client_id,
     caseNumber,
@@ -398,10 +398,12 @@ routes.post('/cases', async (c) => {
     data.notes || null,
     data.deposit_required ? 1 : 0,
     data.deposit_amount || 0,
+    data.deposit_tax_included ? 1 : 0,
     data.withholding_tax ? 1 : 0,
     data.success_fee_enabled ? 1 : 0,
     data.success_fee_rate || 0,
     data.success_fee_amount || 0,
+    data.success_fee_tax_included ? 1 : 0,
     data.contract_url || null,
     accessToken,
     orgId
@@ -554,10 +556,24 @@ routes.post('/cases', async (c) => {
       const invoiceNumber = `INV-${invoiceYear}-${invoiceSeq}`
       
       // 消費税計算（10%）
-      const subtotal = data.deposit_amount
+      // 税込入力の場合は税抜を逆算、税抜入力の場合は税込を計算
       const taxRate = 10
-      const taxAmount = Math.floor(subtotal * taxRate / 100)
-      const totalAmount = subtotal + taxAmount
+      let subtotal: number
+      let taxAmount: number
+      let totalAmount: number
+      
+      if (data.deposit_tax_included) {
+        // 税込入力：税込金額を優先、税抜を逆算
+        totalAmount = data.deposit_amount
+        // 税抜 = 税込 - 消費税、消費税 = 税込 - (税込 / 1.1) を切り捨て
+        taxAmount = Math.floor(totalAmount - totalAmount / (1 + taxRate / 100))
+        subtotal = totalAmount - taxAmount
+      } else {
+        // 税抜入力：税抜金額を優先、税込を計算
+        subtotal = data.deposit_amount
+        taxAmount = Math.floor(subtotal * taxRate / 100)
+        totalAmount = subtotal + taxAmount
+      }
       
       // 発行日・支払期限
       const issueDate = now.toISOString().split('T')[0]
@@ -694,11 +710,13 @@ routes.put('/cases/:id', async (c) => {
         notes = COALESCE(?, notes),
         deposit_required = COALESCE(?, deposit_required),
         deposit_amount = COALESCE(?, deposit_amount),
+        deposit_tax_included = COALESCE(?, deposit_tax_included),
         deposit_paid = COALESCE(?, deposit_paid),
         withholding_tax = COALESCE(?, withholding_tax),
         success_fee_enabled = COALESCE(?, success_fee_enabled),
         success_fee_rate = COALESCE(?, success_fee_rate),
         success_fee_amount = COALESCE(?, success_fee_amount),
+        success_fee_tax_included = COALESCE(?, success_fee_tax_included),
         contract_url = COALESCE(?, contract_url),
         applied_amount = COALESCE(?, applied_amount),
         granted_amount = COALESCE(?, granted_amount),
@@ -716,11 +734,13 @@ routes.put('/cases/:id', async (c) => {
       data.notes !== undefined ? data.notes : null,
       data.deposit_required !== undefined ? (data.deposit_required ? 1 : 0) : null,
       data.deposit_amount !== undefined ? data.deposit_amount : null,
+      data.deposit_tax_included !== undefined ? (data.deposit_tax_included ? 1 : 0) : null,
       data.deposit_paid !== undefined ? (data.deposit_paid ? 1 : 0) : null,
       data.withholding_tax !== undefined ? (data.withholding_tax ? 1 : 0) : null,
       data.success_fee_enabled !== undefined ? (data.success_fee_enabled ? 1 : 0) : null,
       data.success_fee_rate !== undefined ? data.success_fee_rate : null,
       data.success_fee_amount !== undefined ? data.success_fee_amount : null,
+      data.success_fee_tax_included !== undefined ? (data.success_fee_tax_included ? 1 : 0) : null,
       data.contract_url !== undefined ? data.contract_url : null,
       data.applied_amount !== undefined ? data.applied_amount : null,
       data.granted_amount !== undefined ? data.granted_amount : null,

@@ -1363,8 +1363,10 @@ routes.get('/portal/:token', async (c) => {
                     if (paymentInfo && paymentInfo.deposit_required && !hasDepositInvoice) {
                         console.log('Showing case deposit section (no invoice found)');
                         const depositAmount = paymentInfo.deposit_amount || 0;
+                        const depositTaxIncluded = paymentInfo.deposit_tax_included;
                         const depositPaid = paymentInfo.deposit_paid;
                         const depositReported = paymentInfo.deposit_transfer_reported;
+                        const taxLabel = depositTaxIncluded ? '（税込）' : '（税抜）';
                         
                         if (depositPaid) {
                             // 手付金支払い完了
@@ -1374,7 +1376,7 @@ routes.get('/portal/:token', async (c) => {
                                         <i class="fas fa-check-circle text-lg"></i>
                                         <div class="flex-1">
                                             <span class="font-bold text-sm">着手金 確認済み</span>
-                                            <span class="text-xs text-green-600 ml-2">¥\${depositAmount.toLocaleString()}</span>
+                                            <span class="text-xs text-green-600 ml-2">¥\${depositAmount.toLocaleString()}\${taxLabel}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1391,7 +1393,7 @@ routes.get('/portal/:token', async (c) => {
                                         担当者が確認中です。しばらくお待ちください。
                                     </p>
                                     <div class="mt-2 text-sm font-bold text-purple-800">
-                                        報告金額: ¥\${depositAmount.toLocaleString()}
+                                        報告金額: ¥\${depositAmount.toLocaleString()}\${taxLabel}
                                     </div>
                                 </div>
                             \`);
@@ -1407,7 +1409,7 @@ routes.get('/portal/:token', async (c) => {
                                         下記の金額のお振込みをお願いいたします。
                                     </p>
                                     <div class="text-lg font-bold text-yellow-800 mb-3">
-                                        ¥\${depositAmount.toLocaleString()}
+                                        ¥\${depositAmount.toLocaleString()}<span class="text-sm font-normal ml-1">\${taxLabel}</span>
                                     </div>
                                     <div class="flex gap-2">
                                         <button onclick="showPaymentTransferModal('deposit', \${depositAmount})" 

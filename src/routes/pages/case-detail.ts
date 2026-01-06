@@ -455,10 +455,23 @@ routes.get('/case/:id', async (c) => {
                                                 <input type="checkbox" id="depositRequiredEdit" ${caseData.deposit_required ? 'checked' : ''} onchange="updateRewardSettings()" class="rounded text-blue-600">
                                                 <span class="text-sm">手付金あり</span>
                                             </label>
-                                            <div id="depositAmountEditField" class="${caseData.deposit_required ? '' : 'hidden'}">
-                                                <label class="block text-xs text-gray-500 mb-1">金額（円）</label>
+                                            <div id="depositAmountEditField" class="${caseData.deposit_required ? '' : 'hidden'} space-y-2">
+                                                <div class="flex items-center justify-between">
+                                                    <label class="block text-xs text-gray-500">金額（円）</label>
+                                                    <div class="flex items-center gap-1">
+                                                        <button type="button" id="depositTaxExcluding" onclick="setDepositTaxMode('excluding')" 
+                                                                class="text-xs px-2 py-0.5 rounded ${caseData.deposit_tax_included ? 'bg-gray-200 text-gray-600' : 'bg-blue-600 text-white'}">税抜</button>
+                                                        <button type="button" id="depositTaxIncluding" onclick="setDepositTaxMode('including')" 
+                                                                class="text-xs px-2 py-0.5 rounded ${caseData.deposit_tax_included ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'}">税込</button>
+                                                    </div>
+                                                </div>
                                                 <input type="number" id="depositAmountEdit" value="${caseData.deposit_amount || ''}" 
-                                                       class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 50000">
+                                                       class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 50000" oninput="calculateDepositPreview()">
+                                                <input type="hidden" id="depositTaxIncludedEdit" value="${caseData.deposit_tax_included ? '1' : '0'}">
+                                                <p id="depositCalcHint" class="text-xs text-gray-500">${caseData.deposit_tax_included ? '税込金額を入力' : '税抜金額を入力（税込は自動計算）'}</p>
+                                                <div id="depositPreview" class="text-xs bg-gray-50 rounded p-2 ${caseData.deposit_amount ? '' : 'hidden'}">
+                                                    <span id="depositPreviewText"></span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -491,10 +504,23 @@ routes.get('/case/:id', async (c) => {
                                                     <input type="number" id="successFeePercentageEdit" value="${caseData.success_fee_rate || ''}" 
                                                            class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 10" min="0" max="100" step="0.1">
                                                 </div>
-                                                <div id="successFeeAmountEditField" class="${caseData.success_fee_amount > 0 && !caseData.success_fee_rate ? '' : 'hidden'}">
-                                                    <label class="block text-xs text-gray-500 mb-1">固定報酬額（円）</label>
+                                                <div id="successFeeAmountEditField" class="${caseData.success_fee_amount > 0 && !caseData.success_fee_rate ? '' : 'hidden'} space-y-2">
+                                                    <div class="flex items-center justify-between">
+                                                        <label class="block text-xs text-gray-500">固定報酬額（円）</label>
+                                                        <div class="flex items-center gap-1">
+                                                            <button type="button" id="successFeeTaxExcluding" onclick="setSuccessFeeTaxMode('excluding')" 
+                                                                    class="text-xs px-2 py-0.5 rounded ${caseData.success_fee_tax_included ? 'bg-gray-200 text-gray-600' : 'bg-blue-600 text-white'}">税抜</button>
+                                                            <button type="button" id="successFeeTaxIncluding" onclick="setSuccessFeeTaxMode('including')" 
+                                                                    class="text-xs px-2 py-0.5 rounded ${caseData.success_fee_tax_included ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600'}">税込</button>
+                                                        </div>
+                                                    </div>
                                                     <input type="number" id="successFeeAmountEdit" value="${caseData.success_fee_amount || ''}" 
-                                                           class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 100000" min="0">
+                                                           class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 100000" min="0" oninput="calculateSuccessFeePreview()">
+                                                    <input type="hidden" id="successFeeTaxIncludedEdit" value="${caseData.success_fee_tax_included ? '1' : '0'}">
+                                                    <p id="successFeeCalcHint" class="text-xs text-gray-500">${caseData.success_fee_tax_included ? '税込金額を入力' : '税抜金額を入力（税込は自動計算）'}</p>
+                                                    <div id="successFeePreview" class="text-xs bg-gray-50 rounded p-2 ${caseData.success_fee_amount ? '' : 'hidden'}">
+                                                        <span id="successFeePreviewText"></span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1823,27 +1849,132 @@ routes.get('/case/:id', async (c) => {
                 const depositField = document.getElementById('depositAmountEditField');
                 if (depositRequired) {
                     depositField.classList.remove('hidden');
+                    calculateDepositPreview();
                 } else {
                     depositField.classList.add('hidden');
                 }
             }
             window.updateRewardSettings = updateRewardSettings;
             
+            // 手付金の税込/税抜モード切替
+            let depositTaxMode = '${caseData.deposit_tax_included ? 'including' : 'excluding'}';
+            function setDepositTaxMode(mode) {
+                depositTaxMode = mode;
+                document.getElementById('depositTaxIncludedEdit').value = mode === 'including' ? '1' : '0';
+                const excludingBtn = document.getElementById('depositTaxExcluding');
+                const includingBtn = document.getElementById('depositTaxIncluding');
+                const hint = document.getElementById('depositCalcHint');
+                
+                if (mode === 'excluding') {
+                    excludingBtn.className = 'text-xs px-2 py-0.5 rounded bg-blue-600 text-white';
+                    includingBtn.className = 'text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600';
+                    hint.textContent = '税抜金額を入力（税込は自動計算）';
+                } else {
+                    excludingBtn.className = 'text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600';
+                    includingBtn.className = 'text-xs px-2 py-0.5 rounded bg-green-600 text-white';
+                    hint.textContent = '税込金額を入力';
+                }
+                calculateDepositPreview();
+            }
+            window.setDepositTaxMode = setDepositTaxMode;
+            
+            // 手付金プレビュー計算
+            function calculateDepositPreview() {
+                const inputValue = parseInt(document.getElementById('depositAmountEdit').value) || 0;
+                const preview = document.getElementById('depositPreview');
+                const previewText = document.getElementById('depositPreviewText');
+                
+                if (inputValue <= 0) {
+                    preview.classList.add('hidden');
+                    return;
+                }
+                
+                preview.classList.remove('hidden');
+                const taxRate = 10;
+                
+                if (depositTaxMode === 'including') {
+                    // 税込入力：税抜を逆算
+                    const subtotal = inputValue - Math.floor(inputValue - inputValue / (1 + taxRate / 100));
+                    const tax = inputValue - subtotal;
+                    previewText.innerHTML = '税込 <strong>¥' + inputValue.toLocaleString() + '</strong> → 税抜 ¥' + subtotal.toLocaleString() + ' + 消費税 ¥' + tax.toLocaleString();
+                } else {
+                    // 税抜入力：税込を計算
+                    const tax = Math.floor(inputValue * taxRate / 100);
+                    const total = inputValue + tax;
+                    previewText.innerHTML = '税抜 ¥' + inputValue.toLocaleString() + ' + 消費税 ¥' + tax.toLocaleString() + ' = <strong>税込 ¥' + total.toLocaleString() + '</strong>';
+                }
+            }
+            window.calculateDepositPreview = calculateDepositPreview;
+            
+            // 成功報酬の税込/税抜モード切替
+            let successFeeTaxMode = '${caseData.success_fee_tax_included ? 'including' : 'excluding'}';
+            function setSuccessFeeTaxMode(mode) {
+                successFeeTaxMode = mode;
+                document.getElementById('successFeeTaxIncludedEdit').value = mode === 'including' ? '1' : '0';
+                const excludingBtn = document.getElementById('successFeeTaxExcluding');
+                const includingBtn = document.getElementById('successFeeTaxIncluding');
+                const hint = document.getElementById('successFeeCalcHint');
+                
+                if (mode === 'excluding') {
+                    excludingBtn.className = 'text-xs px-2 py-0.5 rounded bg-blue-600 text-white';
+                    includingBtn.className = 'text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600';
+                    hint.textContent = '税抜金額を入力（税込は自動計算）';
+                } else {
+                    excludingBtn.className = 'text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600';
+                    includingBtn.className = 'text-xs px-2 py-0.5 rounded bg-green-600 text-white';
+                    hint.textContent = '税込金額を入力';
+                }
+                calculateSuccessFeePreview();
+            }
+            window.setSuccessFeeTaxMode = setSuccessFeeTaxMode;
+            
+            // 成功報酬プレビュー計算
+            function calculateSuccessFeePreview() {
+                const inputValue = parseInt(document.getElementById('successFeeAmountEdit').value) || 0;
+                const preview = document.getElementById('successFeePreview');
+                const previewText = document.getElementById('successFeePreviewText');
+                
+                if (inputValue <= 0) {
+                    preview.classList.add('hidden');
+                    return;
+                }
+                
+                preview.classList.remove('hidden');
+                const taxRate = 10;
+                
+                if (successFeeTaxMode === 'including') {
+                    // 税込入力：税抜を逆算
+                    const subtotal = inputValue - Math.floor(inputValue - inputValue / (1 + taxRate / 100));
+                    const tax = inputValue - subtotal;
+                    previewText.innerHTML = '税込 <strong>¥' + inputValue.toLocaleString() + '</strong> → 税抜 ¥' + subtotal.toLocaleString() + ' + 消費税 ¥' + tax.toLocaleString();
+                } else {
+                    // 税抜入力：税込を計算
+                    const tax = Math.floor(inputValue * taxRate / 100);
+                    const total = inputValue + tax;
+                    previewText.innerHTML = '税抜 ¥' + inputValue.toLocaleString() + ' + 消費税 ¥' + tax.toLocaleString() + ' = <strong>税込 ¥' + total.toLocaleString() + '</strong>';
+                }
+            }
+            window.calculateSuccessFeePreview = calculateSuccessFeePreview;
+            
             async function saveRewardSettings() {
                 try {
                     const depositRequired = document.getElementById('depositRequiredEdit').checked;
                     const depositAmount = parseInt(document.getElementById('depositAmountEdit').value) || 0;
+                    const depositTaxIncluded = document.getElementById('depositTaxIncludedEdit').value === '1';
                     const successFeeEnabled = document.getElementById('successFeeEnabledEdit').checked;
                     const successFeeType = document.getElementById('successFeeTypeEdit')?.value || 'percentage';
                     const successFeeRate = parseFloat(document.getElementById('successFeePercentageEdit')?.value) || 0;
                     const successFeeAmount = parseInt(document.getElementById('successFeeAmountEdit')?.value) || 0;
+                    const successFeeTaxIncluded = document.getElementById('successFeeTaxIncludedEdit')?.value === '1';
                     
                     const data = {
                         deposit_required: depositRequired ? 1 : 0,
                         deposit_amount: depositAmount,
+                        deposit_tax_included: depositTaxIncluded ? 1 : 0,
                         success_fee_enabled: successFeeEnabled ? 1 : 0,
                         success_fee_rate: successFeeType === 'percentage' ? successFeeRate : 0,
-                        success_fee_amount: successFeeType === 'fixed' ? successFeeAmount : 0
+                        success_fee_amount: successFeeType === 'fixed' ? successFeeAmount : 0,
+                        success_fee_tax_included: successFeeTaxIncluded ? 1 : 0
                     };
                     
                     await axios.put(\`/api/cases/\${CASE_ID}\`, data);
