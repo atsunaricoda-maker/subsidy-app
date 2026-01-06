@@ -154,7 +154,7 @@ routes.get('/master/subsidy-types', async (c) => {
         
         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
         <script>
-            ${masterSidebarScripts()}
+            ${masterSidebarScripts}
             
             let allSubsidyTypes = [];
             let currentSubsidyTypeId = null;
