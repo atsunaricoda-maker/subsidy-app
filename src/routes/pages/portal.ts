@@ -1237,24 +1237,40 @@ routes.get('/portal/:token', async (c) => {
             
             // モーダル開閉関数
             function openModal(modalId) {
+                console.log('=== openModal START ===');
                 console.log('openModal called:', modalId);
                 const modal = document.getElementById(modalId);
-                console.log('Modal element:', modal);
+                console.log('Modal element found:', modal ? 'YES' : 'NO');
+                
                 if (modal) {
+                    console.log('Before - className:', modal.className);
+                    console.log('Before - style.display:', modal.style.display);
+                    console.log('Before - has hidden class:', modal.classList.contains('hidden'));
+                    
                     // hiddenクラスを削除
                     modal.classList.remove('hidden');
+                    console.log('After remove hidden - has hidden class:', modal.classList.contains('hidden'));
+                    
                     // display: flex を!importantで強制設定（Tailwindの優先順位を上書き）
                     modal.style.setProperty('display', 'flex', 'important');
                     modal.style.setProperty('visibility', 'visible', 'important');
                     modal.style.setProperty('opacity', '1', 'important');
                     
+                    console.log('After setProperty - style.cssText:', modal.style.cssText);
+                    
                     const computedStyle = window.getComputedStyle(modal);
-                    console.log('Modal after style change - display:', computedStyle.display, ', visibility:', computedStyle.visibility, ', className:', modal.className);
+                    console.log('Computed - display:', computedStyle.display);
+                    console.log('Computed - visibility:', computedStyle.visibility);
+                    console.log('Computed - opacity:', computedStyle.opacity);
+                    console.log('Computed - z-index:', computedStyle.zIndex);
+                    console.log('Computed - position:', computedStyle.position);
                     
                     // モーダルのコンテンツを読み込む
                     if (modalId === 'hearingModal' && typeof loadHearingForModal === 'function') loadHearingForModal();
                     if (modalId === 'documentsModal' && typeof loadDocumentsForModal === 'function') loadDocumentsForModal();
                     if (modalId === 'messagesModal' && typeof loadMessagesForModal === 'function') loadMessagesForModal();
+                    
+                    console.log('=== openModal END ===');
                 } else {
                     console.error('Modal not found:', modalId);
                 }
