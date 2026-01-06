@@ -1421,20 +1421,9 @@ routes.get('/admin/guidelines', (c) => {
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button onclick="toggleGuidelineStatus(\${g.id}, '\${g.status}')" 
-                                                class="px-3 py-1 rounded text-sm \${g.status === 'active' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}"
-                                                title="\${g.status === 'active' ? '終了にする' : '有効にする'}">
-                                            <i class="fas fa-\${g.status === 'active' ? 'pause' : 'play'} mr-1"></i>
-                                            \${g.status === 'active' ? '終了' : '有効化'}
-                                        </button>
-                                        <button onclick='openEditGuidelineModal(\${JSON.stringify(g).replace(/'/g, "&#39;")})' 
-                                                class="px-3 py-1 bg-blue-100 text-blue-600 rounded text-sm hover:bg-blue-200">
-                                            <i class="fas fa-edit mr-1"></i>編集
-                                        </button>
-                                        <button onclick="deleteGuideline(\${g.id})" 
-                                                class="px-3 py-1 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200">
-                                            <i class="fas fa-trash mr-1"></i>削除
-                                        </button>
+                                        <span class="text-xs text-gray-400 flex items-center">
+                                            <i class="fas fa-lock mr-1"></i>閲覧専用
+                                        </span>
                                     </div>
                                 </div>
                             </div>
