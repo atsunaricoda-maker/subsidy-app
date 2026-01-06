@@ -172,52 +172,84 @@ routes.get('/portal/:token', async (c) => {
                         </div>
                     </div>
                     
-                    <!-- クイックアクション（カード形式） -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <button type="button" id="btnHearing" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-indigo-500 text-left w-full">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-clipboard-list text-indigo-600"></i>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-gray-500">ヒアリング</div>
-                                    <div id="hearingQuickStatus" class="font-bold text-indigo-600">0/0</div>
-                                </div>
-                            </div>
-                        </button>
-                        <button type="button" id="btnDocuments" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-green-500 text-left w-full">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-file-upload text-green-600"></i>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-gray-500">書類提出</div>
-                                    <div id="documentsQuickStatus" class="font-bold text-green-600">確認する</div>
-                                </div>
-                            </div>
-                        </button>
-                        <button type="button" id="btnCreate" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-purple-500 text-left w-full">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-file-signature text-purple-600"></i>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-gray-500">書類作成</div>
-                                    <div class="font-bold text-purple-600">作成する</div>
-                                </div>
-                            </div>
-                        </button>
-                        <button type="button" id="btnMessages" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500 text-left w-full">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-comments text-blue-600"></i>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-gray-500">やり取り</div>
-                                    <div id="messagesQuickStatus" class="font-bold text-blue-600">0件</div>
+                    <!-- タブ切り替え（カード形式） -->
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <div class="grid grid-cols-4 border-b">
+                            <button type="button" id="tabHearing" class="tab-btn active flex flex-col items-center gap-1 p-3 border-b-2 border-indigo-500 bg-indigo-50 text-indigo-600">
+                                <i class="fas fa-clipboard-list text-lg"></i>
+                                <span class="text-xs font-medium">ヒアリング</span>
+                                <span id="hearingQuickStatus" class="text-xs font-bold">0/0</span>
+                            </button>
+                            <button type="button" id="tabDocuments" class="tab-btn flex flex-col items-center gap-1 p-3 border-b-2 border-transparent hover:bg-gray-50 text-gray-500">
+                                <i class="fas fa-file-upload text-lg"></i>
+                                <span class="text-xs font-medium">書類提出</span>
+                                <span id="documentsQuickStatus" class="text-xs font-bold">確認</span>
+                            </button>
+                            <button type="button" id="tabCreate" class="tab-btn flex flex-col items-center gap-1 p-3 border-b-2 border-transparent hover:bg-gray-50 text-gray-500">
+                                <i class="fas fa-file-signature text-lg"></i>
+                                <span class="text-xs font-medium">書類作成</span>
+                                <span class="text-xs font-bold">作成</span>
+                            </button>
+                            <button type="button" id="tabMessages" class="tab-btn flex flex-col items-center gap-1 p-3 border-b-2 border-transparent hover:bg-gray-50 text-gray-500">
+                                <i class="fas fa-comments text-lg"></i>
+                                <span class="text-xs font-medium">やり取り</span>
+                                <span id="messagesQuickStatus" class="text-xs font-bold">0件</span>
+                            </button>
+                        </div>
+                        
+                        <!-- ヒアリングパネル -->
+                        <div id="panelHearing" class="tab-panel p-4">
+                            <div id="hearingPanelContent">
+                                <div class="text-center py-8 text-gray-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>読み込み中...</p>
                                 </div>
                             </div>
-                        </button>
+                            <div class="mt-4 pt-4 border-t flex justify-end">
+                                <button onclick="saveAllHearingAnswers()" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+                                    <i class="fas fa-save mr-2"></i>保存する
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 書類提出パネル -->
+                        <div id="panelDocuments" class="tab-panel hidden p-4">
+                            <div id="documentsPanelContent">
+                                <div class="text-center py-8 text-gray-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>読み込み中...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 書類作成パネル -->
+                        <div id="panelCreate" class="tab-panel hidden p-4">
+                            <div id="createPanelContent">
+                                <div class="text-center py-8 text-gray-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>読み込み中...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- メッセージパネル -->
+                        <div id="panelMessages" class="tab-panel hidden p-4">
+                            <div id="messagesPanelContent">
+                                <div class="text-center py-8 text-gray-400">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                    <p>読み込み中...</p>
+                                </div>
+                            </div>
+                            <div class="border-t pt-4 mt-4">
+                                <div class="flex gap-2">
+                                    <input type="text" id="messageInput" placeholder="メッセージを入力..." 
+                                        class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                    <button onclick="sendMessage()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- パイプライン進捗（メイン表示） -->
@@ -722,151 +754,6 @@ routes.get('/portal/:token', async (c) => {
             </div>
         </div>
 
-            <!-- ===== ヒアリングモーダル ===== -->
-            <div id="hearingModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-                <div class="modal-content bg-white rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-xl">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-clipboard-list text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">ヒアリング回答</h3>
-                                <p class="text-xs text-indigo-200">必要事項をご記入ください</p>
-                            </div>
-                        </div>
-                        <button onclick="closeModal('hearingModal')" class="text-white hover:text-indigo-200 text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="hearingModalContent" class="flex-1 overflow-y-auto p-4">
-                        <div class="text-center py-8 text-gray-400">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>読み込み中...</p>
-                        </div>
-                    </div>
-                    <div class="p-4 border-t bg-gray-50 flex justify-between">
-                        <button onclick="closeModal('hearingModal')" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg">
-                            閉じる
-                        </button>
-                        <button onclick="saveAllHearingAnswers()" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
-                            <i class="fas fa-save mr-2"></i>保存する
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ===== 書類提出モーダル ===== -->
-            <div id="documentsModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-                <div class="modal-content bg-white rounded-xl w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-xl">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-file-upload text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">書類提出</h3>
-                                <p class="text-xs text-green-200">必要書類をアップロードしてください</p>
-                            </div>
-                        </div>
-                        <button onclick="closeModal('documentsModal')" class="text-white hover:text-green-200 text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="documentsModalContent" class="flex-1 overflow-y-auto p-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="documentsGrid">
-                            <div class="text-center py-8 text-gray-400 col-span-2">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>読み込み中...</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="p-4 border-t bg-gray-50 flex justify-end">
-                        <button onclick="closeModal('documentsModal')" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg">
-                            閉じる
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ===== 書類作成モーダル ===== -->
-            <div id="createModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-                <div class="modal-content bg-white rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-t-xl">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-file-signature text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">書類作成</h3>
-                                <p class="text-xs text-purple-200">AIが書類作成をサポートします</p>
-                            </div>
-                        </div>
-                        <button onclick="closeModal('createModal')" class="text-white hover:text-purple-200 text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="createModalContent" class="flex-1 overflow-y-auto p-4">
-                        <div class="space-y-4">
-                            <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                                <h4 class="font-bold text-purple-800 mb-2"><i class="fas fa-magic mr-2"></i>AI自動作成</h4>
-                                <p class="text-sm text-purple-600 mb-3">ヒアリング回答をもとに、AIが事業計画書などを自動作成します。</p>
-                                <button onclick="window.location.hash='tabPanelCreate'; closeModal('createModal');" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
-                                    <i class="fas fa-arrow-right mr-1"></i>書類作成タブへ移動
-                                </button>
-                            </div>
-                            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                <h4 class="font-bold text-gray-800 mb-2"><i class="fas fa-file-alt mr-2"></i>テンプレート</h4>
-                                <p class="text-sm text-gray-600 mb-3">よく使う書式のテンプレートをダウンロードできます。</p>
-                                <div class="grid grid-cols-2 gap-2 text-sm" id="templateList">
-                                    <a href="#" class="flex items-center gap-2 px-3 py-2 bg-white border rounded hover:bg-gray-50">
-                                        <i class="fas fa-file-word text-blue-600"></i>事業計画書
-                                    </a>
-                                    <a href="#" class="flex items-center gap-2 px-3 py-2 bg-white border rounded hover:bg-gray-50">
-                                        <i class="fas fa-file-word text-blue-600"></i>収支計画書
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="p-4 border-t bg-gray-50 flex justify-end">
-                        <button onclick="closeModal('createModal')" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg">
-                            閉じる
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ===== やり取りモーダル ===== -->
-            <div id="messagesModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-                <div class="modal-content bg-white rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-t-xl">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-comments text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">メッセージ</h3>
-                                <p class="text-xs text-blue-200">担当者とのやり取り</p>
-                            </div>
-                        </div>
-                        <button onclick="closeModal('messagesModal')" class="text-white hover:text-blue-200 text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="messagesModalContent" class="flex-1 overflow-y-auto p-4 bg-gray-50">
-                        <div class="text-center py-8 text-gray-400">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>読み込み中...</p>
-                        </div>
-                    </div>
-                    <div class="p-4 border-t bg-white">
-                        <div class="flex gap-2">
-                            <input type="text" id="modalMessageInput" 
-                                   placeholder="メッセージを入力..." 
-                                   class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                   onkeypress="if(event.key==='Enter') sendModalMessage()">
-                            <button onclick="sendModalMessage()" 
-                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- 書類アップロードモーダル -->
             <div id="documentUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                 <div class="bg-white rounded-xl w-full max-w-sm shadow-xl">
@@ -1235,57 +1122,63 @@ routes.get('/portal/:token', async (c) => {
             // グローバル関数（最初に定義）
             // ========================================
             
-            // モーダル開閉関数
-            function openModal(modalId) {
-                console.log('=== openModal START ===');
-                console.log('openModal called:', modalId);
-                const modal = document.getElementById(modalId);
-                console.log('Modal element found:', modal ? 'YES' : 'NO');
+            // タブ切り替え関数
+            function switchTab(tabName) {
+                // すべてのタブボタンを非アクティブに
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('active', 'border-indigo-500', 'border-green-500', 'border-purple-500', 'border-blue-500', 'bg-indigo-50', 'bg-green-50', 'bg-purple-50', 'bg-blue-50', 'text-indigo-600', 'text-green-600', 'text-purple-600', 'text-blue-600');
+                    btn.classList.add('border-transparent', 'text-gray-500');
+                });
                 
-                if (modal) {
-                    console.log('Before - className:', modal.className);
-                    console.log('Before - style.display:', modal.style.display);
-                    console.log('Before - has hidden class:', modal.classList.contains('hidden'));
+                // すべてのパネルを非表示
+                document.querySelectorAll('.tab-panel').forEach(panel => {
+                    panel.classList.add('hidden');
+                });
+                
+                // 選択されたタブをアクティブに
+                const activeTab = document.getElementById('tab' + tabName);
+                const activePanel = document.getElementById('panel' + tabName);
+                
+                if (activeTab && activePanel) {
+                    activePanel.classList.remove('hidden');
+                    activeTab.classList.remove('border-transparent', 'text-gray-500');
+                    activeTab.classList.add('active');
                     
-                    // hiddenクラスを削除
-                    modal.classList.remove('hidden');
-                    console.log('After remove hidden - has hidden class:', modal.classList.contains('hidden'));
+                    // タブごとの色を設定
+                    const colors = {
+                        'Hearing': { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-600' },
+                        'Documents': { border: 'border-green-500', bg: 'bg-green-50', text: 'text-green-600' },
+                        'Create': { border: 'border-purple-500', bg: 'bg-purple-50', text: 'text-purple-600' },
+                        'Messages': { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-600' }
+                    };
                     
-                    // display: flex を!importantで強制設定（Tailwindの優先順位を上書き）
-                    modal.style.setProperty('display', 'flex', 'important');
-                    modal.style.setProperty('visibility', 'visible', 'important');
-                    modal.style.setProperty('opacity', '1', 'important');
-                    // 追加: 位置とサイズを強制設定
-                    modal.style.setProperty('position', 'fixed', 'important');
-                    modal.style.setProperty('top', '0', 'important');
-                    modal.style.setProperty('left', '0', 'important');
-                    modal.style.setProperty('right', '0', 'important');
-                    modal.style.setProperty('bottom', '0', 'important');
-                    modal.style.setProperty('width', '100vw', 'important');
-                    modal.style.setProperty('height', '100vh', 'important');
-                    modal.style.setProperty('align-items', 'center', 'important');
-                    modal.style.setProperty('justify-content', 'center', 'important');
-                    modal.style.setProperty('z-index', '9999', 'important');
-                    modal.style.setProperty('background', 'rgba(0,0,0,0.5)', 'important');
+                    const color = colors[tabName];
+                    if (color) {
+                        activeTab.classList.add(color.border, color.bg, color.text);
+                    }
                     
-                    console.log('After setProperty - style.cssText:', modal.style.cssText);
-                    
-                    const computedStyle = window.getComputedStyle(modal);
-                    console.log('Computed - display:', computedStyle.display);
-                    console.log('Computed - visibility:', computedStyle.visibility);
-                    console.log('Computed - opacity:', computedStyle.opacity);
-                    console.log('Computed - z-index:', computedStyle.zIndex);
-                    console.log('Computed - position:', computedStyle.position);
-                    
-                    // モーダルのコンテンツを読み込む
-                    if (modalId === 'hearingModal' && typeof loadHearingForModal === 'function') loadHearingForModal();
-                    if (modalId === 'documentsModal' && typeof loadDocumentsForModal === 'function') loadDocumentsForModal();
-                    if (modalId === 'messagesModal' && typeof loadMessagesForModal === 'function') loadMessagesForModal();
-                    
-                    console.log('=== openModal END ===');
-                } else {
-                    console.error('Modal not found:', modalId);
+                    // コンテンツを読み込む
+                    if (tabName === 'Hearing') loadHearingPanel();
+                    if (tabName === 'Documents') loadDocumentsPanel();
+                    if (tabName === 'Create') loadCreatePanel();
+                    if (tabName === 'Messages') loadMessagesPanel();
                 }
+            }
+            
+            // 互換性のために残す
+            function openModal(modalId) {
+                const tabMap = {
+                    'hearingModal': 'Hearing',
+                    'documentsModal': 'Documents', 
+                    'createModal': 'Create',
+                    'messagesModal': 'Messages'
+                };
+                const tabName = tabMap[modalId];
+                if (tabName) switchTab(tabName);
+            }
+            
+            function closeModal(modalId) {
+                // モーダルは廃止したので何もしない
             }
             
             function closeModal(modalId) {
@@ -4370,12 +4263,30 @@ routes.get('/portal/:token', async (c) => {
                 showMessage('info', '回答を保存中...');
                 
                 try {
-                    const answersToSave = Object.entries(hearingAnswers)
-                        .filter(([_, value]) => value && value.trim())
-                        .map(([questionId, answerText]) => ({
-                            question_id: parseInt(questionId),
-                            answer_text: answerText
-                        }));
+                    // パネル内のtextareaから回答を収集
+                    const textareas = document.querySelectorAll('#hearingPanelContent textarea[data-question-id]');
+                    const answersToSave = [];
+                    textareas.forEach(textarea => {
+                        const questionId = parseInt(textarea.dataset.questionId);
+                        const answerText = textarea.value.trim();
+                        if (answerText) {
+                            answersToSave.push({ question_id: questionId, answer_text: answerText });
+                            // hearingAnswersオブジェクトも更新
+                            hearingAnswers[questionId] = answerText;
+                        }
+                    });
+                    
+                    // 既存の方法もフォールバック
+                    if (answersToSave.length === 0) {
+                        Object.entries(hearingAnswers)
+                            .filter(([_, value]) => value && value.trim())
+                            .forEach(([questionId, answerText]) => {
+                                answersToSave.push({
+                                    question_id: parseInt(questionId),
+                                    answer_text: answerText
+                                });
+                            });
+                    }
                     
                     if (answersToSave.length === 0) {
                         showMessage('error', '保存する回答がありません');
@@ -4594,9 +4505,9 @@ routes.get('/portal/:token', async (c) => {
                 }
             }
             
-            // モーダル用データ読み込み
-            async function loadHearingForModal() {
-                const container = document.getElementById('hearingModalContent');
+            // パネル用データ読み込み（タブ切り替え時に呼ばれる）
+            async function loadHearingPanel() {
+                const container = document.getElementById('hearingPanelContent');
                 if (!container) return;
                 
                 try {
@@ -4690,8 +4601,8 @@ routes.get('/portal/:token', async (c) => {
                 }
             }
             
-            async function loadDocumentsForModal() {
-                const container = document.getElementById('documentsGrid');
+            async function loadDocumentsPanel() {
+                const container = document.getElementById('documentsPanelContent');
                 if (!container) return;
                 
                 try {
@@ -4766,8 +4677,8 @@ routes.get('/portal/:token', async (c) => {
                 }
             }
             
-            async function loadMessagesForModal() {
-                const container = document.getElementById('messagesModalContent');
+            async function loadMessagesPanel() {
+                const container = document.getElementById('messagesPanelContent');
                 if (!container) return;
                 
                 try {
@@ -4813,8 +4724,8 @@ routes.get('/portal/:token', async (c) => {
                 }
             }
             
-            async function sendModalMessage() {
-                const input = document.getElementById('modalMessageInput');
+            async function sendMessage() {
+                const input = document.getElementById('messageInput');
                 const message = input.value.trim();
                 if (!message) return;
                 
@@ -4826,12 +4737,45 @@ routes.get('/portal/:token', async (c) => {
                     });
                     
                     input.value = '';
-                    await loadMessagesForModal();
+                    await loadMessagesPanel();
                     showMessage('メッセージを送信しました', 'success');
                 } catch (error) {
                     console.error('Error sending message:', error);
                     alert('メッセージの送信に失敗しました');
                 }
+            }
+            
+            async function loadCreatePanel() {
+                const container = document.getElementById('createPanelContent');
+                if (!container) return;
+                
+                container.innerHTML = \`
+                    <div class="space-y-4">
+                        <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                            <h4 class="font-bold text-purple-800 mb-2"><i class="fas fa-magic mr-2"></i>AI自動作成</h4>
+                            <p class="text-sm text-purple-600 mb-3">ヒアリング回答をもとに、AIが事業計画書などを自動作成します。</p>
+                            <button onclick="startAiDocumentCreation()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+                                <i class="fas fa-robot mr-1"></i>AI作成を開始
+                            </button>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <h4 class="font-bold text-gray-800 mb-2"><i class="fas fa-file-alt mr-2"></i>テンプレート</h4>
+                            <p class="text-sm text-gray-600 mb-3">よく使う書式のテンプレートをダウンロードできます。</p>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <a href="#" class="flex items-center gap-2 px-3 py-2 bg-white border rounded hover:bg-gray-50">
+                                    <i class="fas fa-file-word text-blue-600"></i>事業計画書
+                                </a>
+                                <a href="#" class="flex items-center gap-2 px-3 py-2 bg-white border rounded hover:bg-gray-50">
+                                    <i class="fas fa-file-word text-blue-600"></i>収支計画書
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                \`;
+            }
+            
+            function startAiDocumentCreation() {
+                alert('AI書類作成機能は準備中です');
             }
             
             // AIアシスタントモーダル（レガシー互換）
@@ -6536,30 +6480,29 @@ routes.get('/portal/:token', async (c) => {
             
             // 初期化処理（ステータス読み込み後に他の機能を読み込む）
             async function initPortal() {
-                // クイックアクションボタンのイベントリスナーを設定（イベント委譲を使用）
+                // タブボタンのイベントリスナーを設定
                 document.addEventListener('click', function(e) {
-                    const target = e.target.closest('#btnHearing, #btnDocuments, #btnCreate, #btnMessages');
+                    const target = e.target.closest('#tabHearing, #tabDocuments, #tabCreate, #tabMessages');
                     if (!target) return;
                     
                     e.preventDefault();
                     e.stopPropagation();
                     
-                    if (target.id === 'btnHearing') {
-                        console.log('Hearing button clicked via delegation');
-                        openModal('hearingModal');
-                    } else if (target.id === 'btnDocuments') {
-                        console.log('Documents button clicked via delegation');
-                        openModal('documentsModal');
-                    } else if (target.id === 'btnCreate') {
-                        console.log('Create button clicked via delegation');
-                        openModal('createModal');
-                    } else if (target.id === 'btnMessages') {
-                        console.log('Messages button clicked via delegation');
-                        openModal('messagesModal');
+                    if (target.id === 'tabHearing') {
+                        switchTab('Hearing');
+                    } else if (target.id === 'tabDocuments') {
+                        switchTab('Documents');
+                    } else if (target.id === 'tabCreate') {
+                        switchTab('Create');
+                    } else if (target.id === 'tabMessages') {
+                        switchTab('Messages');
                     }
                 });
                 
-                console.log('Portal initialized - event delegation set up');
+                console.log('Portal initialized - tab system set up');
+                
+                // 初期タブ（ヒアリング）を読み込む
+                loadHearingPanel();
                 
                 // まずステータスを読み込む（見込みステータスの判定に必要）
                 await loadStatus();
