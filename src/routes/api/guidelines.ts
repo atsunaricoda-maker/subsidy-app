@@ -522,12 +522,37 @@ routes.get('/admin/notifications/summary', async (c) => {
     return c.json({ new_message: 0, document_upload: 0, payment_report: 0, other: 0 })
   }
   
+  try {
+    // テーブルが存在しない場合は作成
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS admin_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        notification_type TEXT NOT NULL,
+        title TEXT,
+        message TEXT,
+        related_id INTEGER,
+        related_table TEXT,
+        is_read INTEGER DEFAULT 0,
+        organization_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+  } catch (e) {
+    // テーブル作成エラーは無視
+  }
+  
   // organization_idでテナント分離（自組織の未読通知のみ取得）
-  const allNotifications = await DB.prepare(`
-    SELECT id, notification_type, related_table, related_id
-    FROM admin_notifications 
-    WHERE is_read = 0 AND organization_id = ?
-  `).bind(orgId).all()
+  let allNotifications
+  try {
+    allNotifications = await DB.prepare(`
+      SELECT id, notification_type, related_table, related_id
+      FROM admin_notifications 
+      WHERE is_read = 0 AND organization_id = ?
+    `).bind(orgId).all()
+  } catch (e) {
+    console.error('Error loading notifications:', e)
+    return c.json({ new_message: 0, document_upload: 0, payment_report: 0, other: 0 })
+  }
   
   let notifications = allNotifications.results || []
   
