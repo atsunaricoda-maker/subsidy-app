@@ -6494,38 +6494,30 @@ routes.get('/portal/:token', async (c) => {
             
             // 初期化処理（ステータス読み込み後に他の機能を読み込む）
             async function initPortal() {
-                // クイックアクションボタンのイベントリスナーを設定
-                const btnHearing = document.getElementById('btnHearing');
-                const btnDocuments = document.getElementById('btnDocuments');
-                const btnCreate = document.getElementById('btnCreate');
-                const btnMessages = document.getElementById('btnMessages');
-                
-                if (btnHearing) {
-                    btnHearing.addEventListener('click', function() {
-                        console.log('Hearing button clicked');
+                // クイックアクションボタンのイベントリスナーを設定（イベント委譲を使用）
+                document.addEventListener('click', function(e) {
+                    const target = e.target.closest('#btnHearing, #btnDocuments, #btnCreate, #btnMessages');
+                    if (!target) return;
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (target.id === 'btnHearing') {
+                        console.log('Hearing button clicked via delegation');
                         openModal('hearingModal');
-                    });
-                }
-                if (btnDocuments) {
-                    btnDocuments.addEventListener('click', function() {
-                        console.log('Documents button clicked');
+                    } else if (target.id === 'btnDocuments') {
+                        console.log('Documents button clicked via delegation');
                         openModal('documentsModal');
-                    });
-                }
-                if (btnCreate) {
-                    btnCreate.addEventListener('click', function() {
-                        console.log('Create button clicked');
+                    } else if (target.id === 'btnCreate') {
+                        console.log('Create button clicked via delegation');
                         openModal('createModal');
-                    });
-                }
-                if (btnMessages) {
-                    btnMessages.addEventListener('click', function() {
-                        console.log('Messages button clicked');
+                    } else if (target.id === 'btnMessages') {
+                        console.log('Messages button clicked via delegation');
                         openModal('messagesModal');
-                    });
-                }
+                    }
+                });
                 
-                console.log('Portal initialized - buttons:', { btnHearing, btnDocuments, btnCreate, btnMessages });
+                console.log('Portal initialized - event delegation set up');
                 
                 // まずステータスを読み込む（見込みステータスの判定に必要）
                 await loadStatus();
