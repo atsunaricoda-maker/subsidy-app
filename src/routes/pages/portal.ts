@@ -152,26 +152,6 @@ routes.get('/portal/:token', async (c) => {
                             </div>
                         </div>
                         
-                        <!-- ステータスカード -->
-                        <div class="bg-white rounded-lg shadow p-3 mb-3">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    <div class="text-xl" id="statusIcon"></div>
-                                    <div>
-                                        <div class="text-sm font-bold" id="statusText"></div>
-                                        <div class="text-xs text-gray-500" id="statusDescription"></div>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-xs text-gray-500">ヒアリング進捗</div>
-                                    <div id="hearingProgress" class="text-xs font-medium text-indigo-600">0/0</div>
-                                </div>
-                            </div>
-                            <div class="mt-2 w-full bg-indigo-200 rounded-full h-1.5">
-                                <div id="hearingProgressBar" class="bg-indigo-600 h-1.5 rounded-full transition-all" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        
                         <!-- 2カラムレイアウト: パイプライン + 請求書/契約 -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
                             <!-- パイプライン進捗 -->
@@ -1027,12 +1007,6 @@ routes.get('/portal/:token', async (c) => {
                 
                 currentStatus = status;
                 isInquiryStatus = (status === 'inquiry');
-                
-                const info = STATUS_INFO[status] || STATUS_INFO['inquiry'];
-                
-                document.getElementById('statusIcon').textContent = info.icon;
-                document.getElementById('statusText').textContent = info.text;
-                document.getElementById('statusDescription').textContent = info.desc;
                 
                 // 電子契約URLがあれば表示
                 if (contractUrl) {
@@ -3836,7 +3810,7 @@ routes.get('/portal/:token', async (c) => {
             }
             
             function updateProgress() {
-                // 必須質問の進捗
+                // 必須質問の進捗（内部状態の更新のみ）
                 const requiredQuestions = hearingQuestions.filter(q => q.is_required);
                 const requiredAnswered = requiredQuestions.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
                 const requiredTotal = requiredQuestions.length;
@@ -3847,22 +3821,14 @@ routes.get('/portal/:token', async (c) => {
                 const optionalAnswered = optionalQuestions.filter(q => hearingAnswers[q.id] && hearingAnswers[q.id].trim()).length;
                 const optionalTotal = optionalQuestions.length;
                 
-                // 表示更新
-                let progressText = \`必須: \${requiredAnswered}/\${requiredTotal}問\`;
-                if (optionalTotal > 0) {
-                    progressText += \` ｜ 任意: \${optionalAnswered}/\${optionalTotal}問\`;
-                }
-                document.getElementById('hearingProgress').textContent = progressText;
-                document.getElementById('hearingProgressBar').style.width = \`\${requiredPercent}%\`;
-                
-                // 必須完了でバーの色を変更
-                const progressBar = document.getElementById('hearingProgressBar');
-                if (requiredPercent === 100) {
-                    progressBar.classList.remove('bg-indigo-600');
-                    progressBar.classList.add('bg-green-500');
-                } else {
-                    progressBar.classList.remove('bg-green-500');
-                    progressBar.classList.add('bg-indigo-600');
+                // ヒアリングタブ内の進捗表示があれば更新
+                const hearingTabProgress = document.getElementById('hearingTabProgress');
+                if (hearingTabProgress) {
+                    let progressText = \`必須: \${requiredAnswered}/\${requiredTotal}問\`;
+                    if (optionalTotal > 0) {
+                        progressText += \` ｜ 任意: \${optionalAnswered}/\${optionalTotal}問\`;
+                    }
+                    hearingTabProgress.textContent = progressText;
                 }
             }
             
