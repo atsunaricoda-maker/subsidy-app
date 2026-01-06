@@ -183,6 +183,12 @@ routes.get('/portal/:token', async (c) => {
                                 <div class="w-full bg-gray-200 rounded-full h-1.5 mb-2">
                                     <div id="pipelineProgressBar" class="bg-blue-500 h-1.5 rounded-full transition-all" style="width: 0%"></div>
                                 </div>
+                                <!-- フィルターボタン -->
+                                <div class="flex gap-1 mb-2 flex-wrap">
+                                    <button onclick="filterPipelineTasks('all')" id="filterAll" class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-medium">すべて</button>
+                                    <button onclick="filterPipelineTasks('customer')" id="filterCustomer" class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 hover:bg-orange-100 hover:text-orange-700">顧客タスク</button>
+                                    <button onclick="filterPipelineTasks('pending')" id="filterPending" class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 hover:bg-yellow-100 hover:text-yellow-700">未完了</button>
+                                </div>
                                 <div id="pipelineTasksList" class="space-y-1.5 max-h-48 overflow-y-auto text-xs"></div>
                             </div>
                             
@@ -1608,6 +1614,10 @@ routes.get('/portal/:token', async (c) => {
                 }
             }
             
+            // パイプラインタスクのグローバル保持用
+            let pipelineTasks = [];
+            let currentPipelineFilter = 'all';
+            
             // パイプライン進捗を読み込む
             async function loadPipelineProgress() {
                 try {
@@ -1642,68 +1652,108 @@ routes.get('/portal/:token', async (c) => {
                     
                     // タスク一覧を取得
                     const tasksResponse = await axios.get(\`/api/pipelines/\${activePipeline.id}/tasks\`);
-                    const tasks = tasksResponse.data;
+                    pipelineTasks = tasksResponse.data;
                     
-                    const tasksContainer = document.getElementById('pipelineTasksList');
+                    // 初期表示はすべてのタスク
+                    renderPipelineTasks(pipelineTasks);
                     
-                    if (tasks.length === 0) {
-                        tasksContainer.innerHTML = '<div class="text-gray-500 text-center py-2">タスクがありません</div>';
-                        return;
-                    }
-                    
-                    const statusStyles = {
-                        pending: { bg: 'bg-gray-100', text: 'text-gray-600', icon: 'fa-circle' },
-                        in_progress: { bg: 'bg-blue-100', text: 'text-blue-600', icon: 'fa-spinner fa-spin' },
-                        completed: { bg: 'bg-green-100', text: 'text-green-600', icon: 'fa-check' },
-                        skipped: { bg: 'bg-gray-100', text: 'text-gray-400', icon: 'fa-minus' }
-                    };
-                    
-                    const taskTypeLabels = {
-                        internal: '自社対応',
-                        external: '顧客対応',
-                        both: '共同'
-                    };
-                    
-                    // STEP形式で表示（参考画像③）
-                    tasksContainer.innerHTML = tasks.map((task, index) => {
-                        const style = statusStyles[task.status] || statusStyles.pending;
-                        const isCustomerTask = task.task_type === 'external' || task.task_type === 'both';
-                        const stepNum = index + 1;
-                        const isCompleted = task.status === 'completed';
-                        const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
-                        
-                        return \`
-                            <div class="border rounded-lg p-3 \${isCompleted ? 'bg-green-50 border-green-200' : (isCustomerTask ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200')}">
-                                <div class="flex items-start gap-3">
-                                    <div class="flex-shrink-0">
-                                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm \${isCompleted ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}">
-                                            \${isCompleted ? '<i class="fas fa-check"></i>' : stepNum}
-                                        </div>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <span class="font-medium text-sm \${style.text}">\${task.task_name}</span>
-                                            \${isCustomerTask ? '<span class="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">顧客</span>' : ''}
-                                            \${isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-600 rounded">完了</span>' : ''}
-                                        </div>
-                                        <div class="text-xs text-gray-500">
-                                            \${task.description || ''}
-                                            \${task.end_date ? '<span class="ml-1">期限: ' + task.end_date + '</span>' : ''}
-                                        </div>
-                                    </div>
-                                    \${canComplete ? \`
-                                        <button onclick="completeTask(\${task.id})" 
-                                                class="flex-shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
-                                            <i class="fas fa-check mr-1"></i>完了
-                                        </button>
-                                    \` : ''}
-                                </div>
-                            </div>
-                        \`;
-                    }).join('');
+                    // 現在のフィルターを適用
+                    filterPipelineTasks(currentPipelineFilter);
                 } catch (error) {
                     console.error('Error loading pipeline progress:', error);
                 }
+            }
+            
+            // パイプラインタスクのフィルター
+            function filterPipelineTasks(filter) {
+                currentPipelineFilter = filter;
+                
+                // フィルターボタンのスタイル更新
+                const filterButtons = {
+                    'all': document.getElementById('filterAll'),
+                    'customer': document.getElementById('filterCustomer'),
+                    'pending': document.getElementById('filterPending')
+                };
+                
+                Object.entries(filterButtons).forEach(([key, btn]) => {
+                    if (btn) {
+                        if (key === filter) {
+                            btn.className = 'px-2 py-0.5 text-xs rounded-full font-medium ' + 
+                                (key === 'all' ? 'bg-blue-100 text-blue-700' : 
+                                 key === 'customer' ? 'bg-orange-100 text-orange-700' : 
+                                 'bg-yellow-100 text-yellow-700');
+                        } else {
+                            btn.className = 'px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200';
+                        }
+                    }
+                });
+                
+                // タスクをフィルタリング
+                let filteredTasks = pipelineTasks;
+                if (filter === 'customer') {
+                    filteredTasks = pipelineTasks.filter(t => t.task_type === 'external' || t.task_type === 'both');
+                } else if (filter === 'pending') {
+                    filteredTasks = pipelineTasks.filter(t => t.status !== 'completed' && t.status !== 'skipped');
+                }
+                
+                renderPipelineTasks(filteredTasks);
+            }
+            
+            // パイプラインタスクの描画
+            function renderPipelineTasks(tasks) {
+                const tasksContainer = document.getElementById('pipelineTasksList');
+                if (!tasksContainer) return;
+                
+                if (tasks.length === 0) {
+                    tasksContainer.innerHTML = '<div class="text-gray-500 text-center py-2">該当するタスクがありません</div>';
+                    return;
+                }
+                
+                const statusStyles = {
+                    pending: { bg: 'bg-gray-100', text: 'text-gray-600', icon: 'fa-circle' },
+                    in_progress: { bg: 'bg-blue-100', text: 'text-blue-600', icon: 'fa-spinner fa-spin' },
+                    completed: { bg: 'bg-green-100', text: 'text-green-600', icon: 'fa-check' },
+                    skipped: { bg: 'bg-gray-100', text: 'text-gray-400', icon: 'fa-minus' }
+                };
+                
+                tasksContainer.innerHTML = tasks.map((task, index) => {
+                    const style = statusStyles[task.status] || statusStyles.pending;
+                    const isCustomerTask = task.task_type === 'external' || task.task_type === 'both';
+                    // 元のインデックスを取得
+                    const originalIndex = pipelineTasks.findIndex(t => t.id === task.id);
+                    const stepNum = originalIndex + 1;
+                    const isCompleted = task.status === 'completed';
+                    const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
+                    
+                    return \`
+                        <div class="border rounded-lg p-3 \${isCompleted ? 'bg-green-50 border-green-200' : (isCustomerTask ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200')}">
+                            <div class="flex items-start gap-3">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm \${isCompleted ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}">
+                                        \${isCompleted ? '<i class="fas fa-check"></i>' : stepNum}
+                                    </div>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-medium text-sm \${style.text}">\${task.task_name}</span>
+                                        \${isCustomerTask ? '<span class="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">顧客</span>' : ''}
+                                        \${isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-600 rounded">完了</span>' : ''}
+                                    </div>
+                                    <div class="text-xs text-gray-500">
+                                        \${task.description || ''}
+                                        \${task.end_date ? '<span class="ml-1">期限: ' + task.end_date + '</span>' : ''}
+                                    </div>
+                                </div>
+                                \${canComplete ? \`
+                                    <button onclick="completeTask(\${task.id})" 
+                                            class="flex-shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
+                                        <i class="fas fa-check mr-1"></i>完了
+                                    </button>
+                                \` : ''}
+                            </div>
+                        </div>
+                    \`;
+                }).join('');
             }
             
             // タスク完了（顧客用）
@@ -4999,6 +5049,7 @@ routes.get('/portal/:token', async (c) => {
             window.runAIAnalysis = runAIAnalysis;
             window.closeFinancialIndicatorsModal = closeFinancialIndicatorsModal;
             window.completeTask = completeTask;
+            window.filterPipelineTasks = filterPipelineTasks;
             window.markAnnouncementRead = markAnnouncementRead;
             window.showPaymentModal = showPaymentModal;
             window.closeBankTransferModal = closeBankTransferModal;
