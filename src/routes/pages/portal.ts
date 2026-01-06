@@ -3145,10 +3145,8 @@ routes.get('/portal/:token', async (c) => {
             }
             
             async function loadCommunications() {
-                // 案件IDがある場合は案件別、なければ顧客全体のやり取りを取得
-                const url = CASE_ID 
-                    ? \`/api/cases/\${CASE_ID}/communications\`
-                    : \`/api/clients/\${CLIENT_ID}/communications\`;
+                // ポータル用APIを使用
+                const url = \`/api/portal/clients/\${CLIENT_ID}/communications\` + (CASE_ID ? \`?case_id=\${CASE_ID}\` : '');
                 const response = await axios.get(url);
                 const comms = response.data;
                 
@@ -3176,16 +3174,20 @@ routes.get('/portal/:token', async (c) => {
             document.getElementById('clientMessageForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const message = document.getElementById('clientMessageInput').value;
+                if (!message.trim()) return;
                 
-                await axios.post(\`/api/clients/\${CLIENT_ID}/communications\`, {
-                    message,
-                    case_id: CASE_ID || null,
-                    sender_type: 'client',
-                    sender_name: '${client.name}'
-                });
-                
-                document.getElementById('clientMessageInput').value = '';
-                loadCommunications();
+                try {
+                    await axios.post(\`/api/portal/clients/\${CLIENT_ID}/communications\`, {
+                        message,
+                        case_id: CASE_ID || null
+                    });
+                    
+                    document.getElementById('clientMessageInput').value = '';
+                    loadCommunications();
+                } catch (error) {
+                    console.error('メッセージ送信エラー:', error);
+                    alert('メッセージの送信に失敗しました');
+                }
             });
 
             document.getElementById('fileInput').addEventListener('change', async (e) => {
@@ -4975,11 +4977,10 @@ routes.get('/portal/:token', async (c) => {
                 }
                 
                 try {
-                    // 新規申込として通信を送信
-                    await axios.post(\`/api/clients/\${CLIENT_ID}/communications\`, {
+                    // 新規申込として通信を送信（ポータル用API）
+                    await axios.post(\`/api/portal/clients/\${CLIENT_ID}/communications\`, {
                         message: \`【新規申込希望】\\n申請種別: \${subsidyTypeName}\\n相談内容: \${notes || 'なし'}\\nプライバシーポリシー同意: 済\`,
-                        sender_type: 'client',
-                        sender_name: '${client.name}'
+                        case_id: null
                     });
                     
                     showMessage('success', '新規申込を送信しました。担当者からご連絡いたします。');

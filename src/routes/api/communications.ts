@@ -79,4 +79,71 @@ routes.post('/clients/:id/communications', async (c) => {
   })
 })
 
+// ポータルからのメッセージ送信（認証なし、アクセストークンで検証）
+routes.post('/portal/clients/:id/communications', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  // client_idとaccess_tokenで検証
+  const clientCheck = await DB.prepare(`
+    SELECT id, name, company_name, organization_id FROM clients WHERE id = ?
+  `).bind(id).first() as any
+  
+  if (!clientCheck) {
+    return c.json({ error: 'クライアントが見つかりません' }, 404)
+  }
+  
+  const result = await DB.prepare(`
+    INSERT INTO communications (client_id, case_id, message, sender_type, sender_name)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(
+    id,
+    data.case_id || null,
+    data.message,
+    'client',
+    clientCheck.name || '顧客'
+  ).run()
+  
+  // 管理者に通知を作成
+  const clientName = clientCheck.company_name || clientCheck.name || '顧客'
+  await DB.prepare(`
+    INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(
+    'new_message',
+    '新しいメッセージ',
+    `${clientName}様から新しいメッセージが届きました`,
+    id,
+    'clients',
+    clientCheck.organization_id
+  ).run()
+  
+  return c.json({ 
+    id: result.meta.last_row_id,
+    success: true
+  })
+})
+
+// ポータルからのメッセージ取得（認証なし）
+routes.get('/portal/clients/:id/communications', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const caseId = c.req.query('case_id')
+  
+  let query = `SELECT * FROM communications WHERE client_id = ?`
+  const params: any[] = [id]
+  
+  if (caseId) {
+    query += ` AND (case_id = ? OR case_id IS NULL)`
+    params.push(caseId)
+  }
+  
+  query += ` ORDER BY created_at ASC`
+  
+  const result = await DB.prepare(query).bind(...params).all()
+  
+  return c.json(result.results)
+})
+
 export default routes
