@@ -292,7 +292,7 @@ routes.get('/portal/:token', async (c) => {
                 </div>
                 
                 <!-- ===== AIサイドバー（右側常時表示） ===== -->
-                <aside id="aiSidebar" class="portal-sidebar hidden lg:flex">
+                <aside id="aiSidebar" class="portal-sidebar lg:flex">
                     <div class="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2">
@@ -4531,6 +4531,14 @@ routes.get('/portal/:token', async (c) => {
                 const modal = document.getElementById(modalId);
                 if (modal) modal.classList.add('hidden');
             }
+            
+            // グローバルスコープに公開
+            window.openModal = openModal;
+            window.closeModal = closeModal;
+            window.toggleAiSidebar = toggleAiSidebar;
+            window.setAiQuestion = setAiQuestion;
+            window.sendAiMessage = sendAiMessage;
+            window.sendModalMessage = sendModalMessage;
             
             // モーダル用データ読み込み
             async function loadHearingForModal() {
