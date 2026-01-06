@@ -440,6 +440,25 @@ routes.get('/admin/notifications', async (c) => {
     return c.json([])
   }
   
+  try {
+    // テーブルが存在しない場合は作成
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS admin_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        notification_type TEXT NOT NULL,
+        title TEXT,
+        message TEXT,
+        related_id INTEGER,
+        related_table TEXT,
+        is_read INTEGER DEFAULT 0,
+        organization_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+  } catch (e) {
+    // テーブル作成エラーは無視
+  }
+  
   const unreadOnly = c.req.query('unread_only') === 'true'
   
   // organization_idでテナント分離（自組織の通知のみ取得）
@@ -449,7 +468,13 @@ routes.get('/admin/notifications', async (c) => {
   }
   query += ` ORDER BY created_at DESC LIMIT 50`
   
-  const result = await DB.prepare(query).bind(orgId).all()
+  let result
+  try {
+    result = await DB.prepare(query).bind(orgId).all()
+  } catch (e) {
+    console.error('Error loading notifications:', e)
+    return c.json([])
+  }
   let notifications = result.results || []
   
   // 支払い報告通知の場合、関連する請求書が既にpaid状態ならフィルタリング
