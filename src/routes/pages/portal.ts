@@ -1255,6 +1255,18 @@ routes.get('/portal/:token', async (c) => {
                     modal.style.setProperty('display', 'flex', 'important');
                     modal.style.setProperty('visibility', 'visible', 'important');
                     modal.style.setProperty('opacity', '1', 'important');
+                    // 追加: 位置とサイズを強制設定
+                    modal.style.setProperty('position', 'fixed', 'important');
+                    modal.style.setProperty('top', '0', 'important');
+                    modal.style.setProperty('left', '0', 'important');
+                    modal.style.setProperty('right', '0', 'important');
+                    modal.style.setProperty('bottom', '0', 'important');
+                    modal.style.setProperty('width', '100vw', 'important');
+                    modal.style.setProperty('height', '100vh', 'important');
+                    modal.style.setProperty('align-items', 'center', 'important');
+                    modal.style.setProperty('justify-content', 'center', 'important');
+                    modal.style.setProperty('z-index', '9999', 'important');
+                    modal.style.setProperty('background', 'rgba(0,0,0,0.5)', 'important');
                     
                     console.log('After setProperty - style.cssText:', modal.style.cssText);
                     
