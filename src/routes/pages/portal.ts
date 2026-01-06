@@ -43,311 +43,94 @@ routes.get('/portal/:token', async (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
-    <body class="bg-gray-50 min-h-screen">
+    <body class="bg-gradient-to-br from-slate-50 to-green-50 min-h-screen">
         <style>
-            /* === 新デザイン: 1ページダッシュボード === */
-            
-            /* レイアウト */
-            .portal-layout { display: flex; height: 100vh; overflow: hidden; }
-            .portal-main { flex: 1; overflow-y: auto; }
-            .portal-sidebar { width: 320px; border-left: 1px solid #e5e7eb; background: white; display: flex; flex-direction: column; }
-            
-            /* モバイル対応 */
-            @media (max-width: 1024px) {
-                .portal-sidebar { display: none; }
-                .portal-sidebar.mobile-open { display: flex; position: fixed; right: 0; top: 0; bottom: 0; z-index: 50; width: 100%; max-width: 360px; box-shadow: -4px 0 20px rgba(0,0,0,0.15); }
-            }
-            
-            /* タブ切り替え（互換性維持） */
+            /* タブ切り替え対応 */
             .main-tab-btn { transition: all 0.3s; border-radius: 12px 12px 0 0; }
             .main-tab-btn.active { background: white; color: #16a34a; font-weight: 600; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
             .main-tab-btn:not(.active):hover { background: rgba(255,255,255,0.2); }
             .main-tab-content { display: none; }
             .main-tab-content.active { display: block; }
+            /* 1画面に収まるレイアウト */
             .portal-container { height: calc(100vh - 140px); overflow: hidden; }
             .tab-panel { height: 100%; overflow-y: auto; }
-            
-            /* パイプラインステップ */
-            .pipeline-step { position: relative; padding-left: 2.5rem; padding-bottom: 1.5rem; }
-            .pipeline-step:last-child { padding-bottom: 0; }
-            .pipeline-step::before { content: ''; position: absolute; left: 0.9rem; top: 2rem; bottom: 0; width: 2px; background: #e5e7eb; }
-            .pipeline-step:last-child::before { display: none; }
-            .pipeline-step-icon { position: absolute; left: 0; top: 0; width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; z-index: 1; }
-            .pipeline-step.completed .pipeline-step-icon { background: #10b981; color: white; }
-            .pipeline-step.current .pipeline-step-icon { background: #3b82f6; color: white; animation: pulse 2s infinite; }
-            .pipeline-step.pending .pipeline-step-icon { background: #e5e7eb; color: #9ca3af; }
-            .pipeline-step.customer .pipeline-step-icon { border: 2px solid #f59e0b; }
-            
-            /* タスク完了ボタン */
-            .task-btn { transition: all 0.2s; }
-            .task-btn-pending { background: #fef3c7; color: #92400e; border: 2px solid #fbbf24; }
-            .task-btn-pending:hover { background: #fbbf24; color: white; transform: scale(1.02); }
-            .task-btn-completed { background: #d1fae5; color: #065f46; border: 2px solid #10b981; cursor: default; }
-            .task-btn-disabled { background: #f3f4f6; color: #9ca3af; border: 2px solid #e5e7eb; cursor: not-allowed; }
-            
-            /* クイックアクションカード */
-            .action-card { transition: all 0.2s; cursor: pointer; }
-            .action-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
-            
-            /* モーダル */
-            .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
-            .modal-content { animation: slideUp 0.3s ease; }
-            @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-            @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); } 50% { box-shadow: 0 0 0 8px rgba(59,130,246,0); } }
-            
-            /* AIチャット */
-            .ai-chat-container { flex: 1; display: flex; flex-direction: column; }
-            .ai-chat-messages { flex: 1; overflow-y: auto; }
-            .ai-message { max-width: 85%; }
-            .ai-message.user { margin-left: auto; background: #3b82f6; color: white; }
-            .ai-message.assistant { background: #f3f4f6; color: #1f2937; }
-            
+            /* モバイル対応 */
+            @media (max-width: 768px) {
+                .portal-container { height: calc(100vh - 160px); }
+            }
             /* カスタムアニメーション */
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
             .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         </style>
-        
-        <!-- ===== 新レイアウト: メイン + AIサイドバー ===== -->
-        <div class="portal-layout">
-            <!-- メインエリア -->
-            <div class="portal-main">
-                <!-- ヘッダー -->
-                <header class="bg-gradient-to-r from-green-600 via-green-700 to-emerald-700 text-white shadow-lg sticky top-0 z-40">
-                    <div class="px-4 py-3">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                                        <i class="fas fa-user-circle text-lg"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-green-100 text-xs">顧客ポータル</p>
-                                        <h1 class="text-base md:text-lg font-bold">${client.name} 様</h1>
-                                    </div>
-                                </div>
-                                <!-- 案件セレクター -->
-                                <select id="caseSelector" onchange="if(this.value) window.location.href='/portal/'+this.value" 
-                                        class="bg-white/20 text-white text-xs px-3 py-2 rounded-lg border-0 focus:ring-2 focus:ring-white/50 backdrop-blur-sm">
-                                    <option value="">案件を選択...</option>
-                                </select>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <!-- モバイル用AIボタン -->
-                                <button onclick="toggleAiSidebar()" class="lg:hidden w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all" title="AIに相談">
-                                    <i class="fas fa-robot"></i>
-                                </button>
-                                <button onclick="openNewApplicationModal()" 
-                                        class="bg-white text-green-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition-all hover:scale-105">
-                                    <i class="fas fa-plus"></i>
-                                    <span class="hidden sm:inline">新規申請</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
-                <!-- メインコンテンツ（1ページダッシュボード） -->
-                <div class="p-4 space-y-4">
-                    <!-- ステータスバナー -->
-                    <div id="inquiryRestrictionBanner" class="hidden">
-                        <div class="bg-gradient-to-r from-yellow-400 to-amber-400 rounded-xl shadow p-4 text-white">
+        <div class="h-screen flex flex-col">
+            <!-- ヘッダー（モダンスタイル） -->
+            <header class="bg-gradient-to-r from-green-600 via-green-700 to-emerald-700 text-white shadow-xl flex-shrink-0">
+                <div class="container mx-auto px-4 py-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
                             <div class="flex items-center gap-3">
-                                <i class="fas fa-info-circle text-2xl"></i>
-                                <div>
-                                    <span class="font-bold">現在「見込み」ステータスです</span>
-                                    <span class="text-sm opacity-90 ml-2">担当者が案件を開始すると、各機能が利用可能になります</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 次にやるべきこと（目立つ表示） -->
-                    <div id="nextActionsSection" class="hidden">
-                        <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl shadow-lg p-4 text-white">
-                            <div class="flex items-center gap-2 mb-3">
-                                <i class="fas fa-bell text-xl animate-bounce"></i>
-                                <span class="font-bold text-lg">次にやるべきこと</span>
-                            </div>
-                            <div id="nextActionsList" class="space-y-2"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- クイックアクション（カード形式） -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div onclick="openModal('hearingModal')" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-indigo-500">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-clipboard-list text-indigo-600"></i>
+                                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                    <i class="fas fa-user-circle text-lg"></i>
                                 </div>
                                 <div>
-                                    <div class="text-xs text-gray-500">ヒアリング</div>
-                                    <div id="hearingQuickStatus" class="font-bold text-indigo-600">0/0</div>
+                                    <p class="text-green-100 text-xs">顧客ポータル</p>
+                                    <h1 class="text-base md:text-lg font-bold">${client.name} 様</h1>
                                 </div>
                             </div>
+                            <!-- 案件セレクター -->
+                            <select id="caseSelector" onchange="if(this.value) window.location.href='/portal/'+this.value" 
+                                    class="bg-white/20 text-white text-xs px-3 py-2 rounded-lg border-0 focus:ring-2 focus:ring-white/50 backdrop-blur-sm">
+                                <option value="">案件を選択...</option>
+                            </select>
                         </div>
-                        <div onclick="openModal('documentsModal')" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-green-500">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-file-upload text-green-600"></i>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-gray-500">書類提出</div>
-                                    <div id="documentsQuickStatus" class="font-bold text-green-600">確認する</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div onclick="openModal('createModal')" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-purple-500">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-file-signature text-purple-600"></i>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-gray-500">書類作成</div>
-                                    <div class="font-bold text-purple-600">作成する</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div onclick="openModal('messagesModal')" class="action-card bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-comments text-blue-600"></i>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-gray-500">やり取り</div>
-                                    <div id="messagesQuickStatus" class="font-bold text-blue-600">0件</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- パイプライン進捗（メイン表示） -->
-                    <div id="pipelineSection" class="bg-white rounded-xl shadow-sm overflow-hidden">
-                        <div class="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-tasks text-white"></i>
-                                    </div>
-                                    <div>
-                                        <h2 class="font-bold text-gray-800">申請の進捗状況</h2>
-                                        <p class="text-xs text-gray-500">現在のステップと次のアクション</p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div id="pipelineProgressText" class="text-2xl font-bold text-blue-600">0%</div>
-                                    <div class="text-xs text-gray-500">完了</div>
-                                </div>
-                            </div>
-                            <div class="mt-3 w-full bg-gray-200 rounded-full h-2">
-                                <div id="pipelineProgressBar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div id="pipelineSteps" class="p-4">
-                            <div class="text-center py-8 text-gray-400">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>読み込み中...</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 2カラム: 請求書 + ステータス -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <!-- 請求書 -->
-                        <div class="bg-white rounded-xl shadow-sm p-4">
-                            <div class="flex items-center justify-between mb-3">
-                                <div class="flex items-center gap-2">
-                                    <i class="fas fa-file-invoice-dollar text-green-600"></i>
-                                    <span class="font-bold text-gray-800">請求書</span>
-                                </div>
-                                <span id="invoiceCountBadge" class="hidden text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full"></span>
-                            </div>
-                            <div id="portalInvoicesContent" class="space-y-2 max-h-48 overflow-y-auto">
-                                <div class="text-gray-400 py-4 text-center text-sm"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</div>
-                            </div>
-                        </div>
-                        
-                        <!-- 案件ステータス -->
-                        <div class="bg-white rounded-xl shadow-sm p-4">
-                            <div class="flex items-center justify-between mb-3">
-                                <div class="flex items-center gap-2">
-                                    <i class="fas fa-info-circle text-blue-600"></i>
-                                    <span class="font-bold text-gray-800">案件ステータス</span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <div class="text-3xl" id="statusIcon">📋</div>
-                                <div>
-                                    <div class="font-bold text-lg" id="statusText">読み込み中...</div>
-                                    <div class="text-sm text-gray-500" id="statusDescription"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- フッター -->
-                    <div class="text-center text-xs text-gray-400 py-4 space-x-4">
-                        <a href="/privacy-policy" target="_blank" class="hover:text-gray-600">プライバシーポリシー</a>
-                        <a href="/legal" target="_blank" class="hover:text-gray-600">特定商取引法</a>
-                    </div>
-                </div>
-                
-                <!-- ===== AIサイドバー（右側常時表示） ===== -->
-                <aside id="aiSidebar" class="portal-sidebar hidden lg:flex">
-                    <div class="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-robot text-white"></i>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800 text-sm">AIアシスタント</h3>
-                                    <p class="text-xs text-gray-500">24時間対応</p>
-                                </div>
-                            </div>
-                            <button onclick="toggleAiSidebar()" class="lg:hidden text-gray-400 hover:text-gray-600">
-                                <i class="fas fa-times"></i>
+                        <div class="flex items-center gap-3">
+                            <button onclick="openAiModal()" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all" title="AIサポート">
+                                <i class="fas fa-robot"></i>
+                            </button>
+                            <button onclick="openNewApplicationModal()" 
+                                    class="bg-white text-green-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition-all hover:scale-105">
+                                <i class="fas fa-plus"></i>
+                                <span class="hidden sm:inline">新規申請</span>
                             </button>
                         </div>
                     </div>
-                    <div class="ai-chat-container">
-                        <div id="aiChatMessages" class="ai-chat-messages p-4 space-y-3">
-                            <div class="ai-message assistant rounded-lg p-3">
-                                <p class="text-sm">こんにちは！補助金申請についてご質問があればお気軽にどうぞ。</p>
-                                <p class="text-xs text-gray-500 mt-2">例: 「必要な書類は何ですか？」「申請の流れを教えてください」</p>
-                            </div>
-                        </div>
-                        <div class="p-4 border-t bg-gray-50">
-                            <div class="flex gap-2">
-                                <input type="text" id="aiChatInput" 
-                                       placeholder="質問を入力..." 
-                                       class="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                       onkeypress="if(event.key==='Enter') sendAiMessage()">
-                                <button onclick="sendAiMessage()" 
-                                        class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                            <div class="mt-2 flex flex-wrap gap-1">
-                                <button onclick="setAiQuestion('申請の流れを教えて')" class="text-xs px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition">申請の流れ</button>
-                                <button onclick="setAiQuestion('必要書類は何？')" class="text-xs px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition">必要書類</button>
-                                <button onclick="setAiQuestion('現在の進捗は？')" class="text-xs px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 transition">進捗確認</button>
-                            </div>
-                        </div>
-                    </div>
-                </aside>
-            </div>
-            
-            <!-- モバイル用AIサイドバーオーバーレイ -->
-            <div id="aiSidebarOverlay" onclick="toggleAiSidebar()" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
-                
-                <!-- ===== 以下: 旧タブコンテンツ（モーダル移行用に保持） ===== -->
-                <div class="hidden">
-                    <div class="h-screen flex flex-col">
-                        <div class="flex-1 overflow-hidden portal-container">
-                            <div class="container mx-auto h-full px-3 py-3">
-                                <div id="tabPanelHome" class="main-tab-content active tab-panel">
-                                    <div id="legacyInquiryRestrictionBanner" class="hidden mb-3">
-                                        <div class="bg-gradient-to-r from-yellow-400 to-amber-400 rounded-lg shadow p-3 text-white">
+                    <!-- メインタブナビゲーション -->
+                    <nav class="flex gap-2 mt-3 -mb-1">
+                        <button onclick="switchMainTab('home')" id="mainTabHome" class="main-tab-btn active flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-home"></i><span class="hidden sm:inline">ホーム</span>
+                        </button>
+                        <button onclick="switchMainTab('documents')" id="mainTabDocuments" class="main-tab-btn flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-file-upload"></i><span class="hidden sm:inline">書類</span>
+                            <span id="docBadge" class="text-xs bg-white/30 px-2 py-0.5 rounded-full hidden">0</span>
+                        </button>
+                        <button onclick="switchMainTab('create')" id="mainTabCreate" class="main-tab-btn flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-file-signature"></i><span class="hidden sm:inline">書類作成</span>
+                        </button>
+                        <button onclick="switchMainTab('hearing')" id="mainTabHearing" class="main-tab-btn flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-clipboard-list"></i><span class="hidden sm:inline">ヒアリング</span>
+                            <span id="hearingBadge" class="text-xs bg-white/30 px-2 py-0.5 rounded-full hidden">0/0</span>
+                        </button>
+                        <button onclick="switchMainTab('messages')" id="mainTabMessages" class="main-tab-btn flex-1 px-4 py-2.5 text-xs sm:text-sm flex items-center justify-center gap-2">
+                            <i class="fas fa-comments"></i><span class="hidden sm:inline">やり取り</span>
+                            <span id="msgBadge" class="text-xs bg-red-500 px-2 py-0.5 rounded-full hidden">0</span>
+                        </button>
+                    </nav>
+                </div>
+            </header>
+
+            <!-- メインコンテンツ（タブで切り替え） -->
+            <div class="flex-1 overflow-hidden portal-container">
+                <div class="container mx-auto h-full px-3 py-3">
+                    <!-- ========================================== -->
+                    <!-- ホームタブ -->
+                    <!-- ========================================== -->
+                    <div id="tabPanelHome" class="main-tab-content active tab-panel">
+                        <!-- 見込みステータス時の制限バナー -->
+                        <div id="inquiryRestrictionBanner" class="hidden mb-3">
+                            <div class="bg-gradient-to-r from-yellow-400 to-amber-400 rounded-lg shadow p-3 text-white">
                                 <div class="flex items-center gap-2">
                                     <i class="fas fa-info-circle"></i>
                                     <div>
@@ -722,151 +505,6 @@ routes.get('/portal/:token', async (c) => {
             </div>
         </div>
 
-            <!-- ===== ヒアリングモーダル ===== -->
-            <div id="hearingModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-                <div class="modal-content bg-white rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-xl">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-clipboard-list text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">ヒアリング回答</h3>
-                                <p class="text-xs text-indigo-200">必要事項をご記入ください</p>
-                            </div>
-                        </div>
-                        <button onclick="closeModal('hearingModal')" class="text-white hover:text-indigo-200 text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="hearingModalContent" class="flex-1 overflow-y-auto p-4">
-                        <div class="text-center py-8 text-gray-400">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>読み込み中...</p>
-                        </div>
-                    </div>
-                    <div class="p-4 border-t bg-gray-50 flex justify-between">
-                        <button onclick="closeModal('hearingModal')" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg">
-                            閉じる
-                        </button>
-                        <button onclick="saveAllHearingAnswers()" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
-                            <i class="fas fa-save mr-2"></i>保存する
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ===== 書類提出モーダル ===== -->
-            <div id="documentsModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-                <div class="modal-content bg-white rounded-xl w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-xl">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-file-upload text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">書類提出</h3>
-                                <p class="text-xs text-green-200">必要書類をアップロードしてください</p>
-                            </div>
-                        </div>
-                        <button onclick="closeModal('documentsModal')" class="text-white hover:text-green-200 text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="documentsModalContent" class="flex-1 overflow-y-auto p-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="documentsGrid">
-                            <div class="text-center py-8 text-gray-400 col-span-2">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>読み込み中...</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="p-4 border-t bg-gray-50 flex justify-end">
-                        <button onclick="closeModal('documentsModal')" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg">
-                            閉じる
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ===== 書類作成モーダル ===== -->
-            <div id="createModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-                <div class="modal-content bg-white rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-t-xl">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-file-signature text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">書類作成</h3>
-                                <p class="text-xs text-purple-200">AIが書類作成をサポートします</p>
-                            </div>
-                        </div>
-                        <button onclick="closeModal('createModal')" class="text-white hover:text-purple-200 text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="createModalContent" class="flex-1 overflow-y-auto p-4">
-                        <div class="space-y-4">
-                            <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                                <h4 class="font-bold text-purple-800 mb-2"><i class="fas fa-magic mr-2"></i>AI自動作成</h4>
-                                <p class="text-sm text-purple-600 mb-3">ヒアリング回答をもとに、AIが事業計画書などを自動作成します。</p>
-                                <button onclick="window.location.hash='tabPanelCreate'; closeModal('createModal');" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
-                                    <i class="fas fa-arrow-right mr-1"></i>書類作成タブへ移動
-                                </button>
-                            </div>
-                            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                <h4 class="font-bold text-gray-800 mb-2"><i class="fas fa-file-alt mr-2"></i>テンプレート</h4>
-                                <p class="text-sm text-gray-600 mb-3">よく使う書式のテンプレートをダウンロードできます。</p>
-                                <div class="grid grid-cols-2 gap-2 text-sm" id="templateList">
-                                    <a href="#" class="flex items-center gap-2 px-3 py-2 bg-white border rounded hover:bg-gray-50">
-                                        <i class="fas fa-file-word text-blue-600"></i>事業計画書
-                                    </a>
-                                    <a href="#" class="flex items-center gap-2 px-3 py-2 bg-white border rounded hover:bg-gray-50">
-                                        <i class="fas fa-file-word text-blue-600"></i>収支計画書
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="p-4 border-t bg-gray-50 flex justify-end">
-                        <button onclick="closeModal('createModal')" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg">
-                            閉じる
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ===== やり取りモーダル ===== -->
-            <div id="messagesModal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
-                <div class="modal-content bg-white rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-t-xl">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-comments text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">メッセージ</h3>
-                                <p class="text-xs text-blue-200">担当者とのやり取り</p>
-                            </div>
-                        </div>
-                        <button onclick="closeModal('messagesModal')" class="text-white hover:text-blue-200 text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="messagesModalContent" class="flex-1 overflow-y-auto p-4 bg-gray-50">
-                        <div class="text-center py-8 text-gray-400">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>読み込み中...</p>
-                        </div>
-                    </div>
-                    <div class="p-4 border-t bg-white">
-                        <div class="flex gap-2">
-                            <input type="text" id="modalMessageInput" 
-                                   placeholder="メッセージを入力..." 
-                                   class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                   onkeypress="if(event.key==='Enter') sendModalMessage()">
-                            <button onclick="sendModalMessage()" 
-                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- 書類アップロードモーダル -->
             <div id="documentUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
                 <div class="bg-white rounded-xl w-full max-w-sm shadow-xl">
@@ -1231,22 +869,6 @@ routes.get('/portal/:token', async (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
-            // ========================================
-            // XSS対策: HTMLエスケープ関数
-            // ========================================
-            function escapeHtml(text) {
-                if (text === null || text === undefined) return '';
-                const str = String(text);
-                const map = {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#039;'
-                };
-                return str.replace(/[&<>"']/g, m => map[m]);
-            }
-            
             // ========================================
             // メインタブ切り替え関数
             // ========================================
@@ -1958,11 +1580,11 @@ routes.get('/portal/:token', async (c) => {
                                 <div class="flex items-start gap-3">
                                     <i class="fas \${style.icon} mt-0.5"></i>
                                     <div class="flex-1">
-                                        <div class="font-medium \${style.text}">\${escapeHtml(a.title)}</div>
-                                        <div class="text-sm \${style.text} mt-1">\${escapeHtml(a.content)}</div>
+                                        <div class="font-medium \${style.text}">\${a.title}</div>
+                                        <div class="text-sm \${style.text} mt-1">\${a.content}</div>
                                     </div>
                                     \${!a.is_read ? \`
-                                        <button onclick="markAnnouncementRead(\${parseInt(a.id) || 0})" class="text-xs text-gray-500 hover:text-gray-700">
+                                        <button onclick="markAnnouncementRead(\${a.id})" class="text-xs text-gray-500 hover:text-gray-700">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     \` : ''}
@@ -2002,169 +1624,85 @@ routes.get('/portal/:token', async (c) => {
                         pipelines = pipelines.filter(p => p.case_id === CASE_ID);
                     }
                     
-                    // 新UI用のステップ表示コンテナ
-                    const stepsContainer = document.getElementById('pipelineSteps');
-                    // レガシー用（互換性維持）
-                    const legacySection = document.getElementById('pipelineProgressSection');
-                    const legacyTasksContainer = document.getElementById('pipelineTasksList');
-                    
                     if (pipelines.length === 0) {
-                        if (stepsContainer) {
-                            stepsContainer.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-4xl mb-3"></i><p>パイプラインがありません</p></div>';
-                        }
-                        if (legacySection) legacySection.classList.add('hidden');
+                        document.getElementById('pipelineProgressSection').classList.add('hidden');
                         return;
                     }
                     
                     // アクティブなパイプラインを取得（最新のもの）
                     const activePipeline = pipelines.find(p => p.status === 'active') || pipelines[0];
                     
-                    if (legacySection) legacySection.classList.remove('hidden');
+                    const section = document.getElementById('pipelineProgressSection');
+                    section.classList.remove('hidden');
                     
                     // 進捗率を更新
                     const progress = activePipeline.progress_percentage || 0;
-                    const progressTextEls = document.querySelectorAll('#pipelineProgressText');
-                    const progressBarEls = document.querySelectorAll('#pipelineProgressBar');
-                    progressTextEls.forEach(el => el.textContent = progress + '%');
-                    progressBarEls.forEach(el => el.style.width = progress + '%');
+                    document.getElementById('pipelineProgressText').textContent = progress + '%';
+                    document.getElementById('pipelineProgressBar').style.width = progress + '%';
                     
                     // タスク一覧を取得
                     const tasksResponse = await axios.get(\`/api/pipelines/\${activePipeline.id}/tasks\`);
                     const tasks = tasksResponse.data;
                     
+                    const tasksContainer = document.getElementById('pipelineTasksList');
+                    
                     if (tasks.length === 0) {
-                        if (stepsContainer) {
-                            stepsContainer.innerHTML = '<div class="text-center py-8 text-gray-400"><p>タスクがありません</p></div>';
-                        }
-                        if (legacyTasksContainer) {
-                            legacyTasksContainer.innerHTML = '<div class="text-gray-500 text-center py-2">タスクがありません</div>';
-                        }
+                        tasksContainer.innerHTML = '<div class="text-gray-500 text-center py-2">タスクがありません</div>';
                         return;
                     }
                     
-                    // 現在進行中のタスクを特定
-                    let currentTaskIndex = tasks.findIndex(t => t.status === 'in_progress');
-                    if (currentTaskIndex === -1) {
-                        currentTaskIndex = tasks.findIndex(t => t.status === 'pending');
-                    }
+                    const statusStyles = {
+                        pending: { bg: 'bg-gray-100', text: 'text-gray-600', icon: 'fa-circle' },
+                        in_progress: { bg: 'bg-blue-100', text: 'text-blue-600', icon: 'fa-spinner fa-spin' },
+                        completed: { bg: 'bg-green-100', text: 'text-green-600', icon: 'fa-check' },
+                        skipped: { bg: 'bg-gray-100', text: 'text-gray-400', icon: 'fa-minus' }
+                    };
                     
-                    // ===== 新UI用: 縦型ステップ表示 =====
-                    if (stepsContainer) {
-                        stepsContainer.innerHTML = tasks.map((task, index) => {
-                            const isCompleted = task.status === 'completed';
-                            const isCurrent = index === currentTaskIndex;
-                            const isPending = task.status === 'pending' && !isCurrent;
-                            const isCustomerTask = task.task_type === 'external' || task.task_type === 'both';
-                            const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
-                            
-                            // ステップの状態クラス
-                            let stepClass = 'pending';
-                            if (isCompleted) stepClass = 'completed';
-                            else if (isCurrent) stepClass = 'current';
-                            if (isCustomerTask && !isCompleted) stepClass += ' customer';
-                            
-                            // タスクボタンの状態
-                            let buttonHtml = '';
-                            if (isCustomerTask) {
-                                if (isCompleted) {
-                                    // 完了済み
-                                    buttonHtml = \`
-                                        <div class="task-btn task-btn-completed px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-                                            <i class="fas fa-check-circle"></i>
-                                            <span>完了済み</span>
+                    const taskTypeLabels = {
+                        internal: '自社対応',
+                        external: '顧客対応',
+                        both: '共同'
+                    };
+                    
+                    // STEP形式で表示（参考画像③）
+                    tasksContainer.innerHTML = tasks.map((task, index) => {
+                        const style = statusStyles[task.status] || statusStyles.pending;
+                        const isCustomerTask = task.task_type === 'external' || task.task_type === 'both';
+                        const stepNum = index + 1;
+                        const isCompleted = task.status === 'completed';
+                        const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
+                        
+                        return \`
+                            <div class="border rounded-lg p-3 \${isCompleted ? 'bg-green-50 border-green-200' : (isCustomerTask ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200')}">
+                                <div class="flex items-start gap-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm \${isCompleted ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}">
+                                            \${isCompleted ? '<i class="fas fa-check"></i>' : stepNum}
                                         </div>
-                                    \`;
-                                } else if (canComplete) {
-                                    // 対応が必要
-                                    buttonHtml = \`
-                                        <button onclick="completeTask(\${parseInt(task.id) || 0})" 
-                                                class="task-btn task-btn-pending px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-                                            <i class="fas fa-hand-pointer"></i>
-                                            <span>タップして完了</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="font-medium text-sm \${style.text}">\${task.task_name}</span>
+                                            \${isCustomerTask ? '<span class="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">顧客</span>' : ''}
+                                            \${isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-600 rounded">完了</span>' : ''}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            \${task.description || ''}
+                                            \${task.end_date ? '<span class="ml-1">期限: ' + task.end_date + '</span>' : ''}
+                                        </div>
+                                    </div>
+                                    \${canComplete ? \`
+                                        <button onclick="completeTask(\${task.id})" 
+                                                class="flex-shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
+                                            <i class="fas fa-check mr-1"></i>完了
                                         </button>
-                                    \`;
-                                } else {
-                                    // 待機中
-                                    buttonHtml = \`
-                                        <div class="task-btn task-btn-disabled px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-                                            <i class="fas fa-clock"></i>
-                                            <span>待機中</span>
-                                        </div>
-                                    \`;
-                                }
-                            }
-                            
-                            return \`
-                                <div class="pipeline-step \${stepClass} animate-fadeIn" style="animation-delay: \${index * 0.05}s">
-                                    <div class="pipeline-step-icon">
-                                        \${isCompleted ? '<i class="fas fa-check"></i>' : (isCurrent ? '<i class="fas fa-arrow-right"></i>' : (index + 1))}
-                                    </div>
-                                    <div class="bg-white rounded-xl p-4 shadow-sm border \${isCompleted ? 'border-green-200' : (isCurrent ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200')}">
-                                        <div class="flex items-start justify-between gap-3">
-                                            <div class="flex-1">
-                                                <div class="flex items-center gap-2 flex-wrap">
-                                                    <span class="font-medium \${isCompleted ? 'text-green-700' : (isCurrent ? 'text-blue-700' : 'text-gray-700')}">\${escapeHtml(task.task_name)}</span>
-                                                    \${isCustomerTask ? '<span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">お客様対応</span>' : '<span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">担当者対応</span>'}
-                                                    \${isCurrent ? '<span class="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full animate-pulse">進行中</span>' : ''}
-                                                </div>
-                                                \${task.description ? \`<p class="text-sm text-gray-500 mt-1">\${escapeHtml(task.description)}</p>\` : ''}
-                                                \${task.end_date ? \`<p class="text-xs text-gray-400 mt-1"><i class="fas fa-calendar-alt mr-1"></i>期限: \${escapeHtml(task.end_date)}</p>\` : ''}
-                                            </div>
-                                            <div class="flex-shrink-0">
-                                                \${buttonHtml}
-                                            </div>
-                                        </div>
-                                    </div>
+                                    \` : ''}
                                 </div>
-                            \`;
-                        }).join('');
-                    }
-                    
-                    // ===== レガシーUI用（互換性維持） =====
-                    if (legacyTasksContainer) {
-                        legacyTasksContainer.innerHTML = tasks.map((task, index) => {
-                            const isCompleted = task.status === 'completed';
-                            const isCustomerTask = task.task_type === 'external' || task.task_type === 'both';
-                            const stepNum = index + 1;
-                            const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
-                            
-                            const statusClass = isCompleted ? 'bg-green-50 border-green-200' : (isCustomerTask ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200');
-                            
-                            return \`
-                                <div class="border rounded-lg p-3 \${statusClass}">
-                                    <div class="flex items-start gap-3">
-                                        <div class="flex-shrink-0">
-                                            <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm \${isCompleted ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}">
-                                                \${isCompleted ? '<i class="fas fa-check"></i>' : stepNum}
-                                            </div>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-2 mb-1 flex-wrap">
-                                                <span class="font-medium text-sm">\${escapeHtml(task.task_name)}</span>
-                                                \${isCustomerTask ? '<span class="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">お客様</span>' : ''}
-                                                \${isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-600 rounded">完了</span>' : ''}
-                                            </div>
-                                            <div class="text-xs text-gray-500">
-                                                \${escapeHtml(task.description || '')}
-                                            </div>
-                                        </div>
-                                        \${canComplete ? \`
-                                            <button onclick="completeTask(\${parseInt(task.id) || 0})" 
-                                                    class="task-btn task-btn-pending flex-shrink-0 px-3 py-1.5 text-xs rounded-lg font-medium">
-                                                <i class="fas fa-hand-pointer mr-1"></i>完了
-                                            </button>
-                                        \` : ''}
-                                    </div>
-                                </div>
-                            \`;
-                        }).join('');
-                    }
+                            </div>
+                        \`;
+                    }).join('');
                 } catch (error) {
                     console.error('Error loading pipeline progress:', error);
-                    const stepsContainer = document.getElementById('pipelineSteps');
-                    if (stepsContainer) {
-                        stepsContainer.innerHTML = '<div class="text-center py-8 text-red-400"><i class="fas fa-exclamation-circle text-2xl mb-2"></i><p>読み込みエラー</p></div>';
-                    }
                 }
             }
             
@@ -4445,298 +3983,14 @@ routes.get('/portal/:token', async (c) => {
             // モーダル関連
             // ===============================
             
-            // AIサイドバー関連（新UI）
-            function toggleAiSidebar() {
-                const sidebar = document.getElementById('aiSidebar');
-                const overlay = document.getElementById('aiSidebarOverlay');
-                sidebar.classList.toggle('mobile-open');
-                if (overlay) overlay.classList.toggle('hidden');
-            }
-            
-            function setAiQuestion(question) {
-                document.getElementById('aiChatInput').value = question;
-                sendAiMessage();
-            }
-            
-            async function sendAiMessage() {
-                const input = document.getElementById('aiChatInput');
-                const message = input.value.trim();
-                if (!message) return;
-                
-                const chatMessages = document.getElementById('aiChatMessages');
-                
-                // ユーザーメッセージを追加
-                chatMessages.innerHTML += \`
-                    <div class="ai-message user rounded-lg p-3">
-                        <p class="text-sm">\${escapeHtml(message)}</p>
-                    </div>
-                \`;
-                input.value = '';
-                
-                // スクロール
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                
-                // ローディング表示
-                const loadingId = 'ai-loading-' + Date.now();
-                chatMessages.innerHTML += \`
-                    <div id="\${loadingId}" class="ai-message assistant rounded-lg p-3">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-spinner fa-spin text-blue-500"></i>
-                            <span class="text-sm text-gray-500">考えています...</span>
-                        </div>
-                    </div>
-                \`;
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                
-                try {
-                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/ai-chat\`, {
-                        message: message,
-                        case_id: CASE_ID
-                    });
-                    
-                    // ローディングを削除
-                    document.getElementById(loadingId)?.remove();
-                    
-                    // AI回答を追加
-                    chatMessages.innerHTML += \`
-                        <div class="ai-message assistant rounded-lg p-3">
-                            <p class="text-sm whitespace-pre-wrap">\${formatAIResponse(response.data.response || response.data.message || '申し訳ございません、エラーが発生しました。')}</p>
-                        </div>
-                    \`;
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                } catch (error) {
-                    document.getElementById(loadingId)?.remove();
-                    chatMessages.innerHTML += \`
-                        <div class="ai-message assistant rounded-lg p-3 bg-red-50">
-                            <p class="text-sm text-red-600"><i class="fas fa-exclamation-circle mr-1"></i>エラーが発生しました。もう一度お試しください。</p>
-                        </div>
-                    \`;
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                }
-            }
-            
-            // 汎用モーダル開閉
-            function openModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.remove('hidden');
-                    // モーダルのコンテンツを読み込む
-                    if (modalId === 'hearingModal') loadHearingForModal();
-                    if (modalId === 'documentsModal') loadDocumentsForModal();
-                    if (modalId === 'messagesModal') loadMessagesForModal();
-                }
-            }
-            
-            function closeModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) modal.classList.add('hidden');
-            }
-            
-            // モーダル用データ読み込み
-            async function loadHearingForModal() {
-                const container = document.getElementById('hearingModalContent');
-                if (!container) return;
-                
-                try {
-                    // ヒアリング質問を取得
-                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing?case_id=\${CASE_ID || ''}\`);
-                    const questions = response.data;
-                    
-                    if (!questions || questions.length === 0) {
-                        container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-clipboard-check text-3xl mb-2"></i><p>現在、ヒアリング項目はありません</p></div>';
-                        return;
-                    }
-                    
-                    // カテゴリでグループ化
-                    const groups = {};
-                    questions.forEach(q => {
-                        const cat = q.category || '基本情報';
-                        if (!groups[cat]) groups[cat] = [];
-                        groups[cat].push(q);
-                    });
-                    
-                    let html = '';
-                    Object.entries(groups).forEach(([category, qs]) => {
-                        html += \`
-                            <div class="mb-6">
-                                <h4 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                                    <i class="fas fa-folder text-indigo-500"></i>
-                                    \${escapeHtml(category)}
-                                    <span class="text-xs text-gray-400">(\${qs.length}件)</span>
-                                </h4>
-                                <div class="space-y-3">
-                        \`;
-                        qs.forEach(q => {
-                            const hasAnswer = q.answer && q.answer.trim();
-                            html += \`
-                                <div class="bg-gray-50 rounded-lg p-3 border \${hasAnswer ? 'border-green-200' : 'border-gray-200'}">
-                                    <div class="flex items-start gap-2 mb-2">
-                                        <span class="\${hasAnswer ? 'text-green-500' : 'text-gray-400'}">
-                                            <i class="fas \${hasAnswer ? 'fa-check-circle' : 'fa-circle'}"></i>
-                                        </span>
-                                        <label class="text-sm font-medium text-gray-700">\${escapeHtml(q.question_text)}</label>
-                                    </div>
-                                    <textarea id="modal-answer-\${q.id}" 
-                                              data-question-id="\${q.id}"
-                                              class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                                              rows="2"
-                                              placeholder="回答を入力...">\${escapeHtml(q.answer || '')}</textarea>
-                                </div>
-                            \`;
-                        });
-                        html += '</div></div>';
-                    });
-                    
-                    container.innerHTML = html;
-                    
-                    // 回答済み件数を更新
-                    const answered = questions.filter(q => q.answer && q.answer.trim()).length;
-                    document.getElementById('hearingQuickStatus').textContent = \`\${answered}/\${questions.length}\`;
-                    
-                } catch (error) {
-                    console.error('Error loading hearing for modal:', error);
-                    container.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-circle text-2xl mb-2"></i><p>読み込みエラー</p></div>';
-                }
-            }
-            
-            async function loadDocumentsForModal() {
-                const container = document.getElementById('documentsGrid');
-                if (!container) return;
-                
-                try {
-                    // 案件別書類を取得
-                    const caseDocsResponse = await axios.get(\`/api/cases/\${CASE_ID}/documents\`);
-                    const caseDocs = caseDocsResponse.data || [];
-                    
-                    // 共通書類を取得
-                    const commonDocsResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`);
-                    const commonDocs = commonDocsResponse.data || [];
-                    
-                    let html = '';
-                    
-                    // 案件別書類
-                    if (caseDocs.length > 0) {
-                        html += '<div class="col-span-2 mb-4"><h4 class="font-bold text-gray-700 mb-3"><i class="fas fa-folder text-green-500 mr-2"></i>案件書類</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
-                        caseDocs.forEach(doc => {
-                            const isUploaded = doc.file_url || doc.uploaded;
-                            html += \`
-                                <div class="bg-white border rounded-lg p-3 \${isUploaded ? 'border-green-200' : 'border-gray-200'}">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2">
-                                            <i class="fas \${isUploaded ? 'fa-check-circle text-green-500' : 'fa-file text-gray-400'}"></i>
-                                            <span class="text-sm font-medium">\${escapeHtml(doc.document_type || doc.name)}</span>
-                                        </div>
-                                        <button onclick="openUploadModal('\${escapeHtml(doc.document_type || doc.name)}', \${isUploaded})" 
-                                                class="px-3 py-1 text-xs \${isUploaded ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'} rounded-lg hover:opacity-80">
-                                            \${isUploaded ? '確認' : 'アップロード'}
-                                        </button>
-                                    </div>
-                                </div>
-                            \`;
-                        });
-                        html += '</div></div>';
-                    }
-                    
-                    // 共通書類
-                    html += '<div class="col-span-2"><h4 class="font-bold text-gray-700 mb-3"><i class="fas fa-folder-open text-blue-500 mr-2"></i>共通書類</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
-                    const commonDocTypes = ['決算書', '登記簿謄本', '定款', '本人確認書類', 'その他'];
-                    commonDocTypes.forEach(docType => {
-                        const existing = commonDocs.find(d => d.document_type === docType);
-                        const isUploaded = !!existing;
-                        html += \`
-                            <div class="bg-white border rounded-lg p-3 \${isUploaded ? 'border-green-200' : 'border-gray-200'}">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <i class="fas \${isUploaded ? 'fa-check-circle text-green-500' : 'fa-file text-gray-400'}"></i>
-                                        <span class="text-sm font-medium">\${escapeHtml(docType)}</span>
-                                    </div>
-                                    <button onclick="openCommonDocUploadModal('\${escapeHtml(docType)}')" 
-                                            class="px-3 py-1 text-xs \${isUploaded ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'} rounded-lg hover:opacity-80">
-                                        \${isUploaded ? '更新' : 'アップロード'}
-                                    </button>
-                                </div>
-                            </div>
-                        \`;
-                    });
-                    html += '</div></div>';
-                    
-                    container.innerHTML = html || '<div class="text-center py-8 text-gray-500 col-span-2"><p>書類がありません</p></div>';
-                    
-                } catch (error) {
-                    console.error('Error loading documents for modal:', error);
-                    container.innerHTML = '<div class="text-center py-8 text-red-500 col-span-2"><i class="fas fa-exclamation-circle text-2xl mb-2"></i><p>読み込みエラー</p></div>';
-                }
-            }
-            
-            async function loadMessagesForModal() {
-                const container = document.getElementById('messagesModalContent');
-                if (!container) return;
-                
-                try {
-                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/communications?case_id=\${CASE_ID || ''}\`);
-                    const messages = response.data || [];
-                    
-                    if (messages.length === 0) {
-                        container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-comments text-4xl mb-2"></i><p>メッセージはありません</p></div>';
-                        return;
-                    }
-                    
-                    container.innerHTML = messages.map(msg => {
-                        const isClient = msg.direction === 'to_client' ? false : true;
-                        const time = msg.created_at ? new Date(msg.created_at).toLocaleString('ja-JP') : '';
-                        return \`
-                            <div class="flex \${isClient ? 'justify-end' : 'justify-start'} mb-3">
-                                <div class="max-w-[80%] \${isClient ? 'bg-blue-500 text-white' : 'bg-white border'} rounded-lg p-3 shadow-sm">
-                                    <p class="text-sm whitespace-pre-wrap">\${escapeHtml(msg.message || msg.content)}</p>
-                                    <p class="text-xs \${isClient ? 'text-blue-200' : 'text-gray-400'} mt-1">\${time}</p>
-                                </div>
-                            </div>
-                        \`;
-                    }).join('');
-                    
-                    // 最下部にスクロール
-                    container.scrollTop = container.scrollHeight;
-                    
-                } catch (error) {
-                    console.error('Error loading messages for modal:', error);
-                    container.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-circle text-2xl mb-2"></i><p>読み込みエラー</p></div>';
-                }
-            }
-            
-            async function sendModalMessage() {
-                const input = document.getElementById('modalMessageInput');
-                const message = input.value.trim();
-                if (!message) return;
-                
-                try {
-                    await axios.post(\`/api/clients/\${CLIENT_ID}/communications\`, {
-                        message: message,
-                        case_id: CASE_ID,
-                        direction: 'from_client'
-                    });
-                    
-                    input.value = '';
-                    await loadMessagesForModal();
-                    showMessage('メッセージを送信しました', 'success');
-                } catch (error) {
-                    console.error('Error sending message:', error);
-                    alert('メッセージの送信に失敗しました');
-                }
-            }
-            
-            // AIアシスタントモーダル（レガシー互換）
+            // AIアシスタントモーダル
             function openAiModal() {
-                // 新UIではサイドバーを開く、レガシーUIではモーダルを開く
-                if (document.getElementById('aiSidebar')) {
-                    toggleAiSidebar();
-                } else {
-                    document.getElementById('aiModal')?.classList.remove('hidden');
-                    document.getElementById('portalAiChatInput')?.focus();
-                }
+                document.getElementById('aiModal').classList.remove('hidden');
+                document.getElementById('portalAiChatInput').focus();
             }
             
             function closeAiModal() {
-                document.getElementById('aiModal')?.classList.add('hidden');
+                document.getElementById('aiModal').classList.add('hidden');
             }
             
             // AI提案モーダル
