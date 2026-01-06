@@ -4538,11 +4538,39 @@ routes.get('/portal/:token', async (c) => {
                 if (!container) return;
                 
                 try {
-                    // ヒアリング質問を取得
-                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing?case_id=\${CASE_ID || ''}\`);
-                    const questions = response.data;
+                    // 補助金種別IDを取得（案件情報から）
+                    let subsidyTypeId = 0;
+                    if (CASE_ID) {
+                        try {
+                            const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
+                            subsidyTypeId = caseRes.data?.subsidy_type_id || 0;
+                        } catch (e) {
+                            console.log('Case not found, using default subsidy type');
+                        }
+                    }
                     
-                    if (!questions || questions.length === 0) {
+                    // ヒアリング質問を取得（共通質問 + 補助金種別固有の質問）
+                    const questionsRes = await axios.get(\`/api/hearing-questions/\${subsidyTypeId}\`);
+                    const questions = questionsRes.data || [];
+                    
+                    // 既存の回答を取得
+                    let answersRes;
+                    if (CASE_ID) {
+                        answersRes = await axios.get(\`/api/cases/\${CASE_ID}/hearing-answers\`);
+                    } else {
+                        answersRes = await axios.get(\`/api/clients/\${CLIENT_ID}/hearing-answers\`);
+                    }
+                    const answers = {};
+                    (answersRes.data || []).forEach(a => {
+                        answers[a.question_id] = a.answer_text;
+                    });
+                    
+                    // 質問に回答をマージ
+                    questions.forEach(q => {
+                        q.answer = answers[q.id] || '';
+                    });
+                    
+                    if (questions.length === 0) {
                         container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-clipboard-check text-3xl mb-2"></i><p>現在、ヒアリング項目はありません</p></div>';
                         return;
                     }
@@ -4591,7 +4619,8 @@ routes.get('/portal/:token', async (c) => {
                     
                     // 回答済み件数を更新
                     const answered = questions.filter(q => q.answer && q.answer.trim()).length;
-                    document.getElementById('hearingQuickStatus').textContent = \`\${answered}/\${questions.length}\`;
+                    const quickStatus = document.getElementById('hearingQuickStatus');
+                    if (quickStatus) quickStatus.textContent = \`\${answered}/\${questions.length}\`;
                     
                 } catch (error) {
                     console.error('Error loading hearing for modal:', error);
@@ -4604,9 +4633,16 @@ routes.get('/portal/:token', async (c) => {
                 if (!container) return;
                 
                 try {
-                    // 案件別書類を取得
-                    const caseDocsResponse = await axios.get(\`/api/cases/\${CASE_ID}/documents\`);
-                    const caseDocs = caseDocsResponse.data || [];
+                    let caseDocs = [];
+                    // 案件別書類を取得（CASE_IDがある場合のみ）
+                    if (CASE_ID) {
+                        try {
+                            const caseDocsResponse = await axios.get(\`/api/cases/\${CASE_ID}/documents\`);
+                            caseDocs = caseDocsResponse.data || [];
+                        } catch (e) {
+                            console.log('Case documents not found');
+                        }
+                    }
                     
                     // 共通書類を取得
                     const commonDocsResponse = await axios.get(\`/api/clients/\${CLIENT_ID}/common-documents\`);
@@ -4673,22 +4709,34 @@ routes.get('/portal/:token', async (c) => {
                 if (!container) return;
                 
                 try {
-                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/communications?case_id=\${CASE_ID || ''}\`);
-                    const messages = response.data || [];
+                    let messages = [];
+                    // CASE_IDがある場合は案件別、なければクライアント別
+                    try {
+                        if (CASE_ID) {
+                            const response = await axios.get(\`/api/cases/\${CASE_ID}/communications\`);
+                            messages = response.data || [];
+                        } else {
+                            const response = await axios.get(\`/api/clients/\${CLIENT_ID}/communications\`);
+                            messages = response.data || [];
+                        }
+                    } catch (e) {
+                        console.log('Communications not found, showing empty state');
+                        messages = [];
+                    }
                     
                     if (messages.length === 0) {
-                        container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-comments text-4xl mb-2"></i><p>メッセージはありません</p></div>';
+                        container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-comments text-4xl mb-2"></i><p>メッセージはありません</p><p class="text-sm mt-2">担当者からの連絡がここに表示されます</p></div>';
                         return;
                     }
                     
                     container.innerHTML = messages.map(msg => {
-                        const isClient = msg.direction === 'to_client' ? false : true;
+                        const isFromClient = msg.direction === 'from_client';
                         const time = msg.created_at ? new Date(msg.created_at).toLocaleString('ja-JP') : '';
                         return \`
-                            <div class="flex \${isClient ? 'justify-end' : 'justify-start'} mb-3">
-                                <div class="max-w-[80%] \${isClient ? 'bg-blue-500 text-white' : 'bg-white border'} rounded-lg p-3 shadow-sm">
+                            <div class="flex \${isFromClient ? 'justify-end' : 'justify-start'} mb-3">
+                                <div class="max-w-[80%] \${isFromClient ? 'bg-blue-500 text-white' : 'bg-white border'} rounded-lg p-3 shadow-sm">
                                     <p class="text-sm whitespace-pre-wrap">\${escapeHtml(msg.message || msg.content)}</p>
-                                    <p class="text-xs \${isClient ? 'text-blue-200' : 'text-gray-400'} mt-1">\${time}</p>
+                                    <p class="text-xs \${isFromClient ? 'text-blue-200' : 'text-gray-400'} mt-1">\${time}</p>
                                 </div>
                             </div>
                         \`;
@@ -4699,7 +4747,7 @@ routes.get('/portal/:token', async (c) => {
                     
                 } catch (error) {
                     console.error('Error loading messages for modal:', error);
-                    container.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-circle text-2xl mb-2"></i><p>読み込みエラー</p></div>';
+                    container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-comments text-4xl mb-2"></i><p>メッセージはありません</p></div>';
                 }
             }
             
