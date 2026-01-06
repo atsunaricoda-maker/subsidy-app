@@ -1228,19 +1228,27 @@ routes.get('/portal/:token', async (c) => {
                         const caseRes = await axios.get(\`/api/cases/\${CASE_ID}\`);
                         paymentInfo = caseRes.data;
                         
-                        // 未払い請求書を取得
+                        // 請求書を取得
                         try {
                             const invoicesRes = await axios.get(\`/api/cases/\${CASE_ID}/invoices\`);
-                            unpaidInvoices = (invoicesRes.data || []).filter(inv => 
+                            const allInvoicesFromAPI = invoicesRes.data || [];
+                            
+                            // 未払い請求書（issued, sent）
+                            unpaidInvoices = allInvoicesFromAPI.filter(inv => 
                                 inv.status === 'issued' || inv.status === 'sent'
                             );
-                            // 報告済み請求書も取得
-                            var reportedInvoices = (invoicesRes.data || []).filter(inv => 
+                            // 報告済み請求書（payment_reported）
+                            var reportedInvoices = allInvoicesFromAPI.filter(inv => 
                                 inv.status === 'payment_reported'
+                            );
+                            // 支払い確認済み請求書（paid）
+                            var paidInvoices = allInvoicesFromAPI.filter(inv => 
+                                inv.status === 'paid'
                             );
                         } catch (e) {
                             console.log('No invoices found');
                             var reportedInvoices = [];
+                            var paidInvoices = [];
                         }
                     }
                     
@@ -1263,6 +1271,27 @@ routes.get('/portal/:token', async (c) => {
                                         </div>
                                     </div>
                                     <p class="text-xs text-purple-600 mt-1">担当者が確認中です。しばらくお待ちください。</p>
+                                </div>
+                            \`);
+                        }
+                    }
+                    
+                    // ========== 支払い確認済み請求書セクション ==========
+                    if (paidInvoices && paidInvoices.length > 0) {
+                        for (const inv of paidInvoices) {
+                            const typeLabel = inv.invoice_type === 'success_fee' ? '成功報酬' : 
+                                              inv.invoice_type === 'deposit' ? '着手金' : 
+                                              inv.item_name || '請求';
+                            
+                            htmlParts.push(\`
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                                    <div class="flex items-center gap-2 text-green-700">
+                                        <i class="fas fa-check-circle text-lg"></i>
+                                        <div class="flex-1">
+                                            <span class="font-bold text-sm">\${typeLabel} 支払い確認済み</span>
+                                            <span class="text-xs text-green-600 ml-2">¥\${inv.total_amount.toLocaleString()}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             \`);
                         }
@@ -1307,14 +1336,14 @@ routes.get('/portal/:token', async (c) => {
                         }
                     }
                     
-                    if (!paymentInfo && unpaidInvoices.length === 0 && (!reportedInvoices || reportedInvoices.length === 0)) {
+                    if (!paymentInfo && unpaidInvoices.length === 0 && (!reportedInvoices || reportedInvoices.length === 0) && (!paidInvoices || paidInvoices.length === 0)) {
                         section.classList.add('hidden');
                         return;
                     }
                     
                     // 請求書ベースの支払いがある場合は、案件直接の支払い情報は表示しない（重複防止）
-                    // 請求書に着手金(deposit)タイプがあるかチェック
-                    const allInvoices = [...unpaidInvoices, ...(reportedInvoices || [])];
+                    // 全ての請求書（未払い、報告済み、確認済み）を含めてチェック
+                    const allInvoices = [...unpaidInvoices, ...(reportedInvoices || []), ...(paidInvoices || [])];
                     const hasDepositInvoice = allInvoices.some(inv => inv.invoice_type === 'deposit');
                     const hasSuccessFeeInvoice = allInvoices.some(inv => inv.invoice_type === 'success_fee');
                     
