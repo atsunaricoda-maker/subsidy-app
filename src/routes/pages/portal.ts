@@ -1132,7 +1132,7 @@ routes.get('/portal/:token', async (c) => {
                                     icon: 'fa-clipboard-list',
                                     text: 'ヒアリング質問への回答',
                                     description: '必須質問があと ' + requiredUnanswered + ' 問残っています',
-                                    action: "scrollToSection('hearingSection')",
+                                    action: "switchMainTab('hearing')",
                                     priority: 2
                                 });
                             }
@@ -1155,7 +1155,7 @@ routes.get('/portal/:token', async (c) => {
                                     icon: 'fa-tasks',
                                     text: task.task_name,
                                     description: task.end_date ? '期限: ' + task.end_date : '対応をお願いします',
-                                    action: "scrollToSection('statusSection')",
+                                    action: "switchMainTab('home')",
                                     priority: 3
                                 });
                             });
@@ -1190,7 +1190,7 @@ routes.get('/portal/:token', async (c) => {
                                 icon: 'fa-upload',
                                 text: '書類のアップロード',
                                 description: '未提出の書類が ' + missingDocs + ' 件あります',
-                                action: "switchPortalTab('documents'); scrollToSection('documentSection')",
+                                action: "switchMainTab('documents')",
                                 priority: 4
                             });
                         }
