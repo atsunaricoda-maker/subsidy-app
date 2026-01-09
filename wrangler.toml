@@ -2,5 +2,5 @@ name = "subsidy-app"
 compatibility_date = "2024-01-01"
 
 [vars]
-STRIPE_PUBLIC_KEY = "pk_test_51SN6HPHHmXlTI7JB0XrN8JQjJM1gTtvjZgaPPDSZuU7jmRxRwhexBRDLHbmfS7rnYwb0Vf3NlRxDy5QLuVjY1nAY009J693yDi"
+STRIPE_PUBLIC_KEY = "pk_live_51JT6BfH6PyDypRN5lqNIrShGcT4LYB33Yzwa5sfBdVSuEirL6AgxNnAsCaAFOvuFJabwTfkiJeocblEDO3BzN7pP00vWjHVYlq"
 # STRIPE_SECRET_KEY should be set as secret: wrangler secret put STRIPE_SECRET_KEY
