@@ -640,7 +640,11 @@ ${sectionSpecific}
 ・文章の途中で終わらず、必ず完結した文で終わること`
   
   try {
+    console.log(`[Document Generation] Section: ${sectionId}, max_chars: ${section.max_chars}, expected max_tokens: ${section.max_chars * 3}`)
+    
     let content = await callAI(prompt, env, 2, section.max_chars)
+    
+    console.log(`[Document Generation] AI Response length: ${content?.length || 0} chars for section ${sectionId}`)
     
     // マークダウン記法を除去
     if (content) {
@@ -1040,7 +1044,11 @@ ${data.additional_instructions}
 ・文章の途中で終わらず、必ず完結した文で終わること`
 
   try {
+    console.log(`[Document Regeneration] Section: ${sectionId}, max_chars: ${section.max_chars}, expected max_tokens: ${section.max_chars * 3}`)
+    
     let content = await callAI(prompt, env, 2, section.max_chars)
+    
+    console.log(`[Document Regeneration] AI Response length: ${content?.length || 0} chars for section ${sectionId}`)
     
     // マークダウン記法を除去
     if (content) {

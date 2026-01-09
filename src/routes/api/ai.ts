@@ -51,8 +51,8 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.7,
-              // maxOutputTokensは制限しない（プロンプトで文字数を指示）
-              maxOutputTokens: 4096,
+              // 日本語は1文字≒1-2トークン、余裕を持って*3、上限は8192
+              maxOutputTokens: maxChars ? Math.min(maxChars * 3, 8192) : 8192,
             }
           })
         }
@@ -78,6 +78,16 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
       }
       
       const data = await response.json()
+      
+      // finishReasonをログ出力（デバッグ用）
+      const finishReason = data.candidates?.[0]?.finishReason
+      console.log(`Gemini API response - finishReason: ${finishReason}`)
+      
+      // MAX_TOKENSで打ち切られた場合は警告
+      if (finishReason === 'MAX_TOKENS') {
+        console.warn(`Gemini API response truncated due to MAX_TOKENS limit`)
+      }
+      
       return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
       
     } catch (error) {
@@ -173,6 +183,15 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
       }
       
       const data = await response.json()
+      
+      // stop_reasonをログ出力（デバッグ用）
+      console.log(`Claude API response - stop_reason: ${data.stop_reason}, usage: ${JSON.stringify(data.usage)}`)
+      
+      // max_tokensで打ち切られた場合は警告
+      if (data.stop_reason === 'max_tokens') {
+        console.warn(`Claude API response truncated due to max_tokens limit. Input tokens: ${data.usage?.input_tokens}, Output tokens: ${data.usage?.output_tokens}`)
+      }
+      
       return data.content?.[0]?.text || ''
       
     } catch (error) {
