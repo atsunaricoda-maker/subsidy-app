@@ -3963,4 +3963,140 @@ routes.post('/master/subsidy-guidelines/:subsidyTypeId/ai-update', async (c) => 
   }
 })
 
+// =============================================
+// マスター管理用: 監視URL・更新ログAPI
+// =============================================
+
+// 監視URL一覧取得
+routes.get('/master/subsidy-watch-urls', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // テーブルが存在しない場合は作成
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS subsidy_watch_urls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subsidy_type_id INTEGER,
+        url TEXT NOT NULL,
+        description TEXT,
+        last_checked_at DATETIME,
+        last_content_hash TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    const result = await DB.prepare(`
+      SELECT w.*, s.name as subsidy_name 
+      FROM subsidy_watch_urls w
+      LEFT JOIN subsidy_types s ON w.subsidy_type_id = s.id
+      WHERE w.is_active = 1
+      ORDER BY w.created_at DESC
+    `).all()
+    
+    return c.json(result.results || [])
+  } catch (error: any) {
+    console.error('Load watch URLs error:', error)
+    return c.json([])
+  }
+})
+
+// 監視URL追加
+routes.post('/master/subsidy-watch-urls', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO subsidy_watch_urls (subsidy_type_id, url, description)
+      VALUES (?, ?, ?)
+    `).bind(
+      data.subsidy_type_id || null,
+      data.url,
+      data.description || null
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error: any) {
+    console.error('Add watch URL error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 監視URL削除
+routes.delete('/master/subsidy-watch-urls/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    await DB.prepare(`
+      UPDATE subsidy_watch_urls SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete watch URL error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 更新ログ一覧取得
+routes.get('/master/subsidy-update-logs', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // テーブルが存在しない場合は作成
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS subsidy_update_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subsidy_type_id INTEGER,
+        watch_url_id INTEGER,
+        change_type TEXT,
+        change_summary TEXT,
+        old_content TEXT,
+        new_content TEXT,
+        status TEXT DEFAULT 'pending',
+        reviewed_by INTEGER,
+        reviewed_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    const result = await DB.prepare(`
+      SELECT l.*, s.name as subsidy_name, w.url as watch_url
+      FROM subsidy_update_logs l
+      LEFT JOIN subsidy_types s ON l.subsidy_type_id = s.id
+      LEFT JOIN subsidy_watch_urls w ON l.watch_url_id = w.id
+      ORDER BY l.created_at DESC
+      LIMIT 100
+    `).all()
+    
+    return c.json(result.results || [])
+  } catch (error: any) {
+    console.error('Load update logs error:', error)
+    return c.json([])
+  }
+})
+
+// 更新ログステータス更新
+routes.put('/master/subsidy-update-logs/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE subsidy_update_logs 
+      SET status = ?, reviewed_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(data.status, id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Update log status error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 export default routes

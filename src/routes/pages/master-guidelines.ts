@@ -929,7 +929,7 @@ routes.get('/master/guidelines', (c) => {
 
             // 監視URL一覧
             async function loadWatchUrls() {
-                const response = await axios.get('/api/subsidy-watch-urls', axiosConfig);
+                const response = await axios.get('/api/master/subsidy-watch-urls', axiosConfig);
                 const urls = response.data;
                 
                 const tbody = document.getElementById('watchUrlsList');
@@ -963,7 +963,7 @@ routes.get('/master/guidelines', (c) => {
 
             // 更新ログ一覧
             async function loadUpdateLogs() {
-                const response = await axios.get('/api/subsidy-update-logs', axiosConfig);
+                const response = await axios.get('/api/master/subsidy-update-logs', axiosConfig);
                 const logs = response.data;
                 
                 const tbody = document.getElementById('updateLogsList');
@@ -1236,7 +1236,7 @@ routes.get('/master/guidelines', (c) => {
                 const data = Object.fromEntries(formData);
                 
                 try {
-                    await axios.post('/api/subsidy-watch-urls', data, axiosConfig);
+                    await axios.post('/api/master/subsidy-watch-urls', data, axiosConfig);
                     showToast('監視URLを追加しました');
                     closeAddUrlModal();
                     loadWatchUrls();
