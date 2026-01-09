@@ -143,7 +143,8 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
         },
         body: JSON.stringify({
           model: modelName,
-          max_tokens: maxChars ? Math.min(maxChars * 2, 8192) : 4096,
+          // 日本語は1文字≒1-2トークン、余裕を持って*3、上限も拡大
+          max_tokens: maxChars ? Math.min(maxChars * 3, 16384) : 8192,
           messages: [
             {
               role: 'user',
