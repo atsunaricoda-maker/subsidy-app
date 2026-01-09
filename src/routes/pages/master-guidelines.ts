@@ -694,7 +694,7 @@ routes.get('/master/guidelines', (c) => {
 
             // 公募要領一覧
             async function loadGuidelines() {
-                const response = await axios.get('/api/subsidy-guidelines', axiosConfig);
+                const response = await axios.get('/api/master/subsidy-guidelines', axiosConfig);
                 allGuidelines = response.data;
                 renderGuidelines();
             }
@@ -1148,7 +1148,7 @@ routes.get('/master/guidelines', (c) => {
                 if (data.min_amount) data.min_amount = parseInt(data.min_amount) * 10000;
                 
                 try {
-                    await axios.post('/api/subsidy-guidelines', data, axiosConfig);
+                    await axios.post('/api/master/subsidy-guidelines', data, axiosConfig);
                     showToast('公募要領を追加しました');
                     closeAddGuidelineModal();
                     loadGuidelines();

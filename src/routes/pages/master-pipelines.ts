@@ -315,7 +315,7 @@ routes.get('/master/pipelines', (c) => {
                 try {
                     const category = document.getElementById('filterCategory').value;
                     const treeMode = document.getElementById('treeViewToggle')?.checked;
-                    let url = '/api/pipeline-templates?tree=' + (treeMode ? 'true' : 'false') + '&master_only=true';
+                    let url = '/api/master/pipeline-templates?tree=' + (treeMode ? 'true' : 'false') + '&master_only=true';
                     if (category) {
                         url += '&category=' + category;
                     }
@@ -544,7 +544,7 @@ routes.get('/master/pipelines', (c) => {
             async function showTemplateDetail(id) {
                 try {
                     const token = localStorage.getItem('master_token');
-                    const response = await axios.get('/api/pipeline-templates/' + id, {
+                    const response = await axios.get('/api/master/pipeline-templates/' + id, {
                         headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                     });
                     const template = response.data;
@@ -672,7 +672,7 @@ routes.get('/master/pipelines', (c) => {
             async function createChildPipeline(parentId) {
                 try {
                     const token = localStorage.getItem('master_token');
-                    const response = await axios.get('/api/pipeline-templates/' + parentId, {
+                    const response = await axios.get('/api/master/pipeline-templates/' + parentId, {
                         headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                     });
                     const parent = response.data;
@@ -699,7 +699,7 @@ routes.get('/master/pipelines', (c) => {
                         }))
                     };
                     
-                    const createResponse = await axios.post('/api/pipeline-templates', childData, {
+                    const createResponse = await axios.post('/api/master/pipeline-templates', childData, {
                         headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                     });
                     
@@ -720,7 +720,7 @@ routes.get('/master/pipelines', (c) => {
             async function loadParentPipelineOptions(excludeId = null, selectedParentId = null) {
                 try {
                     const token = localStorage.getItem('master_token');
-                    const response = await axios.get('/api/pipeline-templates?master_only=true', {
+                    const response = await axios.get('/api/master/pipeline-templates?master_only=true', {
                         headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                     });
                     const templates = response.data;
@@ -812,7 +812,7 @@ routes.get('/master/pipelines', (c) => {
                 
                 try {
                     const token = localStorage.getItem('master_token');
-                    await axios.delete('/api/pipeline-templates/' + id, {
+                    await axios.delete('/api/master/pipeline-templates/' + id, {
                         headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                     });
                     showToast('テンプレートを削除しました');
@@ -831,7 +831,7 @@ routes.get('/master/pipelines', (c) => {
                 try {
                     editingTemplateId = id;
                     const token = localStorage.getItem('master_token');
-                    const response = await axios.get('/api/pipeline-templates/' + id, {
+                    const response = await axios.get('/api/master/pipeline-templates/' + id, {
                         headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                     });
                     const template = response.data;
@@ -936,11 +936,11 @@ routes.get('/master/pipelines', (c) => {
                     const token = localStorage.getItem('master_token');
                     let response;
                     if (editingTemplateId) {
-                        response = await axios.put('/api/pipeline-templates/' + editingTemplateId, data, {
+                        response = await axios.put('/api/master/pipeline-templates/' + editingTemplateId, data, {
                             headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                         });
                     } else {
-                        response = await axios.post('/api/pipeline-templates', data, {
+                        response = await axios.post('/api/master/pipeline-templates', data, {
                             headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                         });
                     }

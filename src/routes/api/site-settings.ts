@@ -3441,4 +3441,526 @@ routes.get('/public/platform-settings', async (c) => {
   }
 })
 
+// =============================================
+// マスター管理用: パイプラインテンプレートAPI
+// =============================================
+
+// マスターテンプレート一覧取得
+routes.get('/master/pipeline-templates', async (c) => {
+  const { DB } = c.env
+  const treeView = c.req.query('tree') === 'true'
+  const category = c.req.query('category')
+  
+  try {
+    // テーブルが存在しない場合は作成
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS pipeline_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        category TEXT DEFAULT 'subsidy',
+        service_start_offset INTEGER DEFAULT 0,
+        service_end_offset INTEGER DEFAULT 0,
+        requires_approval INTEGER DEFAULT 0,
+        allow_external_tasks INTEGER DEFAULT 0,
+        progress_reflection TEXT DEFAULT 'manual',
+        created_by INTEGER,
+        subsidy_type_ids TEXT,
+        parent_id INTEGER,
+        display_order INTEGER DEFAULT 0,
+        is_master_template INTEGER DEFAULT 1,
+        organization_id INTEGER,
+        copied_from_template_id INTEGER,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    let query = `
+      SELECT pt.*, 
+             (SELECT COUNT(*) FROM pipeline_template_tasks WHERE template_id = pt.id) as task_count
+      FROM pipeline_templates pt
+      WHERE pt.is_active = 1 AND pt.is_master_template = 1
+    `
+    const params: any[] = []
+    
+    const allowedCategories = ['subsidy', 'grant', 'license']
+    if (category && allowedCategories.includes(category)) {
+      query += ` AND pt.category = ?`
+      params.push(category)
+    }
+    
+    if (treeView) {
+      query += ` ORDER BY COALESCE(pt.parent_id, pt.id), pt.parent_id IS NOT NULL, pt.display_order, pt.id`
+    } else {
+      query += ` ORDER BY pt.display_order, pt.id`
+    }
+    
+    const templates = params.length > 0 
+      ? await DB.prepare(query).bind(...params).all()
+      : await DB.prepare(query).all()
+    
+    return c.json(templates.results || [])
+  } catch (error: any) {
+    console.error('Load pipeline templates error:', error)
+    return c.json([])
+  }
+})
+
+// マスターテンプレート詳細取得
+routes.get('/master/pipeline-templates/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    const template = await DB.prepare(`
+      SELECT * FROM pipeline_templates WHERE id = ? AND is_active = 1
+    `).bind(id).first()
+    
+    if (!template) {
+      return c.json({ error: 'テンプレートが見つかりません' }, 404)
+    }
+    
+    // タスクも取得
+    const tasks = await DB.prepare(`
+      SELECT * FROM pipeline_template_tasks WHERE template_id = ? ORDER BY sort_order ASC
+    `).bind(id).all()
+    
+    return c.json({
+      ...template,
+      tasks: tasks.results || []
+    })
+  } catch (error: any) {
+    console.error('Get pipeline template error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// マスターテンプレート作成
+routes.post('/master/pipeline-templates', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO pipeline_templates 
+      (name, description, category, service_start_offset, service_end_offset, 
+       requires_approval, allow_external_tasks, progress_reflection, 
+       subsidy_type_ids, parent_id, display_order, is_master_template)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).bind(
+      data.name,
+      data.description || '',
+      data.category || 'subsidy',
+      data.service_start_offset || 0,
+      data.service_end_offset || 0,
+      data.requires_approval ? 1 : 0,
+      data.allow_external_tasks ? 1 : 0,
+      data.progress_reflection || 'manual',
+      data.subsidy_type_ids || null,
+      data.parent_id || null,
+      data.display_order || 0
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error: any) {
+    console.error('Create pipeline template error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// マスターテンプレート更新
+routes.put('/master/pipeline-templates/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE pipeline_templates SET
+        name = ?, description = ?, category = ?,
+        service_start_offset = ?, service_end_offset = ?,
+        requires_approval = ?, allow_external_tasks = ?,
+        progress_reflection = ?, subsidy_type_ids = ?,
+        parent_id = ?, display_order = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      data.name,
+      data.description || '',
+      data.category || 'subsidy',
+      data.service_start_offset || 0,
+      data.service_end_offset || 0,
+      data.requires_approval ? 1 : 0,
+      data.allow_external_tasks ? 1 : 0,
+      data.progress_reflection || 'manual',
+      data.subsidy_type_ids || null,
+      data.parent_id || null,
+      data.display_order || 0,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Update pipeline template error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// マスターテンプレート削除
+routes.delete('/master/pipeline-templates/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    await DB.prepare(`
+      UPDATE pipeline_templates SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete pipeline template error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// =============================================
+// マスター管理用: 公募要領API
+// =============================================
+
+// 公募要領一覧取得
+routes.get('/master/subsidy-guidelines', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // テーブルが存在しない場合は作成
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS subsidy_guidelines (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subsidy_type_id INTEGER NOT NULL,
+        fiscal_year TEXT,
+        version TEXT,
+        application_start_date TEXT,
+        application_end_date TEXT,
+        max_amount INTEGER,
+        min_amount INTEGER,
+        subsidy_rate TEXT,
+        eligibility_requirements TEXT,
+        target_expenses TEXT,
+        document_sections TEXT,
+        character_limits TEXT,
+        status TEXT DEFAULT 'active',
+        source_url TEXT,
+        pdf_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    // 期限切れを自動更新
+    const today = new Date().toISOString().split('T')[0]
+    await DB.prepare(`
+      UPDATE subsidy_guidelines 
+      SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+      WHERE status = 'active' 
+      AND application_end_date IS NOT NULL 
+      AND application_end_date < ?
+    `).bind(today).run()
+    
+    const result = await DB.prepare(`
+      SELECT g.*, s.name as subsidy_name 
+      FROM subsidy_guidelines g
+      LEFT JOIN subsidy_types s ON g.subsidy_type_id = s.id
+      ORDER BY g.subsidy_type_id, g.fiscal_year DESC
+    `).all()
+    
+    return c.json(result.results || [])
+  } catch (error: any) {
+    console.error('Load subsidy guidelines error:', error)
+    return c.json([])
+  }
+})
+
+// 公募要領詳細取得
+routes.get('/master/subsidy-guidelines/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT g.*, s.name as subsidy_name 
+      FROM subsidy_guidelines g
+      LEFT JOIN subsidy_types s ON g.subsidy_type_id = s.id
+      WHERE g.id = ?
+    `).bind(id).first()
+    
+    return c.json(result || null)
+  } catch (error: any) {
+    console.error('Get subsidy guideline error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 公募要領作成
+routes.post('/master/subsidy-guidelines', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO subsidy_guidelines (
+        subsidy_type_id, fiscal_year, version,
+        application_start_date, application_end_date,
+        max_amount, min_amount, subsidy_rate,
+        eligibility_requirements, target_expenses,
+        document_sections, character_limits,
+        status, source_url, pdf_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.subsidy_type_id,
+      data.fiscal_year || null,
+      data.version || null,
+      data.application_start_date || null,
+      data.application_end_date || null,
+      data.max_amount || null,
+      data.min_amount || null,
+      data.subsidy_rate || null,
+      data.eligibility_requirements || null,
+      data.target_expenses || null,
+      data.document_sections || null,
+      data.character_limits || null,
+      data.status || 'active',
+      data.source_url || null,
+      data.pdf_url || null
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error: any) {
+    console.error('Create subsidy guideline error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 公募要領更新
+routes.put('/master/subsidy-guidelines/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE subsidy_guidelines SET
+        subsidy_type_id = ?, fiscal_year = ?, version = ?,
+        application_start_date = ?, application_end_date = ?,
+        max_amount = ?, min_amount = ?, subsidy_rate = ?,
+        eligibility_requirements = ?, target_expenses = ?,
+        document_sections = ?, character_limits = ?,
+        status = ?, source_url = ?, pdf_url = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      data.subsidy_type_id,
+      data.fiscal_year || null,
+      data.version || null,
+      data.application_start_date || null,
+      data.application_end_date || null,
+      data.max_amount || null,
+      data.min_amount || null,
+      data.subsidy_rate || null,
+      data.eligibility_requirements || null,
+      data.target_expenses || null,
+      data.document_sections || null,
+      data.character_limits || null,
+      data.status || 'active',
+      data.source_url || null,
+      data.pdf_url || null,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Update subsidy guideline error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 公募要領ステータス更新
+routes.patch('/master/subsidy-guidelines/:id/status', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE subsidy_guidelines SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(data.status, id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Update guideline status error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 公募要領削除
+routes.delete('/master/subsidy-guidelines/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    await DB.prepare(`DELETE FROM subsidy_guidelines WHERE id = ?`).bind(id).run()
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete subsidy guideline error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// AI抽出
+routes.post('/master/subsidy-guidelines/:subsidyTypeId/ai-extract', async (c) => {
+  const { DB, CLAUDE_API_KEY } = c.env
+  const subsidyTypeId = c.req.param('subsidyTypeId')
+  const data = await c.req.json()
+  const url = data.url
+  
+  if (!url) {
+    return c.json({ error: 'URLが指定されていません' }, 400)
+  }
+  
+  try {
+    // 補助金種別を取得
+    const subsidyType = await DB.prepare(`
+      SELECT * FROM subsidy_types WHERE id = ?
+    `).bind(subsidyTypeId).first() as any
+    
+    if (!subsidyType) {
+      return c.json({ error: '補助金種別が見つかりません' }, 404)
+    }
+    
+    // URLからHTMLを取得
+    let htmlContent = ''
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; SubsidyGuidelineBot/1.0)'
+        }
+      })
+      htmlContent = await response.text()
+    } catch (fetchError) {
+      return c.json({ error: 'URLからの情報取得に失敗しました' }, 400)
+    }
+    
+    // HTMLを簡略化（タグを除去して本文のみ抽出）
+    const textContent = htmlContent
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 15000)
+    
+    // Claude APIで抽出
+    const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        messages: [{
+          role: 'user',
+          content: `以下は「${subsidyType.name}」の公募要領ページの内容です。この内容から以下の情報を抽出してJSON形式で返してください。
+
+抽出する項目:
+1. fiscal_year: 年度（例: "令和6年度"）
+2. application_start_date: 申請開始日（YYYY-MM-DD形式）
+3. application_end_date: 申請締切日（YYYY-MM-DD形式）
+4. max_amount: 補助上限額（数値のみ、円単位）
+5. min_amount: 補助下限額（数値のみ、円単位、なければnull）
+6. subsidy_rate: 補助率（例: "1/2", "2/3"）
+7. eligibility_requirements: 対象者・要件（配列形式）
+8. target_expenses: 対象経費（配列形式）
+
+ページ内容:
+${textContent}
+
+必ず以下のJSON形式で回答してください:
+\`\`\`json
+{
+  "fiscal_year": "...",
+  "application_start_date": "YYYY-MM-DD",
+  "application_end_date": "YYYY-MM-DD",
+  "max_amount": 数値,
+  "min_amount": 数値またはnull,
+  "subsidy_rate": "...",
+  "eligibility_requirements": ["...", "..."],
+  "target_expenses": ["...", "..."]
+}
+\`\`\``
+        }]
+      })
+    })
+    
+    const claudeData = await claudeResponse.json() as any
+    const responseText = claudeData.content?.[0]?.text || ''
+    
+    // JSONを抽出
+    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/)
+    if (jsonMatch) {
+      const extracted = JSON.parse(jsonMatch[1])
+      return c.json({
+        success: true,
+        subsidyTypeId,
+        subsidyName: subsidyType.name,
+        source_url: url,
+        ...extracted
+      })
+    }
+    
+    return c.json({ error: '情報の抽出に失敗しました' }, 400)
+  } catch (error: any) {
+    console.error('AI extract error:', error)
+    return c.json({ error: error.message || 'AI抽出に失敗しました' }, 500)
+  }
+})
+
+// AI抽出結果を保存
+routes.post('/master/subsidy-guidelines/:subsidyTypeId/ai-update', async (c) => {
+  const { DB } = c.env
+  const subsidyTypeId = c.req.param('subsidyTypeId')
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO subsidy_guidelines (
+        subsidy_type_id, fiscal_year,
+        application_start_date, application_end_date,
+        max_amount, min_amount, subsidy_rate,
+        eligibility_requirements, target_expenses,
+        status, source_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+    `).bind(
+      subsidyTypeId,
+      data.fiscal_year || null,
+      data.application_start_date || null,
+      data.application_end_date || null,
+      data.max_amount || null,
+      data.min_amount || null,
+      data.subsidy_rate || null,
+      JSON.stringify(data.eligibility_requirements || []),
+      JSON.stringify(data.target_expenses || []),
+      data.source_url || null
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error: any) {
+    console.error('Save AI extract error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 export default routes
