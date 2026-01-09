@@ -42,7 +42,9 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
       
-      const maxOutputTokens = maxChars ? Math.min(maxChars * 4, 8192) : 8192
+      // 日本語は1文字あたり2-3トークン必要なケースが多い
+      // 安全のため maxChars * 5 で設定し、上限は8192（Gemini Flashの推奨出力上限）
+      const maxOutputTokens = maxChars ? Math.min(maxChars * 5, 8192) : 8192
       
       console.log(`[Gemini API] Request - model: ${modelName}, maxOutputTokens: ${maxOutputTokens}, prompt length: ${prompt.length} chars`)
       
@@ -55,7 +57,6 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.7,
-              // 日本語は1文字≒1-2トークン、余裕を持って*4（より多めに確保）
               maxOutputTokens: maxOutputTokens,
             }
           })
@@ -149,10 +150,13 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
       }
       
       // Claude APIリクエスト（タイムアウト設定なし - Cloudflare Workersの制限に従う）
+      // 日本語は1文字あたり2-3トークン必要なケースが多い
+      // 安全のため maxChars * 5 で設定し、上限は16384（Claude Haikuの出力上限）
+      const calculatedMaxTokens = maxChars ? Math.min(maxChars * 5, 16384) : 8192
+      
       const requestBody = {
         model: modelName,
-        // 日本語は1文字≒1-2トークン、余裕を持って*4（より多めに確保）、上限も拡大
-        max_tokens: maxChars ? Math.min(maxChars * 4, 16384) : 8192,
+        max_tokens: calculatedMaxTokens,
         messages: [
           {
             role: 'user',

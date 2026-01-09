@@ -640,7 +640,7 @@ ${sectionSpecific}
 ・文章の途中で終わらず、必ず完結した文で終わること`
   
   try {
-    console.log(`[Document Generation] Section: ${sectionId}, max_chars: ${section.max_chars}, expected max_tokens: ${section.max_chars * 3}`)
+    console.log(`[Document Generation] Section: ${sectionId}, max_chars: ${section.max_chars}, expected max_tokens: ${section.max_chars * 5}`)
     
     let content = await callAI(prompt, env, 2, section.max_chars)
     
@@ -1051,7 +1051,7 @@ ${data.additional_instructions}
 ・文章の途中で終わらず、必ず完結した文で終わること`
 
   try {
-    console.log(`[Document Regeneration] Section: ${sectionId}, max_chars: ${section.max_chars}, expected max_tokens: ${section.max_chars * 3}`)
+    console.log(`[Document Regeneration] Section: ${sectionId}, max_chars: ${section.max_chars}, expected max_tokens: ${section.max_chars * 5}`)
     
     let content = await callAI(prompt, env, 2, section.max_chars)
     
