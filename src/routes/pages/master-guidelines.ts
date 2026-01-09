@@ -680,7 +680,7 @@ routes.get('/master/guidelines', (c) => {
 
             // 補助金種別読み込み
             async function loadSubsidyTypes() {
-                const response = await axios.get('/api/subsidy-types', axiosConfig);
+                const response = await axios.get('/api/master/subsidy-types', axiosConfig);
                 subsidyTypes = response.data;
                 
                 const options = '<option value="">選択してください</option>' + 

@@ -1403,7 +1403,7 @@ routes.get('/master/document-templates', async (c) => {
             
             async function loadSubsidyTypes() {
                 try {
-                    const res = await axios.get('/api/subsidy-types');
+                    const res = await axios.get('/api/master/subsidy-types');
                     const select = document.getElementById('templateSubsidyType');
                     (res.data || []).forEach(st => {
                         select.innerHTML += \`<option value="\${st.id}">\${st.name}</option>\`;

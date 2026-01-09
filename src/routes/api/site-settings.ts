@@ -543,6 +543,27 @@ routes.post('/master/subsidy-types', async (c) => {
   }
 })
 
+// 補助金種別詳細取得（マスター管理用）
+routes.get('/master/subsidy-types/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT * FROM subsidy_types WHERE id = ?
+    `).bind(id).first()
+    
+    if (!result) {
+      return c.json({ error: '補助金種別が見つかりません' }, 404)
+    }
+    
+    return c.json(result)
+  } catch (error: any) {
+    console.error('Get subsidy type error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // 補助金種別更新（マスター管理用）
 routes.put('/master/subsidy-types/:id', async (c) => {
   const { DB } = c.env
@@ -587,6 +608,78 @@ routes.delete('/master/subsidy-types/:id', async (c) => {
     return c.json({ success: true })
   } catch (error: any) {
     console.error('Delete subsidy type error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// =============================================
+// マスター管理用: 補助金種別ドキュメントAPI
+// =============================================
+
+// 補助金種別の必要書類一覧取得
+routes.get('/master/subsidy-types/:subsidyId/documents', async (c) => {
+  const { DB } = c.env
+  const subsidyId = c.req.param('subsidyId')
+  
+  try {
+    // テーブルがなければ作成
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS subsidy_type_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subsidy_type_id INTEGER NOT NULL,
+        document_type TEXT NOT NULL,
+        description TEXT,
+        is_required INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    const results = await DB.prepare(`
+      SELECT * FROM subsidy_type_documents WHERE subsidy_type_id = ? ORDER BY id ASC
+    `).bind(subsidyId).all()
+    
+    return c.json(results.results || [])
+  } catch (error: any) {
+    console.error('Get subsidy documents error:', error)
+    return c.json([])
+  }
+})
+
+// 補助金種別に必要書類を追加
+routes.post('/master/subsidy-types/:subsidyId/documents', async (c) => {
+  const { DB } = c.env
+  const subsidyId = c.req.param('subsidyId')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      INSERT INTO subsidy_type_documents (subsidy_type_id, document_type, description, is_required)
+      VALUES (?, ?, ?, ?)
+    `).bind(
+      subsidyId,
+      data.document_type,
+      data.description || null,
+      data.is_required ? 1 : 0
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Add subsidy document error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 補助金種別の必要書類を削除
+routes.delete('/master/subsidy-types/:subsidyId/documents/:docId', async (c) => {
+  const { DB } = c.env
+  const docId = c.req.param('docId')
+  
+  try {
+    await DB.prepare(`DELETE FROM subsidy_type_documents WHERE id = ?`).bind(docId).run()
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete subsidy document error:', error)
     return c.json({ error: error.message }, 500)
   }
 })
@@ -1505,7 +1598,7 @@ routes.get('/master/organizations', async (c) => {
             
             async function loadPlans() {
                 try {
-                    const response = await axios.get('/api/subscription/plans');
+                    const response = await axios.get('/api/master/plans');
                     const select = document.getElementById('planFilter');
                     response.data.forEach(plan => {
                         const option = document.createElement('option');
@@ -1750,7 +1843,7 @@ routes.get('/master/organizations/new', async (c) => {
             
             async function loadPlans() {
                 try {
-                    const response = await axios.get('/api/subscription/plans');
+                    const response = await axios.get('/api/master/plans');
                     const select = document.getElementById('planSelect');
                     response.data.forEach(plan => {
                         const option = document.createElement('option');
@@ -2371,7 +2464,7 @@ routes.get('/master/organizations/:id', async (c) => {
                 document.getElementById('planModal').classList.remove('hidden');
                 if (plans.length === 0) {
                     try {
-                        const response = await axios.get('/api/subscription/plans');
+                        const response = await axios.get('/api/master/plans');
                         plans = response.data;
                     } catch (e) {
                         plans = [];

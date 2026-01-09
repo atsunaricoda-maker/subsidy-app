@@ -747,7 +747,7 @@ routes.get('/master/pipelines', (c) => {
             async function loadSubsidyTypesForCheckbox(selectedIds = []) {
                 try {
                     const token = localStorage.getItem('master_token');
-                    const response = await axios.get('/api/subsidy-types', {
+                    const response = await axios.get('/api/master/subsidy-types', {
                         headers: token ? { 'Authorization': 'Bearer ' + token } : {}
                     });
                     allSubsidyTypes = response.data;

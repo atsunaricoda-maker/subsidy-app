@@ -253,7 +253,7 @@ routes.get('/master/subsidy-types', async (c) => {
             
             async function editSubsidyType(id) {
                 try {
-                    const res = await axios.get('/api/subsidy-types/' + id);
+                    const res = await axios.get('/api/master/subsidy-types/' + id);
                     const item = res.data;
                     
                     document.getElementById('modalTitle').textContent = '補助金種別を編集';
@@ -321,7 +321,7 @@ routes.get('/master/subsidy-types', async (c) => {
             
             async function loadDocuments() {
                 try {
-                    const res = await axios.get('/api/subsidy-types/' + currentSubsidyTypeId + '/documents');
+                    const res = await axios.get('/api/master/subsidy-types/' + currentSubsidyTypeId + '/documents');
                     const docs = res.data;
                     
                     const container = document.getElementById('documentsList');
@@ -361,7 +361,7 @@ routes.get('/master/subsidy-types', async (c) => {
             
             async function addDocument(docType, description, isRequired) {
                 try {
-                    await axios.post('/api/subsidy-types/' + currentSubsidyTypeId + '/documents', {
+                    await axios.post('/api/master/subsidy-types/' + currentSubsidyTypeId + '/documents', {
                         document_type: docType,
                         description: description,
                         is_required: isRequired ? 1 : 0
@@ -376,7 +376,7 @@ routes.get('/master/subsidy-types', async (c) => {
                 if (!confirm('この書類を削除しますか？')) return;
                 
                 try {
-                    await axios.delete('/api/subsidy-types/' + currentSubsidyTypeId + '/documents/' + docId);
+                    await axios.delete('/api/master/subsidy-types/' + currentSubsidyTypeId + '/documents/' + docId);
                     await loadDocuments();
                 } catch (err) {
                     alert('削除に失敗しました');
