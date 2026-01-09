@@ -1190,7 +1190,7 @@ routes.get('/master/guidelines', (c) => {
                 if (data.min_amount) data.min_amount = parseInt(data.min_amount) * 10000;
                 
                 try {
-                    await axios.put(\`/api/subsidy-guidelines/\${id}\`, data, axiosConfig);
+                    await axios.put(\`/api/master/subsidy-guidelines/\${id}\`, data, axiosConfig);
                     showToast('公募要領を更新しました');
                     closeEditGuidelineModal();
                     loadGuidelines();
@@ -1202,7 +1202,7 @@ routes.get('/master/guidelines', (c) => {
             async function toggleGuidelineStatus(id, currentStatus) {
                 const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
                 try {
-                    await axios.patch(\`/api/subsidy-guidelines/\${id}/status\`, { status: newStatus }, axiosConfig);
+                    await axios.patch(\`/api/master/subsidy-guidelines/\${id}/status\`, { status: newStatus }, axiosConfig);
                     showToast(newStatus === 'active' ? '有効にしました' : '終了にしました');
                     loadGuidelines();
                 } catch (error) {
@@ -1213,7 +1213,7 @@ routes.get('/master/guidelines', (c) => {
             async function deleteGuideline(id) {
                 if (!confirm('この公募要領を削除しますか？')) return;
                 try {
-                    await axios.delete(\`/api/subsidy-guidelines/\${id}\`, axiosConfig);
+                    await axios.delete(\`/api/master/subsidy-guidelines/\${id}\`, axiosConfig);
                     showToast('削除しました');
                     loadGuidelines();
                 } catch (error) {
@@ -1248,7 +1248,7 @@ routes.get('/master/guidelines', (c) => {
             async function deleteWatchUrl(id) {
                 if (!confirm('この監視URLを削除しますか？')) return;
                 try {
-                    await axios.delete(\`/api/subsidy-watch-urls/\${id}\`, axiosConfig);
+                    await axios.delete(\`/api/master/subsidy-watch-urls/\${id}\`, axiosConfig);
                     showToast('削除しました');
                     loadWatchUrls();
                 } catch (error) {
@@ -1260,7 +1260,7 @@ routes.get('/master/guidelines', (c) => {
             async function checkUpdatesNow() {
                 showToast('更新チェックを開始しています...');
                 try {
-                    const response = await axios.post('/api/subsidy-check-updates', {}, axiosConfig);
+                    const response = await axios.post('/api/master/subsidy-check-updates', {}, axiosConfig);
                     const result = response.data;
                     
                     const changes = result.results?.filter(r => r.change_detected).length || 0;
@@ -1279,7 +1279,7 @@ routes.get('/master/guidelines', (c) => {
 
             async function updateLogStatus(id, status) {
                 try {
-                    await axios.put(\`/api/subsidy-update-logs/\${id}\`, {
+                    await axios.put(\`/api/master/subsidy-update-logs/\${id}\`, {
                         status,
                         reviewed_by: localStorage.getItem('master_name') || 'master'
                     }, axiosConfig);
@@ -1322,7 +1322,7 @@ routes.get('/master/guidelines', (c) => {
                 document.getElementById('aiExtractSubmitBtn').disabled = true;
                 
                 try {
-                    const response = await axios.post(\`/api/subsidy-guidelines/\${subsidyTypeId}/ai-extract\`, { url }, axiosConfig);
+                    const response = await axios.post(\`/api/master/subsidy-guidelines/\${subsidyTypeId}/ai-extract\`, { url }, axiosConfig);
                     const result = response.data;
                     
                     if (result.error) {
@@ -1422,7 +1422,7 @@ routes.get('/master/guidelines', (c) => {
                 }
                 
                 try {
-                    const response = await axios.post(\`/api/subsidy-guidelines/\${currentAiResult.subsidyTypeId}/ai-update\`, currentAiResult, axiosConfig);
+                    const response = await axios.post(\`/api/master/subsidy-guidelines/\${currentAiResult.subsidyTypeId}/ai-update\`, currentAiResult, axiosConfig);
                     
                     if (response.data.success) {
                         showToast(\`公募要領を\${response.data.action === 'created' ? '新規登録' : '更新'}しました\`);
