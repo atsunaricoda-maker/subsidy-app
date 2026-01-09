@@ -4109,4 +4109,67 @@ routes.put('/master/subsidy-update-logs/:id', async (c) => {
   }
 })
 
+// マスター用 文書テンプレート一覧取得
+routes.get('/master/document-templates', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT dt.*, st.name as subsidy_name
+      FROM document_templates dt
+      LEFT JOIN subsidy_types st ON dt.subsidy_type_id = st.id
+      ORDER BY dt.subsidy_type_id
+    `).all()
+    
+    return c.json(result.results || [])
+  } catch (error: any) {
+    console.error('Load document templates error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// マスター用 文書テンプレート詳細取得
+routes.get('/master/document-templates/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT dt.*, st.name as subsidy_name
+      FROM document_templates dt
+      LEFT JOIN subsidy_types st ON dt.subsidy_type_id = st.id
+      WHERE dt.id = ?
+    `).bind(id).first()
+    
+    if (!result) {
+      return c.json({ error: 'テンプレートが見つかりません' }, 404)
+    }
+    
+    return c.json(result)
+  } catch (error: any) {
+    console.error('Load document template error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// マスター用 文書テンプレート更新
+routes.put('/master/document-templates/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE document_templates 
+      SET sections = ?, ai_prompt_base = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(JSON.stringify(data.sections), data.ai_prompt_base || null, id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Update document template error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 export default routes
