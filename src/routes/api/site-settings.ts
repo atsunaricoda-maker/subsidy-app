@@ -3749,18 +3749,28 @@ routes.put('/master/subsidy-guidelines/:id', async (c) => {
   const data = await c.req.json()
   
   try {
+    // 部分更新に対応（COALESCEで既存値を保持）
     await DB.prepare(`
       UPDATE subsidy_guidelines SET
-        subsidy_type_id = ?, fiscal_year = ?, version = ?,
-        application_start_date = ?, application_end_date = ?,
-        max_amount = ?, min_amount = ?, subsidy_rate = ?,
-        eligibility_requirements = ?, target_expenses = ?,
-        document_sections = ?, character_limits = ?,
-        status = ?, source_url = ?, pdf_url = ?,
+        subsidy_type_id = COALESCE(?, subsidy_type_id),
+        fiscal_year = COALESCE(?, fiscal_year),
+        version = COALESCE(?, version),
+        application_start_date = COALESCE(?, application_start_date),
+        application_end_date = COALESCE(?, application_end_date),
+        max_amount = COALESCE(?, max_amount),
+        min_amount = COALESCE(?, min_amount),
+        subsidy_rate = COALESCE(?, subsidy_rate),
+        eligibility_requirements = COALESCE(?, eligibility_requirements),
+        target_expenses = COALESCE(?, target_expenses),
+        document_sections = COALESCE(?, document_sections),
+        character_limits = COALESCE(?, character_limits),
+        status = COALESCE(?, status),
+        source_url = COALESCE(?, source_url),
+        pdf_url = COALESCE(?, pdf_url),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
-      data.subsidy_type_id,
+      data.subsidy_type_id || null,
       data.fiscal_year || null,
       data.version || null,
       data.application_start_date || null,
@@ -3772,7 +3782,7 @@ routes.put('/master/subsidy-guidelines/:id', async (c) => {
       data.target_expenses || null,
       data.document_sections || null,
       data.character_limits || null,
-      data.status || 'active',
+      data.status || null,
       data.source_url || null,
       data.pdf_url || null,
       id
