@@ -42,6 +42,10 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
       
+      const maxOutputTokens = maxChars ? Math.min(maxChars * 4, 8192) : 8192
+      
+      console.log(`[Gemini API] Request - model: ${modelName}, maxOutputTokens: ${maxOutputTokens}, prompt length: ${prompt.length} chars`)
+      
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
         {
@@ -51,8 +55,8 @@ async function callGeminiAPI(prompt: string, apiKey: string, maxRetries = 3, max
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.7,
-              // 日本語は1文字≒1-2トークン、余裕を持って*3、上限は8192
-              maxOutputTokens: maxChars ? Math.min(maxChars * 3, 8192) : 8192,
+              // 日本語は1文字≒1-2トークン、余裕を持って*4（より多めに確保）
+              maxOutputTokens: maxOutputTokens,
             }
           })
         }
@@ -144,6 +148,21 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
         await new Promise(resolve => setTimeout(resolve, waitTime))
       }
       
+      // Claude APIリクエスト（タイムアウト設定なし - Cloudflare Workersの制限に従う）
+      const requestBody = {
+        model: modelName,
+        // 日本語は1文字≒1-2トークン、余裕を持って*4（より多めに確保）、上限も拡大
+        max_tokens: maxChars ? Math.min(maxChars * 4, 16384) : 8192,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      }
+      
+      console.log(`[Claude API] Request - model: ${modelName}, max_tokens: ${requestBody.max_tokens}, prompt length: ${prompt.length} chars`)
+      
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -151,17 +170,7 @@ async function callClaudeAPI(prompt: string, apiKey: string, maxRetries = 3, max
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01'
         },
-        body: JSON.stringify({
-          model: modelName,
-          // 日本語は1文字≒1-2トークン、余裕を持って*3、上限も拡大
-          max_tokens: maxChars ? Math.min(maxChars * 3, 16384) : 8192,
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ]
-        })
+        body: JSON.stringify(requestBody)
       })
       
       // 429（レート制限）または5xx（サーバーエラー）の場合はリトライ

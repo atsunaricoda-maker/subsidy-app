@@ -663,6 +663,13 @@ ${sectionSpecific}
       content = `【文字数超過】現在${content.length}文字（上限${section.max_chars}文字を${overCount}文字超過）\n編集して${section.max_chars}文字以内に収めてください。\n\n---\n\n${content}`
     }
     
+    // 文字数が極端に少ない場合は警告（途中で切れた可能性）
+    const minExpectedChars = Math.floor(section.max_chars * 0.3) // 最低でも30%は欲しい
+    if (content && content.length < minExpectedChars && content.length > 0) {
+      console.warn(`[Document Generation] Section ${sectionId} content is too short: ${content.length} chars (expected at least ${minExpectedChars})`)
+      content = `【注意】生成された内容が短すぎます（${content.length}文字）。AIの応答が途中で切れた可能性があります。\n「再生成」ボタンで再度生成をお試しください。\n\n---\n\n${content}`
+    }
+    
     // セクション内容を更新
     const sectionsContent = JSON.parse(doc.sections_content || '{}')
     sectionsContent[sectionId] = content || `【生成エラー】セクション「${section.title}」の生成結果が空でした。再生成をお試しください。`
@@ -1065,6 +1072,13 @@ ${data.additional_instructions}
     if (content && content.length > section.max_chars) {
       const overCount = content.length - section.max_chars
       content = `【文字数超過】現在${content.length}文字（上限${section.max_chars}文字を${overCount}文字超過）\n編集して${section.max_chars}文字以内に収めてください。\n\n---\n\n${content}`
+    }
+    
+    // 文字数が極端に少ない場合は警告（途中で切れた可能性）
+    const minExpectedChars = Math.floor(section.max_chars * 0.3)
+    if (content && content.length < minExpectedChars && content.length > 0) {
+      console.warn(`[Document Regeneration] Section ${data.section_id} content is too short: ${content.length} chars (expected at least ${minExpectedChars})`)
+      content = `【注意】生成された内容が短すぎます（${content.length}文字）。AIの応答が途中で切れた可能性があります。\n「再生成」ボタンで再度生成をお試しください。\n\n---\n\n${content}`
     }
     
     // セクション内容を更新
