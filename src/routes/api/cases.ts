@@ -382,34 +382,46 @@ routes.post('/cases', async (c) => {
   `).bind(`CASE-${dateStr}-%`, orgId).first()
   const caseNumber = `CASE-${dateStr}-${String((countResult?.count || 0) + 1).padStart(4, '0')}`
   
-  const result = await DB.prepare(`
-    INSERT INTO cases (
-      client_id, case_number, subsidy_type_id, status, assigned_to, notes,
-      deposit_required, deposit_amount, deposit_tax_included, withholding_tax,
-      success_fee_enabled, success_fee_rate, success_fee_amount, success_fee_tax_included,
-      contract_url, access_token, organization_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    data.client_id,
-    caseNumber,
-    data.subsidy_type_id || null,
-    data.status || 'inquiry',
-    data.assigned_to || null,
-    data.notes || null,
-    data.deposit_required ? 1 : 0,
-    data.deposit_amount || 0,
-    data.deposit_tax_included ? 1 : 0,
-    data.withholding_tax ? 1 : 0,
-    data.success_fee_enabled ? 1 : 0,
-    data.success_fee_rate || 0,
-    data.success_fee_amount || 0,
-    data.success_fee_tax_included ? 1 : 0,
-    data.contract_url || null,
-    accessToken,
-    orgId
-  ).run()
+  let result
+  let caseId
   
-  const caseId = result.meta.last_row_id
+  try {
+    result = await DB.prepare(`
+      INSERT INTO cases (
+        client_id, case_number, subsidy_type_id, status, assigned_to, notes,
+        deposit_required, deposit_amount, deposit_tax_included, withholding_tax,
+        success_fee_enabled, success_fee_rate, success_fee_amount, success_fee_tax_included,
+        contract_url, access_token, organization_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.client_id,
+      caseNumber,
+      data.subsidy_type_id || null,
+      data.status || 'inquiry',
+      data.assigned_to || null,
+      data.notes || null,
+      data.deposit_required ? 1 : 0,
+      data.deposit_amount || 0,
+      data.deposit_tax_included ? 1 : 0,
+      data.withholding_tax ? 1 : 0,
+      data.success_fee_enabled ? 1 : 0,
+      data.success_fee_rate || 0,
+      data.success_fee_amount || 0,
+      data.success_fee_tax_included ? 1 : 0,
+      data.contract_url || null,
+      accessToken,
+      orgId
+    ).run()
+    
+    caseId = result.meta.last_row_id
+  } catch (insertError: any) {
+    console.error('Case insert error:', insertError)
+    return c.json({ 
+      error: '案件の登録に失敗しました', 
+      details: insertError.message,
+      cause: insertError.cause
+    }, 500)
+  }
   
   // 補助金種別に必要書類が設定されていない場合、デフォルト書類を自動追加
   if (data.subsidy_type_id) {

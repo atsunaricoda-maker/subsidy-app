@@ -3411,6 +3411,45 @@ routes.post('/master/migrate/pipeline-task-attachments', async (c) => {
   }
 })
 
+// casesテーブルに税込・源泉徴収カラムを追加するマイグレーション
+routes.post('/master/migrate/cases-tax-columns', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const columns = [
+      { name: 'deposit_tax_included', type: 'INTEGER DEFAULT 0' },
+      { name: 'withholding_tax', type: 'INTEGER DEFAULT 0' },
+      { name: 'success_fee_tax_included', type: 'INTEGER DEFAULT 0' }
+    ]
+    
+    const results = []
+    
+    for (const col of columns) {
+      try {
+        await DB.prepare(`ALTER TABLE cases ADD COLUMN ${col.name} ${col.type}`).run()
+        results.push({ column: col.name, status: 'added' })
+        console.log(`Added ${col.name} column to cases table`)
+      } catch (e: any) {
+        if (e.message.includes('duplicate column')) {
+          results.push({ column: col.name, status: 'already exists' })
+        } else {
+          results.push({ column: col.name, status: 'error', error: e.message })
+        }
+        console.log(`${col.name} column: ${e.message}`)
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'casesテーブルの税関連カラム追加が完了しました',
+      results
+    })
+  } catch (error: any) {
+    console.error('Migration error:', error)
+    return c.json({ error: 'マイグレーションに失敗しました: ' + error.message }, 500)
+  }
+})
+
 // 公開用プラットフォーム設定取得（認証不要）
 routes.get('/public/platform-settings', async (c) => {
   const { DB } = c.env
