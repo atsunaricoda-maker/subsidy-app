@@ -2692,13 +2692,14 @@ routes.get('/master/organizations/:id/detail', async (c) => {
     WHERE organization_id = ? AND created_at >= date('now', 'start of month')
   `).bind(orgId).first()
   
-  // 枠情報
+  // 枠情報（statusに関係なく取得）
   const slots = await DB.prepare(`
-    SELECT monthly_slots_remaining, purchased_slots_remaining
+    SELECT sb.monthly_slots_remaining, sb.purchased_slots_remaining
     FROM slot_balances sb
-    JOIN user_subscriptions us ON sb.subscription_id = us.id
-    WHERE us.organization_id = ? AND us.status = 'active'
+    WHERE sb.organization_id = ?
   `).bind(orgId).first()
+  
+  console.log('Slots for org', orgId, ':', slots)
   
   return c.json({
     ...org,
