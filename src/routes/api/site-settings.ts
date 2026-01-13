@@ -2859,22 +2859,58 @@ routes.post('/master/organizations/:id/change-plan', async (c) => {
 routes.post('/master/organizations/:id/add-slots', async (c) => {
   const { DB } = c.env
   const orgId = c.req.param('id')
-  const { count, reason, note } = await c.req.json()
+  
+  let data
+  try {
+    data = await c.req.json()
+  } catch (e) {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+  
+  const { count, reason, note } = data
+  
+  console.log('Add slots request:', { orgId, count, reason, note })
   
   if (!count || count < 1) {
     return c.json({ error: 'Invalid count' }, 400)
   }
   
-  // slot_balances更新
-  const subscription = await DB.prepare(`
-    SELECT us.id as subscription_id, sb.id as balance_id, sb.purchased_slots_remaining
-    FROM user_subscriptions us
-    JOIN slot_balances sb ON us.id = sb.subscription_id
-    WHERE us.organization_id = ? AND us.status = 'active'
+  // まずサブスクリプションを確認
+  const userSub = await DB.prepare(`
+    SELECT id, status, plan_id FROM user_subscriptions WHERE organization_id = ?
   `).bind(orgId).first()
   
+  console.log('User subscription:', userSub)
+  
+  // slot_balancesがない場合は作成する
+  let subscription = await DB.prepare(`
+    SELECT us.id as subscription_id, sb.id as balance_id, sb.purchased_slots_remaining
+    FROM user_subscriptions us
+    LEFT JOIN slot_balances sb ON us.id = sb.subscription_id
+    WHERE us.organization_id = ?
+  `).bind(orgId).first()
+  
+  console.log('Subscription with slots:', subscription)
+  
   if (!subscription) {
-    return c.json({ error: 'No active subscription found' }, 404)
+    return c.json({ error: 'No subscription found for this organization', orgId }, 404)
+  }
+  
+  // slot_balancesがない場合は作成
+  if (!subscription.balance_id) {
+    console.log('Creating slot_balances for subscription:', subscription.subscription_id)
+    await DB.prepare(`
+      INSERT INTO slot_balances (subscription_id, organization_id, monthly_slots_remaining, purchased_slots_remaining)
+      VALUES (?, ?, 0, 0)
+    `).bind(subscription.subscription_id, orgId).run()
+    
+    // 再取得
+    subscription = await DB.prepare(`
+      SELECT us.id as subscription_id, sb.id as balance_id, sb.purchased_slots_remaining
+      FROM user_subscriptions us
+      LEFT JOIN slot_balances sb ON us.id = sb.subscription_id
+      WHERE us.organization_id = ?
+    `).bind(orgId).first()
   }
   
   const newBalance = (subscription.purchased_slots_remaining || 0) + count
