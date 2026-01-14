@@ -1069,6 +1069,65 @@ routes.get('/site-settings', async (c) => {
   }
 })
 
+// デバッグ用: メール・reCAPTCHA設定確認
+routes.get('/master/debug/auth-settings', async (c) => {
+  const { DB, RECAPTCHA_SECRET_KEY, RESEND_API_KEY } = c.env
+  
+  try {
+    // site_settingsからメール設定を取得
+    const settings = await DB.prepare(`
+      SELECT setting_key, 
+             CASE 
+               WHEN setting_key LIKE '%api_key%' OR setting_key LIKE '%secret%' 
+               THEN SUBSTRING(setting_value, 1, 10) || '...(masked)'
+               ELSE setting_value 
+             END as setting_value
+      FROM site_settings 
+      WHERE setting_key IN ('resend_api_key', 'email_from', 'email_notifications_enabled', 'recaptcha_site_key', 'recaptcha_secret_key')
+    `).all()
+    
+    // pending_verificationsテーブルの状態確認
+    let pendingCount = 0
+    let recentVerifications: any[] = []
+    try {
+      const count = await DB.prepare(`SELECT COUNT(*) as cnt FROM pending_verifications`).first() as any
+      pendingCount = count?.cnt || 0
+      
+      const recent = await DB.prepare(`
+        SELECT email, 
+               SUBSTRING(verification_code, 1, 2) || '****' as code_masked,
+               expires_at,
+               verified_at,
+               created_at
+        FROM pending_verifications 
+        ORDER BY created_at DESC 
+        LIMIT 5
+      `).all()
+      recentVerifications = recent.results || []
+    } catch (e) {
+      // テーブルが存在しない
+    }
+    
+    return c.json({
+      env_vars: {
+        RECAPTCHA_SECRET_KEY: RECAPTCHA_SECRET_KEY ? 'SET (masked)' : 'NOT SET - using default',
+        RESEND_API_KEY: RESEND_API_KEY ? 'SET (masked)' : 'NOT SET'
+      },
+      site_settings: settings.results || [],
+      pending_verifications: {
+        total_count: pendingCount,
+        recent: recentVerifications
+      },
+      recaptcha_info: {
+        site_key: '6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ',
+        note: 'reCAPTCHA v3 - スコアベースの検証'
+      }
+    })
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
 // サイト設定更新
 routes.post('/site-settings', async (c) => {
   const { DB } = c.env

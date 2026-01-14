@@ -343,26 +343,33 @@ routes.get('/signup', (c) => {
                 const btn = document.getElementById('sendCodeBtn');
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                hideError();
                 
                 try {
+                    console.log('[DEBUG] Getting reCAPTCHA token...');
                     const recaptchaToken = await grecaptcha.execute('6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ', {action: 'send_verification'});
+                    console.log('[DEBUG] reCAPTCHA token obtained:', recaptchaToken.substring(0, 20) + '...');
                     
+                    console.log('[DEBUG] Sending verification request for:', email);
                     const response = await axios.post('/api/signup/send-verification', {
                         email: email,
                         recaptcha_token: recaptchaToken
                     });
+                    console.log('[DEBUG] Response:', response.data);
                     
                     if (response.data.success) {
                         document.getElementById('verificationCodeSection').classList.remove('hidden');
                         document.getElementById('emailStatus').classList.remove('hidden');
                         document.getElementById('emailStatus').className = 'text-xs mt-1 text-blue-600';
-                        document.getElementById('emailStatus').innerHTML = '<i class="fas fa-envelope mr-1"></i>認証コードを送信しました';
+                        document.getElementById('emailStatus').innerHTML = '<i class="fas fa-envelope mr-1"></i>認証コードを送信しました。メールをご確認ください。';
                         document.getElementById('email').readOnly = true;
                         btn.innerHTML = '再送信';
                         btn.disabled = false;
                     }
                 } catch (error) {
-                    showError(error.response?.data?.error || '認証コードの送信に失敗しました');
+                    console.error('[DEBUG] Error:', error);
+                    console.error('[DEBUG] Error response:', error.response?.data);
+                    showError(error.response?.data?.error || '認証コードの送信に失敗しました。コンソールを確認してください。');
                     btn.innerHTML = '認証コード送信';
                     btn.disabled = false;
                 }
@@ -381,12 +388,15 @@ routes.get('/signup', (c) => {
                 const btn = document.getElementById('verifyCodeBtn');
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                hideError();
                 
                 try {
+                    console.log('[DEBUG] Verifying code for:', email);
                     const response = await axios.post('/api/signup/verify-email', {
                         email: email,
                         code: code
                     });
+                    console.log('[DEBUG] Verify response:', response.data);
                     
                     if (response.data.success) {
                         emailVerified = true;
@@ -398,6 +408,8 @@ routes.get('/signup', (c) => {
                         hideError();
                     }
                 } catch (error) {
+                    console.error('[DEBUG] Verify error:', error);
+                    console.error('[DEBUG] Verify error response:', error.response?.data);
                     showError(error.response?.data?.error || '認証に失敗しました');
                     btn.innerHTML = '確認';
                     btn.disabled = false;
@@ -470,6 +482,11 @@ routes.get('/signup', (c) => {
                 errorDiv.textContent = message;
                 errorDiv.classList.remove('hidden');
                 errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            function hideError() {
+                const errorDiv = document.getElementById('errorMessage');
+                errorDiv.classList.add('hidden');
             }
             
             // slug自動生成・バリデーション

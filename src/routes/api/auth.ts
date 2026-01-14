@@ -218,13 +218,17 @@ routes.post('/signup/send-verification', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
+  console.log('[SEND-VERIFICATION] Request received for email:', data.email)
+  
   // reCAPTCHA検証
   const recaptchaSecretKey = c.env.RECAPTCHA_SECRET_KEY || '6LcKKr8qAAAAAH-_QIIABuXKmCeCVMCXPvBFAXwt'
   if (data.recaptcha_token) {
     const recaptchaResult = await verifyRecaptcha(data.recaptcha_token, recaptchaSecretKey)
     if (!recaptchaResult.success) {
+      console.warn('[SEND-VERIFICATION] reCAPTCHA failed:', recaptchaResult)
       return c.json({ error: recaptchaResult.error || 'セキュリティ検証に失敗しました' }, 400)
     }
+    console.log('[SEND-VERIFICATION] reCAPTCHA passed, score:', recaptchaResult.score)
   } else {
     return c.json({ error: 'セキュリティ検証が必要です' }, 400)
   }
@@ -272,8 +276,15 @@ routes.post('/signup/send-verification', async (c) => {
     
     // メール送信
     const emailSettings = await getEmailSettings(DB)
+    console.log('[SEND-VERIFICATION] Email settings:', { 
+      hasApiKey: !!emailSettings.apiKey, 
+      fromEmail: emailSettings.fromEmail,
+      enabled: emailSettings.enabled 
+    })
+    
     if (emailSettings.apiKey) {
-      await sendEmail(emailSettings.apiKey, {
+      console.log('[SEND-VERIFICATION] Sending email to:', data.email)
+      const emailResult = await sendEmail(emailSettings.apiKey, {
         to: data.email,
         subject: '【申請らくらく君】メールアドレス認証コード',
         html: `
@@ -292,15 +303,17 @@ routes.post('/signup/send-verification', async (c) => {
         `,
         from: emailSettings.fromEmail || 'noreply@shinsei-raku.com'
       })
+      console.log('[SEND-VERIFICATION] Email send result:', emailResult)
     } else {
-      console.log('Email skipped: No API key. Code:', verificationCode)
+      console.log('[SEND-VERIFICATION] Email skipped: No API key. Code:', verificationCode)
     }
+    
+    // デバッグ用：認証コードをログに出力
+    console.log(`[EMAIL VERIFICATION] Code sent to ${data.email}: ${verificationCode}`)
     
     return c.json({ 
       success: true, 
-      message: '認証コードを送信しました。メールをご確認ください。',
-      // 開発時のみコードを返す（本番では削除）
-      // debug_code: verificationCode 
+      message: '認証コードを送信しました。メールをご確認ください。'
     })
     
   } catch (error: any) {
