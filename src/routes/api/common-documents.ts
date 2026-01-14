@@ -3,6 +3,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
+import { validateFile, sanitizeFileName } from '../../utils/file-security'
 
 const routes = new Hono<AppEnv>()
 
@@ -128,6 +129,13 @@ routes.post('/clients/:clientId/common-documents', async (c) => {
       return c.json({ error: 'ファイルと書類種別は必須です' }, 400)
     }
     
+    // ファイルセキュリティ検証
+    const validation = await validateFile(file)
+    if (!validation.valid) {
+      console.warn(`[FILE SECURITY] Common document upload rejected for client ${clientId}: ${validation.error}`)
+      return c.json({ error: validation.error }, 400)
+    }
+    
     // 書類タイプの設定を取得
     const docTypeConfig = await DB.prepare(`
       SELECT * FROM common_document_types WHERE name = ?
@@ -162,9 +170,9 @@ routes.post('/clients/:clientId/common-documents', async (c) => {
     }
     
     // R2にアップロード
-    const fileName = file.name
+    const safeFileName = sanitizeFileName(file.name)
     const arrayBuffer = await file.arrayBuffer()
-    const filePath = `common-docs/${clientId}/${Date.now()}_${fileName}`
+    const filePath = `common-docs/${clientId}/${Date.now()}_${safeFileName}`
     
     await R2.put(filePath, arrayBuffer, {
       httpMetadata: { contentType: file.type }
@@ -178,7 +186,7 @@ routes.post('/clients/:clientId/common-documents', async (c) => {
     `).bind(
       clientId,
       documentType,
-      fileName,
+      safeFileName, // サニタイズ済みファイル名
       filePath,
       file.size,
       fiscalYear,

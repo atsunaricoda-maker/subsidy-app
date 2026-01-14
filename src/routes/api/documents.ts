@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 import { sendEmail, getEmailSettings, documentUploadedEmail } from '../../utils/email'
+import { validateFile, sanitizeFileName } from '../../utils/file-security'
 
 const routes = new Hono<AppEnv>()
 
@@ -73,9 +74,21 @@ routes.post('/clients/:id/documents/upload', async (c) => {
       return c.json({ error: 'No document_type provided' }, 400)
     }
     
+    // ファイルセキュリティ検証
+    const validation = await validateFile(file)
+    if (!validation.valid) {
+      console.warn(`[FILE SECURITY] Upload rejected for client ${id}: ${validation.error}`)
+      return c.json({ error: validation.error }, 400)
+    }
+    
+    if (validation.warnings && validation.warnings.length > 0) {
+      console.log(`[FILE SECURITY] Warnings for client ${id}:`, validation.warnings)
+    }
+    
     // R2にファイル保存
     const timestamp = Date.now()
-    const fileName = `${timestamp}-${file.name}`
+    const safeFileName = sanitizeFileName(file.name)
+    const fileName = `${timestamp}-${safeFileName}`
     const filePath = `documents/${id}/${fileName}`
     
     await R2.put(filePath, file.stream(), {
@@ -92,7 +105,7 @@ routes.post('/clients/:id/documents/upload', async (c) => {
       id,
       caseId || null,
       documentType,
-      file.name,
+      safeFileName, // サニタイズ済みファイル名を保存
       filePath,
       file.size,
       uploadedBy || 'client'
