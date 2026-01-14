@@ -11,6 +11,10 @@ routes.get('/subsidy-types', async (c) => {
   const user = await getCurrentUser(c)
   const categoryFilter = c.req.query('category') || ''
   
+  // サブドメインからテナント組織IDを取得（未ログインでも動作するように）
+  const tenantOrgId = c.get('tenantOrgId')
+  const effectiveOrgId = user?.organization_id || tenantOrgId
+  
   // id = 0 は共通質問用の内部レコードなので除外
   let query = `SELECT * FROM subsidy_types WHERE id > 0`
   const params: string[] = []
@@ -27,24 +31,24 @@ routes.get('/subsidy-types', async (c) => {
     params.push(mappedCategory)
   } else {
     // 組織の業務範囲を取得してフィルタリング（カテゴリ指定がない場合のみ）
-    if (user?.organization_id) {
+    if (effectiveOrgId) {
       const org = await DB.prepare(`SELECT business_scope FROM organizations WHERE id = ?`)
-        .bind(user.organization_id).first()
+        .bind(effectiveOrgId).first() as { business_scope?: string } | null
       
       if (org?.business_scope) {
-        const scope = org.business_scope as string
+        const scope = org.business_scope
         
         // カテゴリマッピング:
-        // - grant (助成金) = 厚労省系 = 社労士管轄 (labor)
-        // - subsidy (補助金) = 経産省系 = 行政書士管轄 (administrative)
-        // - license (許認可) = 行政書士管轄 (administrative)
+        // - 社労士管轄 = 厚労省系 = 社労士 (labor)
+        // - 行政書士管轄 = 経産省系 = 行政書士 (administrative)
+        // - 許認可 = 行政書士 (administrative)
         
         if (scope === 'labor') {
-          // 社労士: 助成金のみ
-          query += ` AND (category IN ('grant', '雇用系', '助成金', '社労士管轄') OR category IS NULL)`
+          // 社労士: 助成金のみ（社労士管轄カテゴリ）
+          query += ` AND category = '社労士管轄'`
         } else if (scope === 'administrative') {
           // 行政書士: 補助金と許認可
-          query += ` AND (category IN ('subsidy', 'license', 'IT系', '設備投資系', '一般', '補助金', '許認可', '行政書士管轄') OR category IS NULL)`
+          query += ` AND category IN ('行政書士管轄', '許認可')`
         }
         // 'both' の場合は全て表示
       }
