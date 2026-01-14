@@ -107,6 +107,7 @@ routes.get('/signup', (c) => {
         <title>新規登録 - 申請らくらく君</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://www.google.com/recaptcha/api.js?render=6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ"></script>
     </head>
     <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
         <div class="min-h-screen py-12 px-4">
@@ -172,10 +173,31 @@ routes.get('/signup', (c) => {
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス <span class="text-red-500">*</span></label>
-                                    <input type="email" name="email" required 
-                                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                           placeholder="例: info@example.com">
+                                    <div class="flex gap-2">
+                                        <input type="email" name="email" id="email" required 
+                                               class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               placeholder="例: info@example.com">
+                                        <button type="button" id="sendCodeBtn" onclick="sendVerificationCode()"
+                                                class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm whitespace-nowrap">
+                                            認証コード送信
+                                        </button>
+                                    </div>
+                                    <div id="emailStatus" class="text-xs mt-1 hidden"></div>
                                 </div>
+                                <div id="verificationCodeSection" class="hidden">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">認証コード <span class="text-red-500">*</span></label>
+                                    <div class="flex gap-2">
+                                        <input type="text" name="verification_code" id="verification_code" 
+                                               class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-xl tracking-widest"
+                                               placeholder="000000" maxlength="6" pattern="[0-9]{6}">
+                                        <button type="button" id="verifyCodeBtn" onclick="verifyCode()"
+                                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm whitespace-nowrap">
+                                            確認
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">メールに届いた6桁のコードを入力してください</p>
+                                </div>
+                                <input type="hidden" name="email_verified" id="email_verified" value="false">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
                                     <input type="tel" name="phone" 
@@ -297,6 +319,8 @@ routes.get('/signup', (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+            let emailVerified = false;
+            
             // 業務範囲選択
             function selectScope(scope, element) {
                 document.querySelectorAll('.scope-option').forEach(el => {
@@ -308,18 +332,101 @@ routes.get('/signup', (c) => {
                 element.querySelector('input[type="radio"]').checked = true;
             }
             
+            // 認証コード送信
+            async function sendVerificationCode() {
+                const email = document.getElementById('email').value;
+                if (!email) {
+                    showError('メールアドレスを入力してください');
+                    return;
+                }
+                
+                const btn = document.getElementById('sendCodeBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                try {
+                    const recaptchaToken = await grecaptcha.execute('6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ', {action: 'send_verification'});
+                    
+                    const response = await axios.post('/api/signup/send-verification', {
+                        email: email,
+                        recaptcha_token: recaptchaToken
+                    });
+                    
+                    if (response.data.success) {
+                        document.getElementById('verificationCodeSection').classList.remove('hidden');
+                        document.getElementById('emailStatus').classList.remove('hidden');
+                        document.getElementById('emailStatus').className = 'text-xs mt-1 text-blue-600';
+                        document.getElementById('emailStatus').innerHTML = '<i class="fas fa-envelope mr-1"></i>認証コードを送信しました';
+                        document.getElementById('email').readOnly = true;
+                        btn.innerHTML = '再送信';
+                        btn.disabled = false;
+                    }
+                } catch (error) {
+                    showError(error.response?.data?.error || '認証コードの送信に失敗しました');
+                    btn.innerHTML = '認証コード送信';
+                    btn.disabled = false;
+                }
+            }
+            
+            // 認証コード確認
+            async function verifyCode() {
+                const email = document.getElementById('email').value;
+                const code = document.getElementById('verification_code').value;
+                
+                if (!code || code.length !== 6) {
+                    showError('6桁の認証コードを入力してください');
+                    return;
+                }
+                
+                const btn = document.getElementById('verifyCodeBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                try {
+                    const response = await axios.post('/api/signup/verify-email', {
+                        email: email,
+                        code: code
+                    });
+                    
+                    if (response.data.success) {
+                        emailVerified = true;
+                        document.getElementById('email_verified').value = 'true';
+                        document.getElementById('emailStatus').className = 'text-xs mt-1 text-green-600';
+                        document.getElementById('emailStatus').innerHTML = '<i class="fas fa-check-circle mr-1"></i>メールアドレスが認証されました';
+                        document.getElementById('verificationCodeSection').classList.add('hidden');
+                        document.getElementById('sendCodeBtn').classList.add('hidden');
+                        hideError();
+                    }
+                } catch (error) {
+                    showError(error.response?.data?.error || '認証に失敗しました');
+                    btn.innerHTML = '確認';
+                    btn.disabled = false;
+                }
+            }
+            
             // フォーム送信
             document.getElementById('signupForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                
+                // メール認証チェック
+                if (!emailVerified) {
+                    showError('メールアドレスの認証が必要です。「認証コード送信」ボタンを押して認証してください。');
+                    return;
+                }
                 
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData);
                 
                 const btn = document.getElementById('submitBtn');
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>登録中...';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>認証中...';
                 
                 try {
+                    // reCAPTCHA v3 トークン取得
+                    const recaptchaToken = await grecaptcha.execute('6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ', {action: 'signup'});
+                    
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>登録中...';
+                    
                     const response = await axios.post('/api/signup', {
                         organization_name: data.organization_name,
                         slug: data.slug,
@@ -328,7 +435,8 @@ routes.get('/signup', (c) => {
                         admin_name: data.admin_name,
                         username: data.username,
                         password: data.password,
-                        business_scope: data.business_scope
+                        business_scope: data.business_scope,
+                        recaptcha_token: recaptchaToken
                     });
                     
                     if (response.data.success) {

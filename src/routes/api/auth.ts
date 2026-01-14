@@ -3,8 +3,14 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser } from '../../utils/auth'
 import { hashPassword, verifyPassword, isPasswordHashed } from '../../utils/password'
+import { sendEmail, getEmailSettings } from '../../utils/email'
 
 const routes = new Hono<AppEnv>()
+
+// 6桁の認証コード生成
+function generateVerificationCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString()
+}
 
 // slug重複チェックAPI
 routes.get('/check-slug', async (c) => {
@@ -26,10 +32,58 @@ routes.get('/check-slug', async (c) => {
   return c.json({ available: !existing })
 })
 
+// reCAPTCHA検証ヘルパー関数
+async function verifyRecaptcha(token: string, secretKey: string): Promise<{success: boolean, score?: number, error?: string}> {
+  if (!token) {
+    return { success: false, error: 'reCAPTCHAトークンがありません' }
+  }
+  
+  try {
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `secret=${secretKey}&response=${token}`
+    })
+    
+    const result = await response.json() as any
+    console.log('reCAPTCHA verification result:', result)
+    
+    if (!result.success) {
+      return { success: false, error: 'reCAPTCHA検証に失敗しました' }
+    }
+    
+    // スコアが0.5未満の場合はボットと判定
+    if (result.score < 0.5) {
+      console.warn('Low reCAPTCHA score:', result.score)
+      return { success: false, score: result.score, error: 'セキュリティ検証に失敗しました。しばらく時間をおいてから再度お試しください。' }
+    }
+    
+    return { success: true, score: result.score }
+  } catch (error) {
+    console.error('reCAPTCHA verification error:', error)
+    return { success: false, error: 'セキュリティ検証中にエラーが発生しました' }
+  }
+}
+
 // サインアップAPI（シンプル版：14日間トライアル + 1件枠付与）
 routes.post('/signup', async (c) => {
-  const { DB } = c.env
+  const { DB, RECAPTCHA_SECRET_KEY } = c.env
   const data = await c.req.json()
+  
+  // reCAPTCHA検証（シークレットキーが設定されている場合のみ）
+  const recaptchaSecretKey = RECAPTCHA_SECRET_KEY || '6LcKKr8qAAAAAH-_QIIABuXKmCeCVMCXPvBFAXwt'
+  if (data.recaptcha_token) {
+    const recaptchaResult = await verifyRecaptcha(data.recaptcha_token, recaptchaSecretKey)
+    if (!recaptchaResult.success) {
+      console.warn('reCAPTCHA failed for signup:', recaptchaResult)
+      return c.json({ error: recaptchaResult.error || 'セキュリティ検証に失敗しました' }, 400)
+    }
+    console.log('reCAPTCHA passed with score:', recaptchaResult.score)
+  } else {
+    // トークンがない場合は拒否（セキュリティ強化）
+    console.warn('No reCAPTCHA token provided')
+    return c.json({ error: 'セキュリティ検証が必要です。ページを再読み込みしてお試しください。' }, 400)
+  }
   
   // バリデーション
   if (!data.organization_name || !data.email || !data.username || !data.password || !data.admin_name || !data.slug) {
@@ -67,6 +121,21 @@ routes.post('/signup', async (c) => {
   const existingUsername = await DB.prepare(`SELECT id FROM admin_users WHERE username = ?`).bind(data.username).first()
   if (existingUsername) {
     return c.json({ error: 'このユーザー名は既に使用されています。別のユーザー名をお試しください。' }, 400)
+  }
+  
+  // メール認証済みチェック（セキュリティ強化）
+  try {
+    const verifiedEmail = await DB.prepare(`
+      SELECT * FROM pending_verifications 
+      WHERE email = ? AND verified_at IS NOT NULL AND verified_at > datetime('now', '-30 minutes')
+    `).bind(data.email).first()
+    
+    if (!verifiedEmail) {
+      return c.json({ error: 'メールアドレスの認証が完了していません。認証コードを取得して認証を完了してください。' }, 400)
+    }
+  } catch (e) {
+    // pending_verificationsテーブルが存在しない場合はスキップ（初期セットアップ時）
+    console.log('Verification table check skipped:', e)
   }
   
   try {
@@ -141,6 +210,139 @@ routes.post('/signup', async (c) => {
   } catch (error: any) {
     console.error('Signup error:', error)
     return c.json({ error: '登録に失敗しました: ' + error.message }, 500)
+  }
+})
+
+// メール認証コード送信API（Step 1）
+routes.post('/signup/send-verification', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  // reCAPTCHA検証
+  const recaptchaSecretKey = c.env.RECAPTCHA_SECRET_KEY || '6LcKKr8qAAAAAH-_QIIABuXKmCeCVMCXPvBFAXwt'
+  if (data.recaptcha_token) {
+    const recaptchaResult = await verifyRecaptcha(data.recaptcha_token, recaptchaSecretKey)
+    if (!recaptchaResult.success) {
+      return c.json({ error: recaptchaResult.error || 'セキュリティ検証に失敗しました' }, 400)
+    }
+  } else {
+    return c.json({ error: 'セキュリティ検証が必要です' }, 400)
+  }
+  
+  // バリデーション
+  if (!data.email) {
+    return c.json({ error: 'メールアドレスを入力してください' }, 400)
+  }
+  
+  // メールアドレス形式チェック
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(data.email)) {
+    return c.json({ error: '有効なメールアドレスを入力してください' }, 400)
+  }
+  
+  // メールアドレス重複チェック
+  const existingEmail = await DB.prepare(`SELECT id FROM organizations WHERE email = ?`).bind(data.email).first()
+  if (existingEmail) {
+    return c.json({ error: 'このメールアドレスは既に登録されています' }, 400)
+  }
+  
+  // 認証コード生成
+  const verificationCode = generateVerificationCode()
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10分後に期限切れ
+  
+  try {
+    // pending_verificationsテーブルを作成（存在しない場合）
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS pending_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL UNIQUE,
+        verification_code TEXT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        verified_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    // 既存の認証コードを削除して新しいコードを挿入
+    await DB.prepare(`DELETE FROM pending_verifications WHERE email = ?`).bind(data.email).run()
+    await DB.prepare(`
+      INSERT INTO pending_verifications (email, verification_code, expires_at)
+      VALUES (?, ?, ?)
+    `).bind(data.email, verificationCode, expiresAt).run()
+    
+    // メール送信
+    const emailSettings = await getEmailSettings(DB)
+    if (emailSettings.apiKey) {
+      await sendEmail(emailSettings.apiKey, {
+        to: data.email,
+        subject: '【申請らくらく君】メールアドレス認証コード',
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1e40af;">メールアドレス認証</h2>
+            <p>申請らくらく君への登録ありがとうございます。</p>
+            <p>以下の認証コードを入力して、登録を完了してください。</p>
+            <div style="background: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+              <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1e40af;">${verificationCode}</span>
+            </div>
+            <p style="color: #6b7280; font-size: 14px;">※このコードは10分間有効です。</p>
+            <p style="color: #6b7280; font-size: 14px;">※心当たりがない場合は、このメールを無視してください。</p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+            <p style="color: #9ca3af; font-size: 12px;">申請らくらく君 - 補助金・助成金申請管理システム</p>
+          </div>
+        `,
+        from: emailSettings.fromEmail || 'noreply@shinsei-raku.com'
+      })
+    } else {
+      console.log('Email skipped: No API key. Code:', verificationCode)
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: '認証コードを送信しました。メールをご確認ください。',
+      // 開発時のみコードを返す（本番では削除）
+      // debug_code: verificationCode 
+    })
+    
+  } catch (error: any) {
+    console.error('Send verification error:', error)
+    return c.json({ error: '認証コードの送信に失敗しました' }, 500)
+  }
+})
+
+// メール認証コード確認API（Step 2）
+routes.post('/signup/verify-email', async (c) => {
+  const { DB } = c.env
+  const { email, code } = await c.req.json()
+  
+  if (!email || !code) {
+    return c.json({ error: 'メールアドレスと認証コードを入力してください' }, 400)
+  }
+  
+  try {
+    // 認証コード確認
+    const pending = await DB.prepare(`
+      SELECT * FROM pending_verifications 
+      WHERE email = ? AND verification_code = ? AND expires_at > datetime('now') AND verified_at IS NULL
+    `).bind(email, code).first()
+    
+    if (!pending) {
+      return c.json({ error: '認証コードが無効または期限切れです' }, 400)
+    }
+    
+    // 認証済みマークを付ける
+    await DB.prepare(`
+      UPDATE pending_verifications SET verified_at = CURRENT_TIMESTAMP WHERE email = ?
+    `).bind(email).run()
+    
+    return c.json({ 
+      success: true, 
+      message: 'メールアドレスが認証されました',
+      email_verified: true
+    })
+    
+  } catch (error: any) {
+    console.error('Verify email error:', error)
+    return c.json({ error: '認証に失敗しました' }, 500)
   }
 })
 
