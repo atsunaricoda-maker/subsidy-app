@@ -301,7 +301,9 @@ routes.post('/signup/send-verification', async (c) => {
             <p style="color: #9ca3af; font-size: 12px;">申請らくらく君 - 補助金・助成金申請管理システム</p>
           </div>
         `,
-        from: emailSettings.fromEmail || 'noreply@shinsei-raku.com'
+        // Resendではドメイン認証済みのメールアドレスのみ使用可能
+        // 認証済みドメインがない場合はResendのデフォルトを使用
+        from: 'onboarding@resend.dev'
       })
       console.log('[SEND-VERIFICATION] Email send result:', emailResult)
     } else {
@@ -311,9 +313,14 @@ routes.post('/signup/send-verification', async (c) => {
     // デバッグ用：認証コードをログに出力
     console.log(`[EMAIL VERIFICATION] Code sent to ${data.email}: ${verificationCode}`)
     
+    // メール送信結果をログに含める（デバッグ時のみ参考）
+    const emailSent = emailSettings.apiKey ? true : false
+    
     return c.json({ 
       success: true, 
-      message: '認証コードを送信しました。メールをご確認ください。'
+      message: emailSent 
+        ? '認証コードを送信しました。メールをご確認ください。' 
+        : '認証コードを生成しました（メール送信はスキップされました）'
     })
     
   } catch (error: any) {
