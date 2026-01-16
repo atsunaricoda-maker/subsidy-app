@@ -12,6 +12,62 @@ function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
+// メール送信テストAPI（デバッグ用）
+routes.post('/test-email', async (c) => {
+  const { DB } = c.env
+  const { email, test_secret } = await c.req.json()
+  
+  // シークレットキーで保護
+  if (test_secret !== 'DEBUG_EMAIL_TEST_2024') {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  if (!email) {
+    return c.json({ error: 'Email required' }, 400)
+  }
+  
+  try {
+    const emailSettings = await getEmailSettings(DB)
+    console.log('[TEST-EMAIL] Settings:', { 
+      hasApiKey: !!emailSettings.apiKey, 
+      fromEmail: emailSettings.fromEmail 
+    })
+    
+    if (!emailSettings.apiKey) {
+      return c.json({ 
+        success: false, 
+        error: 'No API key configured',
+        settings: { hasApiKey: false, fromEmail: emailSettings.fromEmail }
+      })
+    }
+    
+    const result = await sendEmail(emailSettings.apiKey, {
+      to: email,
+      subject: '【テスト】申請らくらく君 メール送信テスト',
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1e40af;">メール送信テスト</h2>
+          <p>このメールは申請らくらく君のメール送信テストです。</p>
+          <p>送信時刻: ${new Date().toISOString()}</p>
+        </div>
+      `,
+      from: 'onboarding@resend.dev'
+    })
+    
+    console.log('[TEST-EMAIL] Result:', result)
+    
+    return c.json({
+      success: result.success,
+      messageId: result.messageId,
+      error: result.error,
+      settings: { hasApiKey: true, fromEmail: emailSettings.fromEmail }
+    })
+  } catch (error: any) {
+    console.error('[TEST-EMAIL] Error:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 // slug重複チェックAPI
 routes.get('/check-slug', async (c) => {
   const { DB } = c.env
@@ -306,6 +362,18 @@ routes.post('/signup/send-verification', async (c) => {
         from: 'onboarding@resend.dev'
       })
       console.log('[SEND-VERIFICATION] Email send result:', emailResult)
+      
+      // メール送信失敗時のエラーハンドリング
+      if (!emailResult.success) {
+        console.error('[SEND-VERIFICATION] Email failed:', emailResult.error)
+        // Resendのドメイン未認証エラーの場合、特別なメッセージを返す
+        if (emailResult.error?.includes('verify a domain')) {
+          return c.json({ 
+            error: 'メール送信の設定が完了していません。管理者にお問い合わせください。',
+            debug_hint: 'Resend domain verification required'
+          }, 500)
+        }
+      }
     } else {
       console.log('[SEND-VERIFICATION] Email skipped: No API key. Code:', verificationCode)
     }
