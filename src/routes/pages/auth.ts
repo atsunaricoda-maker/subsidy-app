@@ -49,12 +49,6 @@ routes.get('/login', (c) => {
                     </p>
                 </div>
                 
-                <div class="mt-4 p-4 bg-blue-50 rounded-lg text-sm">
-                    <p class="font-medium text-blue-800 mb-2">デモ用ログイン情報：</p>
-                    <p class="text-blue-700">ユーザー名: <code class="bg-white px-2 py-1 rounded">admin</code></p>
-                    <p class="text-blue-700">パスワード: <code class="bg-white px-2 py-1 rounded">admin123</code></p>
-                </div>
-                
                 <div id="errorMessage" class="hidden mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm"></div>
                 
                 <!-- フッターリンク -->
