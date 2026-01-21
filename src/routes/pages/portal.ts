@@ -601,8 +601,8 @@ routes.get('/portal/:token', async (c) => {
             </div>
 
             <!-- AIアシスタント フローティングボタン -->
-            <!-- bottom-24 (6rem = 96px) にして下部コンテンツと被らないようにする -->
-            <div id="aiFloatingBtn" class="fixed bottom-24 right-4 z-40">
+            <!-- bottom-32 (8rem = 128px) にして書類リストと被らないようにする -->
+            <div id="aiFloatingBtn" class="fixed bottom-32 right-4 z-40">
                 <button onclick="openAiModal()" 
                         class="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-700 flex items-center gap-2">
                     <i class="fas fa-robot text-lg"></i>
