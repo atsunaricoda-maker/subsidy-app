@@ -2712,6 +2712,7 @@ routes.get('/', async (c) => {
             window.showDeleteChoiceDialog = showDeleteChoiceDialog;
             window.showToast = showToast;
             window.filterClients = filterClients;
+            window.openStatusModal = openStatusModal;
             window.toggleDepositFields = toggleDepositFields;
             window.toggleSuccessFeeFields = toggleSuccessFeeFields;
             window.toggleSuccessFeeType = toggleSuccessFeeType;

@@ -1081,7 +1081,7 @@ routes.get('/portal/:token', async (c) => {
                             icon: 'fa-yen-sign',
                             text: '手付金のお支払い',
                             description: '¥' + depositAmount.toLocaleString() + ' のお支払いをお願いします',
-                            action: "showBankTransferModal('¥" + depositAmount.toLocaleString() + "')",
+                            action: "showBankTransferModal(" + depositAmount + ", '手付金')",
                             priority: 1
                         });
                     }

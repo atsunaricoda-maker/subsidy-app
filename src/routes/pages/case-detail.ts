@@ -2261,14 +2261,14 @@ routes.get('/case/:id', async (c) => {
                                 <input type="hidden" name="invoiceId" value="\${inv.id}">
                                 
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">請求書タイトル</label>
-                                    <input type="text" name="title" value="\${inv.title || ''}" 
-                                           class="w-full px-3 py-2 border rounded-lg" placeholder="例: 手付金請求書">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">品目名</label>
+                                    <input type="text" name="title" value="\${inv.item_name || ''}" 
+                                           class="w-full px-3 py-2 border rounded-lg" placeholder="例: IT導入補助金申請 着手金">
                                 </div>
                                 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">請求金額（税抜）</label>
-                                    <input type="number" name="amount" value="\${inv.amount || 0}" 
+                                    <input type="number" name="amount" value="\${inv.subtotal || 0}" 
                                            class="w-full px-3 py-2 border rounded-lg" required>
                                 </div>
                                 
@@ -2307,10 +2307,12 @@ routes.get('/case/:id', async (c) => {
                         e.preventDefault();
                         const formData = new FormData(e.target);
                         try {
+                            const subtotal = parseInt(formData.get('amount')) || 0;
+                            const taxAmount = parseInt(formData.get('tax_amount')) || 0;
                             await axios.put(\`/api/invoices/\${invoiceId}\`, {
-                                title: formData.get('title'),
-                                amount: parseInt(formData.get('amount')) || 0,
-                                tax_amount: parseInt(formData.get('tax_amount')) || 0,
+                                item_name: formData.get('title'),
+                                subtotal: subtotal,
+                                tax_amount: taxAmount,
                                 due_date: formData.get('due_date') || null,
                                 notes: formData.get('notes')
                             });
