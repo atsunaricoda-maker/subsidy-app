@@ -1741,6 +1741,9 @@ routes.get('/case/:id', async (c) => {
                                         </div>
                                         <div class="flex gap-2">
                                             \${inv.status === 'draft' ? \`
+                                                <button onclick="editInvoice(\${inv.id})" class="bg-yellow-500 text-white px-3 py-1.5 rounded text-sm hover:bg-yellow-600">
+                                                    <i class="fas fa-edit mr-1"></i>編集
+                                                </button>
                                                 <button onclick="issueInvoice(\${inv.id})" class="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700">
                                                     <i class="fas fa-paper-plane mr-1"></i>発行
                                                 </button>
@@ -2233,6 +2236,96 @@ routes.get('/case/:id', async (c) => {
                 }
             }
             window.issueInvoice = issueInvoice;
+            
+            // 請求書を編集
+            async function editInvoice(invoiceId) {
+                try {
+                    const response = await axios.get(\`/api/invoices/\${invoiceId}\`);
+                    const inv = response.data;
+                    
+                    // 編集モーダルを表示
+                    const modal = document.createElement('div');
+                    modal.id = 'editInvoiceModal';
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+                    modal.innerHTML = \`
+                        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                            <div class="p-6 border-b sticky top-0 bg-white">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-bold"><i class="fas fa-edit mr-2 text-yellow-500"></i>請求書を編集</h3>
+                                    <button onclick="document.getElementById('editInvoiceModal').remove()" class="text-gray-400 hover:text-gray-600">
+                                        <i class="fas fa-times text-xl"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <form id="editInvoiceForm" class="p-6 space-y-4">
+                                <input type="hidden" name="invoiceId" value="\${inv.id}">
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">請求書タイトル</label>
+                                    <input type="text" name="title" value="\${inv.title || ''}" 
+                                           class="w-full px-3 py-2 border rounded-lg" placeholder="例: 手付金請求書">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">請求金額（税抜）</label>
+                                    <input type="number" name="amount" value="\${inv.amount || 0}" 
+                                           class="w-full px-3 py-2 border rounded-lg" required>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">消費税額</label>
+                                    <input type="number" name="tax_amount" value="\${inv.tax_amount || 0}" 
+                                           class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">支払期限</label>
+                                    <input type="date" name="due_date" value="\${inv.due_date ? inv.due_date.split('T')[0] : ''}" 
+                                           class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">備考</label>
+                                    <textarea name="notes" rows="3" class="w-full px-3 py-2 border rounded-lg" 
+                                              placeholder="備考があれば入力してください">\${inv.notes || ''}</textarea>
+                                </div>
+                                
+                                <div class="flex justify-end gap-3 pt-4 border-t">
+                                    <button type="button" onclick="document.getElementById('editInvoiceModal').remove()" 
+                                            class="px-4 py-2 border rounded-lg hover:bg-gray-50">キャンセル</button>
+                                    <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">
+                                        <i class="fas fa-save mr-1"></i>保存
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    \`;
+                    document.body.appendChild(modal);
+                    
+                    // フォーム送信処理
+                    document.getElementById('editInvoiceForm').addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.target);
+                        try {
+                            await axios.put(\`/api/invoices/\${invoiceId}\`, {
+                                title: formData.get('title'),
+                                amount: parseInt(formData.get('amount')) || 0,
+                                tax_amount: parseInt(formData.get('tax_amount')) || 0,
+                                due_date: formData.get('due_date') || null,
+                                notes: formData.get('notes')
+                            });
+                            showToast('請求書を更新しました');
+                            document.getElementById('editInvoiceModal').remove();
+                            loadInvoices();
+                        } catch (error) {
+                            alert('更新に失敗しました: ' + (error.response?.data?.error || error.message));
+                        }
+                    });
+                } catch (error) {
+                    alert('請求書情報の取得に失敗しました');
+                }
+            }
+            window.editInvoice = editInvoice;
             
             // 入金確認
             async function markInvoicePaid(invoiceId) {

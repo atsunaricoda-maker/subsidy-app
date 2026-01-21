@@ -891,11 +891,19 @@ routes.get('/portal/:token', async (c) => {
                     const cases = res.data || [];
                     const selector = document.getElementById('caseSelector');
                     if (selector && cases.length > 0) {
-                        selector.innerHTML = cases.map(c => 
-                            '<option value="' + c.access_token + '"' + (c.id === CASE_ID ? ' selected' : '') + '>' +
-                            (c.subsidy_type_name || '案件 #' + c.id) +
-                            '</option>'
-                        ).join('');
+                        // 案件が1件のみの場合はセレクターを非表示
+                        if (cases.length === 1) {
+                            selector.style.display = 'none';
+                        } else {
+                            selector.style.display = 'block';
+                            selector.innerHTML = cases.map(c => 
+                                '<option value="' + c.access_token + '"' + (c.id === CASE_ID ? ' selected' : '') + '>' +
+                                (c.subsidy_type_name || '案件 #' + c.id) +
+                                '</option>'
+                            ).join('');
+                        }
+                    } else {
+                        selector.style.display = 'none';
                     }
                 } catch (e) {
                     console.log('Failed to load cases for selector');
@@ -5090,6 +5098,8 @@ routes.get('/portal/:token', async (c) => {
             window.showWritingGuide = showWritingGuide;
             window.applyTemplate = applyTemplate;
             window.showMessage = showMessage;
+            window.switchMainTab = switchMainTab;
+            window.showBankTransferModal = showBankTransferModal;
             
             // ===============================
             // 書類作成機能
