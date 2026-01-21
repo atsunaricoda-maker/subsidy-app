@@ -3297,7 +3297,7 @@ routes.get('/portal/:token', async (c) => {
                         formData.append('uploaded_by', 'client');
                         formData.append('case_id', CASE_ID);
                         
-                        const response = await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
+                        const response = await axios.post(\`/api/portal/clients/\${CLIENT_ID}/documents/upload\`, formData, {
                             headers: {
                                 'Content-Type': 'multipart/form-data'
                             }
@@ -3377,7 +3377,7 @@ routes.get('/portal/:token', async (c) => {
                         formData.append('uploaded_by', 'client');
                         formData.append('case_id', CASE_ID);
                         
-                        const response = await axios.post(\`/api/clients/\${CLIENT_ID}/documents/upload\`, formData, {
+                        const response = await axios.post(\`/api/portal/clients/\${CLIENT_ID}/documents/upload\`, formData, {
                             headers: {
                                 'Content-Type': 'multipart/form-data'
                             }

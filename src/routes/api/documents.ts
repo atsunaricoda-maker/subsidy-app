@@ -460,4 +460,131 @@ routes.put('/documents/:id/status', async (c) => {
   return c.json({ success: true, updated })
 })
 
+// ポータルからの書類アップロード（認証なし、クライアントIDで検証）
+routes.post('/portal/clients/:id/documents/upload', async (c) => {
+  const { DB, R2 } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    // クライアントの存在確認
+    const clientCheck = await DB.prepare(`
+      SELECT id, name, company_name, organization_id FROM clients WHERE id = ?
+    `).bind(id).first() as any
+    
+    if (!clientCheck) {
+      return c.json({ error: 'クライアントが見つかりません' }, 404)
+    }
+    
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    const documentType = formData.get('document_type') as string
+    const caseId = formData.get('case_id') as string
+    
+    if (!file) {
+      return c.json({ error: 'ファイルが選択されていません' }, 400)
+    }
+    
+    if (!documentType) {
+      return c.json({ error: '書類タイプが指定されていません' }, 400)
+    }
+    
+    // ファイルセキュリティ検証
+    const validation = await validateFile(file)
+    if (!validation.valid) {
+      console.warn(`[FILE SECURITY] Portal upload rejected for client ${id}: ${validation.error}`)
+      return c.json({ error: validation.error }, 400)
+    }
+    
+    if (validation.warnings && validation.warnings.length > 0) {
+      console.log(`[FILE SECURITY] Portal upload warnings for client ${id}:`, validation.warnings)
+    }
+    
+    // R2にファイル保存
+    const timestamp = Date.now()
+    const safeFileName = sanitizeFileName(file.name)
+    const fileName = `${timestamp}-${safeFileName}`
+    const filePath = `documents/${id}/${fileName}`
+    
+    await R2.put(filePath, file.stream(), {
+      httpMetadata: {
+        contentType: file.type
+      }
+    })
+    
+    // メタデータをD1に保存
+    const result = await DB.prepare(`
+      INSERT INTO documents (client_id, case_id, document_type, file_name, file_path, file_size, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id,
+      caseId || null,
+      documentType,
+      safeFileName,
+      filePath,
+      file.size,
+      'client'
+    ).run()
+    
+    // 管理者に通知を作成
+    try {
+      const clientName = clientCheck.company_name || clientCheck.name || '顧客'
+      await DB.prepare(`
+        INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        'document_upload',
+        '書類がアップロードされました',
+        `${clientName}様が「${documentType}」をアップロードしました`,
+        id,
+        'clients',
+        clientCheck.organization_id
+      ).run()
+    } catch (notifError) {
+      console.error('Failed to create notification:', notifError)
+    }
+    
+    // 管理者にメール通知を送信
+    try {
+      const emailSettings = await getEmailSettings(DB)
+      if (emailSettings.enabled && emailSettings.apiKey && caseId) {
+        const caseInfo = await DB.prepare(`
+          SELECT c.case_number as case_name, o.slug, o.email as admin_email,
+                 st.name as subsidy_name
+          FROM cases c
+          JOIN organizations o ON c.organization_id = o.id
+          LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+          WHERE c.id = ?
+        `).bind(caseId).first() as any
+        
+        if (caseInfo?.admin_email) {
+          const adminUrl = `https://${caseInfo.slug}.shinsei-raku.com/cases/${caseId}`
+          const clientName = clientCheck.company_name || clientCheck.name || '顧客'
+          
+          await sendEmail({
+            apiKey: emailSettings.apiKey,
+            to: caseInfo.admin_email,
+            from: emailSettings.fromEmail || 'noreply@resend.dev',
+            subject: `【書類アップロード】${clientName}様が「${documentType}」をアップロードしました`,
+            html: documentUploadedEmail(clientName, documentType, adminUrl)
+          })
+        }
+      }
+    } catch (emailError) {
+      console.error('Failed to send email notification:', emailError)
+    }
+    
+    return c.json({ 
+      success: true,
+      id: result.meta.last_row_id,
+      message: 'ファイルがアップロードされました'
+    })
+  } catch (error) {
+    console.error('Portal document upload error:', error)
+    return c.json({ 
+      error: 'アップロードに失敗しました',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500)
+  }
+})
+
 export default routes
