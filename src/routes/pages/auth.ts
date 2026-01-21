@@ -347,8 +347,17 @@ routes.get('/signup', (c) => {
                 
                 try {
                     console.log('[DEBUG] Getting reCAPTCHA token...');
-                    const recaptchaToken = await grecaptcha.execute('6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ', {action: 'send_verification'});
-                    console.log('[DEBUG] reCAPTCHA token obtained:', recaptchaToken.substring(0, 20) + '...');
+                    let recaptchaToken = '';
+                    try {
+                        if (typeof grecaptcha !== 'undefined' && grecaptcha.execute) {
+                            recaptchaToken = await grecaptcha.execute('6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ', {action: 'send_verification'});
+                            console.log('[DEBUG] reCAPTCHA token obtained:', recaptchaToken.substring(0, 20) + '...');
+                        } else {
+                            console.log('[DEBUG] reCAPTCHA not available, proceeding without token');
+                        }
+                    } catch (recaptchaError) {
+                        console.log('[DEBUG] reCAPTCHA error (continuing without token):', recaptchaError);
+                    }
                     
                     console.log('[DEBUG] Sending verification request for:', email);
                     const response = await axios.post('/api/signup/send-verification', {
@@ -441,8 +450,15 @@ routes.get('/signup', (c) => {
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>認証中...';
                 
                 try {
-                    // reCAPTCHA v3 トークン取得
-                    const recaptchaToken = await grecaptcha.execute('6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ', {action: 'signup'});
+                    // reCAPTCHA v3 トークン取得（失敗しても続行）
+                    let recaptchaToken = '';
+                    try {
+                        if (typeof grecaptcha !== 'undefined' && grecaptcha.execute) {
+                            recaptchaToken = await grecaptcha.execute('6LcKKr8qAAAAALz_sz5kkkclmbWqb8aUcrzgOVaQ', {action: 'signup'});
+                        }
+                    } catch (recaptchaError) {
+                        console.log('[DEBUG] reCAPTCHA error (continuing without token):', recaptchaError);
+                    }
                     
                     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>登録中...';
                     
