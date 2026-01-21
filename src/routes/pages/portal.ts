@@ -87,8 +87,9 @@ routes.get('/portal/:token', async (c) => {
                             </select>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button onclick="openAiModal()" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all" title="AIサポート">
+                            <button onclick="openAiModal()" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-xl flex items-center gap-2 transition-all shadow-lg hover:shadow-xl hover:scale-105" title="AIサポート">
                                 <i class="fas fa-robot"></i>
+                                <span class="hidden sm:inline text-sm font-medium">AIに相談</span>
                             </button>
                             <button onclick="openNewApplicationModal()" 
                                     class="bg-white text-green-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition-all hover:scale-105">
@@ -600,16 +601,6 @@ routes.get('/portal/:token', async (c) => {
                 </div>
             </div>
 
-            <!-- AIアシスタント フローティングボタン -->
-            <!-- bottom-32 (8rem = 128px) にして書類リストと被らないようにする -->
-            <div id="aiFloatingBtn" class="fixed bottom-32 right-4 z-40">
-                <button onclick="openAiModal()" 
-                        class="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-700 flex items-center gap-2">
-                    <i class="fas fa-robot text-lg"></i>
-                    <span class="hidden sm:inline text-xs font-medium">AIに相談</span>
-                </button>
-            </div>
-
             <!-- AIアシスタント モーダル -->
             <div id="aiModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-end sm:items-center justify-center">
                 <div class="bg-white w-full sm:w-[500px] sm:max-w-lg sm:rounded-lg sm:m-4 rounded-t-2xl max-h-[85vh] flex flex-col">
@@ -890,12 +881,6 @@ routes.get('/portal/:token', async (c) => {
                 // 書類作成タブの場合、資格ステータスを取得して表示切り替え
                 if (tabId === 'create') {
                     loadDocumentCreationMode();
-                }
-                
-                // やり取りタブの時はAIボタンを非表示にする
-                const aiBtn = document.getElementById('aiFloatingBtn');
-                if (aiBtn) {
-                    aiBtn.style.display = (tabId === 'messages') ? 'none' : 'block';
                 }
             }
             
