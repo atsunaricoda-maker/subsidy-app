@@ -369,7 +369,14 @@ routes.get('/signup', (c) => {
                 } catch (error) {
                     console.error('[DEBUG] Error:', error);
                     console.error('[DEBUG] Error response:', error.response?.data);
-                    showError(error.response?.data?.error || '認証コードの送信に失敗しました。コンソールを確認してください。');
+                    const errorMsg = error.response?.data?.error || '認証コードの送信に失敗しました。';
+                    const debugHint = error.response?.data?.debug_hint;
+                    let fullError = errorMsg;
+                    if (debugHint) {
+                        console.error('[DEBUG] Hint:', debugHint);
+                        fullError += '\\n（詳細: ' + debugHint + '）';
+                    }
+                    showError(fullError);
                     btn.innerHTML = '認証コード送信';
                     btn.disabled = false;
                 }

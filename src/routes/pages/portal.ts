@@ -435,14 +435,18 @@ routes.get('/portal/:token', async (c) => {
                             </div>
                             <div id="clientCommunications" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm"></div>
                             <div class="p-3 border-t flex-shrink-0">
-                                <form id="clientMessageForm" class="flex gap-2">
-                                    <input type="text" id="clientMessageInput" 
-                                           placeholder="メッセージを入力..." 
-                                           class="flex-1 px-3 py-2 border rounded text-sm" required>
-                                    <button type="submit" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700">
+                                <form id="clientMessageForm" class="flex gap-2 items-end">
+                                    <textarea id="clientMessageInput" 
+                                           placeholder="メッセージを入力...（Shift+Enterで改行）" 
+                                           class="flex-1 px-3 py-2 border rounded text-sm resize-none" 
+                                           rows="1"
+                                           style="min-height: 38px; max-height: 120px;"
+                                           required></textarea>
+                                    <button type="submit" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 h-[38px]">
                                         <i class="fas fa-paper-plane"></i>
                                     </button>
                                 </form>
+                                <p class="text-xs text-gray-400 mt-1">Shift+Enterで改行、Enterで送信</p>
                             </div>
                         </div>
                     </div>
@@ -597,7 +601,8 @@ routes.get('/portal/:token', async (c) => {
             </div>
 
             <!-- AIアシスタント フローティングボタン -->
-            <div id="aiFloatingBtn" class="fixed bottom-20 right-4 z-40">
+            <!-- bottom-24 (6rem = 96px) にして下部コンテンツと被らないようにする -->
+            <div id="aiFloatingBtn" class="fixed bottom-24 right-4 z-40">
                 <button onclick="openAiModal()" 
                         class="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-700 flex items-center gap-2">
                     <i class="fas fa-robot text-lg"></i>
@@ -3202,10 +3207,18 @@ routes.get('/portal/:token', async (c) => {
                 
                 container.innerHTML = comms.map(comm => {
                     const isClient = comm.sender_type === 'client';
+                    // メッセージ内の改行をHTMLに変換（XSS対策でエスケープも行う）
+                    const escapedMessage = (comm.message || '')
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#039;')
+                        .replace(/\\n/g, '<br>');
                     return \`
                         <div class="flex \${isClient ? 'justify-end' : 'justify-start'}">
                             <div class="max-w-[85%] \${isClient ? 'bg-green-100' : 'bg-gray-100'} rounded-lg px-2.5 py-1.5">
-                                <div class="text-xs">\${comm.message}</div>
+                                <div class="text-xs whitespace-pre-wrap">\${escapedMessage}</div>
                                 <div class="text-xs text-gray-400 mt-0.5">\${comm.sender_name} · \${formatJSTTime(comm.created_at)}</div>
                             </div>
                         </div>
@@ -3215,6 +3228,23 @@ routes.get('/portal/:token', async (c) => {
                 container.scrollTop = container.scrollHeight;
             }
 
+            // メッセージ入力欄の自動リサイズとEnterキー送信
+            const messageInput = document.getElementById('clientMessageInput');
+            
+            // 入力時に自動リサイズ
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
+            
+            // Enterキーで送信（Shift+Enterで改行）
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    document.getElementById('clientMessageForm').dispatchEvent(new Event('submit', { cancelable: true }));
+                }
+            });
+            
             document.getElementById('clientMessageForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const message = document.getElementById('clientMessageInput').value;
@@ -3227,6 +3257,8 @@ routes.get('/portal/:token', async (c) => {
                     });
                     
                     document.getElementById('clientMessageInput').value = '';
+                    // 高さをリセット
+                    document.getElementById('clientMessageInput').style.height = '38px';
                     loadCommunications();
                 } catch (error) {
                     console.error('メッセージ送信エラー:', error);

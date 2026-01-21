@@ -9,6 +9,8 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/webp',
   'image/heic',
   'image/heif',
+  'image/bmp',
+  'image/tiff',
   // PDF
   'application/pdf',
   // Office文書
@@ -24,6 +26,11 @@ const ALLOWED_MIME_TYPES = new Set([
   // ZIP（注意が必要）
   'application/zip',
   'application/x-zip-compressed',
+  // その他（ブラウザによるMIMEタイプの違いに対応）
+  'application/octet-stream', // 不明なバイナリ（警告付きで許可）
+  // Rich Text
+  'application/rtf',
+  'text/rtf',
 ])
 
 // 危険な拡張子
@@ -151,9 +158,21 @@ export async function validateFile(file: File): Promise<FileValidationResult> {
     if (!file.type) {
       warnings.push('ファイルタイプが不明です。')
     } else {
-      return {
-        valid: false,
-        error: `このファイル形式（${file.type}）はアップロードできません。画像、PDF、Office文書のみ対応しています。`
+      // application/octet-streamは拡張子で判断
+      if (file.type === 'application/octet-stream') {
+        const safeExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heic', '.zip']
+        if (!safeExtensions.includes(extension)) {
+          return {
+            valid: false,
+            error: `このファイル形式（${extension}）はアップロードできません。`
+          }
+        }
+        warnings.push('ファイルタイプが不明確ですが、拡張子に基づいて許可されました。')
+      } else {
+        return {
+          valid: false,
+          error: `このファイル形式（${file.type}）はアップロードできません。画像、PDF、Office文書のみ対応しています。`
+        }
       }
     }
   }

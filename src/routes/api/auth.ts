@@ -373,9 +373,19 @@ routes.post('/signup/send-verification', async (c) => {
             debug_hint: 'Resend domain verification required'
           }, 500)
         }
+        // その他のメール送信エラー
+        return c.json({ 
+          error: '認証コードの送信に失敗しました。しばらく時間をおいてから再度お試しください。',
+          debug_hint: emailResult.error
+        }, 500)
       }
     } else {
       console.log('[SEND-VERIFICATION] Email skipped: No API key. Code:', verificationCode)
+      // API Keyが設定されていない場合はエラーを返す
+      return c.json({ 
+        error: 'メール送信の設定が完了していません。管理者にお問い合わせください。',
+        debug_hint: 'No Resend API key configured'
+      }, 500)
     }
     
     // デバッグ用：認証コードをログに出力

@@ -2728,12 +2728,30 @@ routes.get('/', async (c) => {
             loadData();
             restoreRightTab();
             
-            // URLパラメータでopenNewCase=trueの場合、新規案件モーダルを開く
+            // URLパラメータでopenNewCaseがある場合、新規案件モーダルを開く
+            // openNewCase=true の場合は通常の新規案件登録
+            // openNewCase=CLIENT_ID (数値)の場合はその顧客を自動選択して新規案件登録
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('openNewCase') === 'true') {
+            const openNewCaseParam = urlParams.get('openNewCase');
+            if (openNewCaseParam) {
                 // データの読み込みが完了してからモーダルを開く
                 setTimeout(() => {
                     openNewCaseModal();
+                    
+                    // openNewCaseがクライアントID（数値）の場合、そのクライアントを自動選択
+                    const clientIdToSelect = parseInt(openNewCaseParam);
+                    if (!isNaN(clientIdToSelect) && clientIdToSelect > 0) {
+                        // 既存顧客選択モードに設定
+                        setTimeout(() => {
+                            document.querySelector('input[name="customer_type"][value="existing"]').checked = true;
+                            toggleCustomerType();
+                            const select = document.getElementById('existingClientSelect');
+                            if (select) {
+                                select.value = clientIdToSelect;
+                            }
+                        }, 100);
+                    }
+                    
                     // URLからパラメータを削除
                     history.replaceState({}, document.title, window.location.pathname);
                 }, 500);
