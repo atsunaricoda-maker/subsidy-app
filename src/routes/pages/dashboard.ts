@@ -2382,16 +2382,10 @@ routes.get('/', async (c) => {
             
             // 特定顧客に対して新規案件モーダルを開く
             function openNewCaseModalForClient(clientId, clientName) {
+                // クライアントIDを保存してからモーダルを開く
+                // loadExistingClients()完了後に自動選択される
+                window.pendingClientIdToSelect = clientId;
                 openNewCaseModal();
-                // 既存顧客を選択状態にする
-                setTimeout(() => {
-                    document.querySelector('input[name="customer_type"][value="existing"]').checked = true;
-                    toggleCustomerType();
-                    const select = document.getElementById('existingClientSelect');
-                    if (select) {
-                        select.value = clientId;
-                    }
-                }, 100);
             }
             
             // 案件ステータス更新
