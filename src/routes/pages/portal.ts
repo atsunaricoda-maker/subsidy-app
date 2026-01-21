@@ -1127,11 +1127,27 @@ routes.get('/portal/:token', async (c) => {
                                 (t.status === 'pending' || t.status === 'in_progress')
                             );
                             customerTasks.forEach(task => {
+                                // タスク名に基づいて適切なアクションを設定
+                                let action = "switchMainTab('home')";
+                                let icon = 'fa-tasks';
+                                const taskNameLower = (task.task_name || '').toLowerCase();
+                                
+                                if (taskNameLower.includes('書類') || taskNameLower.includes('添付') || taskNameLower.includes('アップロード')) {
+                                    action = "switchMainTab('documents')";
+                                    icon = 'fa-file-upload';
+                                } else if (taskNameLower.includes('ヒアリング') || taskNameLower.includes('質問') || taskNameLower.includes('回答')) {
+                                    action = "switchMainTab('hearing')";
+                                    icon = 'fa-clipboard-list';
+                                } else if (taskNameLower.includes('支払') || taskNameLower.includes('振込') || taskNameLower.includes('入金')) {
+                                    action = "showPaymentSection()";
+                                    icon = 'fa-yen-sign';
+                                }
+                                
                                 nextActions.push({
-                                    icon: 'fa-tasks',
+                                    icon: icon,
                                     text: task.task_name,
                                     description: task.end_date ? '期限: ' + task.end_date : '対応をお願いします',
-                                    action: "switchMainTab('home')",
+                                    action: action,
                                     priority: 3
                                 });
                             });
@@ -5091,6 +5107,19 @@ routes.get('/portal/:token', async (c) => {
             window.showPaymentTransferModal = showPaymentTransferModal;
             window.showInvoicePaymentModal = showInvoicePaymentModal;
             window.reportInvoiceTransfer = reportInvoiceTransfer;
+            
+            // 支払いセクションへ移動
+            function showPaymentSection() {
+                switchMainTab('home');
+                // 少し待ってからスクロール
+                setTimeout(() => {
+                    const paymentSection = document.getElementById('paymentReportSection');
+                    if (paymentSection) {
+                        paymentSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }, 300);
+            }
+            window.showPaymentSection = showPaymentSection;
             window.switchHearingCategory = switchHearingCategory;
             window.useExampleById = useExampleById;
             window.showWritingGuide = showWritingGuide;
