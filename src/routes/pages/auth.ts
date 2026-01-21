@@ -20,7 +20,7 @@ routes.get('/login', (c) => {
         <div class="min-h-screen flex items-center justify-center">
             <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
                 <div class="text-center mb-8">
-                    <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
+                    <img src="/static/logo.png" alt="申請らくらく君" class="w-24 h-auto mx-auto mb-4">
                     <h1 class="text-2xl font-bold text-gray-800">申請らくらく君</h1>
                     <p class="text-sm text-gray-600 mt-2">管理者ログイン</p>
                 </div>
@@ -114,7 +114,7 @@ routes.get('/signup', (c) => {
             <div class="max-w-xl mx-auto">
                 <!-- ヘッダー -->
                 <div class="text-center mb-8">
-                    <i class="fas fa-file-invoice-dollar text-5xl text-blue-600 mb-4"></i>
+                    <img src="/static/logo.png" alt="申請らくらく君" class="w-28 h-auto mx-auto mb-4">
                     <h1 class="text-3xl font-bold text-gray-800">申請らくらく君</h1>
                     <p class="text-gray-600 mt-2">14日間の無料トライアル（1件分）で今すぐ始めましょう</p>
                 </div>

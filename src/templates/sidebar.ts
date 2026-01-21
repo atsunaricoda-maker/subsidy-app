@@ -7,10 +7,10 @@ export function generateSidebar(activePage: string = '') {
   return `
     <aside id="sidebar" class="fixed inset-y-0 left-0 w-52 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
         <div class="p-3 border-b border-blue-700 flex-shrink-0">
-            <h1 class="text-base font-bold flex items-center gap-2">
-                <i class="fas fa-file-invoice-dollar"></i>
-                <span>申請らくらく君</span>
-            </h1>
+            <a href="/" class="flex items-center gap-2">
+                <img src="/static/logo.png" alt="申請らくらく君" class="w-8 h-8 rounded">
+                <span class="text-base font-bold">申請らくらく君</span>
+            </a>
         </div>
         
         <nav class="p-2 space-y-0.5 flex-1 overflow-y-auto">
