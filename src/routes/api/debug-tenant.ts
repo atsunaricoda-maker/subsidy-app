@@ -32,6 +32,53 @@ routes.get('/debug/tenant-status', async (c) => {
     GROUP BY organization_id
   `).all()
   
+  // 顧客のorganization_id分布
+  const clientDistribution = await DB.prepare(`
+    SELECT organization_id, COUNT(*) as count 
+    FROM clients 
+    GROUP BY organization_id
+  `).all()
+  
+  // 顧客数（effectiveOrgIdでフィルタ）
+  let filteredClientCount = null
+  if (effectiveOrgId) {
+    const fc = await DB.prepare(`SELECT COUNT(*) as count FROM clients WHERE organization_id = ?`).bind(effectiveOrgId).first()
+    filteredClientCount = fc?.count ?? 0
+  }
+  
+  // subsidy_guidelinesテーブルの状態
+  let guidelinesInfo = null
+  try {
+    const gl = await DB.prepare(`SELECT COUNT(*) as count FROM subsidy_guidelines`).first()
+    guidelinesInfo = { count: gl?.count ?? 0 }
+  } catch (e: any) {
+    guidelinesInfo = { error: e.message }
+  }
+  
+  // clients APIクエリのテスト（LEFT JOINを含む）
+  let clientsQueryTest = null
+  if (effectiveOrgId) {
+    try {
+      const testResult = await DB.prepare(`
+        SELECT c.id, c.name, c.organization_id, c.subsidy_type_id,
+               sg.application_end_date,
+               sg.max_amount
+        FROM clients c
+        LEFT JOIN subsidy_guidelines sg ON c.subsidy_type_id = sg.subsidy_type_id AND sg.status = 'active'
+        WHERE c.organization_id = ?
+        ORDER BY c.created_at DESC
+        LIMIT 5
+      `).bind(effectiveOrgId).all()
+      clientsQueryTest = {
+        success: true,
+        count: testResult.results?.length ?? 0,
+        sample: testResult.results?.slice(0, 3)
+      }
+    } catch (e: any) {
+      clientsQueryTest = { success: false, error: e.message }
+    }
+  }
+  
   return c.json({
     headers: {
       'x-original-host': originalHost,
@@ -39,17 +86,25 @@ routes.get('/debug/tenant-status', async (c) => {
     },
     middleware: {
       tenantOrgId,
+      tenantOrgIdType: typeof tenantOrgId,
       tenantSlug,
       tenantOrg
     },
     user: user ? {
       id: user.id,
       username: user.username,
-      organization_id: user.organization_id
+      organization_id: user.organization_id,
+      organization_id_type: typeof user.organization_id,
+      role: user.role
     } : null,
     effectiveOrgId,
+    effectiveOrgIdType: typeof effectiveOrgId,
     organizations: orgs.results,
-    caseDistribution: caseDistribution.results
+    clientDistribution: clientDistribution.results,
+    caseDistribution: caseDistribution.results,
+    filteredClientCount,
+    guidelinesInfo,
+    clientsQueryTest
   })
 })
 

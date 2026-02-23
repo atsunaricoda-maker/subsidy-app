@@ -27,6 +27,12 @@ routes.get('/admin/subscription', async (c) => {
             ${generateSidebar('subscription')}
             
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">プラン・枠管理</span>
+                </div>
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
@@ -570,7 +576,7 @@ routes.get('/admin/subscription', async (c) => {
                                 <h3 class="text-lg font-bold text-gray-900">\${pkg.package_name}</h3>
                                 <p class="text-3xl font-bold text-gray-900 my-3">¥\${pkg.price.toLocaleString()}</p>
                                 <p class="text-sm text-gray-500 mb-4">1枠あたり ¥\${perSlot.toLocaleString()}</p>
-                                <button onclick="purchaseSlots(\${pkg.id}, '\${pkg.package_name}', \${pkg.price})" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
+                                <button onclick="purchaseSlots('\${pkg.package_code}', '\${pkg.package_name}', \${pkg.price})" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">
                                     <i class="fas fa-shopping-cart mr-2"></i>購入する
                                 </button>
                             </div>
@@ -666,20 +672,11 @@ routes.get('/admin/subscription', async (c) => {
             }
             
             // Stripe決済で追加枠購入
-            async function purchaseSlots(packageId, name, price) {
-                // パッケージIDをSlot パッケージ名に変換（DBのslot_packagesと一致）
-                const slotPackageMap = { 1: 'slot_1', 2: 'slot_3', 3: 'slot_10' };
-                const slotPackage = slotPackageMap[packageId];
-                
-                if (!slotPackage) {
-                    alert('無効なパッケージです');
-                    return;
-                }
-                
+            async function purchaseSlots(packageCode, name, price) {
                 if (!confirm(name + '（¥' + price.toLocaleString() + '）を購入しますか？\\n\\nStripe決済画面に移動します。\\n※追加購入した枠は無期限で使用できます。')) return;
                 
                 try {
-                    const response = await axios.post('/api/stripe/create-slot-checkout', { slot_package: slotPackage });
+                    const response = await axios.post('/api/stripe/create-slot-checkout', { slot_package: packageCode });
                     if (response.data.checkout_url) {
                         window.location.href = response.data.checkout_url;
                     } else {
@@ -752,6 +749,12 @@ routes.get('/admin/settings', async (c) => {
             ${generateSidebar('settings')}
             
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">システム設定</span>
+                </div>
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
@@ -1585,6 +1588,12 @@ routes.get('/admin/payments', async (c) => {
             ${generateSidebar('payments')}
             
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">支払い管理</span>
+                </div>
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">

@@ -226,6 +226,12 @@ routes.get('/admin/statistics', async (c) => {
             ${generateSidebar('statistics')}
             
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">統計情報</span>
+                </div>
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">

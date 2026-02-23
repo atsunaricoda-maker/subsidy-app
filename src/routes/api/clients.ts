@@ -97,48 +97,57 @@ routes.get('/clients', async (c) => {
     return c.json({ error: '組織が特定できません' }, 401)
   }
   
-  // 補助金の公募要領情報もJOINして取得
-  let query = `
-    SELECT c.*, 
-           sg.application_end_date,
-           sg.max_amount,
-           sg.subsidy_rate,
-           sg.fiscal_year
-    FROM clients c
-    LEFT JOIN subsidy_guidelines sg ON c.subsidy_type_id = sg.subsidy_type_id AND sg.status = 'active'
-    WHERE c.organization_id = ?
-  `
-  let params: any[] = [orgId]
-  
-  // adminロール以外は自分が担当の案件のみ表示
-  if (user && user.role !== 'admin') {
-    query += ` AND c.assigned_to = ?`
-    params.push(user.username)
+  try {
+    // 顧客一覧を取得（LEFT JOINによる重複を防ぐためサブクエリで最新ガイドラインのみ取得）
+    let query = `
+      SELECT c.*, 
+             sg.application_end_date,
+             sg.max_amount,
+             sg.subsidy_rate,
+             sg.fiscal_year
+      FROM clients c
+      LEFT JOIN subsidy_guidelines sg ON sg.id = (
+        SELECT sg2.id FROM subsidy_guidelines sg2 
+        WHERE sg2.subsidy_type_id = c.subsidy_type_id AND sg2.status = 'active'
+        ORDER BY sg2.id DESC LIMIT 1
+      )
+      WHERE c.organization_id = ?
+    `
+    let params: any[] = [orgId]
+    
+    // adminロール以外は自分が担当の顧客、または担当者未設定の顧客を表示
+    if (user && user.role !== 'admin') {
+      query += ` AND (c.assigned_to = ? OR c.assigned_to IS NULL)`
+      params.push(user.username)
+    }
+    
+    query += ` ORDER BY c.created_at DESC`
+    
+    const result = await DB.prepare(query).bind(...params).all()
+    
+    // 案件情報を含める場合
+    if (includeCases && result.results) {
+      const clientsWithCases = await Promise.all(result.results.map(async (client: any) => {
+        const casesResult = await DB.prepare(`
+          SELECT cases.*, subsidy_types.name as subsidy_type_name
+          FROM cases
+          LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+          WHERE cases.client_id = ?
+          ORDER BY cases.created_at DESC
+        `).bind(client.id).all()
+        return {
+          ...client,
+          cases: casesResult.results || []
+        }
+      }))
+      return c.json(clientsWithCases)
+    }
+    
+    return c.json(result.results || [])
+  } catch (error: any) {
+    console.error('Error fetching clients:', error)
+    return c.json([], 200)
   }
-  
-  query += ` ORDER BY c.created_at DESC`
-  
-  const result = await DB.prepare(query).bind(...params).all()
-  
-  // 案件情報を含める場合
-  if (includeCases && result.results) {
-    const clientsWithCases = await Promise.all(result.results.map(async (client: any) => {
-      const casesResult = await DB.prepare(`
-        SELECT cases.*, subsidy_types.name as subsidy_type_name
-        FROM cases
-        LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
-        WHERE cases.client_id = ?
-        ORDER BY cases.created_at DESC
-      `).bind(client.id).all()
-      return {
-        ...client,
-        cases: casesResult.results || []
-      }
-    }))
-    return c.json(clientsWithCases)
-  }
-  
-  return c.json(result.results)
 })
 
 // 案件一覧として表示（従来のクライアント一覧の代替）
@@ -190,9 +199,9 @@ routes.get('/clients-with-cases', async (c) => {
   `
   let params: any[] = [orgId]
   
-  // adminロール以外は自分が担当の案件のみ表示
+  // adminロール以外は自分が担当の案件、または担当者未設定の案件を表示
   if (user && user.role !== 'admin') {
-    query += ` AND cases.assigned_to = ?`
+    query += ` AND (cases.assigned_to = ? OR cases.assigned_to IS NULL)`
     params.push(user.username)
   }
   
