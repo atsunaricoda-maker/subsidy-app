@@ -263,13 +263,14 @@ routes.post('/subscription/consume-slot', async (c) => {
     return c.json({ success: true, message: 'Already consumed', already_consumed: true })
   }
   
-  // サブスクリプション取得（プラン情報も含める）
+  // サブスクリプション取得（プラン情報も含める、trial も対象）
   const subscription = await DB.prepare(`
     SELECT us.id, sb.monthly_slots_remaining, sb.purchased_slots_remaining, sp.monthly_slots
     FROM user_subscriptions us
     JOIN slot_balances sb ON us.id = sb.subscription_id
     JOIN subscription_plans sp ON us.plan_id = sp.id
-    WHERE us.organization_id = ? AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status IN ('active', 'trial')
+    ORDER BY us.created_at DESC
     LIMIT 1
   `).bind(orgId).first()
   
@@ -353,13 +354,14 @@ routes.get('/subscription/check-slot', async (c) => {
     return c.json({ error: '組織が特定できません' }, 401)
   }
   
-  // サブスクリプション取得（プラン情報も含める）
+  // サブスクリプション取得（プラン情報も含める、trial も対象）
   const subscription = await DB.prepare(`
     SELECT sb.monthly_slots_remaining, sb.purchased_slots_remaining, sp.monthly_slots
     FROM user_subscriptions us
     JOIN slot_balances sb ON us.id = sb.subscription_id
     JOIN subscription_plans sp ON us.plan_id = sp.id
-    WHERE us.organization_id = ? AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status IN ('active', 'trial')
+    ORDER BY us.created_at DESC
     LIMIT 1
   `).bind(orgId).first()
   
@@ -421,12 +423,13 @@ routes.post('/subscription/purchase-slots', async (c) => {
     return c.json({ error: 'Package not found' }, 404)
   }
   
-  // サブスクリプション取得
+  // サブスクリプション取得（trial も対象）
   const subscription = await DB.prepare(`
     SELECT us.id, sb.purchased_slots_remaining
     FROM user_subscriptions us
     JOIN slot_balances sb ON us.id = sb.subscription_id
-    WHERE us.organization_id = ? AND us.status = 'active'
+    WHERE us.organization_id = ? AND us.status IN ('active', 'trial')
+    ORDER BY us.created_at DESC
     LIMIT 1
   `).bind(orgId).first()
   
@@ -628,7 +631,7 @@ routes.post('/subscription/cancel-scheduled-plan', async (c) => {
   await DB.prepare(`
     UPDATE user_subscriptions 
     SET scheduled_plan_id = NULL, scheduled_plan_date = NULL, updated_at = CURRENT_TIMESTAMP
-    WHERE organization_id = ? AND status = 'active'
+    WHERE organization_id = ? AND status IN ('active', 'trial')
   `).bind(orgId).run()
   
   return c.json({ success: true, message: 'プラン変更の予約をキャンセルしました' })
@@ -691,7 +694,7 @@ routes.get('/subscription/history', async (c) => {
   }
   
   const subscription = await DB.prepare(`
-    SELECT id FROM user_subscriptions WHERE organization_id = ? AND status = 'active' LIMIT 1
+    SELECT id FROM user_subscriptions WHERE organization_id = ? AND status IN ('active', 'trial') ORDER BY created_at DESC LIMIT 1
   `).bind(orgId).first()
   
   if (!subscription) {

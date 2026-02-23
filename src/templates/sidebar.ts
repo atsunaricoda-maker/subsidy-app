@@ -1,155 +1,90 @@
-// 共通サイドバーテンプレート
+// 共通サイドバーテンプレート - リニューアル版
+// 5項目以内のシンプルなナビゲーション
 
 export function generateSidebar(activePage: string = '') {
   const isActive = (page: string) => activePage === page ? 'active' : '';
-  const isSectionActive = (pages: string[]) => pages.includes(activePage);
+  const isGroupActive = (pages: string[]) => pages.includes(activePage) ? 'active' : '';
   
   return `
-    <aside id="sidebar" class="fixed inset-y-0 left-0 w-52 bg-gradient-to-b from-blue-800 to-blue-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
-        <div class="p-3 border-b border-blue-700 flex-shrink-0">
-            <a href="/" class="flex items-center gap-2">
-                <img src="/static/logo.png" alt="申請らくらく君" class="w-8 h-8 rounded">
-                <span class="text-base font-bold">申請らくらく君</span>
+    <aside id="sidebar" class="fixed inset-y-0 left-0 w-56 bg-gradient-to-b from-slate-900 to-slate-800 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+        <div class="p-4 border-b border-white/10 flex-shrink-0">
+            <a href="/" class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-file-invoice-dollar text-white text-sm"></i>
+                </div>
+                <span class="text-base font-bold tracking-tight">申請らくらく君</span>
             </a>
         </div>
         
-        <nav class="p-2 space-y-0.5 flex-1 overflow-y-auto">
-            <!-- ダッシュボード - 常時表示 -->
-            <a href="/" class="sidebar-link ${isActive('dashboard')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                <i class="fas fa-home w-4 text-center"></i>
+        <nav class="p-3 space-y-1 flex-1 overflow-y-auto">
+            <!-- 1. ダッシュボード -->
+            <a href="/" class="sidebar-link ${isActive('dashboard')} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium">
+                <i class="fas fa-chart-pie w-5 text-center text-slate-400"></i>
                 <span>ダッシュボード</span>
             </a>
             
-            <!-- 案件進捗ボード - 最重要機能として目立つ位置に -->
-            <a href="/pipeline" class="sidebar-link ${isActive('pipeline')} flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm bg-gradient-to-r from-indigo-600/40 to-purple-600/40 border border-indigo-400/50 mt-2 hover:from-indigo-600/60 hover:to-purple-600/60">
-                <div class="w-6 h-6 rounded bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow">
-                    <i class="fas fa-columns text-white text-xs"></i>
-                </div>
-                <span class="font-bold">案件進捗ボード</span>
+            <!-- 2. 案件管理（メイン機能） -->
+            <a href="/cases" class="sidebar-link ${isGroupActive(['cases', 'pipeline'])} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium">
+                <i class="fas fa-folder-open w-5 text-center text-slate-400"></i>
+                <span>案件管理</span>
             </a>
             
-            <!-- 案件管理セクション - 折りたたみ可能、デフォルト展開 -->
-            <div class="sidebar-section" data-section="cases">
-                <button onclick="toggleSidebarSection('cases')" class="w-full flex items-center justify-between px-3 py-1.5 text-blue-300 hover:text-white text-xs mt-2">
-                    <span class="font-semibold uppercase tracking-wide">案件管理</span>
-                    <i class="fas fa-chevron-down section-icon transition-transform text-xs"></i>
-                </button>
-                <div class="section-content space-y-0.5">
-                    <a href="/cases" class="sidebar-link ${isActive('cases')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-folder-open w-4 text-center"></i>
-                        <span>案件一覧</span>
-                    </a>
-                    <a href="/clients" class="sidebar-link ${isActive('clients')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-address-book w-4 text-center"></i>
-                        <span>顧客一覧</span>
-                    </a>
-                    <a href="/?openNewCase=true" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-green-300 hover:text-white">
-                        <i class="fas fa-plus w-4 text-center"></i>
-                        <span>新規登録</span>
-                    </a>
-                </div>
-            </div>
+            <!-- 3. 顧客一覧 -->
+            <a href="/clients" class="sidebar-link ${isGroupActive(['clients'])} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium">
+                <i class="fas fa-users w-5 text-center text-slate-400"></i>
+                <span>顧客一覧</span>
+            </a>
             
-            <!-- 申請種別セクション - 折りたたみ可能 -->
-            <div class="sidebar-section" data-section="subsidy">
-                <button onclick="toggleSidebarSection('subsidy')" class="w-full flex items-center justify-between px-3 py-1.5 text-blue-300 hover:text-white text-xs mt-2">
-                    <span class="font-semibold uppercase tracking-wide">申請種別</span>
-                    <i class="fas fa-chevron-down section-icon transition-transform text-xs"></i>
-                </button>
-                <div class="section-content space-y-0.5">
-                    <a href="/subsidy-types" id="sidebarSubsidyLink" class="sidebar-link ${isSectionActive(['subsidy-gyosei', 'subsidy-sharoshi', 'subsidy-kyoninka']) ? 'active' : ''} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-list w-4 text-center"></i>
-                        <span>種別一覧</span>
-                    </a>
-                    <a href="/admin/pipelines" class="sidebar-link ${isActive('pipelines')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-project-diagram w-4 text-center"></i>
-                        <span>パイプライン</span>
-                    </a>
-                    <a href="/admin/guidelines" class="sidebar-link ${isActive('guidelines')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-book-open w-4 text-center"></i>
-                        <span>公募要領</span>
-                    </a>
-                    <a href="/admin/statistics" class="sidebar-link ${isActive('statistics')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-chart-line w-4 text-center"></i>
-                        <span>統計</span>
-                    </a>
-                </div>
-            </div>
-            
-            <!-- 設定セクション - 折りたたみ可能、デフォルト閉じ -->
-            <div class="sidebar-section" data-section="settings">
-                <button onclick="toggleSidebarSection('settings')" class="w-full flex items-center justify-between px-3 py-1.5 text-blue-300 hover:text-white text-xs mt-2">
-                    <span class="font-semibold uppercase tracking-wide">設定</span>
-                    <i class="fas fa-chevron-down section-icon transition-transform text-xs"></i>
-                </button>
-                <div class="section-content space-y-0.5">
-                    <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link ${isActive('users')} hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-users-cog w-4 text-center"></i>
-                        <span>従業員</span>
-                    </a>
-                    <a href="/admin/payments" id="sidebarPaymentsLink" class="sidebar-link ${isActive('payments')} hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-credit-card w-4 text-center"></i>
-                        <span>支払い</span>
-                        <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">0</span>
-                    </a>
-                    <a href="/admin/subscription" id="sidebarSubscriptionLink" class="sidebar-link ${isActive('subscription')} hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-ticket-alt w-4 text-center"></i>
-                        <span>プラン</span>
-                        <span id="slotsBadge" class="ml-auto bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded-full">...</span>
-                    </a>
-                    <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link ${isActive('settings')} hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-cog w-4 text-center"></i>
-                        <span>設定</span>
-                    </a>
-                    <a href="/admin/backup" id="sidebarBackupLink" class="sidebar-link ${isActive('backup')} hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-database w-4 text-center"></i>
-                        <span>バックアップ</span>
-                    </a>
-                </div>
-            </div>
-            
-            <!-- サポートセクション -->
-            <div class="sidebar-section" data-section="support">
-                <button onclick="toggleSidebarSection('support')" class="w-full flex items-center justify-between px-3 py-1.5 text-blue-300 hover:text-white text-xs mt-2">
-                    <span class="font-semibold uppercase tracking-wide">サポート</span>
-                    <i class="fas fa-chevron-down section-icon transition-transform text-xs"></i>
-                </button>
-                <div class="section-content space-y-0.5">
-                    <a href="/help" class="sidebar-link ${isActive('help')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-question-circle w-4 text-center"></i>
-                        <span>ヘルプ・FAQ</span>
-                    </a>
-                    <a href="/contact" class="sidebar-link ${isActive('contact')} flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-                        <i class="fas fa-envelope w-4 text-center"></i>
-                        <span>お問い合わせ</span>
-                    </a>
-                </div>
+            <!-- 4. 申請種別 -->
+            <a href="/subsidy-types" class="sidebar-link ${isGroupActive(['subsidy-types', 'guidelines', 'pipelines', 'statistics'])} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium">
+                <i class="fas fa-list-alt w-5 text-center text-slate-400"></i>
+                <span>申請種別</span>
+            </a>
+
+            <!-- セパレーター -->
+            <div class="my-3 border-t border-white/10"></div>
+
+            <!-- 5. 設定（管理者のみ表示されるサブ項目あり） -->
+            <div class="space-y-0.5">
+                <div class="px-3 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">管理</div>
+                <a href="/admin/settings" id="sidebarSettingsLink" class="sidebar-link ${isActive('settings')} hidden flex items-center gap-3 px-3 py-2 rounded-lg text-sm">
+                    <i class="fas fa-cog w-5 text-center text-slate-400"></i>
+                    <span>設定</span>
+                </a>
+                <a href="/admin/users" id="sidebarEmployeeLink" class="sidebar-link ${isActive('users')} hidden flex items-center gap-3 px-3 py-2 rounded-lg text-sm">
+                    <i class="fas fa-users-cog w-5 text-center text-slate-400"></i>
+                    <span>従業員管理</span>
+                </a>
+                <a href="/admin/subscription" id="sidebarSubscriptionLink" class="sidebar-link ${isActive('subscription')} hidden flex items-center gap-3 px-3 py-2 rounded-lg text-sm">
+                    <i class="fas fa-ticket-alt w-5 text-center text-slate-400"></i>
+                    <span>プラン</span>
+                    <span id="slotsBadge" class="ml-auto bg-slate-600 text-white text-xs px-1.5 py-0.5 rounded-full">...</span>
+                </a>
+                <a href="/admin/payments" id="sidebarPaymentsLink" class="sidebar-link ${isActive('payments')} hidden flex items-center gap-3 px-3 py-2 rounded-lg text-sm">
+                    <i class="fas fa-credit-card w-5 text-center text-slate-400"></i>
+                    <span>支払い</span>
+                    <span id="pendingPaymentsBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">0</span>
+                </a>
+                <a href="/admin/backup" id="sidebarBackupLink" class="sidebar-link ${isActive('backup')} hidden flex items-center gap-3 px-3 py-2 rounded-lg text-sm">
+                    <i class="fas fa-database w-5 text-center text-slate-400"></i>
+                    <span>バックアップ</span>
+                </a>
             </div>
         </nav>
         
-        <!-- プラットフォーム規約リンク -->
-        <div class="px-3 py-1.5 border-t border-blue-700/50">
-            <a href="/master/terms" target="_blank" class="flex items-center gap-2 text-xs text-yellow-300 hover:text-yellow-100 transition-colors">
-                <i class="fas fa-file-contract w-3 text-center"></i>
-                <span>プラットフォーム利用規約</span>
-                <i class="fas fa-external-link-alt text-[10px] ml-auto opacity-60"></i>
-            </a>
-        </div>
-        
-        <!-- 顧客向け法的リンク -->
-        <div class="px-3 py-1.5 border-t border-blue-700/30">
-            <p class="text-[10px] text-blue-400 mb-1">顧客向け規約</p>
-            <div class="flex gap-2 text-xs text-blue-300">
-                <a href="/terms" target="_blank" class="hover:text-white">利用規約</a>
-                <span class="text-blue-500">|</span>
-                <a href="/privacy-policy" target="_blank" class="hover:text-white">個人情報</a>
-                <span class="text-blue-500">|</span>
-                <a href="/legal" target="_blank" class="hover:text-white">特商法</a>
+        <!-- 法的リンク（コンパクト） -->
+        <div class="px-4 py-2 border-t border-white/10">
+            <div class="flex gap-2 text-[10px] text-slate-500">
+                <a href="/terms" target="_blank" class="hover:text-slate-300">利用規約</a>
+                <span>|</span>
+                <a href="/privacy-policy" target="_blank" class="hover:text-slate-300">個人情報</a>
+                <span>|</span>
+                <a href="/master/terms" target="_blank" class="hover:text-slate-300">プラットフォーム規約</a>
             </div>
         </div>
         
         <!-- ユーザー情報 -->
-        <div class="p-2 border-t border-blue-700 bg-blue-900">
+        <div class="p-3 border-t border-white/10 bg-slate-900/50">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm">
                     <i class="fas fa-user"></i>
@@ -157,7 +92,7 @@ export function generateSidebar(activePage: string = '') {
                 <div class="flex-1 min-w-0">
                     <p id="sidebarAdminName" class="text-sm font-medium truncate">管理者</p>
                 </div>
-                <button onclick="logout()" class="text-blue-300 hover:text-white" title="ログアウト">
+                <button onclick="logout()" class="text-slate-400 hover:text-white transition-colors" title="ログアウト">
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
             </div>
@@ -171,20 +106,23 @@ export function generateSidebar(activePage: string = '') {
 
 // 共通のサイドバー用スタイル
 export const sidebarStyles = `
-    .sidebar-link { transition: all 0.2s; }
-    .sidebar-link:hover { background-color: rgba(255,255,255,0.1); }
-    .sidebar-link.active { background-color: rgba(255,255,255,0.2); border-left: 2px solid white; }
-    .sidebar-section .section-content { 
-        max-height: 500px; 
-        overflow: hidden; 
-        transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+    .sidebar-link { 
+        transition: all 0.15s ease; 
+        color: #94a3b8;
     }
-    .sidebar-section.collapsed .section-content { 
-        max-height: 0; 
-        opacity: 0;
+    .sidebar-link:hover { 
+        background-color: rgba(255,255,255,0.08); 
+        color: #e2e8f0;
     }
-    .sidebar-section.collapsed .section-icon { 
-        transform: rotate(-90deg); 
+    .sidebar-link:hover i {
+        color: #e2e8f0;
+    }
+    .sidebar-link.active { 
+        background-color: rgba(59, 130, 246, 0.15); 
+        color: #60a5fa;
+    }
+    .sidebar-link.active i {
+        color: #60a5fa;
     }
 `;
 
@@ -208,32 +146,6 @@ export const sidebarScripts = `
             window.location.href = '/login';
         }
     }
-    
-    // サイドバーセクション折りたたみ機能
-    function toggleSidebarSection(sectionName) {
-        const section = document.querySelector('[data-section="' + sectionName + '"]');
-        if (section) {
-            section.classList.toggle('collapsed');
-            const collapsedSections = JSON.parse(localStorage.getItem('sidebar_collapsed') || '{}');
-            collapsedSections[sectionName] = section.classList.contains('collapsed');
-            localStorage.setItem('sidebar_collapsed', JSON.stringify(collapsedSections));
-        }
-    }
-    
-    // サイドバー初期状態の復元
-    function initSidebarSections() {
-        const collapsedSections = JSON.parse(localStorage.getItem('sidebar_collapsed') || '{"settings": true}');
-        Object.keys(collapsedSections).forEach(sectionName => {
-            if (collapsedSections[sectionName]) {
-                const section = document.querySelector('[data-section="' + sectionName + '"]');
-                if (section) {
-                    section.classList.add('collapsed');
-                }
-            }
-        });
-    }
-    
-    document.addEventListener('DOMContentLoaded', initSidebarSections);
     
     function toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
@@ -263,7 +175,10 @@ export const sidebarScripts = `
     }
     
     if (typeof axios !== 'undefined') {
-        axios.defaults.headers.common['Authorization'] = 'Bearer ' + localStorage.getItem('admin_username') + ':' + localStorage.getItem('admin_role');
+        const sidebarToken = localStorage.getItem('admin_token');
+        if (sidebarToken) {
+            axios.defaults.headers.common['Authorization'] = 'Bearer ' + sidebarToken;
+        }
     }
     
     async function loadSidebarSlotBalance() {
@@ -273,13 +188,13 @@ export const sidebarScripts = `
         try {
             const response = await fetch('/api/subscription/status', {
                 headers: {
-                    'Authorization': 'Bearer ' + localStorage.getItem('admin_username') + ':' + localStorage.getItem('admin_role')
+                    'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')
                 }
             });
             
             if (!response.ok) {
                 badge.textContent = '!';
-                badge.className = 'ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full';
+                badge.className = 'ml-auto bg-slate-600 text-white text-xs px-2 py-0.5 rounded-full';
                 return;
             }
             
@@ -300,42 +215,12 @@ export const sidebarScripts = `
             
         } catch (error) {
             badge.textContent = '!';
-            badge.className = 'ml-auto bg-gray-400 text-white text-xs px-2 py-0.5 rounded-full';
+            badge.className = 'ml-auto bg-slate-600 text-white text-xs px-2 py-0.5 rounded-full';
         }
     }
     
     function applyBusinessScopeLock(scope) {
-        const subsidyLink = document.getElementById('sidebarSubsidyLink');
-        const subsidyIcon = document.getElementById('sidebarSubsidyIcon');
-        const subsidyBadge = document.getElementById('sidebarSubsidyBadge');
-        const grantLink = document.getElementById('sidebarGrantLink');
-        const grantIcon = document.getElementById('sidebarGrantIcon');
-        const grantBadge = document.getElementById('sidebarGrantBadge');
-        const licenseLink = document.getElementById('sidebarLicenseLink');
-        const licenseIcon = document.getElementById('sidebarLicenseIcon');
-        const licenseBadge = document.getElementById('sidebarLicenseBadge');
-        
-        if (scope === 'labor') {
-            if (subsidyLink) lockSidebarItem(subsidyLink, subsidyIcon, subsidyBadge, '行政書士業務', 'administrative');
-            if (licenseLink) lockSidebarItem(licenseLink, licenseIcon, licenseBadge, '行政書士業務', 'administrative');
-        }
-        else if (scope === 'administrative') {
-            if (grantLink) lockSidebarItem(grantLink, grantIcon, grantBadge, '社労士業務', 'labor');
-        }
-    }
-    
-    function lockSidebarItem(link, icon, badge, scopeName, scopeType) {
-        link.href = 'javascript:void(0)';
-        link.onclick = function(e) {
-            e.preventDefault();
-            showScopeLockModal(scopeName, scopeType);
-        };
-        link.classList.add('opacity-50', 'cursor-not-allowed');
-        if (icon) icon.className = 'fas fa-lock w-5 text-gray-400';
-        if (badge) {
-            badge.innerHTML = '<i class="fas fa-lock text-xs"></i>';
-            badge.className = 'ml-auto text-xs bg-gray-500 px-2 py-0.5 rounded';
-        }
+        // Business scope locking is handled at the subsidy-types page level now
     }
     
     function showScopeLockModal(scopeName, scopeType) {
@@ -351,6 +236,144 @@ export const sidebarScripts = `
     }
     
     window.showScopeLockModal = showScopeLockModal;
+    
+    // ======= 共通ユーティリティ（全ページで利用可能） =======
+    
+    // 共通ステータスラベル・色（全ページ共有 — ページ固有のstatusLabelsがあればそちらが優先される）
+    if (typeof window.statusLabels === 'undefined') {
+        window.statusLabels = { inquiry: '見込み', preparing: '書類準備', applying: '申請中', adopted: '採択', rejected: '不採択', completed: '完了', archived: '完了' };
+    }
+    if (typeof window.statusColors === 'undefined') {
+        window.statusColors = { inquiry: 'bg-yellow-100 text-yellow-800', preparing: 'bg-orange-100 text-orange-800', applying: 'bg-purple-100 text-purple-800', adopted: 'bg-blue-100 text-blue-800', rejected: 'bg-red-100 text-red-800', completed: 'bg-green-100 text-green-800', archived: 'bg-green-100 text-green-800' };
+    }
+    
+    // 相対時間表示
+    function formatTimeAgo(dateStr) {
+        if (!dateStr) return '';
+        const date = dateStr && !dateStr.endsWith('Z') && !dateStr.includes('+')
+            ? new Date(dateStr.replace(' ', 'T') + 'Z') : new Date(dateStr);
+        const diffMs = Date.now() - date.getTime();
+        const mins = Math.floor(diffMs / 60000);
+        if (mins < 1) return 'たった今';
+        if (mins < 60) return mins + '分前';
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return hours + '時間前';
+        const days = Math.floor(hours / 24);
+        if (days < 7) return days + '日前';
+        if (days < 30) return Math.floor(days / 7) + '週間前';
+        return date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    }
+    window.formatTimeAgo = formatTimeAgo;
+    
+    // ボタンローディング状態の切替
+    function setButtonLoading(btn, loading, originalText) {
+        if (!btn) return;
+        if (loading) {
+            btn._originalText = btn._originalText || originalText || btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>処理中...';
+            btn.classList.add('opacity-70', 'cursor-not-allowed');
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = btn._originalText || originalText || btn.innerHTML;
+            btn.classList.remove('opacity-70', 'cursor-not-allowed');
+        }
+    }
+    window.setButtonLoading = setButtonLoading;
+    
+    // HTMLエスケープ（XSS対策）
+    if (typeof window.escapeHtml === 'undefined') {
+        window.escapeHtml = function(text) {
+            if (!text) return '';
+            var d = document.createElement('div'); d.textContent = text; return d.innerHTML;
+        };
+    }
+    
+    // 日付フォーマット（月/日）
+    if (typeof window.formatDate === 'undefined') {
+        window.formatDate = function(dateStr) {
+            if (!dateStr) return '';
+            return new Date(dateStr).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+        };
+    }
+    
+    // パンくずリスト生成
+    function generateBreadcrumb(items) {
+        // items: [{label: 'ダッシュボード', href: '/'}, {label: '案件管理', href: '/cases'}, {label: '案件詳細'}]
+        const container = document.getElementById('breadcrumb');
+        if (!container) return;
+        container.innerHTML = items.map(function(item, i) {
+            const isLast = i === items.length - 1;
+            if (isLast) {
+                return '<span class="text-gray-800 font-medium">' + item.label + '</span>';
+            }
+            return '<a href="' + item.href + '" class="text-blue-600 hover:text-blue-800 hover:underline">' + item.label + '</a>'
+                + '<i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>';
+        }).join('');
+    }
+    window.generateBreadcrumb = generateBreadcrumb;
+    
+    // ESCキーでモーダルを閉じる汎用関数
+    // 指定したID群のモーダル(hidden classベース)をESCで閉じられるようにする
+    var _escModalIds = [];
+    function registerEscClose(modalIds) {
+        _escModalIds = _escModalIds.concat(modalIds);
+    }
+    window.registerEscClose = registerEscClose;
+    
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            for (var i = _escModalIds.length - 1; i >= 0; i--) {
+                var modal = document.getElementById(_escModalIds[i]);
+                if (modal && !modal.classList.contains('hidden')) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = '';
+                    return;
+                }
+            }
+        }
+    });
+    
+    // Axios 401インターセプター（セッション切れ時に自動ログイン画面へ）
+    if (typeof axios !== 'undefined' && !window._axiosInterceptorSet) {
+        window._axiosInterceptorSet = true;
+        axios.interceptors.response.use(
+            function(response) { return response; },
+            function(error) {
+                if (error.response && error.response.status === 401) {
+                    var isLoginPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
+                    if (!isLoginPage) {
+                        localStorage.removeItem('admin_token');
+                        alert('セッションの有効期限が切れました。再度ログインしてください。');
+                        window.location.href = '/login';
+                    }
+                }
+                return Promise.reject(error);
+            }
+        );
+    }
+    
+    // トースト通知（共通版 — ページ固有のshowToastがあればそちらが優先される）
+    if (typeof window.showToast === 'undefined') {
+        window.showToast = function(message, type) {
+            type = type || 'success';
+            var colors = {
+                success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-yellow-500', info: 'bg-blue-500'
+            };
+            var icons = {
+                success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle'
+            };
+            var toast = document.createElement('div');
+            toast.className = (colors[type] || colors.info) + ' text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-sm fixed top-4 right-4 z-[9999] transition-all duration-300 translate-x-full';
+            toast.innerHTML = '<i class="fas ' + (icons[type] || icons.info) + '"></i><span>' + message + '</span>';
+            document.body.appendChild(toast);
+            requestAnimationFrame(function() { toast.classList.remove('translate-x-full'); });
+            setTimeout(function() {
+                toast.classList.add('translate-x-full');
+                setTimeout(function() { toast.remove(); }, 300);
+            }, 3000);
+        };
+    }
     
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', loadSidebarSlotBalance);

@@ -54,6 +54,12 @@ routes.get('/subsidy-types', async (c) => {
             ${generateSidebar(category === 'subsidy' ? 'subsidy-gyosei' : category === 'grant' ? 'subsidy-sharoshi' : category === 'license' ? 'subsidy-kyoninka' : '')}
             
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">申請種別</span>
+                </div>
                 <header class="${headerBgClass} text-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">

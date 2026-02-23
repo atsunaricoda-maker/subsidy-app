@@ -57,6 +57,12 @@ routes.get('/help', (c) => {
             
             <!-- メインコンテンツ -->
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">ヘルプ・FAQ</span>
+                </div>
                 <!-- トップバー -->
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
@@ -264,12 +270,7 @@ routes.get('/help', (c) => {
                 return classes[category] || 'bg-gray-100 text-gray-700';
             }
             
-            // HTMLエスケープ
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
+            // escapeHtml は sidebarScripts 共通版を使用
             
             // サイドバー開閉
             function toggleSidebar() {
