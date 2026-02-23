@@ -82,8 +82,58 @@ routes.post('/stripe/webhook', async (c) => {
   const payload = await c.req.text()
   const sig = c.req.header('stripe-signature')
   
-  // Webhook署名検証（本番環境では必須）
-  // 簡易的な実装のため、署名検証は省略（本番では必ず実装してください）
+  // Webhook署名検証
+  if (STRIPE_WEBHOOK_SECRET && sig) {
+    try {
+      const parts = sig.split(',').reduce((acc: any, part: string) => {
+        const [key, value] = part.split('=')
+        acc[key] = value
+        return acc
+      }, {} as Record<string, string>)
+      
+      const timestamp = parts['t']
+      const signature = parts['v1']
+      
+      if (!timestamp || !signature) {
+        return c.json({ error: 'Invalid signature format' }, 400)
+      }
+      
+      // タイムスタンプの有効性チェック（5分以内）
+      const currentTime = Math.floor(Date.now() / 1000)
+      if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
+        return c.json({ error: 'Webhook timestamp too old' }, 400)
+      }
+      
+      // HMAC-SHA256で署名を検証
+      const signedPayload = `${timestamp}.${payload}`
+      const key = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(STRIPE_WEBHOOK_SECRET),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      )
+      const signatureBuffer = await crypto.subtle.sign(
+        'HMAC',
+        key,
+        new TextEncoder().encode(signedPayload)
+      )
+      const expectedSignature = Array.from(new Uint8Array(signatureBuffer))
+        .map(b => b.toString(16).padStart(2, '0')).join('')
+      
+      if (expectedSignature !== signature) {
+        console.error('Webhook signature verification failed')
+        return c.json({ error: 'Invalid signature' }, 400)
+      }
+    } catch (e) {
+      console.error('Webhook signature verification error:', e)
+      return c.json({ error: 'Signature verification failed' }, 400)
+    }
+  } else if (STRIPE_WEBHOOK_SECRET) {
+    // シークレットが設定されているのに署名がない場合は拒否
+    console.error('Webhook received without signature but STRIPE_WEBHOOK_SECRET is set')
+    return c.json({ error: 'Missing stripe-signature header' }, 400)
+  }
   
   let event: any
   try {

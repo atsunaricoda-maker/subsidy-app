@@ -26,6 +26,14 @@ routes.get('/admin/guidelines', (c) => {
             ${generateSidebar('guidelines')}
             
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <a href="/subsidy-types" class="text-blue-600 hover:text-blue-800 hover:underline">申請種別</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">公募要領管理</span>
+                </div>
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
@@ -746,14 +754,7 @@ routes.get('/admin/guidelines', (c) => {
                 if (tab === 'cases') loadCaseTree();
             }
 
-            // トースト
-            function showToast(message, type = 'success') {
-                const toast = document.createElement('div');
-                toast.className = \`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 \${type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white\`;
-                toast.innerHTML = \`<i class="fas fa-\${type === 'success' ? 'check' : 'exclamation'}-circle mr-2"></i>\${message}\`;
-                document.body.appendChild(toast);
-                setTimeout(() => toast.remove(), 3000);
-            }
+            // showToast は sidebarScripts 共通版を使用
             
             // 案件進捗ツリー読み込み
             async function loadCaseTree() {

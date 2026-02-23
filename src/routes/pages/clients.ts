@@ -24,104 +24,67 @@ routes.get('/clients', async (c) => {
             ${modalStyles}
         </style>
     </head>
-    <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <body class="bg-gray-50">
         <div class="min-h-screen flex">
             ${generateSidebar('clients')}
             
             <main class="flex-1 min-h-screen">
-                <!-- ヘッダー：グラデーション背景 -->
-                <header class="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white shadow-lg sticky top-0 z-30">
-                    <div class="flex items-center justify-between px-4 py-4">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 lg:px-6 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">顧客一覧</span>
+                </div>
+                
+                <!-- ヘッダー（ダッシュボード・案件と統一） -->
+                <header class="bg-white border-b sticky top-0 z-30">
+                    <div class="flex items-center justify-between px-4 lg:px-6 py-3">
                         <div class="flex items-center gap-4">
-                            <button onclick="toggleSidebar()" class="lg:hidden text-white/80 hover:text-white">
+                            <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900">
                                 <i class="fas fa-bars text-xl"></i>
                             </button>
                             <div>
-                                <h2 class="text-xl font-bold flex items-center gap-2">
-                                    <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-address-book"></i>
-                                    </div>
-                                    顧客管理
-                                </h2>
-                                <p class="text-blue-100 text-sm mt-0.5">Customer Management</p>
+                                <h2 class="text-lg font-bold text-gray-800">顧客一覧</h2>
+                                <p class="text-xs text-gray-500" id="clientCountLabel">-</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button onclick="exportClientsCSV()" class="bg-white/20 text-white px-4 py-2.5 rounded-xl hover:bg-white/30 font-medium transition-all flex items-center gap-2" title="CSVエクスポート">
+                            <select id="sortSelect" onchange="sortClients()" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                                <option value="updated_desc">更新日 ↓</option>
+                                <option value="name_asc">名前 A→Z</option>
+                                <option value="created_desc">登録日 ↓</option>
+                                <option value="cases_desc">案件数 ↓</option>
+                            </select>
+                            <a href="/api/export/clients/csv" class="text-gray-500 hover:text-gray-700 px-2 py-1.5 rounded-lg border hover:bg-gray-50 text-sm" title="CSV出力">
                                 <i class="fas fa-file-csv"></i>
-                                <span class="hidden sm:inline">CSV出力</span>
-                            </button>
-                            <button onclick="openNewCustomerModal()" class="bg-white text-blue-700 px-5 py-2.5 rounded-xl hover:bg-blue-50 font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
-                                <i class="fas fa-user-plus"></i>
-                                <span>新規顧客追加</span>
+                            </a>
+                            <button onclick="openNewCustomerModal()" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 text-sm font-medium">
+                                <i class="fas fa-plus mr-1"></i>新規顧客
                             </button>
                         </div>
                     </div>
                 </header>
 
-                <div class="p-4 lg:p-6">
-                    <!-- 統計カード -->
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-blue-500 hover:shadow-md transition-shadow">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-gray-500 text-sm">総顧客数</p>
-                                    <p id="statTotalClients" class="text-2xl font-bold text-gray-800">-</p>
-                                </div>
-                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-users text-blue-600 text-xl"></i>
-                                </div>
-                            </div>
+                <div class="p-4 lg:p-6 max-w-7xl mx-auto">
+                    <!-- 検索・フィルター --> 
+                    <div class="mb-4 flex flex-col sm:flex-row gap-2">
+                        <div class="flex-1 relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                            <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
+                                   class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" onkeyup="filterCustomers()">
                         </div>
-                        <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-green-500 hover:shadow-md transition-shadow">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-gray-500 text-sm">今月の新規</p>
-                                    <p id="statNewClients" class="text-2xl font-bold text-gray-800">-</p>
-                                </div>
-                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-user-plus text-green-600 text-xl"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-purple-500 hover:shadow-md transition-shadow">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-gray-500 text-sm">進行中案件</p>
-                                    <p id="statActiveCases" class="text-2xl font-bold text-gray-800">-</p>
-                                </div>
-                                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-briefcase text-purple-600 text-xl"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 border-orange-500 hover:shadow-md transition-shadow">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-gray-500 text-sm">対応待ち</p>
-                                    <p id="statPendingActions" class="text-2xl font-bold text-gray-800">-</p>
-                                </div>
-                                <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-clock text-orange-600 text-xl"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 検索・フィルター -->
-                    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
-                        <div class="flex flex-col sm:flex-row gap-3">
-                            <div class="flex-1 relative">
-                                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
-                                       class="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" onkeyup="filterCustomers()">
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick="setViewMode('table')" id="viewModeTable" class="px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors">
-                                    <i class="fas fa-list"></i>
+                        <div class="flex items-center gap-2">
+                            <select id="caseFilter" onchange="filterCustomers()" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                                <option value="">全顧客</option>
+                                <option value="active">進行中案件あり</option>
+                                <option value="noCases">案件なし</option>
+                            </select>
+                            <div class="flex bg-gray-100 rounded-lg p-0.5">
+                                <button onclick="setViewMode('table')" id="viewModeTable" class="px-3 py-1.5 rounded-md text-xs font-medium bg-white shadow-sm text-gray-700">
+                                    <i class="fas fa-list mr-1"></i>リスト
                                 </button>
-                                <button onclick="setViewMode('card')" id="viewModeCard" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
-                                    <i class="fas fa-th-large"></i>
+                                <button onclick="setViewMode('card')" id="viewModeCard" class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-500">
+                                    <i class="fas fa-th-large mr-1"></i>カード
                                 </button>
                             </div>
                         </div>
@@ -133,16 +96,15 @@ routes.get('/clients', async (c) => {
                             <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
                                 <tr>
                                     <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">顧客名</th>
-                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">会社名</th>
                                     <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">連絡先</th>
-                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">案件数</th>
+                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">案件状況</th>
                                     <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">登録日</th>
-                                    <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">操作</th>
+                                    <th class="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">アクション</th>
                                 </tr>
                             </thead>
                             <tbody id="customerList" class="divide-y divide-gray-100">
                                 <tr>
-                                    <td colspan="6" class="px-4 py-12 text-center text-gray-500">
+                                    <td colspan="5" class="px-4 py-12 text-center text-gray-500">
                                         <div class="flex flex-col items-center">
                                             <i class="fas fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
                                             <p>読み込み中...</p>
@@ -325,19 +287,36 @@ routes.get('/clients', async (c) => {
             let currentClientId = null;
             let currentClientTab = 'info';
             
+            // ステータスラベル・色は sidebarScripts 共通版（window.statusLabels / window.statusColors）を使用
+            
             let viewMode = 'table';
             
             // 表示モード切り替え
             function setViewMode(mode) {
                 viewMode = mode;
                 document.getElementById('viewModeTable').className = mode === 'table' 
-                    ? 'px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors'
-                    : 'px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors';
+                    ? 'px-3 py-1.5 rounded-md text-xs font-medium bg-white shadow-sm text-gray-700'
+                    : 'px-3 py-1.5 rounded-md text-xs font-medium text-gray-500';
                 document.getElementById('viewModeCard').className = mode === 'card'
-                    ? 'px-4 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors'
-                    : 'px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors';
+                    ? 'px-3 py-1.5 rounded-md text-xs font-medium bg-white shadow-sm text-gray-700'
+                    : 'px-3 py-1.5 rounded-md text-xs font-medium text-gray-500';
                 document.getElementById('tableView').classList.toggle('hidden', mode !== 'table');
                 document.getElementById('cardView').classList.toggle('hidden', mode !== 'card');
+                localStorage.setItem('clients_view', mode);
+                renderClients(allClients);
+            }
+            
+            // ソート機能
+            function sortClients() {
+                const sortVal = document.getElementById('sortSelect')?.value || 'updated_desc';
+                allClients.sort(function(a, b) {
+                    switch(sortVal) {
+                        case 'name_asc': return (a.name || '').localeCompare(b.name || '', 'ja');
+                        case 'created_desc': return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                        case 'cases_desc': return (b.cases?.length || 0) - (a.cases?.length || 0);
+                        default: return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+                    }
+                });
                 renderClients(allClients);
             }
             
@@ -345,49 +324,45 @@ routes.get('/clients', async (c) => {
             async function loadClients() {
                 try {
                     const response = await axios.get('/api/clients?include_cases=true');
-                    allClients = response.data;
+                    var data = response.data;
+                    // APIがエラーオブジェクトを返した場合のガード
+                    if (!Array.isArray(data)) {
+                        console.error('API returned non-array:', data);
+                        allClients = [];
+                    } else {
+                        allClients = data;
+                    }
                     renderClients(allClients);
                     updateStats(allClients);
                 } catch (error) {
                     console.error('Error loading clients:', error);
+                    var errMsg = 'データの読み込みに失敗しました';
+                    if (error.response) {
+                        errMsg += '（' + error.response.status + '）';
+                    }
                     document.getElementById('customerList').innerHTML = 
-                        '<tr><td colspan="6" class="px-4 py-12 text-center text-red-500"><i class="fas fa-exclamation-circle text-3xl mb-3"></i><p>データの読み込みに失敗しました</p></td></tr>';
+                        '<tr><td colspan="5" class="px-4 py-12 text-center text-red-500"><i class="fas fa-exclamation-circle text-3xl mb-3"></i><p>' + errMsg + '</p><button onclick="loadClients()" class="mt-3 text-blue-600 hover:text-blue-800 text-sm"><i class="fas fa-redo mr-1"></i>再読み込み</button></td></tr>';
                 }
             }
             
             // 統計を更新
             function updateStats(clients) {
-                document.getElementById('statTotalClients').textContent = clients.length;
-                
-                const now = new Date();
-                const thisMonth = clients.filter(c => {
-                    const created = new Date(c.created_at);
-                    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-                }).length;
-                document.getElementById('statNewClients').textContent = thisMonth;
-                
-                let activeCases = 0;
-                let pendingActions = 0;
-                clients.forEach(c => {
-                    if (c.cases) {
-                        activeCases += c.cases.filter(cs => cs.status !== 'completed' && cs.status !== 'rejected').length;
-                        pendingActions += c.cases.filter(cs => cs.status === 'preparing').length;
-                    }
-                });
-                document.getElementById('statActiveCases').textContent = activeCases;
-                document.getElementById('statPendingActions').textContent = pendingActions;
+                if (!Array.isArray(clients)) clients = [];
+                const activeCases = clients.reduce((sum, c) => sum + (c.cases?.filter(cs => !['completed', 'rejected', 'archived'].includes(cs.status)).length || 0), 0);
+                document.getElementById('clientCountLabel').textContent = clients.length + '件の顧客 / 進行中 ' + activeCases + '件';
             }
             
             // 顧客一覧の表示
             function renderClients(clients) {
+                if (!Array.isArray(clients)) clients = [];
                 if (viewMode === 'card') {
                     renderClientsAsCards(clients);
                     return;
                 }
                 
                 const container = document.getElementById('customerList');
-                if (!clients || clients.length === 0) {
-                    container.innerHTML = '<tr><td colspan="6" class="px-4 py-12 text-center text-gray-500"><i class="fas fa-users text-4xl text-gray-300 mb-3"></i><p>顧客が登録されていません</p></td></tr>';
+                if (clients.length === 0) {
+                    container.innerHTML = '<tr><td colspan="5" class="text-center py-16"><div class="max-w-sm mx-auto"><div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-user-plus text-blue-400 text-2xl"></i></div><p class="text-gray-500 mb-1">顧客が登録されていません</p><p class="text-gray-400 text-sm mb-4">最初の顧客を登録して管理を始めましょう</p><button onclick="openNewCustomerModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium"><i class="fas fa-plus mr-1"></i>最初の顧客を登録</button></div></td></tr>';
                     return;
                 }
                 
@@ -396,7 +371,8 @@ routes.get('/clients', async (c) => {
                 
                 container.innerHTML = clients.map((client, index) => {
                     const caseCount = client.cases?.length || 0;
-                    const activeCases = client.cases?.filter(c => c.status !== 'completed' && c.status !== 'rejected').length || 0;
+                    const activeCases = client.cases?.filter(c => c.status !== 'completed' && c.status !== 'rejected' && c.status !== 'archived').length || 0;
+                    const latestCase = client.cases?.[0];
                     const avatarColor = avatarColors[index % avatarColors.length];
                     const initial = (client.company_name || client.name || '?')[0].toUpperCase();
                     
@@ -404,6 +380,8 @@ routes.get('/clients', async (c) => {
                         <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent customer-row cursor-pointer transition-all group" 
                             data-name="\${client.name}" 
                             data-company="\${client.company_name || ''}"
+                            data-cases="\${caseCount}"
+                            data-active="\${activeCases}"
                             onclick="openClientQuickView(\${client.id})">
                             <td class="px-4 py-4">
                                 <div class="flex items-center gap-3">
@@ -416,29 +394,34 @@ routes.get('/clients', async (c) => {
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-4 py-4 text-gray-600">\${client.company_name || '-'}</td>
                             <td class="px-4 py-4 text-sm text-gray-500 hidden md:table-cell">
                                 \${client.email ? '<div class="flex items-center gap-1"><i class="fas fa-envelope text-gray-400"></i>' + client.email + '</div>' : ''}
                                 \${client.phone ? '<div class="flex items-center gap-1 mt-1"><i class="fas fa-phone text-gray-400"></i>' + client.phone + '</div>' : ''}
+                                \${!client.email && !client.phone ? '<span class="text-gray-400">-</span>' : ''}
                             </td>
                             <td class="px-4 py-4">
+                                \${caseCount === 0 ? '<span class="text-gray-400 text-xs">案件なし</span>' : \`
                                 <div class="flex flex-col gap-1">
-                                    <span class="\${caseCount > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'} px-3 py-1 rounded-full text-xs font-medium inline-flex items-center w-fit">
-                                        <i class="fas fa-folder mr-1"></i>\${caseCount}件
-                                    </span>
-                                    \${activeCases > 0 ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs inline-flex items-center w-fit"><i class="fas fa-play-circle mr-1"></i>進行中 ' + activeCases + '</span>' : ''}
+                                    <div class="flex items-center gap-2">
+                                        <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium"><i class="fas fa-folder mr-1"></i>\${caseCount}件</span>
+                                        \${activeCases > 0 ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs"><i class="fas fa-play-circle mr-1"></i>進行中 ' + activeCases + '</span>' : ''}
+                                    </div>
+                                    \${latestCase ? '<span class="text-xs px-2 py-0.5 rounded ' + (statusColors[latestCase.status] || 'bg-gray-100') + '">' + (statusLabels[latestCase.status] || latestCase.status) + '</span>' : ''}
                                 </div>
+                                \`}
                             </td>
                             <td class="px-4 py-4 text-sm text-gray-500 hidden sm:table-cell">
-                                <div class="flex items-center gap-1">
-                                    <i class="fas fa-calendar text-gray-400"></i>
-                                    \${client.created_at?.split(' ')[0]?.replace(/-/g, '/') || '-'}
-                                </div>
+                                \${client.created_at?.split(' ')[0]?.replace(/-/g, '/') || '-'}
                             </td>
-                            <td class="px-4 py-4">
-                                <button class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors group-hover:bg-blue-600 group-hover:text-white">
-                                    <i class="fas fa-arrow-right"></i>
-                                </button>
+                            <td class="px-4 py-4 text-right">
+                                <div class="flex items-center justify-end gap-1">
+                                    <button onclick="event.stopPropagation(); openEditClientModal(\${client.id})" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="編集">
+                                        <i class="fas fa-pen text-xs"></i>
+                                    </button>
+                                    <a href="/client/\${client.id}" onclick="event.stopPropagation()" class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-colors text-xs font-medium">
+                                        詳細 <i class="fas fa-arrow-right"></i>
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     \`;
@@ -447,24 +430,37 @@ routes.get('/clients', async (c) => {
             
             function filterCustomers() {
                 const query = document.getElementById('searchQuery').value.toLowerCase();
+                const caseFilter = document.getElementById('caseFilter')?.value || '';
+                
+                function matchesFilter(el) {
+                    const name = (el.dataset.name || '').toLowerCase();
+                    const company = (el.dataset.company || '').toLowerCase();
+                    const cases = parseInt(el.dataset.cases || '0');
+                    const active = parseInt(el.dataset.active || '0');
+                    
+                    // テキスト検索
+                    if (query && !(name.includes(query) || company.includes(query))) return false;
+                    // 案件フィルター
+                    if (caseFilter === 'active' && active === 0) return false;
+                    if (caseFilter === 'noCases' && cases > 0) return false;
+                    
+                    return true;
+                }
+                
                 document.querySelectorAll('.customer-row').forEach(row => {
-                    const name = row.dataset.name.toLowerCase();
-                    const company = row.dataset.company.toLowerCase();
-                    row.style.display = (name.includes(query) || company.includes(query)) ? '' : 'none';
+                    row.style.display = matchesFilter(row) ? '' : 'none';
                 });
-                // カードビューもフィルター
                 document.querySelectorAll('.customer-card').forEach(card => {
-                    const name = card.dataset.name?.toLowerCase() || '';
-                    const company = card.dataset.company?.toLowerCase() || '';
-                    card.style.display = (name.includes(query) || company.includes(query)) ? '' : 'none';
+                    card.style.display = matchesFilter(card) ? '' : 'none';
                 });
             }
             
             // カード表示で顧客一覧を描画
             function renderClientsAsCards(clients) {
+                if (!Array.isArray(clients)) clients = [];
                 const container = document.getElementById('cardView');
-                if (!clients || clients.length === 0) {
-                    container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500"><i class="fas fa-users text-4xl text-gray-300 mb-3"></i><p>顧客が登録されていません</p></div>';
+                if (clients.length === 0) {
+                    container.innerHTML = '<div class="col-span-full text-center py-16"><div class="max-w-sm mx-auto"><div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-user-plus text-blue-400 text-2xl"></i></div><p class="text-gray-500 mb-1">顧客が登録されていません</p><p class="text-gray-400 text-sm mb-4">最初の顧客を登録して管理を始めましょう</p><button onclick="openNewCustomerModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium"><i class="fas fa-plus mr-1"></i>最初の顧客を登録</button></div></div>';
                     return;
                 }
                 
@@ -472,7 +468,7 @@ routes.get('/clients', async (c) => {
                 
                 container.innerHTML = clients.map((client, index) => {
                     const caseCount = client.cases?.length || 0;
-                    const activeCases = client.cases?.filter(c => c.status !== 'completed' && c.status !== 'rejected').length || 0;
+                    const activeCases = client.cases?.filter(c => c.status !== 'completed' && c.status !== 'rejected' && c.status !== 'archived').length || 0;
                     const avatarColor = avatarColors[index % avatarColors.length];
                     const initial = (client.company_name || client.name || '?')[0].toUpperCase();
                     
@@ -480,6 +476,8 @@ routes.get('/clients', async (c) => {
                         <div class="customer-card bg-white rounded-xl shadow-sm hover:shadow-lg transition-all cursor-pointer border border-gray-100 hover:border-blue-200 overflow-hidden"
                              data-name="\${client.name}" 
                              data-company="\${client.company_name || ''}"
+                             data-cases="\${caseCount}"
+                             data-active="\${activeCases}"
                              onclick="openClientQuickView(\${client.id})">
                             <div class="p-5">
                                 <div class="flex items-start gap-4">
@@ -490,26 +488,29 @@ routes.get('/clients', async (c) => {
                                         <h3 class="font-bold text-gray-900 truncate">\${client.name}</h3>
                                         <p class="text-sm text-gray-500 truncate">\${client.company_name || '-'}</p>
                                         <div class="flex flex-wrap gap-2 mt-2">
-                                            <span class="\${caseCount > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'} px-2 py-0.5 rounded-full text-xs font-medium">
-                                                <i class="fas fa-folder mr-1"></i>\${caseCount}件
-                                            </span>
-                                            \${activeCases > 0 ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs"><i class="fas fa-play-circle mr-1"></i>進行中 ' + activeCases + '</span>' : ''}
+                                            \${caseCount === 0 ? '<span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs">案件なし</span>' : \`
+                                                <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium"><i class="fas fa-folder mr-1"></i>\${caseCount}件</span>
+                                                \${activeCases > 0 ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs"><i class="fas fa-play-circle mr-1"></i>進行中 ' + activeCases + '</span>' : ''}
+                                            \`}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
-                                    <div class="text-gray-500">
+                                    <div class="text-gray-500 truncate">
                                         \${client.email ? '<i class="fas fa-envelope mr-1"></i>' + client.email : ''}
                                     </div>
                                     <div class="text-gray-400 text-xs">
-                                        <i class="fas fa-calendar mr-1"></i>\${client.created_at?.split(' ')[0]?.replace(/-/g, '/') || '-'}
+                                        \${client.created_at?.split(' ')[0]?.replace(/-/g, '/') || '-'}
                                     </div>
                                 </div>
                             </div>
-                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-3 flex justify-end">
-                                <span class="text-blue-600 text-sm font-medium flex items-center gap-1">
+                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-3 flex items-center justify-between">
+                                <button onclick="event.stopPropagation(); openEditClientModal(\${client.id})" class="text-gray-500 hover:text-blue-600 text-sm">
+                                    <i class="fas fa-pen mr-1"></i>編集
+                                </button>
+                                <a href="/client/\${client.id}" onclick="event.stopPropagation()" class="text-blue-600 text-sm font-medium flex items-center gap-1">
                                     詳細を見る <i class="fas fa-arrow-right"></i>
-                                </span>
+                                </a>
                             </div>
                         </div>
                     \`;
@@ -628,15 +629,6 @@ routes.get('/clients', async (c) => {
                     return;
                 }
                 
-                const statusLabels = {
-                    inquiry: '見込み',
-                    preparing: '書類準備中',
-                    applying: '申請中',
-                    adopted: '採択・入金待',
-                    rejected: '不採択',
-                    completed: '完了'
-                };
-                
                 document.getElementById('clientQuickViewContent').innerHTML = \`
                     <div class="space-y-3">
                         \${cases.map(c => \`
@@ -706,7 +698,7 @@ routes.get('/clients', async (c) => {
             // 顧客に紐づく新規案件作成
             function createCaseForClient(clientId) {
                 modalManager.close('clientQuickViewModal');
-                window.location.href = '/?openNewCase=true&client_id=' + clientId;
+                window.location.href = '/cases?newCase=true&client_id=' + clientId;
             }
             
             // CSVエクスポート
@@ -727,10 +719,12 @@ routes.get('/clients', async (c) => {
                 const data = Object.fromEntries(formData);
                 
                 if (!data.name) {
-                    alert('顧客名を入力してください');
+                    showToast('顧客名を入力してください', 'error');
                     return;
                 }
                 
+                const btn = document.querySelector('#newClientModal .modal-footer button:last-child');
+                setButtonLoading(btn, true);
                 try {
                     await axios.post('/api/clients', data);
                     modalManager.close('newClientModal');
@@ -738,7 +732,9 @@ routes.get('/clients', async (c) => {
                     await loadClients();
                 } catch (error) {
                     console.error('Error saving client:', error);
-                    alert('顧客の登録に失敗しました');
+                    showToast('顧客の登録に失敗しました', 'error');
+                } finally {
+                    setButtonLoading(btn, false);
                 }
             }
             
@@ -760,7 +756,7 @@ routes.get('/clients', async (c) => {
                     modalManager.open('editClientModal');
                 } catch (error) {
                     console.error('Error loading client:', error);
-                    alert('顧客情報の取得に失敗しました');
+                    showToast('顧客情報の取得に失敗しました', 'error');
                 }
             }
             
@@ -772,10 +768,12 @@ routes.get('/clients', async (c) => {
                 const clientId = data.id;
                 
                 if (!data.name) {
-                    alert('顧客名を入力してください');
+                    showToast('顧客名を入力してください', 'error');
                     return;
                 }
                 
+                const btn = document.querySelector('#editClientModal .modal-footer button:last-child');
+                setButtonLoading(btn, true);
                 try {
                     await axios.put('/api/clients/' + clientId, data);
                     modalManager.close('editClientModal');
@@ -783,25 +781,17 @@ routes.get('/clients', async (c) => {
                     await loadClients();
                 } catch (error) {
                     console.error('Error saving client:', error);
-                    alert('顧客情報の更新に失敗しました');
+                    showToast('顧客情報の更新に失敗しました', 'error');
+                } finally {
+                    setButtonLoading(btn, false);
                 }
             }
             
-            // トースト通知
-            function showToast(message, type = 'success') {
-                const toast = document.createElement('div');
-                toast.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ' + 
-                    (type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white');
-                toast.innerHTML = '<i class="fas ' + (type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle') + ' mr-2"></i>' + message;
-                document.body.appendChild(toast);
-                setTimeout(() => {
-                    toast.style.opacity = '0';
-                    toast.style.transition = 'opacity 0.3s';
-                    setTimeout(() => toast.remove(), 300);
-                }, 3000);
-            }
+            // showToast は sidebarScripts 共通版を使用
             
             // 初期化
+            const savedViewMode = localStorage.getItem('clients_view') || 'table';
+            if (savedViewMode !== 'table') setViewMode(savedViewMode);
             loadClients();
         </script>
     </body>

@@ -26,6 +26,12 @@ routes.get('/admin/users', (c) => {
             ${generateSidebar('users')}
             
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">従業員管理</span>
+                </div>
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
@@ -167,19 +173,7 @@ routes.get('/admin/users', (c) => {
             ${sidebarScripts}
         </script>
         <script>
-            // トースト表示
-            function showToast(message, type = 'success') {
-                const toast = document.getElementById('toast');
-                const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
-                toast.innerHTML = \`
-                    <div class="\${bgColor} text-white px-6 py-3 rounded-lg shadow-lg">
-                        <i class="fas fa-\${type === 'success' ? 'check-circle' : 'exclamation-circle'} mr-2"></i>
-                        \${message}
-                    </div>
-                \`;
-                toast.classList.remove('hidden');
-                setTimeout(() => toast.classList.add('hidden'), 3000);
-            }
+            // showToast は sidebarScripts 共通版を使用
 
             // ログアウト
             function logout() {

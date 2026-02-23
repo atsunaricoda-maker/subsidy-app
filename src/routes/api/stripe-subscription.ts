@@ -60,11 +60,11 @@ const STRIPE_PRICES = {
     business: 'price_1SeEJcHHmXlTI7JBxRPXqMqa',   // ¥30,000/月 - 月30枠
     enterprise: 'price_1SeEJdHHmXlTI7JBCuGRjpBk'  // ¥100,000/月 - 月100枠
   },
-  // 追加枠Price ID
+  // 追加枠Price ID（キーはDB slot_packages.package_code に合わせる）
   slots: {
-    slot_1: { price_id: 'price_1SeEJdHHmXlTI7JBhAQuNtYY', slots: 1, amount: 1500 },    // ¥1,500/枠
-    slot_3: { price_id: 'price_1SeEJdHHmXlTI7JBLidNMEmf', slots: 3, amount: 3000 },    // ¥3,000/3枠 (¥1,000/枠)
-    slot_10: { price_id: 'price_1SeEJeHHmXlTI7JBzWIBapUn', slots: 10, amount: 9000 }   // ¥9,000/10枠 (¥900/枠)
+    single: { price_id: 'price_1SeEJdHHmXlTI7JBhAQuNtYY', slots: 1, amount: 1500 },    // ¥1,500/枠
+    triple: { price_id: 'price_1SeEJdHHmXlTI7JBLidNMEmf', slots: 3, amount: 3000 },    // ¥3,000/3枠 (¥1,000/枠)
+    bulk: { price_id: 'price_1SeEJeHHmXlTI7JBzWIBapUn', slots: 10, amount: 9000 }   // ¥9,000/10枠 (¥900/枠)
   },
   // 管轄オプション
   addons: {
@@ -328,6 +328,58 @@ routes.post('/stripe/subscription-webhook', async (c) => {
   const payload = await c.req.text()
   const sig = c.req.header('stripe-signature')
   
+  // Webhook署名検証
+  if (STRIPE_WEBHOOK_SECRET && sig) {
+    try {
+      const parts = sig.split(',').reduce((acc: any, part: string) => {
+        const [key, value] = part.split('=')
+        acc[key] = value
+        return acc
+      }, {} as Record<string, string>)
+      
+      const timestamp = parts['t']
+      const signature = parts['v1']
+      
+      if (!timestamp || !signature) {
+        return c.json({ error: 'Invalid signature format' }, 400)
+      }
+      
+      // タイムスタンプの有効性チェック（5分以内）
+      const currentTime = Math.floor(Date.now() / 1000)
+      if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
+        return c.json({ error: 'Webhook timestamp too old' }, 400)
+      }
+      
+      // HMAC-SHA256で署名を検証
+      const signedPayload = `${timestamp}.${payload}`
+      const key = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(STRIPE_WEBHOOK_SECRET),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      )
+      const signatureBuffer = await crypto.subtle.sign(
+        'HMAC',
+        key,
+        new TextEncoder().encode(signedPayload)
+      )
+      const expectedSignature = Array.from(new Uint8Array(signatureBuffer))
+        .map(b => b.toString(16).padStart(2, '0')).join('')
+      
+      if (expectedSignature !== signature) {
+        console.error('Subscription webhook signature verification failed')
+        return c.json({ error: 'Invalid signature' }, 400)
+      }
+    } catch (e) {
+      console.error('Subscription webhook signature verification error:', e)
+      return c.json({ error: 'Signature verification failed' }, 400)
+    }
+  } else if (STRIPE_WEBHOOK_SECRET) {
+    console.error('Subscription webhook received without signature but STRIPE_WEBHOOK_SECRET is set')
+    return c.json({ error: 'Missing stripe-signature header' }, 400)
+  }
+  
   let event: any
   try {
     event = JSON.parse(payload)
@@ -465,9 +517,10 @@ routes.post('/stripe/subscription-webhook', async (c) => {
             const periodEnd = new Date()
             periodEnd.setDate(periodEnd.getDate() + 14)
             
+            // 14日トライアル付きなので、初期ステータスは 'trial'
             const subResult = await DB.prepare(`
               INSERT INTO user_subscriptions (organization_id, plan_id, status, stripe_subscription_id, stripe_customer_id, current_period_start, current_period_end)
-              VALUES (?, ?, 'active', ?, ?, date('now'), ?)
+              VALUES (?, ?, 'trial', ?, ?, date('now'), ?)
             `).bind(orgId, planId, stripeSubscriptionId, stripeCustomerId, periodEnd.toISOString().split('T')[0]).run()
             
             const subscriptionId = subResult.meta?.last_row_id
@@ -687,7 +740,9 @@ routes.post('/stripe/subscription-webhook', async (c) => {
     
     if (orgId) {
       // ステータス更新
+      // Stripe の 'trialing' を内部の 'trial' にマッピング
       const status = subscription.status === 'active' ? 'active' : 
+                     subscription.status === 'trialing' ? 'trial' :
                      subscription.status === 'canceled' ? 'cancelled' : subscription.status
       
       await DB.prepare(`

@@ -168,8 +168,36 @@ app.use('*', async (c, next) => {
     c.set('tenantOrgId', org.id)
     c.set('tenantSlug', slug)
   } else {
-    // サブドメインなし（shinsei-raku.com）の場合
-    // マスター管理者専用なので、マスター関連ページ以外はブロック
+    // サブドメインなし（shinsei-raku.com またはローカル開発環境）の場合
+    const hostForCheck = host.split(':')[0]
+    const isLocalDev = hostForCheck === 'localhost' || 
+                       hostForCheck.includes('sandbox.novita.ai') || 
+                       hostForCheck.includes('127.0.0.1')
+    
+    // ローカル開発環境の場合、DBからデフォルト組織を自動割り当て
+    if (isLocalDev) {
+      try {
+        const { DB } = c.env
+        const defaultOrg = await DB.prepare(`
+          SELECT id, name, slug, email, status, trial_ends_at, business_scope
+          FROM organizations 
+          WHERE status IN ('active', 'trial')
+          ORDER BY id ASC
+          LIMIT 1
+        `).first()
+        
+        if (defaultOrg) {
+          c.set('tenantOrg', defaultOrg)
+          c.set('tenantOrgId', defaultOrg.id)
+          c.set('tenantSlug', defaultOrg.slug || 'localhost')
+          return next()
+        }
+      } catch (e) {
+        console.error('Local dev auto-tenant error:', e)
+      }
+    }
+    
+    // 本番環境: マスター管理者専用なので、マスター関連ページ以外はブロック
     const path = c.req.path
     const allowedPaths = [
       '/master',

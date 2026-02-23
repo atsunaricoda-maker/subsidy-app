@@ -26,6 +26,12 @@ routes.get('/admin/backup', (c) => {
             ${generateSidebar('backup')}
             
             <main class="flex-1 min-h-screen">
+                <!-- パンくずリスト -->
+                <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
+                    <i class="fas fa-chevron-right text-gray-300 text-xs mx-2"></i>
+                    <span class="text-gray-800 font-medium">バックアップ管理</span>
+                </div>
                 <header class="bg-white shadow-sm sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 py-3">
                         <div class="flex items-center gap-4">
@@ -547,24 +553,7 @@ routes.get('/admin/backup', (c) => {
                 }
             }
 
-            // トースト通知
-            function showToast(message, type = 'success') {
-                const toast = document.getElementById('toast');
-                const colors = {
-                    success: 'bg-green-500 text-white',
-                    error: 'bg-red-500 text-white',
-                    warning: 'bg-yellow-500 text-white',
-                    info: 'bg-blue-500 text-white'
-                };
-                
-                toast.className = \`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transition-all transform \${colors[type]}\`;
-                toast.innerHTML = \`<i class="fas fa-\${type === 'success' ? 'check' : type === 'error' ? 'times' : type === 'warning' ? 'exclamation' : 'info'}-circle mr-2"></i>\${message}\`;
-                toast.classList.remove('translate-x-full', 'hidden');
-                
-                setTimeout(() => {
-                    toast.classList.add('translate-x-full');
-                }, 3000);
-            }
+            // showToast は sidebarScripts 共通版を使用
 
             // グローバルスコープに関数を公開（onclick対応）
             window.logout = logout;
