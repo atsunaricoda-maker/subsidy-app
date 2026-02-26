@@ -1,10 +1,20 @@
 // 認証関連ユーティリティ
+import type { Context } from 'hono'
+import type { AppEnv } from '../types'
+
+type AuthUser = {
+  id: number
+  username: string
+  name: string
+  role: string
+  organization_id: number
+}
 
 // 有効な組織IDを取得（テナント分離のための重要な関数）
 // 1. サブドメインのテナントIDがある場合、それを使用
 // 2. ユーザーが認証されている場合、ユーザーの組織IDを使用
-// 3. どちらもない場合はnullを返す（|| 1 のフォールバックを廃止）
-export function getEffectiveOrgId(c: any, user: any): number | null {
+// 3. どちらもない場合はnullを返す
+export function getEffectiveOrgId(c: Context<AppEnv>, user: AuthUser | null): number | null {
   // サブドメインからテナント組織IDを優先（最も安全）
   const tenantOrgId = c.get('tenantOrgId')
   if (tenantOrgId) {
@@ -22,7 +32,7 @@ export function getEffectiveOrgId(c: any, user: any): number | null {
 
 // ユーザー情報取得ヘルパー関数（organization_id含む）
 // サブドメインのテナント組織IDがある場合、それを優先（最も重要な変更）
-export async function getCurrentUser(c: any) {
+export async function getCurrentUser(c: Context<AppEnv>): Promise<AuthUser | null> {
   const authHeader = c.req.header('Authorization')
   if (!authHeader) return null
   
@@ -60,36 +70,33 @@ export async function getCurrentUser(c: any) {
           // 重要：サブドメインのテナントIDがある場合、必ずそれを使用
           // これによりトークンに埋め込まれたorganization_idに関係なく
           // サブドメインのテナントのデータのみ取得可能になる
-          const effectiveOrgId = tenantOrgId || user.organization_id
-          return { ...user, role: user.role || 'admin', organization_id: effectiveOrgId }
+          const effectiveOrgId = tenantOrgId || (user.organization_id as number)
+          return { id: user.id as number, username: user.username as string, name: user.name as string, role: (user.role as string) || 'admin', organization_id: effectiveOrgId }
         }
-        
+
         // テナントIDが指定されていてユーザーが見つからない場合はnull
         if (tenantOrgId) {
           return null
         }
       }
     }
-    
+
     // 古い形式のフォールバック: username:role
     const [username] = decoded.split(':')
     if (username) {
       let query = `SELECT id, username, name, role, organization_id FROM admin_users WHERE username = ?`
-      const bindings: any[] = [username]
-      
+      const bindings: (string | number)[] = [username]
+
       if (tenantOrgId) {
         query += ` AND organization_id = ?`
         bindings.push(tenantOrgId)
       }
-      
+
       const user = await DB.prepare(query).bind(...bindings).first()
       if (user) {
-        // 重要：サブドメインのテナントIDがある場合、必ずそれを使用
-        const effectiveOrgId = tenantOrgId || user.organization_id
-        return { ...user, role: user.role || 'admin', organization_id: effectiveOrgId }
+        const effectiveOrgId = tenantOrgId || (user.organization_id as number)
+        return { id: user.id as number, username: user.username as string, name: user.name as string, role: (user.role as string) || 'admin', organization_id: effectiveOrgId }
       }
-      
-      // ユーザーが見つからない場合はnull（デフォルトorganization_idへのフォールバック廃止）
     }
     return null
   } catch {

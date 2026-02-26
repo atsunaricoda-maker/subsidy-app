@@ -17,12 +17,12 @@
     "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed"
   },
   "dependencies": {
-    "hono": "^4.10.6",
-    "playwright": "^1.57.0"
+    "hono": "^4.10.6"
   },
   "devDependencies": {
     "@hono/vite-build": "^1.2.0",
     "@hono/vite-dev-server": "^0.18.2",
+    "playwright": "^1.57.0",
     "vite": "^6.3.5",
     "wrangler": "^4.4.0"
   }

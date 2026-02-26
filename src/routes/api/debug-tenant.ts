@@ -5,10 +5,16 @@ import { getCurrentUser, getEffectiveOrgId } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
-// テナント状態確認
+// テナント状態確認（認証必須）
 routes.get('/debug/tenant-status', async (c) => {
   const { DB } = c.env
-  
+
+  // 認証チェック: ログインユーザーのみアクセス可能
+  const user = await getCurrentUser(c)
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
   // ミドルウェアから取得されたテナント情報
   const tenantOrgId = c.get('tenantOrgId')
   const tenantSlug = c.get('tenantSlug')
@@ -18,8 +24,6 @@ routes.get('/debug/tenant-status', async (c) => {
   const originalHost = c.req.header('x-original-host') || ''
   const host = c.req.header('host') || ''
   
-  // ユーザー情報
-  const user = await getCurrentUser(c)
   const effectiveOrgId = getEffectiveOrgId(c, user)
   
   // 組織一覧

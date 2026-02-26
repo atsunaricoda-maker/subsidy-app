@@ -10,10 +10,10 @@ routes.get('/cron/check-guideline-updates', async (c) => {
   const { DB } = c.env
   const cronSecret = c.req.header('X-Cron-Secret')
   
-  // セキュリティチェック（本番環境では必須）
-  // if (cronSecret !== c.env.CRON_SECRET) {
-  //   return c.json({ error: 'Unauthorized' }, 401)
-  // }
+  // セキュリティチェック
+  if (!c.env.CRON_SECRET || cronSecret !== c.env.CRON_SECRET) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
   
   // 監視対象URLを取得
   const watchUrls = await DB.prepare(`
@@ -151,6 +151,12 @@ routes.get('/cron/check-guideline-updates', async (c) => {
 // Cron実行履歴取得
 routes.get('/cron/history', async (c) => {
   const { DB } = c.env
+
+  // 認証チェック
+  const user = await getCurrentUser(c)
+  if (!user) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
   
   const result = await DB.prepare(`
     SELECT 

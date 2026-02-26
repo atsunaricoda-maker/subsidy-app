@@ -75,8 +75,32 @@ import emailRoutes from './routes/api/email'
 
 const app = new Hono<AppEnv>()
 
-// CORS設定
-app.use('/api/*', cors())
+// CORS設定（許可オリジンを制限）
+app.use('/api/*', cors({
+  origin: (origin) => {
+    if (!origin) return null
+    if (origin.endsWith('.shinsei-raku.com') ||
+        origin === 'https://shinsei-raku.com' ||
+        origin.endsWith('.subsidy-app.pages.dev') ||
+        origin === 'https://subsidy-app.pages.dev' ||
+        origin.startsWith('http://localhost')) {
+      return origin
+    }
+    return null
+  },
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}))
+
+// セキュリティヘッダーミドルウェア
+app.use('*', async (c, next) => {
+  await next()
+  c.res.headers.set('X-Content-Type-Options', 'nosniff')
+  c.res.headers.set('X-Frame-Options', 'DENY')
+  c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  c.res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+})
 
 // マルチテナントミドルウェア：サブドメインから組織を判別
 app.use('*', async (c, next) => {
@@ -1091,6 +1115,12 @@ app.post('/api/find-organization', async (c) => {
   
   if (!email || typeof email !== 'string') {
     return c.json({ found: false, error: 'メールアドレスを入力してください' }, 400)
+  }
+
+  // メールアドレス形式チェック
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    return c.json({ found: false, error: '有効なメールアドレスを入力してください' }, 400)
   }
   
   try {

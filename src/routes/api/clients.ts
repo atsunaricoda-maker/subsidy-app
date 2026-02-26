@@ -120,20 +120,28 @@ routes.get('/clients', async (c) => {
   
   const result = await DB.prepare(query).bind(...params).all()
   
-  // 案件情報を含める場合
-  if (includeCases && result.results) {
-    const clientsWithCases = await Promise.all(result.results.map(async (client: any) => {
-      const casesResult = await DB.prepare(`
-        SELECT cases.*, subsidy_types.name as subsidy_type_name
-        FROM cases
-        LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
-        WHERE cases.client_id = ?
-        ORDER BY cases.created_at DESC
-      `).bind(client.id).all()
-      return {
-        ...client,
-        cases: casesResult.results || []
-      }
+  // 案件情報を含める場合（一括クエリでN+1問題を回避）
+  if (includeCases && result.results && result.results.length > 0) {
+    const clientIds = result.results.map((client: any) => client.id)
+    const placeholders = clientIds.map(() => '?').join(',')
+    const allCases = await DB.prepare(`
+      SELECT cases.*, subsidy_types.name as subsidy_type_name
+      FROM cases
+      LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
+      WHERE cases.client_id IN (${placeholders})
+      ORDER BY cases.created_at DESC
+    `).bind(...clientIds).all()
+
+    // client_idごとにグループ化
+    const casesByClient = new Map<number, any[]>()
+    for (const c of (allCases.results || []) as any[]) {
+      if (!casesByClient.has(c.client_id)) casesByClient.set(c.client_id, [])
+      casesByClient.get(c.client_id)!.push(c)
+    }
+
+    const clientsWithCases = result.results.map((client: any) => ({
+      ...client,
+      cases: casesByClient.get(client.id) || []
     }))
     return c.json(clientsWithCases)
   }
@@ -251,13 +259,18 @@ routes.get('/clients/:id/quick-view', async (c) => {
   const id = c.req.param('id')
   const tab = c.req.query('tab') || 'info'
   const user = await getCurrentUser(c)
-  
+  const orgId = getEffectiveOrgId(c, user)
+
   try {
-    // 顧客基本情報を取得
-    const client = await DB.prepare(`
-      SELECT * FROM clients WHERE id = ?
-    `).bind(id).first() as any
-    
+    // 顧客基本情報を取得（組織IDでフィルタリング）
+    let query = `SELECT * FROM clients WHERE id = ?`
+    const bindings: any[] = [id]
+    if (orgId) {
+      query += ` AND organization_id = ?`
+      bindings.push(orgId)
+    }
+    const client = await DB.prepare(query).bind(...bindings).first() as any
+
     if (!client) {
       return c.json({ error: 'Client not found' }, 404)
     }

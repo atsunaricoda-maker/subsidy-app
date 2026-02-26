@@ -19,7 +19,9 @@
       "bucket_name": "subsidy-app-documents"
     }
   ],
-  // Note: Environment variables (GEMINI_API_KEY, CRON_SECRET) are set in Cloudflare Dashboard
+  // Note: Environment variables are set in Cloudflare Dashboard:
+  // - GEMINI_API_KEY, CRON_SECRET, RECAPTCHA_SECRET_KEY
+  // - STRIPE_PUBLIC_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
   // Cron Triggers for scheduled guideline monitoring
   // Note: Cron triggers are configured in Cloudflare Dashboard for Pages
   // For Workers, use the following format:

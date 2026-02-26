@@ -6,14 +6,12 @@ import { hashPassword } from '../../utils/password'
 
 const routes = new Hono<AppEnv>()
 
-// ランダムパスワード生成
+// ランダムパスワード生成（暗号学的に安全な乱数）
 function generatePassword(length: number = 12): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'
-  let password = ''
-  for (let i = 0; i < length; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return password
+  const array = new Uint8Array(length)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => chars[byte % chars.length]).join('')
 }
 
 // リダイレクトURLを安全に取得（サブドメイン対応）

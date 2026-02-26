@@ -3259,7 +3259,8 @@ routes.post('/master/impersonate/:id', async (c) => {
     return c.json({ error: 'Admin not found for this organization' }, 404)
   }
   
-  const token = btoa(`${admin.id}:${Date.now()}:impersonate`)
+  // impersonationトークン（organization_idを含めて通常のトークン形式に準拠）
+  const token = btoa(`${admin.id}:${orgId}:${Date.now()}`)
   
   return c.json({
     token,

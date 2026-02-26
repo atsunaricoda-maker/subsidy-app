@@ -59,8 +59,9 @@ export async function hashPassword(password: string): Promise<string> {
  * @returns 一致すればtrue
  */
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  // 旧形式（平文）の場合は直接比較
+  // 旧形式（平文）の場合は直接比較（ログイン時に自動ハッシュ化される）
   if (!storedHash.startsWith('$pbkdf2$')) {
+    console.warn('SECURITY: Plaintext password comparison used. Password will be migrated on next login.')
     return password === storedHash
   }
   

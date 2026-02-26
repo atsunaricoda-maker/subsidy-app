@@ -5,6 +5,46 @@ import { getCurrentUser } from '../../utils/auth'
 
 const routes = new Hono<AppEnv>()
 
+// Stripe Webhook署名検証（Web Crypto API使用）
+async function verifyStripeSignature(
+  payload: string,
+  sigHeader: string,
+  secret: string,
+  toleranceSeconds: number = 300
+): Promise<boolean> {
+  const elements = sigHeader.split(',')
+  const timestamp = elements.find(e => e.startsWith('t='))?.slice(2)
+  const signature = elements.find(e => e.startsWith('v1='))?.slice(3)
+
+  if (!timestamp || !signature) return false
+
+  // タイムスタンプの許容範囲チェック（リプレイ攻撃防止）
+  const now = Math.floor(Date.now() / 1000)
+  if (Math.abs(now - parseInt(timestamp)) > toleranceSeconds) return false
+
+  const signedPayload = `${timestamp}.${payload}`
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload))
+  const expectedSig = Array.from(new Uint8Array(mac))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+
+  // タイミング攻撃防止の定数時間比較
+  if (expectedSig.length !== signature.length) return false
+  let result = 0
+  for (let i = 0; i < expectedSig.length; i++) {
+    result |= expectedSig.charCodeAt(i) ^ signature.charCodeAt(i)
+  }
+  return result === 0
+}
+
 // Stripe決済セッション作成
 routes.post('/clients/:clientId/create-checkout-session', async (c) => {
   const { DB, STRIPE_SECRET_KEY } = c.env as any
@@ -78,13 +118,25 @@ routes.post('/clients/:clientId/create-checkout-session', async (c) => {
 // Stripe Webhook受信
 routes.post('/stripe/webhook', async (c) => {
   const { DB, STRIPE_WEBHOOK_SECRET } = c.env as any
-  
+
   const payload = await c.req.text()
   const sig = c.req.header('stripe-signature')
-  
-  // Webhook署名検証（本番環境では必須）
-  // 簡易的な実装のため、署名検証は省略（本番では必ず実装してください）
-  
+
+  // Webhook署名検証
+  if (!sig) {
+    return c.json({ error: 'Missing stripe-signature header' }, 400)
+  }
+
+  if (STRIPE_WEBHOOK_SECRET) {
+    const isValid = await verifyStripeSignature(payload, sig, STRIPE_WEBHOOK_SECRET)
+    if (!isValid) {
+      console.error('Stripe webhook signature verification failed')
+      return c.json({ error: 'Invalid signature' }, 400)
+    }
+  } else {
+    console.warn('STRIPE_WEBHOOK_SECRET is not set - webhook signature verification skipped')
+  }
+
   let event: any
   try {
     event = JSON.parse(payload)

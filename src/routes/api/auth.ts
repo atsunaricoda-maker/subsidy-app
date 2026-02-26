@@ -7,9 +7,11 @@ import { sendEmail, getEmailSettings } from '../../utils/email'
 
 const routes = new Hono<AppEnv>()
 
-// 6桁の認証コード生成
+// 6桁の認証コード生成（暗号学的に安全な乱数）
 function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  const array = new Uint32Array(1)
+  crypto.getRandomValues(array)
+  return String(100000 + (array[0] % 900000))
 }
 
 // メール送信テストAPI（デバッグ用）
@@ -17,8 +19,9 @@ routes.post('/test-email', async (c) => {
   const { DB } = c.env
   const { email, test_secret } = await c.req.json()
   
-  // シークレットキーで保護
-  if (test_secret !== 'DEBUG_EMAIL_TEST_2024') {
+  // 認証チェック: ログインユーザーのみ使用可能
+  const user = await getCurrentUser(c)
+  if (!user) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
   
@@ -127,19 +130,12 @@ routes.post('/signup', async (c) => {
   const data = await c.req.json()
   
   // reCAPTCHA検証（シークレットキーが設定されている場合のみ）
-  const recaptchaSecretKey = RECAPTCHA_SECRET_KEY || '6LcKKr8qAAAAAH-_QIIABuXKmCeCVMCXPvBFAXwt'
-  if (data.recaptcha_token) {
+  const recaptchaSecretKey = RECAPTCHA_SECRET_KEY
+  if (recaptchaSecretKey && data.recaptcha_token) {
     const recaptchaResult = await verifyRecaptcha(data.recaptcha_token, recaptchaSecretKey)
     if (!recaptchaResult.success) {
-      console.warn('reCAPTCHA failed for signup:', recaptchaResult)
-      // reCAPTCHA失敗時も続行（サイトキー設定ミスの可能性があるため）
-      console.warn('Continuing despite reCAPTCHA failure')
-    } else {
-      console.log('reCAPTCHA passed with score:', recaptchaResult.score)
+      return c.json({ error: recaptchaResult.error || 'セキュリティ検証に失敗しました' }, 403)
     }
-  } else {
-    // トークンがない場合は警告のみ（reCAPTCHAが読み込めない環境用）
-    console.warn('No reCAPTCHA token provided - proceeding without verification')
   }
   
   // バリデーション
@@ -275,21 +271,13 @@ routes.post('/signup/send-verification', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
-  console.log('[SEND-VERIFICATION] Request received for email:', data.email)
-  
-  // reCAPTCHA検証（オプショナル - サイトキーが無効な場合に備える）
-  const recaptchaSecretKey = c.env.RECAPTCHA_SECRET_KEY || '6LcKKr8qAAAAAH-_QIIABuXKmCeCVMCXPvBFAXwt'
-  if (data.recaptcha_token) {
+  // reCAPTCHA検証（シークレットキーが設定されている場合のみ）
+  const recaptchaSecretKey = c.env.RECAPTCHA_SECRET_KEY
+  if (recaptchaSecretKey && data.recaptcha_token) {
     const recaptchaResult = await verifyRecaptcha(data.recaptcha_token, recaptchaSecretKey)
     if (!recaptchaResult.success) {
-      console.warn('[SEND-VERIFICATION] reCAPTCHA failed:', recaptchaResult)
-      // 失敗しても続行（サイトキー設定問題の可能性）
-      console.warn('[SEND-VERIFICATION] Continuing despite reCAPTCHA failure')
-    } else {
-      console.log('[SEND-VERIFICATION] reCAPTCHA passed, score:', recaptchaResult.score)
+      return c.json({ error: recaptchaResult.error || 'セキュリティ検証に失敗しました' }, 403)
     }
-  } else {
-    console.warn('[SEND-VERIFICATION] No reCAPTCHA token - proceeding without verification')
   }
   
   // バリデーション
@@ -391,8 +379,7 @@ routes.post('/signup/send-verification', async (c) => {
       }, 500)
     }
     
-    // デバッグ用：認証コードをログに出力
-    console.log(`[EMAIL VERIFICATION] Code sent to ${data.email}: ${verificationCode}`)
+    // 認証コード送信完了（コード自体はログに出力しない）
     
     // メール送信結果をログに含める（デバッグ時のみ参考）
     const emailSent = emailSettings.apiKey ? true : false

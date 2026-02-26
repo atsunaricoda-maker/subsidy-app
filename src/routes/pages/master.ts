@@ -3,6 +3,7 @@ import { generateMasterSidebar, masterSidebarScripts } from '../../templates/mas
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { getCurrentUser } from '../../utils/auth'
+import { verifyPassword, isPasswordHashed, hashPassword } from '../../utils/password'
 
 const routes = new Hono<AppEnv>()
 
@@ -76,17 +77,34 @@ routes.get('/master/login', (c) => {
 routes.post('/master/login', async (c) => {
   const { DB } = c.env
   const { username, password } = await c.req.json()
-  
+
+  // ユーザー名のみでマスター管理者を検索（パスワードは後で検証）
   const admin = await DB.prepare(`
-    SELECT * FROM master_admins WHERE username = ? AND password_hash = ?
-  `).bind(username, password).first()
-  
+    SELECT * FROM master_admins WHERE username = ?
+  `).bind(username).first() as any
+
   if (!admin) {
-    return c.json({ error: 'Invalid credentials' }, 401)
+    return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401)
   }
-  
+
+  // パスワード検証（ハッシュ化・平文の両方に対応）
+  const isPasswordValid = await verifyPassword(password, admin.password_hash)
+  if (!isPasswordValid) {
+    return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401)
+  }
+
+  // 旧形式（平文）のパスワードの場合、ハッシュ化して更新
+  if (!isPasswordHashed(admin.password_hash)) {
+    try {
+      const hashedPassword = await hashPassword(password)
+      await DB.prepare(`UPDATE master_admins SET password_hash = ? WHERE id = ?`).bind(hashedPassword, admin.id).run()
+    } catch (e) {
+      console.error('Failed to migrate master password:', e)
+    }
+  }
+
   const token = btoa(`master:${admin.id}:${Date.now()}`)
-  
+
   return c.json({
     token,
     name: admin.name,

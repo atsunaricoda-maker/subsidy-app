@@ -83,6 +83,7 @@ export function isOrganizationActive(org: any): boolean {
   if (org.status === 'active') return true
   
   if (org.status === 'trial') {
+    if (!org.trial_ends_at) return false
     const trialEnds = new Date(org.trial_ends_at)
     return trialEnds > new Date()
   }
