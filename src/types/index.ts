@@ -34,6 +34,12 @@ export type Variables = {
   };
   tenantOrgId?: number;
   tenantSlug?: string;
+  // マスター管理者用
+  masterAdmin?: {
+    id: number;
+    name: string;
+    role: string;
+  };
 }
 
 export type AppEnv = {

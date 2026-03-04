@@ -7,6 +7,52 @@ import { hashPassword } from '../../utils/password'
 
 const routes = new Hono<AppEnv>()
 
+// マスター管理者トークン検証ヘルパー
+async function verifyMasterToken(c: any): Promise<{ id: number; name: string; role: string } | null> {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader) return null
+
+  try {
+    const token = authHeader.replace('Bearer ', '')
+    const decoded = atob(token)
+    const parts = decoded.split(':')
+
+    // master:adminId:timestamp 形式
+    if (parts.length >= 2 && parts[0] === 'master') {
+      const masterId = parseInt(parts[1])
+      if (isNaN(masterId)) return null
+
+      const { DB } = c.env
+      const admin = await DB.prepare(
+        'SELECT id, name, role FROM master_admins WHERE id = ?'
+      ).bind(masterId).first()
+
+      if (!admin) return null
+      return admin as { id: number; name: string; role: string }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+// マスター管理APIミドルウェア: /master/* エンドポイントにサーバーサイド認証を追加
+routes.use('/master/*', async (c, next) => {
+  const path = c.req.path
+  const method = c.req.method
+
+  // API呼び出し（/api/master/*）のみ認証チェック
+  // ページ表示（GET /master/*）はクライアントサイドで認証チェック
+  if (path.startsWith('/api/master/')) {
+    const masterAdmin = await verifyMasterToken(c)
+    if (!masterAdmin) {
+      return c.json({ error: 'マスター管理者の認証が必要です' }, 401)
+    }
+    c.set('masterAdmin', masterAdmin)
+  }
+  await next()
+})
+
 // 設定一覧取得（テナント分離対応）
 routes.get('/settings', async (c) => {
   const { DB, CLAUDE_API_KEY } = c.env

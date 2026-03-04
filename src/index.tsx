@@ -78,7 +78,7 @@ const app = new Hono<AppEnv>()
 // CORS設定 - 許可するオリジンを制限
 app.use('/api/*', cors({
   origin: (origin) => {
-    if (!origin) return origin // サーバーサイドリクエスト
+    if (!origin) return origin // 同一オリジンリクエスト（Originヘッダーなし）
     // 本番ドメインとサブドメインを許可
     if (origin.endsWith('.shinsei-raku.com') || origin === 'https://shinsei-raku.com') {
       return origin
@@ -89,6 +89,10 @@ app.use('/api/*', cors({
     }
     // 開発環境
     if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      return origin
+    }
+    // サンドボックス環境
+    if (origin.includes('.sandbox.novita.ai') || origin.includes('.novita.ai')) {
       return origin
     }
     return null // その他のオリジンは拒否
@@ -116,6 +120,14 @@ app.use('*', async (c, next) => {
   
   // サブドメインがある場合、組織を解決
   if (slug) {
+    // サブドメインからの/masterアクセスをブロック（マスター管理はルートドメインのみ）
+    if (path.startsWith('/master') || path.startsWith('/api/master')) {
+      if (path.startsWith('/api/')) {
+        return c.json({ error: 'マスター管理はルートドメインからのみアクセスできます' }, 403)
+      }
+      return c.redirect('https://shinsei-raku.com/master/login')
+    }
+
     const { DB } = c.env
     const org = await getOrganizationBySlug(DB, slug)
     
@@ -1211,6 +1223,13 @@ app.route('', masterAnnouncementsPages)
 app.route('', masterGuidelinesPages)
 app.route('', masterPipelinesPages)
 app.route('', masterSubsidyTypesPages)
+// マスター管理ページのAPIルートを/apiプレフィックスでもアクセス可能にする
+// （ページJS内では /api/master/* を呼ぶため）
+app.route('/api', master_adminsPages)
+app.route('/api', master_dataPages)
+app.route('/api', master_plansPages)
+app.route('/api', masterGuidelinesPages)
+app.route('/api', masterPipelinesPages)
 // site_settingsの/master/*ページルートをルートレベルでもマウント
 app.route('', site_settingsRoutes)
 app.route('', pipelinesPages)

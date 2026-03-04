@@ -456,7 +456,7 @@ routes.get('/master/hearing-questions', async (c) => {
                 if (!confirm('この質問を削除しますか？')) return;
                 
                 try {
-                    await axios.delete('/api/master/hearing-questions/' + id);
+                    await axios.delete('/master/hearing-questions/' + id);
                     loadQuestions();
                 } catch (e) {
                     alert('削除に失敗しました');
@@ -484,9 +484,9 @@ routes.get('/master/hearing-questions', async (c) => {
                 
                 try {
                     if (id) {
-                        await axios.put('/api/master/hearing-questions/' + id, data);
+                        await axios.put('/master/hearing-questions/' + id, data);
                     } else {
-                        await axios.post('/api/master/hearing-questions', data);
+                        await axios.post('/master/hearing-questions', data);
                     }
                     closeModal();
                     loadQuestions();
