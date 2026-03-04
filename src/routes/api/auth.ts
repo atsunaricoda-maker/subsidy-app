@@ -7,18 +7,21 @@ import { sendEmail, getEmailSettings } from '../../utils/email'
 
 const routes = new Hono<AppEnv>()
 
-// 6桁の認証コード生成
+// 6桁の認証コード生成（暗号学的に安全な乱数を使用）
 function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  const array = new Uint32Array(1)
+  crypto.getRandomValues(array)
+  return (100000 + (array[0] % 900000)).toString()
 }
 
-// メール送信テストAPI（デバッグ用）
+// メール送信テストAPI（デバッグ用 - 本番では環境変数でシークレットを管理）
 routes.post('/test-email', async (c) => {
   const { DB } = c.env
   const { email, test_secret } = await c.req.json()
-  
-  // シークレットキーで保護
-  if (test_secret !== 'DEBUG_EMAIL_TEST_2024') {
+
+  // 環境変数からシークレットを取得（ハードコード廃止）
+  const expectedSecret = c.env.DEBUG_EMAIL_SECRET
+  if (!expectedSecret || test_secret !== expectedSecret) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
   
@@ -126,20 +129,18 @@ routes.post('/signup', async (c) => {
   const { DB, RECAPTCHA_SECRET_KEY } = c.env
   const data = await c.req.json()
   
-  // reCAPTCHA検証（シークレットキーが設定されている場合のみ）
-  const recaptchaSecretKey = RECAPTCHA_SECRET_KEY || '6LcKKr8qAAAAAH-_QIIABuXKmCeCVMCXPvBFAXwt'
-  if (data.recaptcha_token) {
+  // reCAPTCHA検証（シークレットキーが設定されている場合は必須）
+  const recaptchaSecretKey = RECAPTCHA_SECRET_KEY
+  if (recaptchaSecretKey) {
+    if (!data.recaptcha_token) {
+      return c.json({ error: 'セキュリティ検証が必要です。ページを再読み込みしてください。' }, 400)
+    }
     const recaptchaResult = await verifyRecaptcha(data.recaptcha_token, recaptchaSecretKey)
     if (!recaptchaResult.success) {
       console.warn('reCAPTCHA failed for signup:', recaptchaResult)
-      // reCAPTCHA失敗時も続行（サイトキー設定ミスの可能性があるため）
-      console.warn('Continuing despite reCAPTCHA failure')
-    } else {
-      console.log('reCAPTCHA passed with score:', recaptchaResult.score)
+      return c.json({ error: recaptchaResult.error || 'セキュリティ検証に失敗しました' }, 403)
     }
-  } else {
-    // トークンがない場合は警告のみ（reCAPTCHAが読み込めない環境用）
-    console.warn('No reCAPTCHA token provided - proceeding without verification')
+    console.log('reCAPTCHA passed with score:', recaptchaResult.score)
   }
   
   // バリデーション
@@ -147,8 +148,12 @@ routes.post('/signup', async (c) => {
     return c.json({ error: '必須項目を入力してください' }, 400)
   }
   
-  if (data.password.length < 6) {
-    return c.json({ error: 'パスワードは6文字以上で入力してください' }, 400)
+  if (data.password.length < 8) {
+    return c.json({ error: 'パスワードは8文字以上で入力してください' }, 400)
+  }
+  // パスワード複雑さチェック
+  if (!/[A-Za-z]/.test(data.password) || !/[0-9]/.test(data.password)) {
+    return c.json({ error: 'パスワードには英字と数字の両方を含めてください' }, 400)
   }
   
   // slugのバリデーション
@@ -266,7 +271,7 @@ routes.post('/signup', async (c) => {
     
   } catch (error: any) {
     console.error('Signup error:', error)
-    return c.json({ error: '登録に失敗しました: ' + error.message }, 500)
+    return c.json({ error: '登録に失敗しました。しばらく時間をおいてから再度お試しください。' }, 500)
   }
 })
 
@@ -277,19 +282,18 @@ routes.post('/signup/send-verification', async (c) => {
   
   console.log('[SEND-VERIFICATION] Request received for email:', data.email)
   
-  // reCAPTCHA検証（オプショナル - サイトキーが無効な場合に備える）
-  const recaptchaSecretKey = c.env.RECAPTCHA_SECRET_KEY || '6LcKKr8qAAAAAH-_QIIABuXKmCeCVMCXPvBFAXwt'
-  if (data.recaptcha_token) {
+  // reCAPTCHA検証（シークレットキーが設定されている場合は必須）
+  const recaptchaSecretKey = c.env.RECAPTCHA_SECRET_KEY
+  if (recaptchaSecretKey) {
+    if (!data.recaptcha_token) {
+      return c.json({ error: 'セキュリティ検証が必要です。ページを再読み込みしてください。' }, 400)
+    }
     const recaptchaResult = await verifyRecaptcha(data.recaptcha_token, recaptchaSecretKey)
     if (!recaptchaResult.success) {
       console.warn('[SEND-VERIFICATION] reCAPTCHA failed:', recaptchaResult)
-      // 失敗しても続行（サイトキー設定問題の可能性）
-      console.warn('[SEND-VERIFICATION] Continuing despite reCAPTCHA failure')
-    } else {
-      console.log('[SEND-VERIFICATION] reCAPTCHA passed, score:', recaptchaResult.score)
+      return c.json({ error: recaptchaResult.error || 'セキュリティ検証に失敗しました' }, 403)
     }
-  } else {
-    console.warn('[SEND-VERIFICATION] No reCAPTCHA token - proceeding without verification')
+    console.log('[SEND-VERIFICATION] reCAPTCHA passed, score:', recaptchaResult.score)
   }
   
   // バリデーション
@@ -447,10 +451,26 @@ routes.post('/signup/verify-email', async (c) => {
   }
 })
 
+// ログイン試行回数の追跡（メモリ内 - Workers間で共有されないが基本的なブルートフォース対策）
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
+const MAX_LOGIN_ATTEMPTS = 10
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000 // 15分
+
 // ログインAPI
 routes.post('/auth/login', async (c) => {
   const { DB } = c.env
   const { username, password } = await c.req.json()
+
+  // レート制限チェック
+  const attemptKey = username?.toLowerCase() || 'unknown'
+  const attempts = loginAttempts.get(attemptKey)
+  if (attempts && attempts.count >= MAX_LOGIN_ATTEMPTS) {
+    const elapsed = Date.now() - attempts.lastAttempt
+    if (elapsed < LOGIN_LOCKOUT_MS) {
+      return c.json({ error: 'ログイン試行回数が上限に達しました。しばらく時間をおいてから再度お試しください。' }, 429)
+    }
+    loginAttempts.delete(attemptKey) // ロックアウト期間経過後にリセット
+  }
   
   // サブドメインからテナント組織IDを取得
   const tenantOrgId = c.get('tenantOrgId')
@@ -475,18 +495,27 @@ routes.post('/auth/login', async (c) => {
   const user = await DB.prepare(query).bind(...bindValues).first() as any
   
   if (!user) {
+    // ログイン失敗を記録
+    const current = loginAttempts.get(attemptKey) || { count: 0, lastAttempt: 0 }
+    loginAttempts.set(attemptKey, { count: current.count + 1, lastAttempt: Date.now() })
     // サブドメインがある場合はより具体的なエラーメッセージ
     if (tenantOrgId) {
       return c.json({ error: 'このサブドメインで有効なアカウントではありません' }, 401)
     }
     return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401)
   }
-  
+
   // パスワードを検証（ハッシュ化されたパスワードと平文パスワードの両方に対応）
   const isPasswordValid = await verifyPassword(password, user.password_hash)
   if (!isPasswordValid) {
+    // ログイン失敗を記録
+    const current = loginAttempts.get(attemptKey) || { count: 0, lastAttempt: 0 }
+    loginAttempts.set(attemptKey, { count: current.count + 1, lastAttempt: Date.now() })
     return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401)
   }
+
+  // ログイン成功時にカウンターをリセット
+  loginAttempts.delete(attemptKey)
   
   // 旧形式（平文）のパスワードの場合、ハッシュ化して更新
   if (!isPasswordHashed(user.password_hash)) {

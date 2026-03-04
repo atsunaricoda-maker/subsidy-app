@@ -251,13 +251,19 @@ routes.get('/clients/:id/quick-view', async (c) => {
   const id = c.req.param('id')
   const tab = c.req.query('tab') || 'info'
   const user = await getCurrentUser(c)
-  
+
+  // organization_idでテナント分離
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+
   try {
-    // 顧客基本情報を取得
+    // 顧客基本情報を取得（テナント分離）
     const client = await DB.prepare(`
-      SELECT * FROM clients WHERE id = ?
-    `).bind(id).first() as any
-    
+      SELECT * FROM clients WHERE id = ? AND organization_id = ?
+    `).bind(id, orgId).first() as any
+
     if (!client) {
       return c.json({ error: 'Client not found' }, 404)
     }
@@ -330,11 +336,17 @@ routes.get('/clients/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const user = await getCurrentUser(c)
-  
+
+  // organization_idでテナント分離
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+
   const client = await DB.prepare(`
-    SELECT * FROM clients WHERE id = ?
-  `).bind(id).first()
-  
+    SELECT * FROM clients WHERE id = ? AND organization_id = ?
+  `).bind(id, orgId).first()
+
   if (!client) {
     return c.json({ error: 'Client not found' }, 404)
   }
@@ -366,14 +378,7 @@ routes.get('/clients/:id', async (c) => {
     })
     
     if (!isClientAssignee && !isCaseAssignee) {
-      return c.json({ 
-        error: 'Access denied',
-        debug: {
-          userUsername: user.username,
-          clientAssignedTo: client.assigned_to,
-          caseAssignees: cases.map((c: any) => c.assigned_to)
-        }
-      }, 403)
+      return c.json({ error: 'Access denied' }, 403)
     }
   }
   
@@ -425,19 +430,25 @@ routes.put('/clients/:id', async (c) => {
   const id = c.req.param('id')
   const data = await c.req.json()
   const user = await getCurrentUser(c)
-  
+
+  // organization_idでテナント分離
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+
   // completedステータスへの変更はadminのみ許可
   if (data.status === 'completed' && user && user.role !== 'admin') {
     return c.json({ error: 'プロジェクトの完了処理は管理者のみ実行できます' }, 403)
   }
-  
+
   await DB.prepare(`
-    UPDATE clients 
-    SET name = ?, company_name = ?, email = ?, phone = ?, 
+    UPDATE clients
+    SET name = ?, company_name = ?, email = ?, phone = ?,
         status = ?, assigned_staff = ?, assigned_to = ?, notes = ?, subsidy_type_id = ?,
         deposit_required = ?, deposit_amount = ?, withholding_tax = ?, contract_url = ?,
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
+    WHERE id = ? AND organization_id = ?
   `).bind(
     data.name,
     data.company_name || null,
@@ -452,9 +463,10 @@ routes.put('/clients/:id', async (c) => {
     data.deposit_amount || 0,
     data.withholding_tax !== undefined ? data.withholding_tax : 0,
     data.contract_url || null,
-    id
+    id,
+    orgId
   ).run()
-  
+
   return c.json({ success: true })
 })
 
@@ -463,9 +475,16 @@ routes.patch('/clients/:id', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const data = await c.req.json()
-  
-  // 現在の顧客データを取得
-  const current = await DB.prepare('SELECT * FROM clients WHERE id = ?').bind(id).first()
+  const user = await getCurrentUser(c)
+
+  // organization_idでテナント分離
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+
+  // 現在の顧客データを取得（テナント分離）
+  const current = await DB.prepare('SELECT * FROM clients WHERE id = ? AND organization_id = ?').bind(id, orgId).first()
   if (!current) {
     return c.json({ error: '顧客が見つかりません' }, 404)
   }
@@ -484,7 +503,7 @@ routes.patch('/clients/:id', async (c) => {
     UPDATE clients 
     SET name = ?, company_name = ?, email = ?, phone = ?, address = ?, notes = ?,
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
+    WHERE id = ? AND organization_id = ?
   `).bind(
     updated.name,
     updated.company_name,
@@ -492,9 +511,10 @@ routes.patch('/clients/:id', async (c) => {
     updated.phone,
     updated.address,
     updated.notes,
-    id
+    id,
+    orgId
   ).run()
-  
+
   return c.json({ success: true, message: '顧客情報を更新しました' })
 })
 
@@ -504,10 +524,22 @@ routes.delete('/clients/:id', async (c) => {
   const id = c.req.param('id')
   const user = await getCurrentUser(c)
   const keepCustomer = c.req.query('keep_customer') === 'true'
-  
+
   // adminのみ削除可能
   if (!user || user.role !== 'admin') {
     return c.json({ error: '顧客の削除は管理者のみ実行できます' }, 403)
+  }
+
+  // organization_idでテナント分離
+  const orgId = getEffectiveOrgId(c, user)
+  if (!orgId) {
+    return c.json({ error: '組織が特定できません' }, 401)
+  }
+
+  // 削除対象が自組織の顧客か確認
+  const clientCheck = await DB.prepare('SELECT id FROM clients WHERE id = ? AND organization_id = ?').bind(id, orgId).first()
+  if (!clientCheck) {
+    return c.json({ error: '顧客が見つかりません' }, 404)
   }
   
   try {

@@ -356,13 +356,16 @@ routes.post('/backup/import', async (c) => {
             // IDを除外して挿入（自動採番）
             const oldId = record.id
             delete record.id
-            
-            const columns = Object.keys(record)
-            const values = Object.values(record)
+
+            // SQLインジェクション対策: カラム名をホワイトリストで検証
+            const columns = Object.keys(record).filter(col => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(col))
+            if (columns.length === 0) continue
+            const values = columns.map(col => record[col])
             const placeholders = columns.map(() => '?').join(', ')
-            
+
+            // テーブル名はimportOrder配列から取得済み（ユーザー入力ではない）
             const result = await DB.prepare(`
-              INSERT INTO ${tableName} (${columns.join(', ')}) 
+              INSERT INTO ${tableName} (${columns.join(', ')})
               VALUES (${placeholders})
             `).bind(...values).run()
             

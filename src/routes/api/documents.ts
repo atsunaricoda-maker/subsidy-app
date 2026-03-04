@@ -241,20 +241,32 @@ routes.post('/documents/upload-file', async (c) => {
   }
 })
 
-// 汎用ファイルダウンロード
+// 汎用ファイルダウンロード（認証必須）
 routes.get('/documents/download-file/:path{.+}', async (c) => {
   const { R2 } = c.env
+  const user = await getCurrentUser(c)
+
+  // 認証チェック
+  if (!user) {
+    return c.json({ error: 'ログインが必要です' }, 401)
+  }
+
   const filePath = decodeURIComponent(c.req.param('path'))
-  
+
+  // パストラバーサル防止
+  if (filePath.includes('..') || filePath.startsWith('/')) {
+    return c.json({ error: 'Invalid path' }, 400)
+  }
+
   try {
     const object = await R2.get(filePath)
-    
+
     if (!object) {
       return c.json({ error: 'File not found' }, 404)
     }
-    
+
     const fileName = filePath.split('/').pop() || 'download'
-    
+
     return new Response(object.body, {
       headers: {
         'Content-Type': object.httpMetadata?.contentType || 'application/octet-stream',
@@ -298,7 +310,7 @@ routes.get('/documents/:id/download', async (c) => {
   return new Response(object.body, {
     headers: {
       'Content-Type': object.httpMetadata?.contentType || 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${doc.file_name}"`
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(doc.file_name)}`
     }
   })
 })
@@ -460,26 +472,42 @@ routes.put('/documents/:id/status', async (c) => {
   return c.json({ success: true, updated })
 })
 
-// ポータルからの書類アップロード（認証なし、クライアントIDで検証）
+// ポータルからの書類アップロード（アクセストークンで認証）
 routes.post('/portal/clients/:id/documents/upload', async (c) => {
   const { DB, R2 } = c.env
   const id = c.req.param('id')
-  
+
   try {
-    // クライアントの存在確認
-    const clientCheck = await DB.prepare(`
-      SELECT id, name, company_name, organization_id FROM clients WHERE id = ?
-    `).bind(id).first() as any
-    
+    // アクセストークンによる認証（クライアントIDだけでは不十分）
+    const formData = await c.req.formData()
+    const accessToken = formData.get('access_token') as string
+    const caseAccessToken = formData.get('case_access_token') as string
+
+    // クライアントの存在確認 + アクセストークン検証
+    let clientCheck: any = null
+    if (caseAccessToken) {
+      // 案件アクセストークンで認証
+      clientCheck = await DB.prepare(`
+        SELECT cl.id, cl.name, cl.company_name, cl.organization_id
+        FROM clients cl
+        JOIN cases ca ON ca.client_id = cl.id
+        WHERE cl.id = ? AND ca.access_token = ?
+      `).bind(id, caseAccessToken).first()
+    } else if (accessToken) {
+      // レガシー: クライアントアクセストークンで認証
+      clientCheck = await DB.prepare(`
+        SELECT id, name, company_name, organization_id FROM clients WHERE id = ? AND access_token = ?
+      `).bind(id, accessToken).first()
+    }
+
     if (!clientCheck) {
-      return c.json({ error: 'クライアントが見つかりません' }, 404)
+      return c.json({ error: 'アクセス権限がありません' }, 403)
     }
     
-    const formData = await c.req.formData()
     const file = formData.get('file') as File
     const documentType = formData.get('document_type') as string
     const caseId = formData.get('case_id') as string
-    
+
     if (!file) {
       return c.json({ error: 'ファイルが選択されていません' }, 400)
     }

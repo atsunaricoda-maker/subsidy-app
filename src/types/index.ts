@@ -11,6 +11,7 @@ export type Bindings = {
   RECAPTCHA_SECRET_KEY?: string;
   CLAUDE_API_KEY?: string;
   RESEND_API_KEY?: string;
+  DEBUG_EMAIL_SECRET?: string;
 }
 
 export type Variables = {

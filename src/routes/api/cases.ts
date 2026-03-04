@@ -45,28 +45,35 @@ routes.get('/cases', async (c) => {
     query += ` AND (cases.is_archived = 0 OR cases.is_archived IS NULL)`
   }
   
-  // ステータスフィルタ（許可された値のみ - SQLインジェクション対策）
+  // ステータスフィルタ（パラメータバインドを使用 - SQLインジェクション対策）
   const allowedStatuses = ['inquiry', 'preparing', 'applying', 'adopted', 'rejected', 'completed', 'submitted']
+  const bindings: any[] = [orgId]
+
   if (statusFilter && allowedStatuses.includes(statusFilter)) {
-    query += ` AND cases.status = '${statusFilter}'`
+    query += ` AND cases.status = ?`
+    bindings.push(statusFilter)
   }
-  
-  // 結果フィルタ
+
+  // 結果フィルタ（パラメータバインドを使用）
   if (resultFilter === 'approved') {
-    query += ` AND cases.result = 'approved'`
+    query += ` AND cases.result = ?`
+    bindings.push('approved')
   } else if (resultFilter === 'rejected') {
-    query += ` AND cases.result = 'rejected'`
+    query += ` AND cases.result = ?`
+    bindings.push('rejected')
   } else if (resultFilter === 'pending') {
-    query += ` AND (cases.result IS NULL AND cases.status = 'completed')`
+    query += ` AND (cases.result IS NULL AND cases.status = ?)`
+    bindings.push('completed')
   }
-  
+
   if (clientId) {
     query += ` AND cases.client_id = ? ORDER BY cases.created_at DESC`
-    const result = await DB.prepare(query).bind(orgId, clientId).all()
+    bindings.push(clientId)
+    const result = await DB.prepare(query).bind(...bindings).all()
     return c.json(result.results)
   } else {
     query += ` ORDER BY cases.created_at DESC`
-    const result = await DB.prepare(query).bind(orgId).all()
+    const result = await DB.prepare(query).bind(...bindings).all()
     return c.json(result.results)
   }
 })

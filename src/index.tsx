@@ -75,8 +75,29 @@ import emailRoutes from './routes/api/email'
 
 const app = new Hono<AppEnv>()
 
-// CORS設定
-app.use('/api/*', cors())
+// CORS設定 - 許可するオリジンを制限
+app.use('/api/*', cors({
+  origin: (origin) => {
+    if (!origin) return origin // サーバーサイドリクエスト
+    // 本番ドメインとサブドメインを許可
+    if (origin.endsWith('.shinsei-raku.com') || origin === 'https://shinsei-raku.com') {
+      return origin
+    }
+    // Cloudflare Pagesのプレビュー
+    if (origin.endsWith('.subsidy-app.pages.dev') || origin === 'https://subsidy-app.pages.dev') {
+      return origin
+    }
+    // 開発環境
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      return origin
+    }
+    return null // その他のオリジンは拒否
+  },
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400
+}))
 
 // マルチテナントミドルウェア：サブドメインから組織を判別
 app.use('*', async (c, next) => {
@@ -119,7 +140,7 @@ app.use('*', async (c, next) => {
             <div class="text-6xl mb-4">💼</div>
             <h1 class="text-2xl font-bold text-gray-800 mb-2">組織が見つかりません</h1>
             <p class="text-gray-600 mb-6">
-              <code class="bg-gray-100 px-2 py-1 rounded">${slug}.shinsei-raku.com</code> は登録されていません。
+              <code class="bg-gray-100 px-2 py-1 rounded">${slug.replace(/[<>"'&]/g, '')}.shinsei-raku.com</code> は登録されていません。
             </p>
             <div class="space-y-3">
               <a href="https://shinsei-raku.com/signup" class="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition">
