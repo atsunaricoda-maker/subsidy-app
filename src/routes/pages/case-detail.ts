@@ -758,7 +758,7 @@ routes.get('/case/:id', async (c) => {
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
-            const CASE_ID = ${id};
+            const CASE_ID = ${parseInt(String(id), 10) || 0};
             const CLIENT_ID = ${caseData.client_id};
             const SUBSIDY_TYPE_ID = ${caseData.subsidy_type_id || 'null'};
             const PORTAL_TOKEN = '${caseData.access_token}';
