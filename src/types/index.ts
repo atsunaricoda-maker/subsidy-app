@@ -7,6 +7,10 @@ export type Bindings = {
   CRON_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PUBLIC_KEY?: string;
+  RECAPTCHA_SECRET_KEY?: string;
+  CLAUDE_API_KEY?: string;
+  RESEND_API_KEY?: string;
 }
 
 export type Variables = {
