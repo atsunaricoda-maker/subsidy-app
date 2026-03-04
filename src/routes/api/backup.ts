@@ -123,8 +123,8 @@ routes.get('/backup/export', async (c) => {
       // 自組織のクライアントに紐づくパイプライン
       safeQuery(`SELECT * FROM client_pipelines WHERE client_id IN (${clientIdPlaceholders})`, clientIdList),
       // 自組織のクライアントに紐づくパイプラインタスク
-      safeQuery(`SELECT pt.* FROM pipeline_tasks pt 
-                 JOIN client_pipelines cp ON pt.pipeline_id = cp.id 
+      safeQuery(`SELECT pt.* FROM client_pipeline_tasks pt
+                 JOIN client_pipelines cp ON pt.pipeline_id = cp.id
                  WHERE cp.client_id IN (${clientIdPlaceholders})`, clientIdList)
     ])
 
@@ -267,7 +267,7 @@ routes.post('/backup/import', async (c) => {
       'invoices',
       'payment_history',
       'client_pipelines',
-      'pipeline_tasks'
+      'client_pipeline_tasks'
     ]
 
     // 既存の自組織データを削除（オプション）
@@ -286,7 +286,7 @@ routes.post('/backup/import', async (c) => {
         
         // 関連テーブルから削除（逆順）
         try {
-          await DB.prepare(`DELETE FROM pipeline_tasks WHERE pipeline_id IN (SELECT id FROM client_pipelines WHERE client_id IN (${placeholders}))`).bind(...existingClientIds).run()
+          await DB.prepare(`DELETE FROM client_pipeline_tasks WHERE pipeline_id IN (SELECT id FROM client_pipelines WHERE client_id IN (${placeholders}))`).bind(...existingClientIds).run()
           await DB.prepare(`DELETE FROM client_pipelines WHERE client_id IN (${placeholders})`).bind(...existingClientIds).run()
           await DB.prepare(`DELETE FROM payment_history WHERE client_id IN (${placeholders})`).bind(...existingClientIds).run()
           await DB.prepare(`DELETE FROM document_section_edits WHERE document_id IN (SELECT id FROM generated_documents WHERE client_id IN (${placeholders}))`).bind(...existingClientIds).run()

@@ -1659,10 +1659,12 @@ routes.post('/ai/refine-document', async (c) => {
   let subsidyType = '補助金'
   if (case_id) {
     const caseInfo = await DB.prepare(`
-      SELECT subsidy_type FROM cases WHERE id = ?
+      SELECT st.name as subsidy_type_name FROM cases c
+      LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
+      WHERE c.id = ?
     `).bind(case_id).first() as any
     if (caseInfo) {
-      subsidyType = caseInfo.subsidy_type || '補助金'
+      subsidyType = caseInfo.subsidy_type_name || '補助金'
     }
   }
   

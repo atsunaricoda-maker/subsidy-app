@@ -72,12 +72,12 @@ routes.post('/clients/:clientId/ai-chat', async (c) => {
     
     // パイプライン進捗を取得
     casePipeline = await DB.prepare(`
-      SELECT * FROM pipelines WHERE case_id = ? ORDER BY created_at DESC LIMIT 1
+      SELECT * FROM client_pipelines WHERE case_id = ? ORDER BY created_at DESC LIMIT 1
     `).bind(caseId).first()
     
     if (casePipeline) {
       const tasksResult = await DB.prepare(`
-        SELECT * FROM pipeline_tasks WHERE pipeline_id = ? ORDER BY sort_order ASC
+        SELECT * FROM client_pipeline_tasks WHERE pipeline_id = ? ORDER BY sort_order ASC
       `).bind((casePipeline as any).id).all()
       caseTasks = (tasksResult.results || []) as any[]
     }

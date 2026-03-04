@@ -554,14 +554,14 @@ routes.post('/master/hearing-questions', async (c) => {
   const data = await c.req.json()
   
   await DB.prepare(`
-    INSERT INTO hearing_questions (subsidy_type_id, category, question_text, hint_text, example_text, display_order, is_required)
+    INSERT INTO hearing_questions (subsidy_type_id, category, question_text, help_text, example_answer, display_order, is_required)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.subsidy_type_id,
     data.category,
     data.question_text,
-    data.hint_text || null,
-    data.example_text || null,
+    data.help_text || data.hint_text || null,
+    data.example_answer || data.example_text || null,
     data.display_order || 0,
     data.is_required ? 1 : 0
   ).run()
@@ -579,8 +579,8 @@ routes.put('/master/hearing-questions/:id', async (c) => {
       subsidy_type_id = ?,
       category = ?,
       question_text = ?,
-      hint_text = ?,
-      example_text = ?,
+      help_text = ?,
+      example_answer = ?,
       display_order = ?,
       is_required = ?
     WHERE id = ?
@@ -588,8 +588,8 @@ routes.put('/master/hearing-questions/:id', async (c) => {
     data.subsidy_type_id,
     data.category,
     data.question_text,
-    data.hint_text || null,
-    data.example_text || null,
+    data.help_text || data.hint_text || null,
+    data.example_answer || data.example_text || null,
     data.display_order || 0,
     data.is_required ? 1 : 0,
     id
