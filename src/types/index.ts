@@ -7,6 +7,11 @@ export type Bindings = {
   CRON_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PUBLIC_KEY?: string;
+  RECAPTCHA_SECRET_KEY?: string;
+  CLAUDE_API_KEY?: string;
+  RESEND_API_KEY?: string;
+  DEBUG_EMAIL_SECRET?: string;
 }
 
 export type Variables = {
@@ -29,6 +34,12 @@ export type Variables = {
   };
   tenantOrgId?: number;
   tenantSlug?: string;
+  // マスター管理者用
+  masterAdmin?: {
+    id: number;
+    name: string;
+    role: string;
+  };
 }
 
 export type AppEnv = {

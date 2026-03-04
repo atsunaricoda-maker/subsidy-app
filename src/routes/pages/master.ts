@@ -76,17 +76,36 @@ routes.get('/master/login', (c) => {
 routes.post('/master/login', async (c) => {
   const { DB } = c.env
   const { username, password } = await c.req.json()
-  
+
+  // ユーザー名でのみ検索（パスワードはアプリ側で検証）
   const admin = await DB.prepare(`
-    SELECT * FROM master_admins WHERE username = ? AND password_hash = ?
-  `).bind(username, password).first()
-  
+    SELECT * FROM master_admins WHERE username = ?
+  `).bind(username).first() as any
+
   if (!admin) {
     return c.json({ error: 'Invalid credentials' }, 401)
   }
-  
+
+  // パスワード検証（ハッシュ化済みかどうかで分岐）
+  const { verifyPassword, isPasswordHashed } = await import('../../utils/password')
+  const isValid = await verifyPassword(password, admin.password_hash)
+  if (!isValid) {
+    return c.json({ error: 'Invalid credentials' }, 401)
+  }
+
+  // 平文パスワードの場合、ハッシュ化して更新
+  if (!isPasswordHashed(admin.password_hash)) {
+    try {
+      const { hashPassword } = await import('../../utils/password')
+      const hashed = await hashPassword(password)
+      await DB.prepare(`UPDATE master_admins SET password_hash = ? WHERE id = ?`).bind(hashed, admin.id).run()
+    } catch (e) {
+      console.error('Failed to migrate master password:', e)
+    }
+  }
+
   const token = btoa(`master:${admin.id}:${Date.now()}`)
-  
+
   return c.json({
     token,
     name: admin.name,

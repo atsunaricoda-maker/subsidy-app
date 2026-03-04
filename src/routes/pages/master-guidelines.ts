@@ -1260,7 +1260,7 @@ routes.get('/master/guidelines', (c) => {
             async function checkUpdatesNow() {
                 showToast('更新チェックを開始しています...');
                 try {
-                    const response = await axios.post('/api/master/subsidy-check-updates', {}, axiosConfig);
+                    const response = await axios.post('/api/subsidy-check-updates', {}, axiosConfig);
                     const result = response.data;
                     
                     const changes = result.results?.filter(r => r.change_detected).length || 0;

@@ -506,21 +506,6 @@ routes.get('/admin/notifications', async (c) => {
   return c.json(notifications)
 })
 
-// 通知を既読にする
-routes.put('/admin/notifications/:id/read', async (c) => {
-  const { DB } = c.env
-  const id = c.req.param('id')
-  const data = await c.req.json()
-  
-  await DB.prepare(`
-    UPDATE admin_notifications 
-    SET is_read = 1, read_by = ?, read_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).bind(data.read_by, id).run()
-  
-  return c.json({ success: true })
-})
-
 // 未読通知数取得
 routes.get('/admin/notifications/unread-count', async (c) => {
   const { DB } = c.env
@@ -655,6 +640,21 @@ routes.put('/admin/notifications/read-all', async (c) => {
     `).bind(read_by).run()
   }
   
+  return c.json({ success: true })
+})
+
+// 通知を個別既読にする（:idパラメータルートはread-allより後に定義）
+routes.put('/admin/notifications/:id/read', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+
+  await DB.prepare(`
+    UPDATE admin_notifications
+    SET is_read = 1, read_by = ?, read_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).bind(data.read_by, id).run()
+
   return c.json({ success: true })
 })
 
