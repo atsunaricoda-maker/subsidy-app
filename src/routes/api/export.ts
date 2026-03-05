@@ -67,7 +67,6 @@ routes.get('/export/clients/csv', async (c) => {
       SELECT 
         c.id,
         c.name,
-        c.company_name,
         c.email,
         c.phone,
         c.address,
@@ -82,13 +81,12 @@ routes.get('/export/clients/csv', async (c) => {
     `).bind(orgId).all()
     
     // CSVヘッダー
-    const headers = ['ID', '担当者名', '会社名', 'メールアドレス', '電話番号', '住所', '補助金種別', '案件数', '備考', '登録日']
+    const headers = ['ID', '顧客名/企業名', 'メールアドレス', '電話番号', '住所', '補助金種別', '案件数', '備考', '登録日']
     
     // CSVデータ
     const rows = (clients.results || []).map((client: any) => [
       client.id,
       client.name,
-      client.company_name || '',
       client.email || '',
       client.phone || '',
       client.address || '',
@@ -139,7 +137,6 @@ routes.get('/export/cases/csv', async (c) => {
         cs.created_at,
         cs.updated_at,
         c.name as client_name,
-        c.company_name,
         c.email as client_email,
         c.phone as client_phone,
         st.name as subsidy_type_name
@@ -151,14 +148,13 @@ routes.get('/export/cases/csv', async (c) => {
     `).bind(orgId).all()
     
     // CSVヘッダー
-    const headers = ['案件ID', '案件番号', '顧客名', '会社名', '補助金種別', 'ステータス', '着手金', '成功報酬', '締切日', 'メール', '電話番号', '備考', '登録日', '更新日']
+    const headers = ['案件ID', '案件番号', '顧客名/企業名', '補助金種別', 'ステータス', '着手金', '成功報酬', '締切日', 'メール', '電話番号', '備考', '登録日', '更新日']
     
     // CSVデータ
     const rows = (cases.results || []).map((cs: any) => [
       cs.id,
       cs.case_number || '',
       cs.client_name || '',
-      cs.company_name || '',
       cs.subsidy_type_name || '',
       statusLabels[cs.status] || cs.status || '',
       cs.deposit_amount || '',
@@ -215,7 +211,6 @@ routes.get('/export/invoices/csv', async (c) => {
         i.item_name,
         i.notes,
         c.name as client_name,
-        c.company_name,
         cs.case_number as case_name
       FROM invoices i
       LEFT JOIN clients c ON i.client_id = c.id
@@ -241,13 +236,12 @@ routes.get('/export/invoices/csv', async (c) => {
     }
     
     // CSVヘッダー
-    const headers = ['請求書番号', '顧客名', '会社名', '案件名', '種別', 'ステータス', '品目', '小計', '消費税', '合計金額', '発行日', '支払期限', '入金日', '備考']
+    const headers = ['請求書番号', '顧客名/企業名', '案件名', '種別', 'ステータス', '品目', '小計', '消費税', '合計金額', '発行日', '支払期限', '入金日', '備考']
     
     // CSVデータ
     const rows = (invoices.results || []).map((inv: any) => [
       inv.invoice_number || '',
       inv.client_name || '',
-      inv.company_name || '',
       inv.case_name || '',
       invoiceTypeLabels[inv.invoice_type] || inv.invoice_type || '',
       invoiceStatusLabels[inv.status] || inv.status || '',
@@ -290,7 +284,7 @@ routes.get('/generated-documents/:id/export', async (c) => {
   // テナント分離: 自組織のクライアントに紐づく文書のみ取得可能
   const doc = await DB.prepare(`
     SELECT gd.*, dt.template_name, dt.sections as template_sections,
-           c.name as client_name, c.company_name, c.organization_id,
+           c.name as client_name, c.organization_id,
            COALESCE(st_template.name, st_client.name) as subsidy_name
     FROM generated_documents gd
     JOIN document_templates dt ON gd.template_id = dt.id
@@ -458,7 +452,7 @@ routes.get('/generated-documents/:id/export', async (c) => {
   <div class="doc-header">
     <h1>事 業 計 画 書</h1>
     <table class="meta-table">
-      <tr><td>申請者：</td><td>${doc.company_name || doc.client_name}</td></tr>
+      <tr><td>申請者：</td><td>${doc.client_name}</td></tr>
       <tr><td>申請補助金：</td><td>${doc.subsidy_name || '未設定'}</td></tr>
       <tr><td>作成日：</td><td>${dateStr}</td></tr>
     </table>
@@ -480,7 +474,6 @@ routes.get('/generated-documents/:id/export', async (c) => {
     return c.json({
       title: doc.document_title,
       client_name: doc.client_name,
-      company_name: doc.company_name,
       subsidy_name: doc.subsidy_name,
       created_at: doc.created_at,
       updated_at: doc.updated_at,
@@ -532,7 +525,6 @@ routes.post('/clients/:clientId/export-all-documents', async (c) => {
     client: {
       id: client.id,
       name: client.name,
-      company_name: client.company_name,
       subsidy_name: client.subsidy_name
     },
     documents: (docs.results || []).map((doc: any) => {

@@ -26,7 +26,7 @@ routes.get('/cases', async (c) => {
     SELECT 
       cases.*,
       clients.name as client_name,
-      clients.company_name,
+      /* company_name removed - unified into name */
       clients.email,
       clients.phone,
       subsidy_types.name as subsidy_type_name,
@@ -100,7 +100,7 @@ routes.get('/cases/:id', async (c) => {
     SELECT 
       cases.*,
       clients.name as client_name,
-      clients.company_name,
+      /* company_name removed - unified into name */
       clients.email,
       clients.phone,
       subsidy_types.name as subsidy_type_name,
@@ -137,7 +137,7 @@ routes.get('/cases/:id/quick-view', async (c) => {
     SELECT 
       cases.*,
       clients.name as client_name,
-      clients.company_name,
+      /* company_name removed - unified into name */
       clients.email,
       clients.phone,
       subsidy_types.name as subsidy_type_name,
@@ -361,7 +361,7 @@ routes.get('/cases/token/:token', async (c) => {
       cases.*,
       clients.id as client_id,
       clients.name as client_name,
-      clients.company_name,
+      /* company_name removed - unified into name */
       clients.email,
       clients.phone,
       subsidy_types.name as subsidy_type_name

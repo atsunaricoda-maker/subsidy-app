@@ -181,7 +181,6 @@ routes.get('/clients-with-cases', async (c) => {
       cases.updated_at,
       clients.id as client_id,
       clients.name,
-      clients.company_name,
       clients.email,
       clients.phone,
       subsidy_types.name as subsidy_type_name,
@@ -285,7 +284,6 @@ routes.get('/clients/:id/quick-view', async (c) => {
     const baseData = {
       id: client.id,
       name: client.name,
-      company_name: client.company_name,
       email: client.email,
       phone: client.phone,
       address: client.address,
@@ -414,11 +412,10 @@ routes.post('/clients', async (c) => {
   
   // 顧客基本情報のみ登録（案件情報は別途casesテーブルに登録）
   const result = await DB.prepare(`
-    INSERT INTO clients (name, company_name, email, phone, address, assigned_staff, assigned_to, access_token, organization_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (name, email, phone, address, assigned_staff, assigned_to, access_token, organization_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     data.name,
-    data.company_name || null,
     data.email || null,
     data.phone || null,
     data.address || null,
@@ -453,14 +450,13 @@ routes.put('/clients/:id', async (c) => {
 
   await DB.prepare(`
     UPDATE clients
-    SET name = ?, company_name = ?, email = ?, phone = ?,
+    SET name = ?, email = ?, phone = ?,
         status = ?, assigned_staff = ?, assigned_to = ?, notes = ?, subsidy_type_id = ?,
         deposit_required = ?, deposit_amount = ?, withholding_tax = ?, contract_url = ?,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND organization_id = ?
   `).bind(
     data.name,
-    data.company_name || null,
     data.email || null,
     data.phone || null,
     data.status,
@@ -501,7 +497,6 @@ routes.patch('/clients/:id', async (c) => {
   // 更新対象のフィールドのみマージ
   const updated = {
     name: data.name !== undefined ? data.name : current.name,
-    company_name: data.company_name !== undefined ? data.company_name : current.company_name,
     email: data.email !== undefined ? data.email : current.email,
     phone: data.phone !== undefined ? data.phone : current.phone,
     address: data.address !== undefined ? data.address : current.address,
@@ -510,12 +505,11 @@ routes.patch('/clients/:id', async (c) => {
   
   await DB.prepare(`
     UPDATE clients 
-    SET name = ?, company_name = ?, email = ?, phone = ?, address = ?, notes = ?,
+    SET name = ?, email = ?, phone = ?, address = ?, notes = ?,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND organization_id = ?
   `).bind(
     updated.name,
-    updated.company_name,
     updated.email,
     updated.phone,
     updated.address,

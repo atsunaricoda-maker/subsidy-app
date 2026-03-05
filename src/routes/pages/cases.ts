@@ -217,13 +217,9 @@ routes.get('/cases', async (c) => {
                         
                         <div id="wizNewCustomer" class="hidden space-y-3">
                             <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-600 mb-1">顧客名 *</label>
-                                    <input type="text" id="wizNewName" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="山田太郎">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-600 mb-1">会社名</label>
-                                    <input type="text" id="wizNewCompany" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="株式会社サンプル">
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">顧客名 / 企業名 *</label>
+                                    <input type="text" id="wizNewName" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="例: 山田太郎 / 株式会社サンプル">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-600 mb-1">メール</label>
@@ -459,7 +455,6 @@ routes.get('/cases', async (c) => {
                                     \${c.result === 'rejected' ? '<span class="px-1 py-0.5 rounded text-xs bg-red-500 text-white">不採択</span>' : ''}
                                 </div>
                                 <div class="font-semibold text-gray-900 text-sm truncate">\${c.client_name || '未設定'}</div>
-                                \${c.company_name ? '<div class="text-xs text-gray-400 truncate">' + c.company_name + '</div>' : ''}
                                 \${c.subsidy_type_name ? '<div class="mt-1"><span class="inline-block px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 truncate">' + c.subsidy_type_name + '</span></div>' : ''}
                                 \${hasProgress ? \`
                                 <div class="mt-1.5">
@@ -535,7 +530,6 @@ routes.get('/cases', async (c) => {
                             <td class="px-4 py-3 font-mono text-sm text-gray-500">\${c.case_number || '#' + c.id}</td>
                             <td class="px-4 py-3">
                                 <div class="font-medium text-gray-900">\${c.client_name || '未設定'}</div>
-                                \${c.company_name ? '<div class="text-xs text-gray-500">' + c.company_name + '</div>' : ''}
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-600">\${c.subsidy_type_name || '-'}</td>
                             <td class="px-4 py-3">
@@ -621,7 +615,6 @@ routes.get('/cases', async (c) => {
                                 <div class="p-3 bg-gray-50 rounded-lg">
                                     <div class="text-xs text-gray-500 mb-0.5">顧客名</div>
                                     <a href="/client/\${d.client_id}" class="font-medium text-blue-600 hover:underline">\${d.client_name || '-'}</a>
-                                    \${d.company_name ? '<div class="text-xs text-gray-400">' + d.company_name + '</div>' : ''}
                                 </div>
                                 <div class="p-3 bg-gray-50 rounded-lg">
                                     <div class="text-xs text-gray-500 mb-0.5">申請種別</div>
@@ -688,7 +681,7 @@ routes.get('/cases', async (c) => {
                     (clientsRes.data || []).forEach(c => {
                         const opt = document.createElement('option');
                         opt.value = c.id;
-                        opt.textContent = c.name + (c.company_name ? ' (' + c.company_name + ')' : '');
+                        opt.textContent = c.name;
                         select.appendChild(opt);
                     });
                     
@@ -821,7 +814,6 @@ routes.get('/cases', async (c) => {
                         // 新規顧客作成
                         const clientRes = await axios.post('/api/clients', {
                             name: document.getElementById('wizNewName').value,
-                            company_name: document.getElementById('wizNewCompany').value || null,
                             email: document.getElementById('wizNewEmail').value || null,
                             phone: document.getElementById('wizNewPhone').value || null,
                             address: document.getElementById('wizNewAddress').value || null

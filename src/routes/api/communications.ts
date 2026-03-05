@@ -58,8 +58,8 @@ routes.post('/clients/:id/communications', async (c) => {
   
   // 顧客からのメッセージの場合、管理者に通知を作成
   if (data.sender_type === 'client') {
-    const client = await DB.prepare(`SELECT name, company_name, organization_id FROM clients WHERE id = ?`).bind(id).first() as any
-    const clientName = client?.company_name || client?.name || '顧客'
+    const client = await DB.prepare(`SELECT name, organization_id FROM clients WHERE id = ?`).bind(id).first() as any
+    const clientName = client?.name || '顧客'
     const clientOrgId = client?.organization_id
     await DB.prepare(`
       INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
@@ -94,7 +94,7 @@ routes.post('/portal/clients/:id/communications', async (c) => {
     
     // client_idとaccess_tokenで検証
     const clientCheck = await DB.prepare(`
-      SELECT id, name, company_name, organization_id FROM clients WHERE id = ?
+      SELECT id, name, organization_id FROM clients WHERE id = ?
     `).bind(id).first() as any
     
     if (!clientCheck) {
@@ -114,7 +114,7 @@ routes.post('/portal/clients/:id/communications', async (c) => {
     
     // 管理者に通知を作成
     try {
-      const clientName = clientCheck.company_name || clientCheck.name || '顧客'
+      const clientName = clientCheck.name || '顧客'
       await DB.prepare(`
         INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
         VALUES (?, ?, ?, ?, ?, ?)

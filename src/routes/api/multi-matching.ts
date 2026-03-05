@@ -46,7 +46,7 @@ routes.post('/clients/:clientId/comprehensive-matching', async (c) => {
   const prompt = `あなたは補助金コンサルタントの専門家です。以下の企業情報を基に、利用可能な全ての補助金との適合性を詳細に分析してください。
 
 【企業情報】
-- 会社名: ${client.company_name || '未設定'}
+- 顧客名/企業名: ${client.name || '未設定'}
 - 業種: ${profile?.industry || '不明'}
 - 従業員数: ${profile?.employee_count || '不明'}人
 - 年商: ${profile?.annual_revenue ? profile.annual_revenue + '万円' : '不明'}
@@ -173,7 +173,7 @@ ${(subsidies.results || []).map((s: any) => `
       success: true,
       error: 'AI分析が一時的に利用できません。基本的な補助金情報を表示しています。',
       analysis: {
-        company_summary: client.company_name ? `${client.company_name}様の補助金候補` : '補助金候補一覧',
+        company_summary: client.name ? `${client.name}様の補助金候補` : '補助金候補一覧',
         recommendations: subsidyList.map((s: any, i: number) => ({
           subsidy_name: s.name,
           match_score: 50,

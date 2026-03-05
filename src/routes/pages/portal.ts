@@ -11,7 +11,7 @@ routes.get('/portal/:token', async (c) => {
   
   // まず案件テーブルから検索
   let caseData = await DB.prepare(`
-    SELECT cases.*, clients.name, clients.company_name, clients.email, clients.phone,
+    SELECT cases.*, clients.name, clients.email, clients.phone,
            clients.id as client_id
     FROM cases
     LEFT JOIN clients ON cases.client_id = clients.id
@@ -2199,8 +2199,7 @@ routes.get('/portal/:token', async (c) => {
                                         <div class="text-xs text-gray-600 font-medium mb-2">
                                             <i class="fas fa-user mr-1"></i>請求先
                                         </div>
-                                        <div class="font-bold text-gray-900">\${inv.client_company || inv.client_name || 'お客様'} 御中</div>
-                                        \${inv.client_name && inv.client_company ? \`<div class="text-sm text-gray-600">\${inv.client_name} 様</div>\` : ''}
+                                        <div class="font-bold text-gray-900">\${inv.client_name || 'お客様'} 御中</div>
                                         \${inv.client_email ? \`<div class="text-sm text-gray-600">Email: \${inv.client_email}</div>\` : ''}
                                     </div>
                                 </div>

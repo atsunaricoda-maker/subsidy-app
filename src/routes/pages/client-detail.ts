@@ -58,7 +58,7 @@ routes.get('/client/:id', async (c) => {
                     </div>
                     <div>
                         <div class="text-white font-bold text-sm">顧客詳細</div>
-                        <div class="text-teal-200 text-xs">${client.company_name || '個人'}</div>
+                        <div class="text-teal-200 text-xs">${client.name}</div>
                     </div>
                     <div class="ml-auto flex items-center gap-1.5 text-xs">
                         <span class="bg-white/10 text-white px-2.5 py-1 rounded-lg">
@@ -82,7 +82,7 @@ routes.get('/client/:id', async (c) => {
                             </button>
                             <div>
                                 <a href="/clients" class="text-xs text-teal-600 hover:text-teal-800"><i class="fas fa-arrow-left mr-1"></i>顧客一覧に戻る</a>
-                                <h2 class="text-lg font-bold text-gray-800">${client.name}${client.company_name ? ' (' + client.company_name + ')' : ''}</h2>
+                                <h2 class="text-lg font-bold text-gray-800">${client.name}</h2>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
@@ -229,12 +229,8 @@ routes.get('/client/:id', async (c) => {
                 </div>
                 <form id="editClientForm" class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium mb-1">顧客名 *</label>
-                        <input type="text" name="name" id="edit_name" required class="w-full px-3 py-2 border rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-1">会社名</label>
-                        <input type="text" name="company_name" id="edit_company_name" class="w-full px-3 py-2 border rounded-lg">
+                        <label class="block text-sm font-medium mb-1">顧客名 / 企業名 *</label>
+                        <input type="text" name="name" id="edit_name" required class="w-full px-3 py-2 border rounded-lg" placeholder="例: 山田太郎 / 株式会社サンプル">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">メールアドレス</label>
@@ -279,7 +275,7 @@ routes.get('/client/:id', async (c) => {
                         <h3 class="text-lg font-bold"><i class="fas fa-plus-circle mr-2"></i>新規案件を作成</h3>
                         <button onclick="closeNewCaseInlineModal()" class="text-white/80 hover:text-white text-xl"><i class="fas fa-times"></i></button>
                     </div>
-                    <p class="text-green-200 text-sm mt-1">${client.name}${client.company_name ? ' (' + client.company_name + ')' : ''}</p>
+                    <p class="text-green-200 text-sm mt-1">${client.name}</p>
                 </div>
                 <form id="newCaseInlineForm" class="p-5 space-y-4">
                     <div>
@@ -412,8 +408,6 @@ routes.get('/client/:id', async (c) => {
                     
                     document.getElementById('clientInfo').innerHTML = 
                         '<div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2">' +
-                            '<span class="text-gray-500"><i class="fas fa-building w-4 text-center mr-1"></i>会社名</span>' +
-                            '<span class="font-medium">' + (currentClient.company_name || '-') + '</span>' +
                             '<span class="text-gray-500"><i class="fas fa-envelope w-4 text-center mr-1"></i>メール</span>' +
                             '<span>' + (currentClient.email ? '<a href="mailto:' + currentClient.email + '" class="text-teal-600 hover:underline">' + currentClient.email + '</a>' : '-') + '</span>' +
                             '<span class="text-gray-500"><i class="fas fa-phone w-4 text-center mr-1"></i>電話</span>' +
@@ -670,7 +664,6 @@ routes.get('/client/:id', async (c) => {
             function editClient() {
                 if (!currentClient) return;
                 document.getElementById('edit_name').value = currentClient.name || '';
-                document.getElementById('edit_company_name').value = currentClient.company_name || '';
                 document.getElementById('edit_email').value = currentClient.email || '';
                 document.getElementById('edit_phone').value = currentClient.phone || '';
                 document.getElementById('edit_address').value = currentClient.address || '';
@@ -691,7 +684,7 @@ routes.get('/client/:id', async (c) => {
                     var formData = new FormData(e.target);
                     var data = Object.fromEntries(formData);
                     await axios.patch('/api/clients/' + CLIENT_ID, {
-                        name: data.name, company_name: data.company_name || null,
+                        name: data.name,
                         email: data.email || null, phone: data.phone || null,
                         address: data.address || null, notes: data.notes || null
                     });

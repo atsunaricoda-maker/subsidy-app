@@ -21,7 +21,6 @@ routes.get('/case/:id', async (c) => {
     SELECT 
       cases.*,
       clients.name as client_name,
-      clients.company_name,
       clients.email,
       clients.phone,
       clients.address,
@@ -115,7 +114,7 @@ routes.get('/case/:id', async (c) => {
                                     <span id="statusBadge" class="px-2.5 py-0.5 rounded-full text-xs font-medium"></span>
                                 </div>
                                 <a href="/client/${caseData.client_id}" class="text-xs text-gray-500 hover:text-teal-600 flex items-center gap-1 mt-0.5">
-                                    <i class="fas fa-user text-xs"></i>${caseData.client_name}${caseData.company_name ? ' (' + caseData.company_name + ')' : ''}
+                                    <i class="fas fa-user text-xs"></i>${caseData.client_name}
                                 </a>
                             </div>
                         </div>
@@ -181,7 +180,6 @@ routes.get('/case/:id', async (c) => {
                                 <i class="fas fa-external-link-alt text-xs text-gray-300 ml-auto group-hover:text-teal-500"></i>
                             </div>
                             <div class="font-bold text-gray-900 truncate">${caseData.client_name}</div>
-                            <div class="text-xs text-gray-500 truncate">${caseData.company_name || '-'}</div>
                         </a>
                         
                         <!-- 申請種別 -->

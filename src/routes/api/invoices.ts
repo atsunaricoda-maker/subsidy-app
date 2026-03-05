@@ -69,7 +69,6 @@ routes.get('/invoices/pending-payments', async (c) => {
     const invoices = await DB.prepare(`
       SELECT i.*, 
              c.name as client_name, 
-             c.company_name,
              cs.case_number
       FROM invoices i
       LEFT JOIN clients c ON i.client_id = c.id
@@ -115,7 +114,7 @@ routes.get('/cases/:caseId/invoices', async (c) => {
     
     // organization_idでテナント分離
     const invoices = await DB.prepare(`
-      SELECT i.*, c.name as client_name, c.company_name as client_company
+      SELECT i.*, c.name as client_name
       FROM invoices i
       LEFT JOIN clients c ON i.client_id = c.id
       WHERE i.case_id = ? AND i.organization_id = ?
@@ -175,7 +174,7 @@ routes.get('/invoices/:id', async (c) => {
   // organization_idでテナント分離
   const invoice = await DB.prepare(`
     SELECT i.*, 
-           c.name as client_name, c.company_name as client_company, c.email as client_email,
+           c.name as client_name, c.email as client_email,
            cs.case_number, st.name as subsidy_name,
            o.name as org_name, o.email as org_email, o.phone as org_phone, o.address as org_address,
            o.bank_name, o.bank_branch, o.bank_account_type, o.bank_account_number, o.bank_account_holder,
@@ -272,7 +271,7 @@ routes.post('/cases/:caseId/invoices', async (c) => {
     
     // 案件情報を取得
     const caseData = await DB.prepare(`
-      SELECT cs.*, c.id as client_id, c.company_name, st.name as subsidy_name
+      SELECT cs.*, c.id as client_id, c.name as client_name, st.name as subsidy_name
       FROM cases cs
       LEFT JOIN clients c ON cs.client_id = c.id
       LEFT JOIN subsidy_types st ON cs.subsidy_type_id = st.id
@@ -538,9 +537,9 @@ routes.put('/invoices/:id/report-transfer', async (c) => {
     
     // 管理者に通知を作成
     const client = invoice.client_id 
-      ? await DB.prepare(`SELECT name, company_name FROM clients WHERE id = ?`).bind(invoice.client_id).first() as any
+      ? await DB.prepare(`SELECT name FROM clients WHERE id = ?`).bind(invoice.client_id).first() as any
       : null
-    const clientName = client?.company_name || client?.name || '顧客'
+    const clientName = client?.name || '顧客'
     const typeLabel = invoice.invoice_type === 'success_fee' ? '成功報酬' : 
                       invoice.invoice_type === 'deposit' ? '着手金' : '請求'
     
@@ -709,7 +708,7 @@ routes.get('/invoices/:id/pdf', async (c) => {
   
   const invoice = await DB.prepare(`
     SELECT i.*, 
-           c.name as client_name, c.company_name as client_company,
+           c.name as client_name,
            cs.case_number, st.name as subsidy_name,
            o.name as org_name, o.email as org_email, o.phone as org_phone, o.address as org_address,
            o.bank_name, o.bank_branch, o.bank_account_type, o.bank_account_number, o.bank_account_holder,
@@ -919,7 +918,7 @@ routes.get('/invoices/:id/pdf', async (c) => {
         
         <div class="parties">
             <div class="client">
-                <div class="client-name">${inv.client_company || inv.client_name || '（顧客名）'}</div>
+                <div class="client-name">${inv.client_name || '（顧客名）'}</div>
             </div>
             <div class="issuer">
                 <div class="issuer-name">${inv.org_name || '（発行元）'}</div>

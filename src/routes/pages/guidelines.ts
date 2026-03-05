@@ -915,7 +915,7 @@ routes.get('/admin/guidelines', (c) => {
                                                         </div>
                                                         <div>
                                                             <div class="flex items-center gap-2">
-                                                                <span class="font-medium">\${caseItem.company_name || caseItem.client_name || '未設定'}</span>
+                                                                <span class="font-medium">\${caseItem.client_name || '未設定'}</span>
                                                                 <span class="text-xs px-2 py-0.5 rounded bg-\${statusConfig.color}-100 text-\${statusConfig.color}-700">
                                                                     \${statusConfig.label}
                                                                 </span>

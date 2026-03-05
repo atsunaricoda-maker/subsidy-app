@@ -152,8 +152,8 @@ routes.post('/clients/:clientId/report-transfer', async (c) => {
     }
     
     // 管理者に入金報告の通知を作成
-    const client = await DB.prepare(`SELECT name, company_name, organization_id FROM clients WHERE id = ?`).bind(clientId).first() as any
-    const clientName = client?.company_name || client?.name || '顧客'
+    const client = await DB.prepare(`SELECT name, organization_id FROM clients WHERE id = ?`).bind(clientId).first() as any
+    const clientName = client?.name || '顧客'
     const clientOrgId = client?.organization_id
     const amountFormatted = amount ? `${amount.toLocaleString()}円` : ''
     const typeLabel = paymentType === 'success_fee' ? '成功報酬' : '着手金'
@@ -275,7 +275,7 @@ routes.get('/payments/pending', async (c) => {
   try {
     // 旧payment_historyからの未確認報告 - organization_idでテナント分離
     const oldPayments = await DB.prepare(`
-      SELECT ph.*, c.name as client_name, c.company_name, 'payment_history' as source
+      SELECT ph.*, c.name as client_name, 'payment_history' as source
       FROM payment_history ph
       JOIN clients c ON ph.client_id = c.id
       WHERE ph.status = 'reported' AND c.organization_id = ?
@@ -295,7 +295,7 @@ routes.get('/payments/pending', async (c) => {
           i.item_name,
           i.case_id,
           c.name as client_name,
-          c.company_name,
+          /* company_name removed */
           cs.case_number,
           'invoices' as source
         FROM invoices i
@@ -345,7 +345,7 @@ routes.get('/payments/history', async (c) => {
         ph.payment_type,
         ph.bank_transfer_confirmed_at as confirmed_at,
         c.name as client_name,
-        c.company_name,
+        /* company_name removed */
         cs.case_number,
         st.name as subsidy_type_name,
         'payment_history' as source,
@@ -378,7 +378,7 @@ routes.get('/payments/history', async (c) => {
           i.invoice_type as payment_type,
           i.paid_at as confirmed_at,
           c.name as client_name,
-          c.company_name,
+          /* company_name removed */
           cs.case_number,
           st.name as subsidy_type_name,
           'invoices' as source,

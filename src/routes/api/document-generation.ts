@@ -220,7 +220,7 @@ routes.post('/clients/:clientId/generate-document', async (c) => {
   
   // 空のセクション内容で文書を作成
   const subsidyName = (client as any).subsidy_name || '補助金'
-  const companyName = (client as any).company_name || (client as any).name || '未設定'
+  const companyName = (client as any).name || '未設定'
   const documentTitle = `${subsidyName} 事業計画書 - ${companyName}`
   
   const emptySections: Record<string, string> = {}
@@ -348,7 +348,7 @@ routes.post('/clients/:clientId/prepare-document', async (c) => {
   
   // 空のセクション内容で文書を作成
   const subsidyName = (client as any).subsidy_name || '補助金'
-  const companyName = (client as any).company_name || (client as any).name || '未設定'
+  const companyName = (client as any).name || '未設定'
   const documentTitle = `${subsidyName} 事業計画書 - ${companyName}`
   
   const emptySections: Record<string, string> = {}
@@ -601,7 +601,7 @@ ${section.description}
 ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
 【顧客情報】
-- 会社名: ${client?.company_name || '未設定'}
+- 顧客名/企業名: ${client?.name || '未設定'}
 - 申請補助金: ${client?.subsidy_name}
 ${guidelinesInfo}
 
@@ -1012,7 +1012,7 @@ ${section.description}
 ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
 【顧客情報】
-- 会社名: ${client?.company_name || '未設定'}
+- 顧客名/企業名: ${client?.name || '未設定'}
 - 申請補助金: ${client?.subsidy_name}
 
 【ヒアリング回答】※この内容のみを情報源として使用すること

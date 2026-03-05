@@ -113,8 +113,8 @@ routes.post('/clients/:id/documents/upload', async (c) => {
     
     // 顧客からのアップロードの場合、管理者に通知を作成
     if (uploadedBy === 'client') {
-      const client = await DB.prepare(`SELECT name, company_name, organization_id FROM clients WHERE id = ?`).bind(id).first() as any
-      const clientName = client?.company_name || client?.name || '顧客'
+      const client = await DB.prepare(`SELECT name, organization_id FROM clients WHERE id = ?`).bind(id).first() as any
+      const clientName = client?.name || '顧客'
       const clientOrgId = client?.organization_id
       await DB.prepare(`
         INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
@@ -327,7 +327,7 @@ routes.get('/cases/:id/documents/download-all', async (c) => {
   
   // 案件情報取得 - organization_idでテナント分離
   const caseInfo = await DB.prepare(`
-    SELECT c.*, cl.name as client_name, cl.company_name, st.name as subsidy_name
+    SELECT c.*, cl.name as client_name, st.name as subsidy_name
     FROM cases c
     LEFT JOIN clients cl ON c.client_id = cl.id
     LEFT JOIN subsidy_types st ON c.subsidy_type_id = st.id
@@ -406,7 +406,7 @@ routes.get('/cases/:id/documents/download-all', async (c) => {
         const base64 = btoa(binaryString)
         
         // フォルダ構成: 共通書類/書類タイプ/ファイル または 案件名_補助金名/書類タイプ/ファイル
-        const caseFolderName = `${caseInfo.company_name || caseInfo.client_name || '案件'}_${caseInfo.subsidy_name || '申請'}`.replace(/[\\/:*?"<>|]/g, '_')
+        const caseFolderName = `${caseInfo.client_name || '案件'}_${caseInfo.subsidy_name || '申請'}`.replace(/[\\/:*?"<>|]/g, '_')
         const folderPath = doc.isCommon 
           ? `共通書類/${doc.type_name || doc.document_type || 'その他'}` 
           : `${caseFolderName}/${doc.document_type || 'その他'}`
@@ -424,7 +424,7 @@ routes.get('/cases/:id/documents/download-all', async (c) => {
   }
   
   // クライアント側でZIP生成するためのデータを返す
-  const clientName = caseInfo.company_name || caseInfo.client_name || '顧客'
+  const clientName = caseInfo.client_name || '顧客'
   const subsidyName = caseInfo.subsidy_name || '案件'
   
   return c.json({
@@ -488,7 +488,7 @@ routes.post('/portal/clients/:id/documents/upload', async (c) => {
     if (caseAccessToken) {
       // 案件アクセストークンで認証
       clientCheck = await DB.prepare(`
-        SELECT cl.id, cl.name, cl.company_name, cl.organization_id
+        SELECT cl.id, cl.name, cl.organization_id
         FROM clients cl
         JOIN cases ca ON ca.client_id = cl.id
         WHERE cl.id = ? AND ca.access_token = ?
@@ -496,7 +496,7 @@ routes.post('/portal/clients/:id/documents/upload', async (c) => {
     } else if (accessToken) {
       // レガシー: クライアントアクセストークンで認証
       clientCheck = await DB.prepare(`
-        SELECT id, name, company_name, organization_id FROM clients WHERE id = ? AND access_token = ?
+        SELECT id, name, organization_id FROM clients WHERE id = ? AND access_token = ?
       `).bind(id, accessToken).first()
     }
 
@@ -555,7 +555,7 @@ routes.post('/portal/clients/:id/documents/upload', async (c) => {
     
     // 管理者に通知を作成
     try {
-      const clientName = clientCheck.company_name || clientCheck.name || '顧客'
+      const clientName = clientCheck.name || '顧客'
       await DB.prepare(`
         INSERT INTO admin_notifications (notification_type, title, message, related_id, related_table, organization_id)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -586,7 +586,7 @@ routes.post('/portal/clients/:id/documents/upload', async (c) => {
         
         if (caseInfo?.admin_email) {
           const adminUrl = `https://${caseInfo.slug}.shinsei-raku.com/cases/${caseId}`
-          const clientName = clientCheck.company_name || clientCheck.name || '顧客'
+          const clientName = clientCheck.name || '顧客'
           
           await sendEmail({
             apiKey: emailSettings.apiKey,

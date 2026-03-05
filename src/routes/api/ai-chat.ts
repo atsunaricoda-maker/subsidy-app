@@ -158,7 +158,7 @@ routes.post('/clients/:clientId/ai-chat', async (c) => {
 
 【顧客情報】
 顧客名: ${client?.name || '未設定'}
-会社名: ${client?.company_name || '未設定'}
+顧客名/企業名: ${client?.name || '未設定'}
 申請予定の補助金: ${caseInfo?.subsidy_name || client?.subsidy_name || '未設定'}
 
 【添削対象の文書】
@@ -199,7 +199,7 @@ ${(chatHistory.results || []).reverse().map((m: any) => `${m.role === 'user' ? '
 
 【顧客情報】
 顧客名: ${client?.name || '未設定'} 様
-会社名: ${client?.company_name || '未設定'}
+顧客名/企業名: ${client?.name || '未設定'}
 申請中の補助金: ${subsidyName}${subsidyCategory ? `（${subsidyCategory}）` : ''}
 
 【現在の進捗状況】
@@ -288,7 +288,7 @@ routes.post('/clients/:clientId/ai-suggest', async (c) => {
 - 〇〇や△△などのプレースホルダーは使用せず、一般的な例を入れてください
 
 【顧客基本情報】
-会社名: ${client?.company_name || '未設定'}
+顧客名/企業名: ${client?.name || '未設定'}
 申請予定の補助金: ${client?.subsidy_name || '未設定'}
 ${profileInfo}
 

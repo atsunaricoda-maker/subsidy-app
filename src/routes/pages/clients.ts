@@ -70,7 +70,7 @@ routes.get('/clients', async (c) => {
                     <div class="mb-4 flex flex-col sm:flex-row gap-2">
                         <div class="flex-1 relative">
                             <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                            <input type="text" id="searchQuery" placeholder="顧客名・会社名で検索..." 
+                            <input type="text" id="searchQuery" placeholder="顧客名・企業名で検索..." 
                                    class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" onkeyup="filterCustomers()">
                         </div>
                         <div class="flex items-center gap-2">
@@ -179,12 +179,8 @@ routes.get('/clients', async (c) => {
             <div class="modal-body">
               <form id="newClientForm" class="space-y-4">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">顧客名 <span class="text-red-500">*</span></label>
-                  <input type="text" name="name" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="山田太郎">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">会社名</label>
-                  <input type="text" name="company_name" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="株式会社サンプル">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">顧客名 / 企業名 <span class="text-red-500">*</span></label>
+                  <input type="text" name="name" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="例: 山田太郎 / 株式会社サンプル">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                   <div>
@@ -232,12 +228,8 @@ routes.get('/clients', async (c) => {
               <form id="editClientForm" class="space-y-4">
                 <input type="hidden" name="id" id="editClientId">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">顧客名 <span class="text-red-500">*</span></label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">顧客名 / 企業名 <span class="text-red-500">*</span></label>
                   <input type="text" name="name" id="editClientName" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">会社名</label>
-                  <input type="text" name="company_name" id="editClientCompany" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                   <div>
@@ -374,12 +366,11 @@ routes.get('/clients', async (c) => {
                     const activeCases = client.cases?.filter(c => c.status !== 'completed' && c.status !== 'rejected' && c.status !== 'archived').length || 0;
                     const latestCase = client.cases?.[0];
                     const avatarColor = avatarColors[index % avatarColors.length];
-                    const initial = (client.company_name || client.name || '?')[0].toUpperCase();
+                    const initial = (client.name || '?')[0].toUpperCase();
                     
                     return \`
                         <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent customer-row cursor-pointer transition-all group" 
                             data-name="\${client.name}" 
-                            data-company="\${client.company_name || ''}"
                             data-cases="\${caseCount}"
                             data-active="\${activeCases}"
                             onclick="openClientQuickView(\${client.id})">
@@ -390,7 +381,6 @@ routes.get('/clients', async (c) => {
                                     </div>
                                     <div>
                                         <div class="font-semibold text-gray-900">\${client.name}</div>
-                                        <div class="text-xs text-gray-500">\${client.company_name || ''}</div>
                                     </div>
                                 </div>
                             </td>
@@ -434,12 +424,11 @@ routes.get('/clients', async (c) => {
                 
                 function matchesFilter(el) {
                     const name = (el.dataset.name || '').toLowerCase();
-                    const company = (el.dataset.company || '').toLowerCase();
                     const cases = parseInt(el.dataset.cases || '0');
                     const active = parseInt(el.dataset.active || '0');
                     
                     // テキスト検索
-                    if (query && !(name.includes(query) || company.includes(query))) return false;
+                    if (query && !name.includes(query)) return false;
                     // 案件フィルター
                     if (caseFilter === 'active' && active === 0) return false;
                     if (caseFilter === 'noCases' && cases > 0) return false;
@@ -470,12 +459,11 @@ routes.get('/clients', async (c) => {
                     const caseCount = client.cases?.length || 0;
                     const activeCases = client.cases?.filter(c => c.status !== 'completed' && c.status !== 'rejected' && c.status !== 'archived').length || 0;
                     const avatarColor = avatarColors[index % avatarColors.length];
-                    const initial = (client.company_name || client.name || '?')[0].toUpperCase();
+                    const initial = (client.name || '?')[0].toUpperCase();
                     
                     return \`
                         <div class="customer-card bg-white rounded-xl shadow-sm hover:shadow-lg transition-all cursor-pointer border border-gray-100 hover:border-blue-200 overflow-hidden"
                              data-name="\${client.name}" 
-                             data-company="\${client.company_name || ''}"
                              data-cases="\${caseCount}"
                              data-active="\${activeCases}"
                              onclick="openClientQuickView(\${client.id})">
@@ -486,7 +474,6 @@ routes.get('/clients', async (c) => {
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <h3 class="font-bold text-gray-900 truncate">\${client.name}</h3>
-                                        <p class="text-sm text-gray-500 truncate">\${client.company_name || '-'}</p>
                                         <div class="flex flex-wrap gap-2 mt-2">
                                             \${caseCount === 0 ? '<span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs">案件なし</span>' : \`
                                                 <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium"><i class="fas fa-folder mr-1"></i>\${caseCount}件</span>
@@ -553,7 +540,7 @@ routes.get('/clients', async (c) => {
                     const response = await axios.get('/api/clients/' + clientId + '/quick-view?tab=' + tab);
                     const data = response.data;
                     
-                    document.getElementById('clientQuickViewTitle').textContent = data.name + (data.company_name ? ' (' + data.company_name + ')' : '');
+                    document.getElementById('clientQuickViewTitle').textContent = data.name;
                     
                     if (tab === 'info') {
                         renderClientInfoTab(data);
@@ -574,12 +561,8 @@ routes.get('/clients', async (c) => {
                     <div class="space-y-6">
                         <div class="grid grid-cols-2 gap-4">
                             <div class="quick-view-item">
-                                <div class="quick-view-label">顧客名</div>
+                                <div class="quick-view-label">顧客名 / 企業名</div>
                                 <div class="quick-view-value">\${data.name || '-'}</div>
-                            </div>
-                            <div class="quick-view-item">
-                                <div class="quick-view-label">会社名</div>
-                                <div class="quick-view-value">\${data.company_name || '-'}</div>
                             </div>
                             <div class="quick-view-item">
                                 <div class="quick-view-label">メールアドレス</div>
@@ -746,7 +729,6 @@ routes.get('/clients', async (c) => {
                     
                     document.getElementById('editClientId').value = client.id;
                     document.getElementById('editClientName').value = client.name || '';
-                    document.getElementById('editClientCompany').value = client.company_name || '';
                     document.getElementById('editClientEmail').value = client.email || '';
                     document.getElementById('editClientPhone').value = client.phone || '';
                     document.getElementById('editClientAddress').value = client.address || '';

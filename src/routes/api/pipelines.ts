@@ -587,7 +587,6 @@ routes.get('/pipelines/all-active', async (c) => {
            pt.name as template_name,
            c.case_number as case_title,
            cl.name as client_name,
-           cl.company_name as client_company,
            st.name as subsidy_name
     FROM client_pipelines cp
     LEFT JOIN pipeline_templates pt ON cp.template_id = pt.id

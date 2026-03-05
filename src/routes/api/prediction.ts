@@ -75,7 +75,7 @@ ${guideline ? `
 ` : ''}
 
 【企業情報】
-- 会社名: ${client.company_name || '未設定'}
+- 顧客名/企業名: ${client.name || '未設定'}
 - 担当者: ${client.name}
 - 業種: ${profile?.industry || '不明'}
 - 従業員数: ${profile?.employee_count || '不明'}人
