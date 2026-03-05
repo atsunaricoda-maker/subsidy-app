@@ -85,10 +85,6 @@ routes.get('/portal/:token', async (c) => {
                             </select>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button onclick="openAiModal()" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-xl flex items-center gap-2 transition-all shadow-lg hover:shadow-xl hover:scale-105" title="AIサポート">
-                                <i class="fas fa-robot"></i>
-                                <span class="hidden sm:inline text-sm font-medium">AIに相談</span>
-                            </button>
                             <button onclick="openNewApplicationModal()" 
                                     class="bg-white text-green-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 shadow-lg hover:shadow-xl transition-all hover:scale-105">
                                 <i class="fas fa-plus"></i>
@@ -599,118 +595,6 @@ routes.get('/portal/:token', async (c) => {
                 </div>
             </div>
 
-            <!-- AIアシスタント モーダル -->
-            <div id="aiModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-end sm:items-center justify-center">
-                <div class="bg-white w-full sm:w-[500px] sm:max-w-lg sm:rounded-lg sm:m-4 rounded-t-2xl max-h-[85vh] flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-purple-600 text-white sm:rounded-t-lg rounded-t-2xl">
-                        <h3 class="font-bold"><i class="fas fa-robot mr-2"></i>AIアシスタント</h3>
-                        <button onclick="closeAiModal()" class="text-white hover:text-purple-200">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-                    
-                    <div id="portalAiChat" class="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-[300px]">
-                        <div class="text-center text-gray-500 py-8">
-                            <i class="fas fa-robot text-4xl mb-3 text-purple-400"></i>
-                            <p class="font-medium">補助金申請のお手伝いをします</p>
-                            <p class="text-sm mt-2">質問への回答方法や、書類の書き方など<br>なんでもお気軽にご相談ください</p>
-                        </div>
-                    </div>
-                    
-                    <div class="p-4 border-t bg-white sm:rounded-b-lg">
-                        <form id="portalAiChatForm" class="flex gap-2">
-                            <input type="text" id="portalAiChatInput" 
-                                   placeholder="質問を入力してください..." 
-                                   class="flex-1 px-4 py-3 border rounded-lg text-base" required>
-                            <button type="submit" 
-                                    class="bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI提案モーダル（質問個別） -->
-            <div id="aiSuggestModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-                <div class="bg-white w-full max-w-lg rounded-lg max-h-[80vh] flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b">
-                        <h3 class="font-bold text-purple-600"><i class="fas fa-magic mr-2"></i>AI回答提案</h3>
-                        <button onclick="closeAiSuggestModal()" class="text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="p-4 border-b bg-gray-50">
-                        <div class="text-sm text-gray-600 mb-1">質問:</div>
-                        <div id="suggestQuestionText" class="font-medium"></div>
-                    </div>
-                    
-                    <div class="flex-1 overflow-y-auto p-4">
-                        <div id="suggestContent" class="text-center py-8 text-gray-500">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>AIが回答を考えています...</p>
-                        </div>
-                    </div>
-                    
-                    <div id="suggestActions" class="p-4 border-t bg-gray-50 hidden">
-                        <div class="flex gap-2">
-                            <button onclick="applySuggestion()" class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
-                                <i class="fas fa-check mr-1"></i>この回答を使う
-                            </button>
-                            <button onclick="regenerateSuggestion()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">
-                                <i class="fas fa-redo"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI書類添削モーダル -->
-            <div id="aiEditDocModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-                <div class="bg-white w-full max-w-4xl rounded-lg max-h-[90vh] flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
-                        <div class="flex items-center gap-3">
-                            <i class="fas fa-magic text-xl"></i>
-                            <div>
-                                <h3 class="font-bold">AI書類添削</h3>
-                                <p id="editDocTitle" class="text-sm text-white/80"></p>
-                            </div>
-                        </div>
-                        <button onclick="closeAiEditDocModal()" class="text-white hover:text-white/80">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
-                        <div id="editDocLoading" class="text-center py-8">
-                            <i class="fas fa-spinner fa-spin text-3xl text-purple-600 mb-3"></i>
-                            <p class="text-gray-600">書類を読み込んでいます...</p>
-                        </div>
-                        
-                        <div id="editDocContent" class="hidden space-y-4">
-                            <!-- セクションごとの編集エリアが動的に生成される -->
-                        </div>
-                    </div>
-                    
-                    <div class="p-4 border-t bg-white rounded-b-lg">
-                        <div class="flex items-center justify-between gap-4">
-                            <div class="flex items-center gap-2 text-sm text-gray-500">
-                                <i class="fas fa-lightbulb text-yellow-500"></i>
-                                <span>セクションを選択して「AI添削」で改善提案を受けられます</span>
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick="closeAiEditDocModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">
-                                    キャンセル
-                                </button>
-                                <button onclick="saveEditedDocument()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                    <i class="fas fa-save mr-1"></i>保存
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- テンプレート選択モーダル -->
             <div id="templateModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
@@ -3742,10 +3626,6 @@ routes.get('/portal/:token', async (c) => {
                 // 入力ボタン群
                 const actionButtons = \`
                     <div class="flex flex-wrap gap-1 mt-2">
-                        <button onclick="openAiSuggestModal(\${question.id})" 
-                                class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200">
-                            <i class="fas fa-magic mr-1"></i>AI提案
-                        </button>
                         <button onclick="openTemplateModal(\${question.id})" 
                                 class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
                             <i class="fas fa-list-alt mr-1"></i>テンプレ
@@ -3876,13 +3756,33 @@ routes.get('/portal/:token', async (c) => {
                     \`;
                 }
                 
-                // モーダルを再利用（AI提案モーダルを流用）
-                const modal = document.getElementById('aiSuggestModal');
-                document.getElementById('suggestQuestionText').textContent = question.question_text;
-                document.getElementById('suggestContent').innerHTML = guideContent;
-                document.getElementById('suggestActions').classList.add('hidden');
-                modal.querySelector('h3').innerHTML = '<i class="fas fa-book mr-2"></i>書き方ガイド';
-                modal.classList.remove('hidden');
+                // 書き方ガイドを表示（シンプルなモーダル）
+                let guideModal = document.getElementById('writingGuideModal');
+                if (!guideModal) {
+                    guideModal = document.createElement('div');
+                    guideModal.id = 'writingGuideModal';
+                    guideModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+                    guideModal.onclick = (e) => { if (e.target === guideModal) guideModal.classList.add('hidden'); };
+                    document.body.appendChild(guideModal);
+                }
+                guideModal.innerHTML = \`
+                    <div class="bg-white w-full max-w-lg rounded-lg max-h-[80vh] flex flex-col">
+                        <div class="flex items-center justify-between p-4 border-b">
+                            <h3 class="font-bold text-blue-600"><i class="fas fa-book mr-2"></i>書き方ガイド</h3>
+                            <button onclick="document.getElementById('writingGuideModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <div class="p-4 border-b bg-gray-50">
+                            <div class="text-sm text-gray-600 mb-1">質問:</div>
+                            <div class="font-medium">\${question.question_text}</div>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-4">
+                            \${guideContent}
+                        </div>
+                    </div>
+                \`;
+                guideModal.classList.remove('hidden');
             }
             
             function updateHearingAnswer(questionId, value) {
@@ -3969,204 +3869,15 @@ routes.get('/portal/:token', async (c) => {
             }
             
             async function autoFillWithAI() {
-                // 未回答の質問があるか確認
-                const unansweredQuestions = hearingQuestions.filter(q => !hearingAnswers[q.id] || !hearingAnswers[q.id].trim());
-                
-                if (unansweredQuestions.length === 0) {
-                    showMessage('success', 'すべての質問に回答済みです！');
-                    return;
-                }
-                
-                // AIチャットで相談を促す
-                const input = document.getElementById('portalAiChatInput');
-                input.value = \`以下の質問について、どのように回答すればよいか教えてください：\\n\\n\${unansweredQuestions.slice(0, 3).map((q, i) => \`\${i+1}. \${q.question_text}\`).join('\\n')}\`;
-                input.focus();
-                
-                // AIチャットセクションにスクロール
-                document.getElementById('portalAiChat').scrollIntoView({ behavior: 'smooth' });
-                
-                showMessage('info', 'AIアシスタントに質問の回答方法を相談しましょう');
+                // AI機能は現在無効です
+                showMessage('info', '現在この機能はご利用いただけません');
             }
 
             // ===============================
             // AIチャット機能
             // ===============================
-            
-            async function loadPortalAiChat() {
-                try {
-                    const response = await axios.get(\`/api/clients/\${CLIENT_ID}/ai-chat\`);
-                    const chats = response.data;
-                    
-                    const container = document.getElementById('portalAiChat');
-                    if (chats.length === 0) {
-                        container.innerHTML = \`
-                            <div class="text-center text-gray-500 py-8">
-                                <i class="fas fa-robot text-4xl mb-2 text-purple-400"></i>
-                                <p>こんにちは！補助金申請のお手伝いをします。</p>
-                                <p class="text-sm mt-2">ご質問やお困りのことがあればお聞かせください。</p>
-                            </div>
-                        \`;
-                        return;
-                    }
-                    
-                    container.innerHTML = chats.map(chat => \`
-                        <div class="flex \${chat.role === 'user' ? 'justify-end' : 'justify-start'} mb-3">
-                            <div class="max-w-[80%] \${chat.role === 'user' ? 'bg-green-100' : 'bg-purple-100'} rounded-lg p-3">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <i class="fas \${chat.role === 'user' ? 'fa-user' : 'fa-robot'} text-sm \${chat.role === 'user' ? 'text-green-600' : 'text-purple-600'}"></i>
-                                    <span class="text-xs font-medium">\${chat.role === 'user' ? 'あなた' : 'AIアシスタント'}</span>
-                                </div>
-                                <div class="text-sm whitespace-pre-wrap">\${chat.content}</div>
-                            </div>
-                        </div>
-                    \`).join('');
-                    
-                    container.scrollTop = container.scrollHeight;
-                } catch (error) {
-                    console.error('AI chat load error:', error);
-                }
-            }
-            
-            document.getElementById('portalAiChatForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const input = document.getElementById('portalAiChatInput');
-                const message = input.value.trim();
-                if (!message) return;
-                
-                input.value = '';
-                input.disabled = true;
-                
-                // ユーザーメッセージを即座に表示
-                const container = document.getElementById('portalAiChat');
-                container.innerHTML += \`
-                    <div class="flex justify-end mb-2">
-                        <div class="max-w-[85%] bg-green-100 rounded-lg px-3 py-2">
-                            <div class="text-sm text-gray-700">\${message}</div>
-                        </div>
-                    </div>
-                    <div class="flex justify-start mb-2" id="portalAiTyping">
-                        <div class="bg-purple-50 rounded-lg px-3 py-2 border border-purple-100">
-                            <i class="fas fa-circle-notch fa-spin text-purple-400 text-xs"></i>
-                            <span class="text-xs text-purple-400 ml-1">回答中...</span>
-                        </div>
-                    </div>
-                \`;
-                container.scrollTop = container.scrollHeight;
-                
-                try {
-                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/ai-chat\`, {
-                        message,
-                        context_type: 'client_portal'
-                    });
-                    
-                    document.getElementById('portalAiTyping').remove();
-                    
-                    const formattedResponse = formatAIResponse(response.data.response);
-                    container.innerHTML += \`
-                        <div class="flex justify-start mb-3">
-                            <div class="max-w-[85%] bg-purple-50 rounded-lg p-3 border border-purple-100">
-                                <div class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">\${formattedResponse}</div>
-                            </div>
-                        </div>
-                    \`;
-                    container.scrollTop = container.scrollHeight;
-                } catch (error) {
-                    document.getElementById('portalAiTyping')?.remove();
-                    showMessage('error', 'AI応答の取得に失敗しました');
-                }
-                
-                input.disabled = false;
-                input.focus();
-            });
-
-            // ===============================
             // モーダル関連
             // ===============================
-            
-            // AIアシスタントモーダル
-            function openAiModal() {
-                document.getElementById('aiModal').classList.remove('hidden');
-                document.getElementById('portalAiChatInput').focus();
-            }
-            
-            function closeAiModal() {
-                document.getElementById('aiModal').classList.add('hidden');
-            }
-            
-            // AI提案モーダル
-            let currentSuggestQuestionId = null;
-            let currentSuggestion = '';
-            
-            function openAiSuggestModal(questionId) {
-                currentSuggestQuestionId = questionId;
-                const question = hearingQuestions.find(q => q.id === questionId);
-                
-                document.getElementById('suggestQuestionText').textContent = question.question_text;
-                document.getElementById('suggestContent').innerHTML = \`
-                    <div class="text-center py-8 text-gray-500">
-                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                        <p>AIが回答を考えています...</p>
-                    </div>
-                \`;
-                document.getElementById('suggestActions').classList.add('hidden');
-                document.getElementById('aiSuggestModal').classList.remove('hidden');
-                
-                generateSuggestion(questionId);
-            }
-            
-            function closeAiSuggestModal() {
-                document.getElementById('aiSuggestModal').classList.add('hidden');
-            }
-            
-            async function generateSuggestion(questionId) {
-                const question = hearingQuestions.find(q => q.id === questionId);
-                
-                try {
-                    const response = await axios.post(\`/api/clients/\${CLIENT_ID}/ai-suggest\`, {
-                        question_id: questionId,
-                        question_text: question.question_text
-                    });
-                    
-                    currentSuggestion = formatAIResponse(response.data.suggestion);
-                    
-                    document.getElementById('suggestContent').innerHTML = \`
-                        <div class="bg-purple-50 rounded-lg p-4 border border-purple-100">
-                            <div class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">\${currentSuggestion}</div>
-                        </div>
-                    \`;
-                    document.getElementById('suggestActions').classList.remove('hidden');
-                } catch (error) {
-                    document.getElementById('suggestContent').innerHTML = \`
-                        <div class="text-center py-8 text-red-500">
-                            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                            <p>提案の取得に失敗しました</p>
-                        </div>
-                    \`;
-                }
-            }
-            
-            function regenerateSuggestion() {
-                document.getElementById('suggestContent').innerHTML = \`
-                    <div class="text-center py-8 text-gray-500">
-                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                        <p>別の回答を考えています...</p>
-                    </div>
-                \`;
-                document.getElementById('suggestActions').classList.add('hidden');
-                generateSuggestion(currentSuggestQuestionId);
-            }
-            
-            function applySuggestion() {
-                if (currentSuggestQuestionId && currentSuggestion) {
-                    const textarea = document.getElementById(\`answer-\${currentSuggestQuestionId}\`);
-                    if (textarea) {
-                        textarea.value = currentSuggestion;
-                        updateHearingAnswer(currentSuggestQuestionId, currentSuggestion);
-                    }
-                    closeAiSuggestModal();
-                    showMessage('success', '回答を入力しました');
-                }
-            }
             
             // テンプレートモーダル
             let currentTemplateQuestionId = null;
@@ -5042,15 +4753,9 @@ routes.get('/portal/:token', async (c) => {
             window.submitNewApplication = submitNewApplication;
             window.scrollToSection = scrollToSection;
             window.switchPortalTab = switchPortalTab;
-            window.openAiModal = openAiModal;
-            window.closeAiModal = closeAiModal;
             window.saveAllHearingAnswers = saveAllHearingAnswers;
             window.closeUploadModal = closeUploadModal;
             window.openUploadModal = openUploadModal;
-            window.openAiSuggestModal = openAiSuggestModal;
-            window.closeAiSuggestModal = closeAiSuggestModal;
-            window.applySuggestion = applySuggestion;
-            window.regenerateSuggestion = regenerateSuggestion;
             window.closeTemplateModal = closeTemplateModal;
             window.openTemplateModal = openTemplateModal;
             window.closeDataInputModal = closeDataInputModal;
@@ -5509,205 +5214,14 @@ routes.get('/portal/:token', async (c) => {
                 window.location.href = '/api/generated-documents/' + docId + '/download';
             }
             
-            // 書類を編集（AI添削モーダルを開く）
+            // 書類を編集（シンプルな編集モーダル）
             let currentEditDocId = null;
             let currentEditSections = {};
             
             async function editDocument(docId) {
-                currentEditDocId = docId;
-                const modal = document.getElementById('aiEditDocModal');
-                const loading = document.getElementById('editDocLoading');
-                const content = document.getElementById('editDocContent');
-                const titleEl = document.getElementById('editDocTitle');
-                
-                modal.classList.remove('hidden');
-                loading.classList.remove('hidden');
-                content.classList.add('hidden');
-                
-                try {
-                    // 書類データを取得
-                    const res = await axios.get('/api/generated-documents/' + docId);
-                    const doc = res.data.document;
-                    
-                    titleEl.textContent = doc.document_title || doc.document_type || '無題の書類';
-                    
-                    // セクションを解析
-                    let sections = {};
-                    if (doc.sections_content) {
-                        try {
-                            sections = typeof doc.sections_content === 'string' 
-                                ? JSON.parse(doc.sections_content) 
-                                : doc.sections_content;
-                        } catch (e) {
-                            sections = { content: doc.sections_content };
-                        }
-                    } else if (doc.content) {
-                        sections = { content: doc.content };
-                    }
-                    
-                    currentEditSections = sections;
-                    
-                    // セクションラベル
-                    const sectionLabels = {
-                        'company_overview': '会社概要・事業概要',
-                        'innovation': '革新的な取組内容',
-                        'equipment_plan': '設備投資計画',
-                        'future_outlook': '将来の展望・期待される効果',
-                        'schedule': '実施スケジュール',
-                        'content': '本文'
-                    };
-                    
-                    // 編集UIを生成
-                    let html = '';
-                    let sectionIndex = 0;
-                    for (const [key, value] of Object.entries(sections)) {
-                        sectionIndex++;
-                        const label = sectionLabels[key] || key;
-                        html += \`
-                            <div class="bg-white rounded-lg border shadow-sm" data-section-key="\${key}">
-                                <div class="flex items-center justify-between p-3 border-b bg-gray-50 rounded-t-lg">
-                                    <h4 class="font-bold text-gray-800">
-                                        <span class="text-purple-600 mr-2">\${sectionIndex}.</span>\${label}
-                                    </h4>
-                                    <button onclick="aiRefineSection('\${key}')" 
-                                            class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 flex items-center gap-1">
-                                        <i class="fas fa-magic"></i>
-                                        <span>AI添削</span>
-                                    </button>
-                                </div>
-                                <div class="p-3">
-                                    <textarea id="section_\${key}" 
-                                              class="w-full min-h-[150px] p-3 border rounded-lg text-sm leading-relaxed resize-y focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                                              placeholder="内容を入力...">\${value || ''}</textarea>
-                                    <div id="aiSuggestion_\${key}" class="hidden mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                                        <div class="flex items-center gap-2 mb-2">
-                                            <i class="fas fa-robot text-purple-600"></i>
-                                            <span class="font-medium text-purple-800">AI添削提案</span>
-                                        </div>
-                                        <div id="suggestionContent_\${key}" class="text-sm text-gray-700 whitespace-pre-wrap"></div>
-                                        <div class="flex gap-2 mt-3">
-                                            <button onclick="applySectionSuggestion('\${key}')" 
-                                                    class="px-3 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
-                                                <i class="fas fa-check mr-1"></i>この提案を適用
-                                            </button>
-                                            <button onclick="hideSectionSuggestion('\${key}')" 
-                                                    class="px-3 py-1.5 border rounded text-sm hover:bg-gray-100">
-                                                閉じる
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        \`;
-                    }
-                    
-                    if (Object.keys(sections).length === 0) {
-                        html = \`
-                            <div class="text-center py-8 text-gray-500">
-                                <i class="fas fa-file-alt text-4xl mb-3 text-gray-300"></i>
-                                <p>編集可能なセクションがありません</p>
-                            </div>
-                        \`;
-                    }
-                    
-                    content.innerHTML = html;
-                    loading.classList.add('hidden');
-                    content.classList.remove('hidden');
-                    
-                } catch (error) {
-                    console.error('Failed to load document:', error);
-                    loading.innerHTML = \`
-                        <div class="text-center text-red-500">
-                            <i class="fas fa-exclamation-circle text-3xl mb-3"></i>
-                            <p>書類の読み込みに失敗しました</p>
-                        </div>
-                    \`;
-                }
+                // AI添削機能は現在無効のため、書類のダウンロードを案内
+                showMessage('info', '書類の編集は管理者にお問い合わせください');
             }
-            
-            function closeAiEditDocModal() {
-                document.getElementById('aiEditDocModal').classList.add('hidden');
-                currentEditDocId = null;
-                currentEditSections = {};
-            }
-            
-            // AI添削を実行
-            async function aiRefineSection(sectionKey) {
-                const textarea = document.getElementById('section_' + sectionKey);
-                const suggestionDiv = document.getElementById('aiSuggestion_' + sectionKey);
-                const suggestionContent = document.getElementById('suggestionContent_' + sectionKey);
-                
-                const currentText = textarea.value;
-                if (!currentText.trim()) {
-                    alert('添削する内容がありません');
-                    return;
-                }
-                
-                suggestionDiv.classList.remove('hidden');
-                suggestionContent.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>AIが添削しています...';
-                
-                try {
-                    const res = await axios.post('/api/ai/refine-document', {
-                        section_key: sectionKey,
-                        content: currentText,
-                        case_id: CASE_ID
-                    });
-                    
-                    suggestionContent.textContent = res.data.refined || res.data.suggestion || '添削結果を取得できませんでした';
-                } catch (error) {
-                    console.error('AI refine error:', error);
-                    suggestionContent.innerHTML = '<span class="text-red-500">添削に失敗しました。もう一度お試しください。</span>';
-                }
-            }
-            
-            // AI提案を適用
-            function applySectionSuggestion(sectionKey) {
-                const textarea = document.getElementById('section_' + sectionKey);
-                const suggestionContent = document.getElementById('suggestionContent_' + sectionKey);
-                
-                textarea.value = suggestionContent.textContent;
-                hideSectionSuggestion(sectionKey);
-            }
-            
-            // AI提案を閉じる
-            function hideSectionSuggestion(sectionKey) {
-                document.getElementById('aiSuggestion_' + sectionKey).classList.add('hidden');
-            }
-            
-            // 編集内容を保存
-            async function saveEditedDocument() {
-                if (!currentEditDocId) return;
-                
-                // 各セクションの値を収集
-                const updatedSections = {};
-                for (const key of Object.keys(currentEditSections)) {
-                    const textarea = document.getElementById('section_' + key);
-                    if (textarea) {
-                        updatedSections[key] = textarea.value;
-                    }
-                }
-                
-                try {
-                    await axios.put('/api/generated-documents/' + currentEditDocId, {
-                        sections_content: JSON.stringify(updatedSections)
-                    });
-                    
-                    alert('保存しました');
-                    closeAiEditDocModal();
-                    loadGeneratedDocuments();
-                    loadProxyCreatedDocuments();
-                } catch (error) {
-                    console.error('Save error:', error);
-                    alert('保存に失敗しました');
-                }
-            }
-            
-            // グローバル関数登録
-            window.aiRefineSection = aiRefineSection;
-            window.applySectionSuggestion = applySectionSuggestion;
-            window.hideSectionSuggestion = hideSectionSuggestion;
-            window.closeAiEditDocModal = closeAiEditDocModal;
-            window.saveEditedDocument = saveEditedDocument;
             
             // 書類を承認
             async function approveDocument(docId) {
@@ -5776,7 +5290,6 @@ routes.get('/portal/:token', async (c) => {
                 loadDocuments();
                 loadCommonDocuments();
                 loadCommunications();
-                loadPortalAiChat();
             }
             initPortal();
         </script>
