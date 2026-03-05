@@ -329,7 +329,7 @@ routes.get('/master/hearing-questions', async (c) => {
                     });
                     
                     html += '<div class="bg-white rounded-lg shadow-sm overflow-hidden ' + catClass + '">';
-                    html += '<div class="tree-toggle p-3 flex items-center justify-between" onclick="toggleNode(\\'' + stName.replace(/'/g, "\\\\'") + '\\')">';
+                    html += '<div class="tree-toggle p-3 flex items-center justify-between" data-node-name="' + stName.replace(/"/g, '&quot;') + '" onclick="toggleNode(this.dataset.nodeName)">';
                     html += '<div class="flex items-center gap-3">';
                     html += '<i class="fas fa-chevron-' + (isExpanded ? 'down' : 'right') + ' text-gray-400 w-4 transition-transform"></i>';
                     html += '<span class="font-medium">' + stName + '</span>';

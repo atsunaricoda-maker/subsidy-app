@@ -427,7 +427,7 @@ routes.get('/client/:id', async (c) => {
                         '<div class="mt-4 pt-4 border-t">' +
                             '<div class="flex items-center justify-between mb-2">' +
                                 '<strong class="text-sm">案件 <span class="ml-1 px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs">' + cases.length + '</span></strong>' +
-                                '<button onclick="switchClientTab(\'cases\')" class="text-xs text-teal-600 hover:text-teal-800"><i class="fas fa-arrow-right mr-1"></i>詳細</button>' +
+                                '<button onclick="switchClientTab(&#39;cases&#39;)" class="text-xs text-teal-600 hover:text-teal-800"><i class="fas fa-arrow-right mr-1"></i>詳細</button>' +
                             '</div>' +
                             (cases.length > 0 ? cases.slice(0, 3).map(function(c) {
                                 var caseSubsidy = subsidyTypes.find(function(s) { return s.id === c.subsidy_type_id; });
@@ -439,7 +439,7 @@ routes.get('/client/:id', async (c) => {
                                     '</div>' +
                                     '<div class="font-medium text-sm mt-1 truncate">' + (caseSubsidy ? caseSubsidy.name : '未設定') + '</div>' +
                                 '</a>';
-                            }).join('') + (cases.length > 3 ? '<button onclick="switchClientTab(\'cases\')" class="text-xs text-teal-600 hover:underline w-full text-center py-1">他 ' + (cases.length - 3) + ' 件を表示</button>' : '') : '<div class="text-gray-400 text-xs text-center py-3"><i class="fas fa-folder-open mr-1"></i>案件がありません</div>') +
+                            }).join('') + (cases.length > 3 ? '<button onclick="switchClientTab(&#39;cases&#39;)" class="text-xs text-teal-600 hover:underline w-full text-center py-1">他 ' + (cases.length - 3) + ' 件を表示</button>' : '') : '<div class="text-gray-400 text-xs text-center py-3"><i class="fas fa-folder-open mr-1"></i>案件がありません</div>') +
                         '</div>' +
                         (cases.length > 0 ? '<div class="mt-3 pt-3 border-t">' +
                             '<div class="text-gray-500 text-xs mb-2"><i class="fas fa-link mr-1"></i>ポータルURL</div>' +
@@ -447,9 +447,11 @@ routes.get('/client/:id', async (c) => {
                                 var pUrl = window.location.origin + '/portal/' + c.access_token;
                                 var caseSubsidy = subsidyTypes.find(function(s) { return s.id === c.subsidy_type_id; });
                                 var label = 'No.' + String(c.id).padStart(4, '0') + (caseSubsidy ? ' ' + caseSubsidy.name : '');
+                                var safeUrl = pUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                                var safeName = (currentClient.name || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
                                 return '<div class="flex items-center gap-2 mb-1.5">' +
                                     '<span class="text-xs text-gray-600 truncate flex-shrink-0" style="max-width:140px" title="' + label + '">' + label + '</span>' +
-                                    '<button onclick="copyPortalUrl(\'' + pUrl.replace(/'/g, "\\'") + '\', \'' + (currentClient.name || '').replace(/'/g, "\\'") + '\')" class="bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 text-xs whitespace-nowrap"><i class="fas fa-copy mr-1"></i>コピー</button>' +
+                                    '<button data-portal-url="' + safeUrl + '" data-client-name="' + safeName + '" onclick="copyPortalUrl(this.dataset.portalUrl, this.dataset.clientName)" class="bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 text-xs whitespace-nowrap"><i class="fas fa-copy mr-1"></i>コピー</button>' +
                                     '<a href="' + pUrl + '" target="_blank" class="text-teal-600 hover:text-teal-800 text-xs"><i class="fas fa-external-link-alt"></i></a>' +
                                 '</div>';
                             }).join('') +
@@ -785,7 +787,7 @@ routes.get('/client/:id', async (c) => {
                             '<div class="p-2 space-y-2 flex-1 min-h-[100px] max-h-[500px] overflow-y-auto">' +
                                 (statusCases.length === 0 ? '<div class="text-center py-4 text-gray-400 text-xs">案件なし</div>' :
                                 statusCases.map(function(c) {
-                                    return '<div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer" onclick="window.location.href=\'/case/' + c.id + '\'">' +
+                                    return '<div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer" onclick="window.location.href=&#39;/case/' + c.id + '&#39;">' +
                                         '<div class="p-3">' +
                                             '<div class="flex items-start justify-between gap-2 mb-2"><span class="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-700 font-mono font-bold">No.' + String(c.id).padStart(4, '0') + '</span></div>' +
                                             (c.subsidy_type_name ? '<div class="text-sm font-medium text-gray-800 mb-2 line-clamp-2">' + c.subsidy_type_name + '</div>' : '') +
