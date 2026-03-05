@@ -4258,46 +4258,6 @@ routes.get('/portal/:token', async (c) => {
                 
                 document.getElementById('templateQuestionText').textContent = question.question_text;
                 
-                // まずquestion_keyで直接マッチを試みる
-                let templates = questionTemplates[question.question_key] || [];
-                
-                // マッチしない場合はキーワードベースで検索
-                if (templates.length === 0) {
-                    const searchText = question.question_text + ' ' + (question.category || '');
-                    for (const [keyword, temps] of Object.entries(keywordTemplates)) {
-                        if (keyword !== 'default' && searchText.includes(keyword)) {
-                            templates = templates.concat(temps);
-                        }
-                    }
-                }
-                
-                // それでもマッチしない場合はデフォルト
-                if (templates.length === 0) {
-                    templates = keywordTemplates['default'];
-                }
-                
-                // 重複を除去
-                templates = [...new Set(templates)];
-                
-                document.getElementById('templateList').innerHTML = templates.map((template, i) => \`
-                    <button onclick="applyTemplate(\${i})" 
-                            class="w-full text-left p-3 border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors">
-                        <div class="text-sm text-gray-700 whitespace-pre-wrap">\${template}</div>
-                    </button>
-                \`).join('');
-                
-                // グローバルに保存
-                window.currentTemplates = templates;
-                
-                document.getElementById('templateModal').classList.remove('hidden');
-            }
-            
-            function openTemplateModal(questionId) {
-                currentTemplateQuestionId = questionId;
-                const question = hearingQuestions.find(q => q.id === questionId);
-                
-                document.getElementById('templateQuestionText').textContent = question.question_text;
-                
                 // 質問キーで直接テンプレートを取得
                 let templates = questionTemplates[question.question_key] || [];
                 

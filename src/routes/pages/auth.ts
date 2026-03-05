@@ -33,12 +33,18 @@ routes.get('/login', (c) => {
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">パスワード</label>
-                        <input type="password" name="password" required 
-                               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="relative">
+                            <input type="password" name="password" id="loginPassword" required 
+                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
+                            <button type="button" onclick="togglePasswordVisibility()" 
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+                                <i id="passwordToggleIcon" class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
-                    <button type="submit" 
-                            class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-                        ログイン
+                    <button type="submit" id="loginBtn"
+                            class="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 font-medium transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-sign-in-alt"></i>ログイン
                     </button>
                 </form>
                 
@@ -64,8 +70,28 @@ routes.get('/login', (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+            function togglePasswordVisibility() {
+                const input = document.getElementById('loginPassword');
+                const icon = document.getElementById('passwordToggleIcon');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.className = 'fas fa-eye-slash';
+                } else {
+                    input.type = 'password';
+                    icon.className = 'fas fa-eye';
+                }
+            }
+            
             document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const btn = document.getElementById('loginBtn');
+                const errorDiv = document.getElementById('errorMessage');
+                errorDiv.classList.add('hidden');
+                
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>ログイン中...';
+                btn.classList.add('opacity-70', 'cursor-not-allowed');
+                
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData);
                 
@@ -79,9 +105,11 @@ routes.get('/login', (c) => {
                     localStorage.setItem('organization_name', response.data.organization_name || '');
                     window.location.href = '/';
                 } catch (error) {
-                    const errorDiv = document.getElementById('errorMessage');
                     errorDiv.textContent = error.response?.data?.error || 'ログインに失敗しました。ユーザー名またはパスワードが正しくありません。';
                     errorDiv.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i>ログイン';
+                    btn.classList.remove('opacity-70', 'cursor-not-allowed');
                 }
             });
         </script>

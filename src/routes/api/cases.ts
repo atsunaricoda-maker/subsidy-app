@@ -30,7 +30,13 @@ routes.get('/cases', async (c) => {
       clients.email,
       clients.phone,
       subsidy_types.name as subsidy_type_name,
-      admin_users.name as assigned_to_name
+      admin_users.name as assigned_to_name,
+      (SELECT COUNT(*) FROM client_pipeline_tasks cpt 
+       JOIN client_pipelines cp ON cpt.pipeline_id = cp.id 
+       WHERE cp.case_id = cases.id) as pipeline_total_tasks,
+      (SELECT COUNT(*) FROM client_pipeline_tasks cpt 
+       JOIN client_pipelines cp ON cpt.pipeline_id = cp.id 
+       WHERE cp.case_id = cases.id AND cpt.status = 'completed') as pipeline_completed_tasks
     FROM cases
     LEFT JOIN clients ON cases.client_id = clients.id
     LEFT JOIN subsidy_types ON cases.subsidy_type_id = subsidy_types.id
@@ -240,50 +246,60 @@ routes.put('/cases/:id/status', async (c) => {
     `).bind(id).first()
     
     if (!alreadyConsumed) {
-      // サブスクリプション取得（テナント分離: organization_id で検索）
+      // サブスクリプション取得（テナント分離: organization_id で検索、trial も含む）
       const subscription = await DB.prepare(`
-        SELECT us.id, sb.monthly_slots_remaining, sb.purchased_slots_remaining
+        SELECT us.id, sb.monthly_slots_remaining, sb.purchased_slots_remaining, sp.monthly_slots
         FROM user_subscriptions us
         JOIN slot_balances sb ON us.id = sb.subscription_id
-        WHERE us.organization_id = ? AND us.status = 'active'
+        JOIN subscription_plans sp ON us.plan_id = sp.id
+        WHERE us.organization_id = ? AND us.status IN ('active', 'trial')
+        ORDER BY us.created_at DESC
         LIMIT 1
       `).bind(orgId).first() as any
       
       if (subscription) {
-        const totalAvailable = (subscription.monthly_slots_remaining || 0) + (subscription.purchased_slots_remaining || 0)
-        
-        if (totalAvailable <= 0) {
-          return c.json({ 
-            error: '利用可能な枠がありません。追加枠を購入してください。', 
-            need_purchase: true,
-            slot_error: true 
-          }, 400)
-        }
-        
-        // 月次枠から優先消費、なければ購入枠から消費
-        let slotType = 'monthly'
-        let newMonthly = subscription.monthly_slots_remaining
-        let newPurchased = subscription.purchased_slots_remaining
-        
-        if (subscription.monthly_slots_remaining > 0) {
-          newMonthly = subscription.monthly_slots_remaining - 1
+        // 無制限プランの場合は枠消費せずに履歴のみ記録
+        if (subscription.monthly_slots === -1) {
+          await DB.prepare(`
+            INSERT INTO slot_usage_history (subscription_id, case_id, slot_type, action, slots_changed, balance_after, note, organization_id)
+            VALUES (?, ?, 'unlimited', 'consumed', 0, -1, '無制限プラン - 枠消費なし（見込み→進行中）', ?)
+          `).bind(subscription.id, id, orgId).run()
         } else {
-          slotType = 'purchased'
-          newPurchased = subscription.purchased_slots_remaining - 1
+          const totalAvailable = (subscription.monthly_slots_remaining || 0) + (subscription.purchased_slots_remaining || 0)
+          
+          if (totalAvailable <= 0) {
+            return c.json({ 
+              error: '利用可能な枠がありません。追加枠を購入してください。', 
+              need_purchase: true,
+              slot_error: true 
+            }, 400)
+          }
+          
+          // 月次枠から優先消費、なければ購入枠から消費
+          let slotType = 'monthly'
+          let newMonthly = subscription.monthly_slots_remaining
+          let newPurchased = subscription.purchased_slots_remaining
+          
+          if (subscription.monthly_slots_remaining > 0) {
+            newMonthly = subscription.monthly_slots_remaining - 1
+          } else {
+            slotType = 'purchased'
+            newPurchased = subscription.purchased_slots_remaining - 1
+          }
+          
+          // 枠を消費
+          await DB.prepare(`
+            UPDATE slot_balances 
+            SET monthly_slots_remaining = ?, purchased_slots_remaining = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE subscription_id = ?
+          `).bind(newMonthly, newPurchased, subscription.id).run()
+          
+          // 使用履歴を記録
+          await DB.prepare(`
+            INSERT INTO slot_usage_history (subscription_id, case_id, slot_type, action, slots_changed, balance_after, note, organization_id)
+            VALUES (?, ?, ?, 'consumed', -1, ?, '案件開始による枠消費（見込み→進行中）', ?)
+          `).bind(subscription.id, id, slotType, newMonthly + newPurchased, orgId).run()
         }
-        
-        // 枠を消費
-        await DB.prepare(`
-          UPDATE slot_balances 
-          SET monthly_slots_remaining = ?, purchased_slots_remaining = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE subscription_id = ?
-        `).bind(newMonthly, newPurchased, subscription.id).run()
-        
-        // 使用履歴を記録
-        await DB.prepare(`
-          INSERT INTO slot_usage_history (subscription_id, case_id, slot_type, action, slots_changed, balance_after, note, organization_id)
-          VALUES (?, ?, ?, 'consumed', -1, ?, '案件開始による枠消費（見込み→進行中）', ?)
-        `).bind(subscription.id, id, slotType, newMonthly + newPurchased, orgId).run()
       }
       // サブスクリプションがない場合は枠消費をスキップ（初期状態対応）
     }
@@ -535,40 +551,7 @@ routes.post('/cases', async (c) => {
       if (existingDepositInvoice) {
         console.log('Deposit invoice already exists for case:', caseId)
       } else {
-        // invoicesテーブルが存在しない場合は作成
-        await DB.prepare(`
-          CREATE TABLE IF NOT EXISTS invoices (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          organization_id INTEGER NOT NULL,
-          case_id INTEGER NOT NULL,
-          client_id INTEGER NOT NULL,
-          invoice_number TEXT NOT NULL,
-          invoice_type TEXT NOT NULL,
-          subtotal INTEGER NOT NULL,
-          tax_rate INTEGER DEFAULT 10,
-          tax_amount INTEGER DEFAULT 0,
-          withholding_tax INTEGER DEFAULT 0,
-          total_amount INTEGER NOT NULL,
-          issue_date DATE,
-          due_date DATE,
-          item_name TEXT NOT NULL,
-          item_description TEXT,
-          granted_amount INTEGER,
-          fee_rate REAL,
-          status TEXT NOT NULL DEFAULT 'draft',
-          paid_at DATETIME,
-          paid_amount INTEGER,
-          payment_reported_at DATETIME,
-          payment_confirmed_at DATETIME,
-          payment_confirmed_by INTEGER,
-          notes TEXT,
-          internal_memo TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `).run()
-      
-      // 請求書番号を生成
+        // 請求書番号を生成
       const now = new Date()
       const invoiceYear = now.getFullYear()
       const invoiceSeq = now.getTime().toString().slice(-6)
