@@ -1756,18 +1756,18 @@ routes.get('/portal/:token', async (c) => {
                     const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
                     
                     return \`
-                        <div class="border rounded-lg p-3 \${isCompleted ? 'bg-green-50 border-green-200' : (isCustomerTask ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200')}">
+                        <div class="border rounded-lg p-3 \${isCompleted ? 'bg-green-50 border-green-200' : (canComplete ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200')}">
                             <div class="flex items-start gap-3">
                                 <div class="flex-shrink-0">
-                                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm \${isCompleted ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm \${isCompleted ? 'bg-green-500 text-white' : (canComplete ? 'bg-orange-400 text-white' : 'bg-gray-300 text-gray-600')}">
                                         \${isCompleted ? '<i class="fas fa-check"></i>' : stepNum}
                                     </div>
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 mb-1">
-                                        <span class="font-medium text-sm \${style.text}">\${task.task_name}</span>
-                                        \${isCustomerTask ? '<span class="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">顧客</span>' : ''}
-                                        \${isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-600 rounded">完了</span>' : ''}
+                                        <span class="font-medium text-sm \${isCompleted ? 'text-green-700' : (canComplete ? 'text-orange-700' : style.text)}">\${task.task_name}</span>
+                                        \${isCustomerTask && !isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">要対応</span>' : ''}
+                                        \${isCompleted ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded"><i class="fas fa-check mr-0.5"></i>完了</span>' : ''}
                                     </div>
                                     <div class="text-xs text-gray-500">
                                         \${task.description || ''}
@@ -1776,8 +1776,8 @@ routes.get('/portal/:token', async (c) => {
                                 </div>
                                 \${canComplete ? \`
                                     <button onclick="completeTask(\${task.id})" 
-                                            class="flex-shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
-                                        <i class="fas fa-check mr-1"></i>完了
+                                            class="flex-shrink-0 px-3 py-1.5 bg-orange-500 text-white text-xs rounded-lg hover:bg-orange-600 transition shadow-sm">
+                                        <i class="fas fa-arrow-right mr-1"></i>完了にする
                                     </button>
                                 \` : ''}
                             </div>
@@ -3103,16 +3103,16 @@ routes.get('/portal/:token', async (c) => {
                         const canComplete = isCustomerTask && (task.status === 'pending' || task.status === 'in_progress');
                         
                         return \`
-                            <div class="flex items-center gap-2 p-2 rounded \${isCompleted ? 'bg-green-50' : (isCustomerTask ? 'bg-blue-50' : 'bg-gray-50')}">
-                                <div class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold \${isCompleted ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-600'}">
+                            <div class="flex items-center gap-2 p-2 rounded \${isCompleted ? 'bg-green-50' : (canComplete ? 'bg-orange-50' : 'bg-gray-50')}">
+                                <div class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold \${isCompleted ? 'bg-green-500 text-white' : (canComplete ? 'bg-orange-400 text-white' : 'bg-gray-300 text-gray-600')}">
                                     \${isCompleted ? '<i class="fas fa-check text-xs"></i>' : (index + 1)}
                                 </div>
                                 <span class="flex-1 \${isCompleted ? 'text-green-700 line-through' : 'text-gray-700'}">\${task.task_name}</span>
-                                \${isCustomerTask && !isCompleted ? '<span class="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-xs">顧客</span>' : ''}
+                                \${isCustomerTask && !isCompleted ? '<span class="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-xs">要対応</span>' : ''}
                                 \${canComplete ? \`
                                     <button onclick="event.stopPropagation(); completeTaskFromList(\${task.id}, \${caseId})" 
-                                            class="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs">
-                                        完了
+                                            class="px-2 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-xs shadow-sm">
+                                        <i class="fas fa-arrow-right mr-0.5"></i>完了にする
                                     </button>
                                 \` : ''}
                             </div>
