@@ -6,7 +6,7 @@ export function generateSidebar(activePage: string = '') {
   const isGroupActive = (pages: string[]) => pages.includes(activePage) ? 'active' : '';
   
   return `
-    <aside id="sidebar" class="fixed inset-y-0 left-0 w-56 bg-gradient-to-b from-slate-900 to-slate-800 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 w-56 bg-gradient-to-b from-slate-900 to-slate-800 text-white transform -translate-x-full lg:translate-x-0 transition-transform duration-300 z-50 flex flex-col overflow-y-auto">
         <div class="p-4 border-b border-white/10 flex-shrink-0">
             <a href="/" class="flex items-center gap-3">
                 <div class="w-9 h-9 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">

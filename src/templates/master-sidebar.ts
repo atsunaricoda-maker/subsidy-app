@@ -4,7 +4,7 @@ export function generateMasterSidebar(activePage: string = '') {
   const isActive = (page: string) => activePage === page ? 'active' : '';
   
   return `
-    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-gray-800 to-gray-900 text-white transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 z-50 flex flex-col">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-gray-800 to-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform duration-300 z-50 flex flex-col overflow-y-auto">
         <div class="p-4 border-b border-gray-700 flex-shrink-0">
             <h1 class="text-xl font-bold flex items-center gap-2">
                 <i class="fas fa-shield-alt"></i>

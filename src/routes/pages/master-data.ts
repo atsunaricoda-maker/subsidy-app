@@ -36,7 +36,7 @@ routes.get('/master/hearing-questions', async (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('hearing')}
             
-            <main class="flex-1 p-6">
+            <main class="flex-1 p-6 lg:ml-64">
                 <div class="mb-6 flex items-center justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-800">ヒアリング質問管理</h1>
@@ -622,7 +622,7 @@ routes.get('/master/ai-models', async (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('ai-models')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 lg:ml-64">
                 <div class="mb-8">
                     <h1 class="text-3xl font-bold text-gray-800">AIモデル設定</h1>
                     <p class="text-gray-600 mt-1">文書生成や書類解析に使用するAIモデルを設定します</p>
@@ -881,7 +881,7 @@ routes.get('/master/ai-prompts', async (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('prompts')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 lg:ml-64">
                 <div class="mb-6">
                     <h1 class="text-3xl font-bold text-gray-800">AIプロンプト管理</h1>
                     <p class="text-gray-600 mt-1">文書生成時に使用するAIプロンプトを管理</p>
@@ -1332,7 +1332,7 @@ routes.get('/master/document-templates', async (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('templates')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 lg:ml-64">
                 <div class="mb-6 flex items-center justify-between">
                     <div>
                         <h1 class="text-3xl font-bold text-gray-800">文書テンプレート管理</h1>

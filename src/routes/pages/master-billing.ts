@@ -21,7 +21,7 @@ routes.get('/master/billing', (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('billing')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 lg:ml-64">
                 <div class="mb-8">
                     <h1 class="text-3xl font-bold text-gray-800">売上・請求</h1>
                     <p class="text-gray-600 mt-1">月次売上と請求状況の管理</p>

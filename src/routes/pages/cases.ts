@@ -61,7 +61,7 @@ routes.get('/cases', async (c) => {
         <div class="min-h-screen flex">
             ${generateSidebar('cases')}
             
-            <main class="flex-1 h-screen overflow-hidden flex flex-col">
+            <main class="flex-1 h-screen overflow-hidden flex flex-col lg:ml-56">
                 <!-- パンくずリスト -->
                 <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
                     <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>

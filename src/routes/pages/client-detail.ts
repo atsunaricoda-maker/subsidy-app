@@ -50,7 +50,7 @@ routes.get('/client/:id', async (c) => {
         <div class="min-h-screen flex">
             ${generateSidebar('clients')}
             
-            <main class="flex-1 min-h-screen">
+            <main class="flex-1 min-h-screen lg:ml-56">
                 <!-- ページ識別バナー -->
                 <div class="page-identity-client px-4 lg:px-6 py-2 flex items-center gap-3">
                     <div class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">

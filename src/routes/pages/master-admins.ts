@@ -21,7 +21,7 @@ routes.get('/master/admins', (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('admins')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 lg:ml-64">
                 <div class="flex justify-between items-center mb-8">
                     <div>
                         <h1 class="text-3xl font-bold text-gray-800">マスター管理者</h1>

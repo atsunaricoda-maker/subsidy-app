@@ -26,7 +26,7 @@ routes.get('/master/pipelines', (c) => {
             ${generateMasterSidebar('master-pipelines')}
             
             <!-- メインコンテンツ -->
-            <main class="flex-1 min-h-screen">
+            <main class="flex-1 min-h-screen lg:ml-64">
                 <!-- 警告バナー -->
                 <div class="bg-yellow-100 border-b border-yellow-300 px-4 py-2 flex items-center gap-2">
                     <i class="fas fa-exclamation-triangle text-yellow-600"></i>

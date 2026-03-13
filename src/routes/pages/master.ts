@@ -129,7 +129,7 @@ routes.get('/master', async (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('dashboard')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 lg:ml-64">
                 <div class="mb-8">
                     <h1 class="text-3xl font-bold text-gray-800">ダッシュボード</h1>
                     <p class="text-gray-600 mt-1">SaaS全体の状況を確認</p>

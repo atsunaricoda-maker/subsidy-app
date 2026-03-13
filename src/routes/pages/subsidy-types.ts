@@ -53,7 +53,7 @@ routes.get('/subsidy-types', async (c) => {
         <div class="min-h-screen flex">
             ${generateSidebar(category === 'subsidy' ? 'subsidy-gyosei' : category === 'grant' ? 'subsidy-sharoshi' : category === 'license' ? 'subsidy-kyoninka' : '')}
             
-            <main class="flex-1 min-h-screen">
+            <main class="flex-1 min-h-screen lg:ml-56">
                 <!-- パンくずリスト -->
                 <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
                     <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>

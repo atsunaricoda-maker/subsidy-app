@@ -33,7 +33,7 @@ routes.get('/', async (c) => {
         <div class="min-h-screen flex">
             ${generateSidebar('dashboard')}
             
-            <main class="flex-1 min-h-screen">
+            <main class="flex-1 min-h-screen lg:ml-56">
                 <header class="bg-white border-b sticky top-0 z-30">
                     <div class="flex items-center justify-between px-4 lg:px-6 py-3">
                         <div class="flex items-center gap-4">

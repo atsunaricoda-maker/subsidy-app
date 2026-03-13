@@ -20,7 +20,7 @@ routes.get('/master/announcements', (c) => {
         <div class="min-h-screen flex">
             ${generateMasterSidebar('announcements')}
             
-            <main class="flex-1 min-h-screen">
+            <main class="flex-1 min-h-screen lg:ml-64">
                 <header class="bg-gray-800 border-b border-gray-700 sticky top-0 z-30">
                     <div class="flex items-center justify-between px-6 py-4">
                         <div class="flex items-center gap-4">

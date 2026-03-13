@@ -21,7 +21,7 @@ routes.get('/master/legal-settings', (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('legal')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 lg:ml-64">
                 <div class="mb-8">
                     <h1 class="text-3xl font-bold text-gray-800">プラットフォーム法的表記設定</h1>
                     <p class="text-gray-600 mt-1">SaaS利用者向けの特定商取引法に基づく表記、利用規約、プライバシーポリシーに表示される情報</p>

@@ -30,7 +30,7 @@ routes.get('/master/subsidy-types', async (c) => {
         <div class="flex min-h-screen">
             ${sidebar}
             
-            <main class="flex-1 lg:ml-0">
+            <main class="flex-1 lg:ml-64">
                 <header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
                     <div class="flex items-center justify-between">
                         <div>

@@ -26,7 +26,7 @@ routes.get('/admin/subscription', async (c) => {
         <div class="min-h-screen flex">
             ${generateSidebar('subscription')}
             
-            <main class="flex-1 min-h-screen">
+            <main class="flex-1 min-h-screen lg:ml-56">
                 <!-- パンくずリスト -->
                 <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
                     <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
@@ -748,7 +748,7 @@ routes.get('/admin/settings', async (c) => {
         <div class="min-h-screen flex">
             ${generateSidebar('settings')}
             
-            <main class="flex-1 min-h-screen">
+            <main class="flex-1 min-h-screen lg:ml-56">
                 <!-- パンくずリスト -->
                 <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
                     <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>
@@ -1587,7 +1587,7 @@ routes.get('/admin/payments', async (c) => {
         <div class="min-h-screen flex">
             ${generateSidebar('payments')}
             
-            <main class="flex-1 min-h-screen">
+            <main class="flex-1 min-h-screen lg:ml-56">
                 <!-- パンくずリスト -->
                 <div class="bg-white px-4 py-1.5 border-b text-xs" id="breadcrumb">
                     <a href="/" class="text-blue-600 hover:text-blue-800 hover:underline">ダッシュボード</a>

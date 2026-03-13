@@ -21,7 +21,7 @@ routes.get('/master/logs', (c) => {
         <div class="flex min-h-screen">
             ${generateMasterSidebar('logs')}
             
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 lg:ml-64">
                 <div class="mb-8">
                     <h1 class="text-3xl font-bold text-gray-800">操作ログ</h1>
                     <p class="text-gray-600 mt-1">システム全体のアクティビティログ</p>
